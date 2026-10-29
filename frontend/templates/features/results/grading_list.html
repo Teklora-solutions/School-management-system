@@ -1,0 +1,77 @@
+{% extends base_template %}
+
+{% block title %}Grading Setup | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-sliders me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Grading Setup
+    </h1>
+    <p class="page-subtitle">One exam-only grading system and pass mark per academic year.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if years %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Academic Year</th>
+            <th scope="col">Pass Mark</th>
+            <th scope="col">Grading System</th>
+            <th scope="col">Classes</th>
+            <th scope="col">Fallback Bands</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in years %}
+          <tr>
+            <td class="fw-600">{{ row.year.name }}{% if row.year.is_current %} <span class="badge ms-1" style="background:var(--accent);color:#fff;">Current</span>{% endif %}</td>
+            <td class="text-muted-sm">{% if row.config %}{{ row.config.pass_mark }}{% else %}—{% endif %}</td>
+            <td>
+              {% if row.scale %}
+                <span class="fw-600">{{ row.scale.name }}</span>
+                <span class="text-muted-sm d-block">{{ row.scale.bands.all|length }} grade band{{ row.scale.bands.all|length|pluralize }}</span>
+              {% else %}
+                <span class="badge" style="background:var(--color-warning);color:#000;">Not set</span>
+              {% endif %}
+            </td>
+            <td class="text-muted-sm">
+              {% if row.scale %}{{ row.selected_count }} of {{ row.class_count }}{% else %}—{% endif %}
+            </td>
+            <td class="text-muted-sm">{{ row.band_count }} band{{ row.band_count|pluralize }}</td>
+            <td class="text-end">
+              <div class="d-flex gap-2 justify-content-end">
+                <a href="{% url 'results:grading_config' row.year.pk %}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-percent me-1"></i>Pass Mark
+                </a>
+                <a href="{% url 'results:grade_scale' row.year.pk %}" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-pencil-square me-1"></i>{% if row.scale %}Edit{% else %}Configure{% endif %} Grading
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-calendar-x fs-1 d-block mb-2"></i>
+      No academic years exist yet. Create one first under Academics.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="alert alert-secondary mt-3 mb-0" role="note">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  Only exams are graded. A year has one grading system; classes ticked on it use its grade bands,
+  and classes left out fall back to the year's legacy fallback bands.
+</div>
+{% endblock content %}

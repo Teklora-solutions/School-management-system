@@ -1,0 +1,239 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Finance Overview | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-speedometer2 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Finance Overview
+      </h1>
+      <p class="page-subtitle">
+        {% if term %}
+          {{ term }} — {{ term.academic_year.name }} ·
+          {{ term.start_date|date:"j M Y" }} to {{ term.end_date|date:"j M Y" }}
+        {% else %}
+          No current term has been set.
+        {% endif %}
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:payment_record' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-cash-coin me-1"></i>Take Payment
+      </a>
+      <a href="{% url 'finance:outstanding_fees' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-exclamation-circle me-1"></i>Outstanding Fees
+      </a>
+      <a href="{% url 'finance:invoice_generate_preview' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-file-earmark-text me-1"></i>Post Invoices
+      </a>
+    </div>
+  </div>
+</div>
+
+{% if term %}
+{# ── Collections (receipt-date basis) ───────────────────────────────────── #}
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-success);">
+        <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ collected_today|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Received today</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-calendar-week" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ collected_this_week|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Received this week</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-calendar-check" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ collected_this_term|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Received in term dates</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-warning);">
+        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;color:var(--color-warning);">
+          {{ currency }} {{ outstanding_total|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Outstanding this term</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-4 align-items-center">
+      <div>
+        <span class="text-muted-sm">Billed this term:</span>
+        <span class="fw-600">{{ currency }} {{ total_billed|floatformat:2|intcomma }}</span>
+      </div>
+      <div>
+        <span class="text-muted-sm">Collection rate:</span>
+        {% if total_billed %}
+          <span class="fw-600">{{ collection_rate }}%</span>
+        {% else %}
+          <span class="fw-600">Nothing billed yet</span>
+        {% endif %}
+      </div>
+      <div class="text-muted-sm" style="font-size:0.78rem;">
+        Billed and outstanding are a term/allocation basis; the three “received”
+        figures are a receipt-date basis. They differ when money settles an older
+        term’s invoice or is held unallocated.
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card mb-3">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-calendar-x" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm mb-0">
+      Pick the current term in Academics and this page will show its collections.
+    </p>
+  </div>
+</div>
+{% endif %}
+
+{# ── Recent receipts ────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-receipt me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Last 10 receipts
+    </h2>
+    <a href="{% url 'finance:payment_list' %}" class="btn btn-sm btn-outline-primary">
+      All payments<i class="bi bi-arrow-right ms-1"></i>
+    </a>
+  </div>
+  <div class="card-body p-0">
+    {% if recent_payments %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Receipt</th>
+            <th scope="col">Student</th>
+            <th scope="col">Method</th>
+            <th scope="col">Reference</th>
+            <th scope="col" class="text-end">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment in recent_payments %}
+          <tr>
+            <td class="text-muted-sm">{{ payment.payment_date|date:"j M Y" }}</td>
+            <td>
+              <a href="{% url 'finance:payment_detail' payment.pk %}" class="fw-600">
+                {{ payment.receipt_number }}
+              </a>
+            </td>
+            <td>
+              {{ payment.student.user.full_name }}
+              <div class="text-muted-sm">{{ payment.student.admission_number }}</div>
+            </td>
+            <td class="text-muted-sm">{{ payment.get_method_display }}</td>
+            <td class="text-muted-sm">{{ payment.reference|default:"—" }}</td>
+            <td class="text-end fw-600 text-success">
+              {{ currency }} {{ payment.amount|floatformat:2|intcomma }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+      No receipts have been recorded yet.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Per-class collection ───────────────────────────────────────────────── #}
+{% if term %}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-diagram-3 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Collection by class
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    {% if class_collection_rates %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Class</th>
+            <th scope="col" class="text-end">Billed</th>
+            <th scope="col" class="text-end">Collected</th>
+            <th scope="col" class="text-end">Waived</th>
+            <th scope="col" class="text-end">Outstanding</th>
+            <th scope="col" class="text-end">Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in class_collection_rates %}
+          <tr>
+            <td class="fw-600">
+              <a href="{% url 'finance:class_summary' row.class_id %}?term={{ term.pk }}">
+                {{ row.class_name }}
+              </a>
+            </td>
+            <td class="text-end">{{ currency }} {{ row.billed|floatformat:2|intcomma }}</td>
+            <td class="text-end text-success">{{ currency }} {{ row.collected|floatformat:2|intcomma }}</td>
+            <td class="text-end text-warning">{{ currency }} {{ row.adjusted|floatformat:2|intcomma }}</td>
+            <td class="text-end fw-600 {% if row.outstanding > 0 %}text-danger{% endif %}">
+              {{ currency }} {{ row.outstanding|floatformat:2|intcomma }}
+            </td>
+            <td class="text-end">
+              {% if row.collection_rate is None %}
+                <span class="text-muted-sm">—</span>
+              {% else %}
+                {{ row.collection_rate }}%
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+      No class has been billed for this term yet.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

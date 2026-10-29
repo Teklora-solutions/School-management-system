@@ -1,0 +1,85 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Classes | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-building-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Classes
+    </h1>
+    <p class="page-subtitle">Manage school classes and their streams.</p>
+  </div>
+  <a href="{% url 'academics:class_create' %}" class="btn btn-primary" id="btn-add-class">
+    <i class="bi bi-plus-circle me-1"></i>Add Class
+  </a>
+</div>
+
+{# Year filter #}
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="d-flex gap-2 align-items-end">
+      <div>
+        <label class="form-label fw-600 mb-1">Filter by Year</label>
+        <select name="year" class="form-select" style="min-width:200px;" onchange="this.form.submit()">
+          <option value="">All years</option>
+          {% for y in years %}
+          <option value="{{ y.pk }}" {% if selected_year_id == y.pk %}selected{% endif %}>{{ y.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if selected_year_id %}
+      <a href="{% url 'academics:class_list' %}" class="btn btn-outline-secondary">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{% if classes %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="class-table">
+        <thead>
+          <tr>
+            <th>Class Name</th>
+            <th>Academic Year</th>
+            <th>Level</th>
+            <th>Streams</th>
+            <th>Class Teacher</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cls in classes %}
+          <tr>
+            <td class="fw-600">{{ cls.name }}</td>
+            <td class="text-muted-sm">{{ cls.academic_year.name }}</td>
+            <td class="text-muted-sm">{{ cls.level_order }}</td>
+            <td>
+              {% for s in cls.streams.all %}
+                <span class="badge" style="background:var(--color-surface-2);border:1px solid var(--color-border);">{{ s.name }}</span>
+              {% empty %}<span class="text-muted-sm">—</span>{% endfor %}
+            </td>
+            <td class="text-muted-sm">{{ cls.class_teacher.get_full_name|default:"—" }}</td>
+            <td class="text-end">
+              <a href="{% url 'academics:class_detail' cls.pk %}" class="btn btn-sm btn-outline-primary" id="btn-class-view-{{ cls.pk }}">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center p-5">
+    <i class="bi bi-building fs-1 d-block mb-2 text-muted-sm"></i>
+    <p class="text-muted-sm">No classes found. <a href="{% url 'academics:class_create' %}">Add one now.</a></p>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

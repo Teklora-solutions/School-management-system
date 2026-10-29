@@ -1,0 +1,232 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Receipt {{ payment.receipt_number }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-receipt me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Receipt {{ payment.receipt_number }}
+      </h1>
+      <p class="page-subtitle">
+        {{ payment.student.user.full_name }} ·
+        {{ payment.student.admission_number }} ·
+        {{ payment.student.current_class.name|default:"No class" }}
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:payment_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>All payments
+      </a>
+      <a href="{% url 'finance:student_statement' payment.student.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-person-lines-fill me-1"></i>Statement
+      </a>
+      <a href="{% url 'finance:payment_receipt_pdf' payment.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-printer me-1"></i>Print receipt
+      </a>
+      {% if not payment.is_reversed and not payment.reverses %}
+      <a href="{% url 'finance:payment_reverse' payment.pk %}" class="btn btn-outline-danger btn-sm">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Reverse
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if payment.is_reversed %}
+<div class="alert alert-danger d-flex align-items-start gap-2" role="alert">
+  <i class="bi bi-exclamation-octagon-fill mt-1" aria-hidden="true"></i>
+  <div>
+    <strong>This receipt has been reversed.</strong>
+    The money was given back, so it no longer counts on any fee figure. Its
+    allocations to invoices are kept on this record for the audit trail — they are
+    simply excluded from what has been collected.
+    {% if payment.reversal_reason %}
+      <div class="mt-1">Reason: {{ payment.reversal_reason }}</div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if payment.reverses %}
+<div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
+  <i class="bi bi-arrow-counterclockwise mt-1" aria-hidden="true"></i>
+  <div>
+    <strong>This row is a reversal, not a payment.</strong>
+    It gives back receipt
+    <a href="{% url 'finance:payment_detail' payment.reverses.pk %}">
+      {{ payment.reverses.receipt_number }}</a>.
+  </div>
+</div>
+{% endif %}
+
+{# ── The money ──────────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-cash-stack" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ payment.amount|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">{% if payment.amount < 0 %}Given back{% else %}Received{% endif %}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-check2-all" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ payment.applied_amount|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Applied to invoices</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-warning);">
+        <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ payment.unapplied_amount|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Unapplied (held as credit)</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-building" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ payment.settled_into.code|default:"—" }}
+        </div>
+        <div class="stat-label">{{ payment.settled_into.name|default:"No settling account recorded" }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Receipt detail ─────────────────────────────────────────────────────── #}
+<div class="row g-3">
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-list-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          What this money was put against
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        {% if payment.allocations.all %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th scope="col">Invoice</th>
+                <th scope="col">Term</th>
+                <th scope="col" class="text-end">Allocated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for allocation in payment.allocations.all %}
+              <tr>
+                <td>
+                  <a href="{% url 'finance:invoice_detail' allocation.invoice.pk %}">
+                    {{ allocation.invoice.invoice_number }}
+                  </a>
+                </td>
+                <td class="text-muted-sm">{{ allocation.invoice.term }}</td>
+                <td class="text-end">
+                  {{ currency }} {{ allocation.allocated_amount|floatformat:2|intcomma }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted-sm">
+          Nothing has been allocated against this receipt yet.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-info-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Receipt record
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr>
+              <td class="text-muted-sm">Date received</td>
+              <td class="fw-600">{{ payment.payment_date|date:"j M Y" }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Method</td>
+              <td class="fw-600">{{ payment.get_method_display }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Reference</td>
+              <td class="text-muted-sm">{{ payment.reference|default:"—" }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Payer</td>
+              <td>{{ payment.payer_name|default:"—" }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Verification code</td>
+              <td class="fw-600">{{ payment.verification_code }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Recorded by</td>
+              <td>{{ payment.recorded_by.full_name|default:"—" }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Recorded on</td>
+              <td class="text-muted-sm">{{ payment.created_at|date:"j M Y H:i" }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Copies printed</td>
+              <td>
+                {{ payment.print_count }}
+                {% if payment.print_count > 1 %}
+                  <div class="text-muted-sm" style="font-size:0.75rem;">
+                    The 2nd and later copies are marked DUPLICATE.
+                  </div>
+                {% endif %}
+              </td>
+            </tr>
+            {% if payment.notes %}
+            <tr>
+              <td class="text-muted-sm">Notes</td>
+              <td>{{ payment.notes }}</td>
+            </tr>
+            {% endif %}
+            {% if payment.attachment %}
+            <tr>
+              <td class="text-muted-sm">Attachment</td>
+              <td><a href="{{ payment.attachment.url }}" target="_blank" rel="noopener">
+                <i class="bi bi-paperclip me-1"></i>Open the slip</a></td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

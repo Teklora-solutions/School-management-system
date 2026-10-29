@@ -1,0 +1,130 @@
+{% extends base_template %}
+
+{% block title %}Message Inbox | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-inbox-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Message Inbox
+  </h1>
+  <p class="page-subtitle">Complaints, inquiries, and feedback from students and parents.</p>
+</div>
+
+{# ── Status summary chips ────────────────────────────────────────── #}
+<div class="d-flex gap-2 flex-wrap mb-3">
+  <span class="badge bg-warning text-dark" style="font-size:0.85rem;padding:0.4em 0.75em;">
+    <i class="bi bi-dot"></i> Open: {{ open_count }}
+  </span>
+  <span class="badge bg-primary" style="font-size:0.85rem;padding:0.4em 0.75em;">
+    <i class="bi bi-dot"></i> In Progress: {{ in_progress_count }}
+  </span>
+  <span class="badge bg-success" style="font-size:0.85rem;padding:0.4em 0.75em;">
+    <i class="bi bi-dot"></i> Resolved: {{ resolved_count }}
+  </span>
+</div>
+
+{# ── Filters ─────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-sm-auto">
+        <label class="text-muted-sm mb-1" for="{{ filter_form.status.id_for_label }}">Status</label>
+        {{ filter_form.status }}
+      </div>
+      <div class="col-12 col-sm-auto">
+        <label class="text-muted-sm mb-1" for="{{ filter_form.message_type.id_for_label }}">Type</label>
+        {{ filter_form.message_type }}
+      </div>
+      <div class="col-12 col-sm-auto flex-grow-1">
+        <label class="text-muted-sm mb-1" for="{{ filter_form.search.id_for_label }}">Search</label>
+        {{ filter_form.search }}
+      </div>
+      <div class="col-12 col-sm-auto">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-search me-1"></i>Filter
+        </button>
+        <a href="{% url 'communications:inbox' %}" class="btn btn-outline-secondary btn-sm ms-1">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Thread list ─────────────────────────────────────────────────── #}
+{% if threads %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0"
+             style="--bs-table-bg:transparent;--bs-table-hover-bg:rgba(255,255,255,0.04);color:var(--color-text);">
+        <thead style="border-bottom:1px solid var(--color-border);">
+          <tr style="color:var(--color-muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.04em;">
+            <th scope="col" class="ps-3">Subject</th>
+            <th scope="col">Sender</th>
+            <th scope="col" class="text-center">Type</th>
+            <th scope="col" class="text-center">Status</th>
+            <th scope="col">Assigned</th>
+            <th scope="col">Last Activity</th>
+            <th scope="col" class="text-center">Msgs</th>
+            <th scope="col" class="pe-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for thread in threads %}
+          <tr>
+            <td class="ps-3 fw-600" style="font-size:0.9rem;max-width:220px;">
+              <span title="{{ thread.subject }}">{{ thread.subject|truncatechars:50 }}</span>
+            </td>
+            <td style="font-size:0.88rem;">
+              {{ thread.sender.get_full_name|default:thread.sender.username }}
+              {% if thread.on_behalf_of %}
+              <div class="text-muted-sm" style="font-size:0.78rem;">on behalf of {{ thread.on_behalf_of.user.full_name }}</div>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              <span class="badge
+                {% if thread.message_type == 'complaint' %}bg-danger
+                {% elif thread.message_type == 'inquiry' %}bg-primary
+                {% else %}bg-success{% endif %}" style="font-size:0.72rem;">
+                {{ thread.get_message_type_display }}
+              </span>
+            </td>
+            <td class="text-center">
+              <span class="badge
+                {% if thread.status == 'open' %}bg-warning text-dark
+                {% elif thread.status == 'in_progress' %}bg-primary
+                {% else %}bg-success{% endif %}" style="font-size:0.72rem;">
+                {{ thread.get_status_display }}
+              </span>
+            </td>
+            <td class="text-muted-sm" style="font-size:0.82rem;">
+              {{ thread.assigned_to.get_full_name|default:"—" }}
+            </td>
+            <td class="text-muted-sm" style="font-size:0.82rem;">
+              {% if thread.last_reply_at %}{{ thread.last_reply_at|date:"M j, Y" }}{% else %}{{ thread.created_at|date:"M j, Y" }}{% endif %}
+            </td>
+            <td class="text-center text-muted-sm" style="font-size:0.82rem;">{{ thread.message_count }}</td>
+            <td class="pe-3 text-end">
+              <a href="{% url 'communications:inbox_thread' thread.pk %}"
+                 class="btn btn-outline-primary btn-sm">
+                View
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-inbox" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm">No messages match the current filters.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}

@@ -1,0 +1,188 @@
+{% extends base_template %}
+
+{% block title %}Grading System — {{ year.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-award me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Grading System — {{ year.name }}
+    </h1>
+    <p class="page-subtitle">Exam grades only. The bands must cover 0–100 with no gaps or overlaps.</p>
+  </div>
+  <a href="{% url 'results:grading_list' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to Grading Setup
+  </a>
+</div>
+
+{% if form.non_field_errors %}
+<div class="alert alert-danger" role="alert">
+  {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" id="scale-form" novalidate>
+  {% csrf_token %}
+
+  {# ── Name ──────────────────────────────────────────────────────────────── #}
+  <div class="card mb-3">
+    <div class="card-header"><h2 class="card-title">Name</h2></div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <label for="{{ form.name.id_for_label }}" class="form-label fw-600">Grading system name <span class="text-danger">*</span></label>
+          {{ form.name }}
+          {% if form.name.help_text %}<div class="form-text">{{ form.name.help_text }}</div>{% endif %}
+          {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Grade bands ───────────────────────────────────────────────────────── #}
+  <div class="card mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <h2 class="card-title mb-0">Grade Bands <span class="text-muted-sm fw-normal">(0–100, no gaps or overlaps)</span></h2>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="add-band">
+        <i class="bi bi-plus me-1"></i>Add band
+      </button>
+    </div>
+    <div class="card-body">
+      {% if band_formset.non_form_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for err in band_formset.non_form_errors %}<div>{{ err }}</div>{% endfor %}
+      </div>
+      {% endif %}
+      {{ band_formset.management_form }}
+      <div class="table-responsive">
+        <table class="table align-middle mb-0" id="band-rows">
+          <thead>
+            <tr>
+              <th>Min (%)</th>
+              <th>Max (%)</th>
+              <th>Grade</th>
+              <th>Remark</th>
+              <th>Points</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in band_formset %}
+            <tr>
+              <td style="width:7rem;">{{ f.min_score }}{% if f.min_score.errors %}<div class="invalid-feedback d-block">{{ f.min_score.errors.0 }}</div>{% endif %}</td>
+              <td style="width:7rem;">{{ f.max_score }}{% if f.max_score.errors %}<div class="invalid-feedback d-block">{{ f.max_score.errors.0 }}</div>{% endif %}</td>
+              <td style="width:6rem;">{{ f.grade }}{% if f.grade.errors %}<div class="invalid-feedback d-block">{{ f.grade.errors.0 }}</div>{% endif %}</td>
+              <td>{{ f.remark }}{% if f.remark.errors %}<div class="invalid-feedback d-block">{{ f.remark.errors.0 }}</div>{% endif %}</td>
+              <td style="width:6rem;">{{ f.points }}{% if f.points.errors %}<div class="invalid-feedback d-block">{{ f.points.errors.0 }}</div>{% endif %}</td>
+              <td>{{ f.DELETE }}<button type="button" class="btn btn-sm btn-outline-danger ms-1" data-remove-row><i class="bi bi-x-lg"></i></button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-muted-sm mt-2 mb-0">Example: 0–30 E, 31–50 D, 51–70 C, 71–85 B, 86–100 A.</p>
+    </div>
+  </div>
+
+  {# ── Classes ───────────────────────────────────────────────────────────── #}
+  <div class="card mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <h2 class="card-title mb-0">Classes Using This System</h2>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="toggle-classes">Select all</button>
+    </div>
+    <div class="card-body">
+      {% if classes %}
+      <div class="row g-2">
+        {% for school_class in classes %}
+        <div class="col-sm-6 col-lg-4">
+          <label class="d-flex align-items-center gap-2 p-2 rounded" style="background:var(--color-surface-2);cursor:pointer;">
+            <input class="form-check-input mt-0" type="checkbox" name="classes" value="{{ school_class.pk }}"
+                   {% if school_class.pk in selected_class_ids %}checked{% endif %}>
+            <span class="fw-600">{{ school_class.name }}</span>
+          </label>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="text-muted-sm mt-2 mb-0">
+        Classes left unticked fall back to the year's legacy fallback grade bands.
+        Saving re-grades every mark already entered for this year, including published results.
+      </p>
+      {% else %}
+      <p class="text-muted-sm mb-0">This academic year has no classes yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 justify-content-between">
+    <div>
+      {% if scale %}
+      <button type="submit" form="delete-scale-form" class="btn btn-outline-danger"
+              onclick="return confirm('Remove this grading system? Its classes will fall back to the year\'s legacy grade bands.');">
+        <i class="bi bi-trash me-1"></i>Remove Grading System
+      </button>
+      {% endif %}
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'results:grading_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" id="btn-save-scale">
+        <i class="bi bi-check2 me-1"></i>Save Grading System
+      </button>
+    </div>
+  </div>
+</form>
+
+{% if scale %}
+<form method="post" action="{% url 'results:grade_scale_delete' year.pk %}" id="delete-scale-form" class="d-none">
+  {% csrf_token %}
+</form>
+{% endif %}
+
+<script>
+(function () {
+  var tbody = document.getElementById("band-rows").querySelector("tbody");
+  var totalForms = document.getElementById("id_bands-TOTAL_FORMS");
+
+  document.getElementById("add-band").addEventListener("click", function () {
+    var template = document.getElementById("band-template").innerHTML;
+    tbody.insertAdjacentHTML("beforeend", template.replace(/__prefix__/g, String(tbody.rows.length)));
+    if (totalForms) totalForms.value = String(tbody.rows.length);
+  });
+
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("[data-remove-row]");
+    if (!btn) return;
+    var row = btn.closest("tr");
+    var del = row.querySelector('input[name$="-DELETE"]');
+    if (del && !row.querySelector('input[name$="-id"]')) {
+      row.remove();
+      if (totalForms) totalForms.value = String(tbody.rows.length);
+    } else if (del) {
+      del.value = "on";
+      row.style.display = "none";
+    }
+  });
+
+  var toggle = document.getElementById("toggle-classes");
+  if (toggle) {
+    toggle.addEventListener("click", function () {
+      var boxes = document.querySelectorAll('input[name="classes"]');
+      var allChecked = Array.prototype.every.call(boxes, function (b) { return b.checked; });
+      boxes.forEach(function (b) { b.checked = !allChecked; });
+      toggle.textContent = allChecked ? "Select all" : "Clear all";
+    });
+  }
+})();
+</script>
+
+<script type="text/template" id="band-template">
+  <tr>
+    <td><input type="number" name="bands-__prefix__-min_score" step="0.01" class="form-control form-control-sm"></td>
+    <td><input type="number" name="bands-__prefix__-max_score" step="0.01" class="form-control form-control-sm"></td>
+    <td><input type="text" name="bands-__prefix__-grade" maxlength="8" class="form-control form-control-sm" placeholder="A"></td>
+    <td><input type="text" name="bands-__prefix__-remark" maxlength="64" class="form-control form-control-sm" placeholder="Excellent"></td>
+    <td><input type="number" name="bands-__prefix__-points" step="0.01" class="form-control form-control-sm" value="0"></td>
+    <td><input type="hidden" name="bands-__prefix__-DELETE"><button type="button" class="btn btn-sm btn-outline-danger ms-1" data-remove-row><i class="bi bi-x-lg"></i></button></td>
+  </tr>
+</script>
+{% endblock content %}

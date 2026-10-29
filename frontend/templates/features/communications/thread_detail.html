@@ -1,0 +1,147 @@
+{% extends base_template %}
+
+{% block title %}{{ thread.subject }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+      <a href="{% if is_staff %}{% url 'communications:inbox' %}{% else %}{% url 'communications:my_messages' %}{% endif %}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back
+      </a>
+      <span class="badge
+        {% if thread.message_type == 'complaint' %}bg-danger
+        {% elif thread.message_type == 'inquiry' %}bg-primary
+        {% else %}bg-success{% endif %}">
+        {{ thread.get_message_type_display }}
+      </span>
+      <span class="badge
+        {% if thread.status == 'open' %}bg-warning text-dark
+        {% elif thread.status == 'in_progress' %}bg-primary
+        {% else %}bg-success{% endif %}">
+        {{ thread.get_status_display }}
+      </span>
+    </div>
+    <h1 class="page-title mb-0">{{ thread.subject }}</h1>
+    <p class="page-subtitle">
+      From {{ thread.sender.get_full_name|default:thread.sender.username }}
+      {% if thread.on_behalf_of %} (on behalf of {{ thread.on_behalf_of.user.full_name }}){% endif %}
+      &mdash; opened {{ thread.created_at|date:"N j, Y" }}
+      {% if thread.assigned_to %}&mdash; assigned to {{ thread.assigned_to.get_full_name }}{% endif %}
+    </p>
+  </div>
+</div>
+
+{# ── Staff quick-actions (assign, status change) ─────────────────── #}
+{% if is_staff %}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-3 align-items-center">
+      {# Status change #}
+      <form method="post" class="d-flex align-items-center gap-2">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="status">
+        <label class="text-muted-sm mb-0" style="white-space:nowrap;">Update status:</label>
+        <select name="new_status" class="form-select form-select-sm" style="width:auto;">
+          {% for val, label in thread.Status.choices %}
+          <option value="{{ val }}" {% if val == thread.status %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm btn-outline-primary">Update</button>
+      </form>
+
+      {# Assign #}
+      {% if staff_users %}
+      <form method="post" class="d-flex align-items-center gap-2">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="assign">
+        <label class="text-muted-sm mb-0" style="white-space:nowrap;">Assign to:</label>
+        <select name="assignee_id" class="form-select form-select-sm" style="width:auto;">
+          <option value="">— select —</option>
+          {% for su in staff_users %}
+          <option value="{{ su.pk }}" {% if thread.assigned_to_id == su.pk %}selected{% endif %}>{{ su.get_full_name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm btn-outline-secondary">Assign</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Thread messages ─────────────────────────────────────────────── #}
+<div class="d-flex flex-column gap-3 mb-3">
+  {% for msg in thread_messages %}
+  <div class="d-flex {% if msg.author_id == request.user.pk %}justify-content-end{% endif %}">
+    <div style="max-width:80%;min-width:260px;">
+      <div class="d-flex align-items-center gap-2 mb-1 {% if msg.author_id == request.user.pk %}justify-content-end{% endif %}">
+        <span class="text-muted-sm" style="font-size:0.8rem;">
+          <strong>{% if msg.author_id == request.user.pk %}You{% else %}{{ msg.author.get_full_name|default:msg.author.username }}{% endif %}</strong>
+          &middot; {{ msg.author.get_role_display }}
+        </span>
+        <span class="text-muted-sm" style="font-size:0.75rem;">{{ msg.created_at|date:"M j, Y H:i" }}</span>
+        {% if msg.is_opening %}
+          <span class="badge bg-secondary" style="font-size:0.65rem;">Original</span>
+        {% endif %}
+      </div>
+      <div class="card" style="{% if msg.author_id == request.user.pk %}background:rgba(var(--accent-rgb,99,102,241),0.15);border-color:var(--accent-light);{% endif %}">
+        <div class="card-body py-3 px-3">
+          <p class="mb-0" style="white-space:pre-wrap;font-size:0.9rem;color:var(--color-text);">{{ msg.body }}</p>
+          {% if msg.attachment %}
+          <div class="mt-2 pt-2" style="border-top:1px solid var(--color-border);">
+            <a href="{{ msg.attachment.url }}" class="text-muted-sm" target="_blank" rel="noopener noreferrer">
+              <i class="bi bi-paperclip me-1"></i>{{ msg.attachment.name|truncatechars:40 }}
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ── Reply form ──────────────────────────────────────────────────── #}
+{% if can_reply and thread.status != 'resolved' %}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title" style="font-size:0.95rem;">
+      <i class="bi bi-reply-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Reply
+    </h2>
+  </div>
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reply">
+      <div class="mb-3">
+        {{ reply_form.body }}
+      </div>
+      {% if is_staff %}
+      <div class="mb-3">
+        <label class="text-muted-sm mb-1">{{ reply_form.new_status.label }}</label>
+        {{ reply_form.new_status }}
+      </div>
+      {% endif %}
+      <div class="mb-3">
+        <label class="text-muted-sm mb-1">Attachment (optional)</label>
+        {{ reply_form.attachment }}
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-send me-1"></i>Send Reply
+      </button>
+    </form>
+  </div>
+</div>
+{% elif thread.status == 'resolved' %}
+<div class="card">
+  <div class="card-body text-center py-3 text-muted-sm">
+    <i class="bi bi-check-circle-fill text-success me-1"></i>
+    This thread is resolved. <a href="{% url 'communications:complaint_create' %}">Start a new message</a> if you need further help.
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}

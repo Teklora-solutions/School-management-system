@@ -1,0 +1,155 @@
+{% extends base_template %}
+
+{% block title %}Add Student | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-person-plus me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Add Student
+  </h1>
+  <p class="page-subtitle">Creates the student account and a linked parent/guardian account. Credentials are emailed.</p>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">New Student</h2></div>
+      <div class="card-body">
+        <form method="post" id="student-create-form" novalidate>
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger" role="alert">
+            {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+          </div>
+          {% endif %}
+
+          <h3 class="h6 text-uppercase text-muted-sm mt-2 mb-3">Student Information</h3>
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label for="{{ form.first_name.id_for_label }}" class="form-label fw-600">First Name <span class="text-danger">*</span></label>
+              {{ form.first_name }}
+              {% if form.first_name.errors %}<div class="invalid-feedback d-block">{{ form.first_name.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.last_name.id_for_label }}" class="form-label fw-600">Last Name <span class="text-danger">*</span></label>
+              {{ form.last_name }}
+              {% if form.last_name.errors %}<div class="invalid-feedback d-block">{{ form.last_name.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label for="{{ form.email.id_for_label }}" class="form-label fw-600">Email <span class="text-danger">*</span></label>
+              {{ form.email }}
+              {% if form.email.errors %}<div class="invalid-feedback d-block">{{ form.email.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.admission_number.id_for_label }}" class="form-label fw-600">Admission Number <span class="text-danger">*</span></label>
+              {{ form.admission_number }}
+              {% if form.admission_number.errors %}<div class="invalid-feedback d-block">{{ form.admission_number.errors.0 }}</div>{% endif %}
+              <div class="form-text">Unique — used as the key for bulk import idempotency.</div>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-4">
+              <label for="{{ form.date_of_birth.id_for_label }}" class="form-label fw-600">Date of Birth</label>
+              {{ form.date_of_birth }}
+              {% if form.date_of_birth.errors %}<div class="invalid-feedback d-block">{{ form.date_of_birth.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-4">
+              <label for="{{ form.gender.id_for_label }}" class="form-label fw-600">Gender</label>
+              {{ form.gender }}
+              {% if form.gender.errors %}<div class="invalid-feedback d-block">{{ form.gender.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-4">
+              <label for="{{ form.current_class.id_for_label }}" class="form-label fw-600">Class</label>
+              {{ form.current_class }}
+              {% if form.current_class.errors %}<div class="invalid-feedback d-block">{{ form.current_class.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label for="{{ form.current_stream.id_for_label }}" class="form-label fw-600">Stream (optional)</label>
+              {{ form.current_stream }}
+              {% if form.current_stream.errors %}<div class="invalid-feedback d-block">{{ form.current_stream.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.address.id_for_label }}" class="form-label fw-600">Address</label>
+              {{ form.address }}
+              {% if form.address.errors %}<div class="invalid-feedback d-block">{{ form.address.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+
+          <h3 class="h6 text-uppercase text-muted-sm mt-4 mb-3">Login</h3>
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label for="{{ form.password.id_for_label }}" class="form-label fw-600">Initial password</label>
+              {{ form.password }}
+              {% if form.password.errors %}<div class="invalid-feedback d-block">{{ form.password.errors.0 }}</div>{% elif form.password.help_text %}<div class="form-text">{{ form.password.help_text }}</div>{% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.password_confirm.id_for_label }}" class="form-label fw-600">Confirm password</label>
+              {{ form.password_confirm }}
+              {% if form.password_confirm.errors %}<div class="invalid-feedback d-block">{{ form.password_confirm.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="form-check mb-3">
+            {{ form.must_change_password }}
+            <label class="form-check-label fw-600" for="{{ form.must_change_password.id_for_label }}">
+              {{ form.must_change_password.label }}
+            </label>
+          </div>
+
+          <h3 class="h6 text-uppercase text-muted-sm mt-4 mb-3">Parent / Guardian</h3>
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label for="{{ form.guardian_first_name.id_for_label }}" class="form-label fw-600">Guardian First Name <span class="text-danger">*</span></label>
+              {{ form.guardian_first_name }}
+              {% if form.guardian_first_name.errors %}<div class="invalid-feedback d-block">{{ form.guardian_first_name.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.guardian_last_name.id_for_label }}" class="form-label fw-600">Guardian Last Name <span class="text-danger">*</span></label>
+              {{ form.guardian_last_name }}
+              {% if form.guardian_last_name.errors %}<div class="invalid-feedback d-block">{{ form.guardian_last_name.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label for="{{ form.guardian_email.id_for_label }}" class="form-label fw-600">Guardian Email <span class="text-danger">*</span></label>
+              {{ form.guardian_email }}
+              {% if form.guardian_email.errors %}<div class="invalid-feedback d-block">{{ form.guardian_email.errors.0 }}</div>{% endif %}
+              <div class="form-text">A parent account is created (or reused) and linked to this student.</div>
+            </div>
+            <div class="col-sm-3">
+              <label for="{{ form.guardian_phone.id_for_label }}" class="form-label fw-600">Guardian Phone</label>
+              {{ form.guardian_phone }}
+              {% if form.guardian_phone.errors %}<div class="invalid-feedback d-block">{{ form.guardian_phone.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-sm-3">
+              <label for="{{ form.relationship.id_for_label }}" class="form-label fw-600">Relationship</label>
+              {{ form.relationship }}
+              {% if form.relationship.errors %}<div class="invalid-feedback d-block">{{ form.relationship.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="d-flex gap-2 justify-content-end mt-4">
+            <a href="{% url 'students:list' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="btn-create-student">
+              <i class="bi bi-check2 me-1"></i>Create Student
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

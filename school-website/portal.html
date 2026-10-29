@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sign in to your Springfield Academy portal — student, parent, teacher, finance, admin or director.">
+  <title>Portal Login | Springfield Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .portal-hero {
+      padding: clamp(3rem,7vw,5rem) 0 clamp(2rem,5vw,3.5rem);
+      background:
+        radial-gradient(ellipse 60% 50% at 15% -5%, var(--gold-glow), transparent 70%),
+        radial-gradient(ellipse 50% 40% at 85% 10%, var(--teal-glow), transparent 70%);
+      text-align: center;
+    }
+    .portal-hero h1 { margin-bottom: .5rem; }
+    .portal-hero p   { color: var(--text-muted); max-width: 52ch; margin: 0 auto 0; }
+
+    /* Portal grid */
+    .portal-grid {
+      display: grid;
+      gap: 1.25rem;
+      grid-template-columns: 1fr;
+      padding-block: clamp(2rem,5vw,4rem);
+    }
+    @media(min-width:540px)  { .portal-grid { grid-template-columns: repeat(2,1fr); } }
+    @media(min-width:1024px) { .portal-grid { grid-template-columns: repeat(3,1fr); } }
+
+    .pcard {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: .75rem;
+      padding: 1.75rem 1.75rem 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: transform var(--trans), box-shadow var(--trans), border-color var(--trans);
+      position: relative;
+      overflow: hidden;
+    }
+    .pcard::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--pcard-accent, var(--accent));
+      transform: scaleX(0); transform-origin: left;
+      transition: transform var(--trans);
+    }
+    .pcard:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); border-color: var(--pcard-accent, var(--accent)); }
+    .pcard:hover::before { transform: scaleX(1); }
+
+    .pcard__icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: grid; place-items: center; font-size: 1.5rem;
+      background: color-mix(in srgb, var(--pcard-accent, var(--accent)) 15%, transparent);
+      color: var(--pcard-accent, var(--accent));
+      flex-shrink: 0;
+    }
+    .pcard__label {
+      font-family: var(--font-heading);
+      font-size: 1.15rem; font-weight: 700;
+      color: var(--heading); margin: 0;
+    }
+    .pcard__desc {
+      font-size: var(--fs-sm); color: var(--text-muted);
+      line-height: 1.6; margin: 0;
+      flex: 1;
+    }
+    .pcard__cta {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-size: var(--fs-sm); font-weight: 600;
+      color: var(--pcard-accent, var(--accent));
+      margin-top: .5rem;
+    }
+    .pcard__cta svg { transition: transform var(--trans); }
+    .pcard:hover .pcard__cta svg { transform: translateX(4px); }
+
+    /* Accent overrides per role */
+    .pcard--student  { --pcard-accent: #0d9488; }
+    .pcard--parent   { --pcard-accent: #8b5cf6; }
+    .pcard--teacher  { --pcard-accent: #f59e0b; }
+    .pcard--finance  { --pcard-accent: #10b981; }
+    .pcard--admin    { --pcard-accent: #ef4444; }
+    .pcard--director { --pcard-accent: #3b82f6; }
+
+    .portal-note {
+      text-align: center;
+      padding: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: clamp(2rem,4vw,3rem);
+      font-size: var(--fs-sm);
+      color: var(--text-muted);
+    }
+    .portal-note strong { color: var(--heading); }
+  </style>
+</head>
+<body data-theme="dark">
+
+<!-- ═══ NAVBAR ═════════════════════════════════════════════════════════════ -->
+<nav class="navbar">
+  <div class="container">
+    <div class="navbar__inner">
+      <a href="index.html" class="navbar__brand">
+        <span class="navbar__brand-dot">&#127979;</span>
+        Springfield Academy
+      </a>
+      <ul class="navbar__links">
+        <li><a class="navbar__link" href="index.html">Home</a></li>
+        <li><a class="navbar__link" href="about.html">About</a></li>
+        <li><a class="navbar__link" href="academics.html">Academics</a></li>
+        <li><a class="navbar__link" href="school-life.html">School Life</a></li>
+        <li><a class="navbar__link" href="admissions.html">Admissions</a></li>
+      </ul>
+      <div class="navbar__actions">
+        <button class="theme-toggle" aria-label="Toggle theme">&#9728;</button>
+        <a href="portal.html" class="btn btn--primary btn--sm">Student Portal</a>
+        <button class="navbar__toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
+      </div>
+    </div>
+  </div>
+  <div class="navbar__mobile">
+    <a class="navbar__link" href="index.html">Home</a>
+    <a class="navbar__link" href="about.html">About</a>
+    <a class="navbar__link" href="academics.html">Academics</a>
+    <a class="navbar__link" href="school-life.html">School Life</a>
+    <a class="navbar__link" href="admissions.html">Admissions</a>
+    <a href="portal.html" class="btn btn--primary btn--block">Student Portal</a>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══════════════════════════════════════════════════════════════ -->
+<div class="portal-hero">
+  <div class="container">
+    <p class="eyebrow" data-reveal>Sign In</p>
+    <h1 data-reveal>Choose Your <span style="background:linear-gradient(135deg,var(--gold),var(--teal));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">Portal</span></h1>
+    <p data-reveal>Select the portal that matches your role at Springfield Academy.</p>
+  </div>
+</div>
+
+<!-- ═══ PORTAL CARDS ════════════════════════════════════════════════════════ -->
+<main>
+  <div class="container">
+    <div class="portal-note" data-reveal>
+      <strong>First time here?</strong> Your login details were sent to you by email when your account was created. Contact the school office if you need help.
+    </div>
+
+    <div class="portal-grid">
+
+      <!-- Student -->
+      <a href="#student" class="pcard pcard--student" data-reveal>
+        <div class="pcard__icon">&#128100;</div>
+        <h2 class="pcard__label">Student Portal</h2>
+        <p class="pcard__desc">View your results, homework, fee statement, timetable, and school announcements.</p>
+        <span class="pcard__cta">
+          Sign in as Student
+          <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </span>
+      </a>
+
+      <!-- Parent -->
+      <a href="#parent" class="pcard pcard--parent" data-reveal>
+        <div class="pcard__icon">&#128106;</div>
+        <h2 class="pcard__label">Parent Portal</h2>
+        <p class="pcard__desc">Follow your child's progress, results, fee balance, and homework. Switch between children easily.</p>
+        <span class="pcard__cta">
+          Sign in as Parent
+          <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </span>
+      </a>
+
+      <!-- Teacher -->
+      <a href="#teacher" class="pcard pcard--teacher" data-reveal>
+        <div class="pcard__icon">&#9999;&#65039;</div>
+        <h2 class="pcard__label">Teacher Portal</h2>
+        <p class="pcard__desc">Manage your classes, enter results, post homework, take attendance, and send announcements.</p>
+        <span class="pcard__cta">
+          Sign in as Teacher
+          <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </span>
+      </a>
+
+      <!-- Finance -->
+      <a href="#finance" class="pcard pcard--finance" data-reveal>
+        <div class="pcard__icon">&#128176;</div>
+        <h2 class="pcard__label">Finance Portal</h2>
+        <p class="pcard__desc">Post invoices, record payments, manage fee structures, and view the full financial ledger.</p>
+        <span class="pcard__cta">
+          Sign in as Finance Officer
+          <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </span>
+      </a>
+
+      <!-- Admin -->
+      <a href="#admin" class="pcard pcard--admin" data-reveal>
+        <div class="pcard__icon">&#128737;&#65039;</div>
+        <h2 class="pcard__label">Admin Portal</h2>
+        <p class="pcard__desc">Full control of students, staff accounts, academic years, promotions, and school settings.</p>
+        <span class="pcard__cta">
+          Sign in as Administrator
+          <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </span>
+      </a>
+
+      <!-- Director -->
+      <a href="#director" class="pcard pcard--director" data-reveal>
+        <div class="pcard__icon">&#128188;</div>
+        <h2 class="pcard__label">Director Portal</h2>
+        <p class="pcard__desc">Read-only executive dashboard — enrolment, results, fee collection, staff directory, and books of account.</p>
+        <span class="pcard__cta">
+          Sign in as Director
+          <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </span>
+      </a>
+
+    </div>
+  </div>
+</main>
+
+<!-- ═══ FOOTER ═════════════════════════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer__grid">
+      <div class="footer__col">
+        <div class="footer__brand"><span class="footer__brand-dot">&#127979;</span> Springfield Academy</div>
+        <p class="footer__about">Nurturing confident, compassionate learners since 1985.</p>
+        <div class="footer__social">
+          <a href="#" aria-label="Facebook">f</a>
+          <a href="#" aria-label="Instagram">&#128247;</a>
+          <a href="#" aria-label="YouTube">&#9654;</a>
+          <a href="#" aria-label="LinkedIn">in</a>
+        </div>
+      </div>
+      <div class="footer__col">
+        <h4>Explore</h4>
+        <a href="index.html">Home</a>
+        <a href="about.html">About Us</a>
+        <a href="academics.html">Academics</a>
+        <a href="school-life.html">School Life</a>
+        <a href="admissions.html">Admissions</a>
+      </div>
+      <div class="footer__col">
+        <h4>Portal Login</h4>
+        <a href="portal.html#student">&#128100; Student Portal</a>
+        <a href="portal.html#parent">&#128106; Parent Portal</a>
+        <a href="portal.html#teacher">&#9999;&#65039; Teacher Portal</a>
+        <a href="portal.html#finance">&#128176; Finance Portal</a>
+        <a href="portal.html#admin">&#128737;&#65039; Admin Portal</a>
+        <a href="portal.html#director">&#128188; Director Portal</a>
+      </div>
+      <div class="footer__col">
+        <h4>Contact</h4>
+        <a href="#">&#128205; 24 Education Road, Accra</a>
+        <a href="tel:+233123456789">&#128222; +233 12 345 6789</a>
+        <a href="mailto:info@springfield.edu">&#9993; info@springfield.edu</a>
+        <a href="admissions.html" class="btn btn--primary btn--sm" style="margin-top:.75rem">Apply Now</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer__bottom">
+    <p>&copy; <span id="year">2026</span> Springfield Academy. All rights reserved. &middot; <a href="#">Privacy Policy</a></p>
+  </div>
+</footer>
+
+<button class="back-to-top" aria-label="Back to top">&#8593;</button>
+<script src="js/main.js"></script>
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

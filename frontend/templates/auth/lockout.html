@@ -1,0 +1,40 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Temporarily blocked | {{ SCHOOL_NAME }}</title>
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap/5.3.3/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+</head>
+<body>
+
+<div class="login-page">
+  <div class="login-card" style="text-align:center;">
+
+    <div class="login-logo">
+      <div class="login-logo-icon" style="background:linear-gradient(135deg,var(--color-danger),#b91c1c);">
+        <i class="bi bi-exclamation-octagon-fill" aria-hidden="true" style="color:#fff;"></i>
+      </div>
+      <h1 style="font-size:1.35rem;margin-bottom:0.25rem;">Too many sign-in attempts</h1>
+    </div>
+
+    <p style="color:var(--color-muted);font-size:0.9375rem;margin-bottom:1.5rem;">
+      This computer has been stopped from signing in for one hour. No password has
+      been changed and no account has been locked — wait an hour, or ask the school
+      administrator to reset your password.
+    </p>
+
+    <a class="btn btn-primary" href="{% url 'accounts:login' %}">
+      <i class="bi bi-arrow-left me-2"></i>Back to the portals
+    </a>
+
+  </div>
+</div>
+
+<script src="{% static 'vendor/bootstrap/5.3.3/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>

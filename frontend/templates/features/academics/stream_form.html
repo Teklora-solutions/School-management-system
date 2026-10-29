@@ -1,0 +1,33 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Add Stream | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Add Stream</h1>
+</div>
+<div class="row justify-content-center">
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" id="stream-form" novalidate>
+          {% csrf_token %}
+          {% if form.non_field_errors %}<div class="alert alert-danger">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>{% endif %}
+          <div class="mb-3">
+            <label for="{{ form.school_class.id_for_label }}" class="form-label fw-600">Class <span class="text-danger">*</span></label>
+            {{ form.school_class }}
+          </div>
+          <div class="mb-3">
+            <label for="{{ form.name.id_for_label }}" class="form-label fw-600">Stream Name <span class="text-danger">*</span></label>
+            {{ form.name }}
+            <div class="form-text">e.g. Blue, Gold, A, B</div>
+          </div>
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{% url 'academics:class_list' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="btn-save-stream">Save Stream</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

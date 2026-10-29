@@ -1,0 +1,278 @@
+{% extends base_template %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Fee Analysis | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-cash-stack me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Fee Analysis
+      </h1>
+      <p class="page-subtitle">Per-class fee billing, collection, and outstanding balances.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if fees_enabled %}
+      <a href="{% url 'dashboards:director_export_fees' %}{% if selected_term_id %}?term={{ selected_term_id }}{% endif %}"
+         class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# Term selector #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+      <label for="term-select" class="text-muted-sm mb-0">Term:</label>
+      <select id="term-select" name="term" class="form-select form-select-sm" style="width:auto;"
+              onchange="this.form.submit()">
+        <option value="">— Select term —</option>
+        {% for t in all_terms %}
+        <option value="{{ t.pk }}" {% if t.pk == selected_term_id %}selected{% endif %}>
+          {{ t }} — {{ t.academic_year.name }}
+        </option>
+        {% endfor %}
+      </select>
+      {% if not selected_term_id %}
+      <span class="text-muted-sm">Select a term to see fees.</span>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{% if selected_term_id and rows %}
+
+{# ── Summary KPI strip ────────────────────────────────────────────────── #}
+{% with total_billed=rows|dictsort:"billed" %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1rem;">
+          {{ currency }}
+          {% with s=rows %}
+            {% for r in s %}{% if forloop.last %}{% endif %}{% endfor %}
+          {% endwith %}
+          —
+        </div>
+        <div class="stat-label">Total Billed</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endwith %}
+
+{# Better summary row using aggregated totals from context #}
+<div class="row g-3 mb-3">
+  {% with b=rows|dictsort:"billed" %}
+  <script>
+    /* totals computed client-side from rows */
+  </script>
+  {% endwith %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body py-2">
+        <div id="fee-summary-strip" class="d-flex flex-wrap gap-4">
+          <div>
+            <div class="text-muted-sm">Total Billed</div>
+            <div class="fw-700 text-accent" id="total-billed">{{ currency }} —</div>
+          </div>
+          <div>
+            <div class="text-muted-sm">Total Collected</div>
+            <div class="fw-700 text-success" id="total-paid">{{ currency }} —</div>
+          </div>
+          <div>
+            <div class="text-muted-sm">Total Outstanding</div>
+            <div class="fw-700 text-warning" id="total-outstanding">{{ currency }} —</div>
+          </div>
+          <div>
+            <div class="text-muted-sm">Collection Rate</div>
+            <div class="fw-700" id="overall-rate">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Chart ────────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-bar-chart me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Billed vs Collected vs Outstanding by Class
+    </h2>
+  </div>
+  <div class="card-body" style="position:relative;min-height:280px;">
+    <canvas id="feeChart" aria-label="Fee collection chart" role="img"></canvas>
+  </div>
+</div>
+
+{# ── Table ────────────────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-table me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Per-Class Breakdown
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table mb-0" aria-label="Per-class fee breakdown">
+        <thead>
+          <tr>
+            <th>Class</th>
+            <th class="text-end">Billed</th>
+            <th class="text-end">Collected</th>
+            <th class="text-end">Outstanding</th>
+            <th class="text-center">Rate</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="fw-600">{{ row.class_name }}</td>
+            <td class="text-end">{{ currency }} {{ row.billed|floatformat:2|intcomma }}</td>
+            <td class="text-end text-success fw-600">{{ currency }} {{ row.collected|floatformat:2|intcomma }}</td>
+            <td class="text-end {% if row.outstanding > 0 %}text-warning{% endif %}">
+              {{ currency }} {{ row.outstanding|floatformat:2|intcomma }}
+            </td>
+            <td class="text-center">
+              <div class="d-flex align-items-center gap-2 justify-content-center">
+                <span class="fw-600
+                  {% if row.collection_rate >= 80 %}text-success
+                  {% elif row.collection_rate >= 50 %}text-warning
+                  {% else %}text-danger{% endif %}">
+                  {{ row.collection_rate }}%
+                </span>
+                <div style="width:60px;background:var(--color-surface-2);border-radius:4px;height:6px;overflow:hidden;">
+                  <div style="width:{{ row.collection_rate }}%;height:100%;
+                    background:{% if row.collection_rate >= 80 %}var(--color-success){% elif row.collection_rate >= 50 %}var(--color-warning){% else %}var(--color-danger){% endif %};
+                    border-radius:4px;"></div>
+                </div>
+              </div>
+            </td>
+            <td class="text-end">
+              <a href="{% url 'dashboards:director_fee_debtors' row.class_id %}?term={{ selected_term_id }}"
+                 class="btn btn-outline-primary btn-sm">
+                Debtors <i class="bi bi-arrow-right ms-1"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% elif selected_term_id %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-cash-stack" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    {% if fees_enabled %}
+    <p class="mt-3 text-muted-sm">No posted invoices found for the selected term.</p>
+    {% else %}
+    <p class="mt-3 text-muted-sm">{{ fees_disabled_message }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock content %}
+
+{% block extra_js %}
+{% if selected_term_id and rows %}
+<script src="{% static 'vendor/chart.js/4.4.4/chart.umd.min.js' %}"></script>
+<script>
+(function () {
+  'use strict';
+  const ACCENT     = '#0ea5e9';
+  const SUCCESS    = '#10b981';
+  const WARNING    = '#f59e0b';
+  const GRID_COLOR = 'rgba(255,255,255,0.06)';
+  const TICK_COLOR = '#8896b3';
+
+  const billed      = {{ chart_billed|safe }};
+  const paid        = {{ chart_paid|safe }};
+  const outstanding = {{ chart_outstanding|safe }};
+
+  // Compute summary strip totals
+  const sumArr = arr => arr.reduce((a, b) => a + b, 0);
+  const fmt = n => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const totalBilled      = sumArr(billed);
+  const totalPaid        = sumArr(paid);
+  const totalOutstanding = sumArr(outstanding);
+  const rate = totalBilled > 0 ? (totalPaid / totalBilled * 100).toFixed(1) : '0.0';
+
+  document.getElementById('total-billed').textContent      = '{{ currency }} ' + fmt(totalBilled);
+  document.getElementById('total-paid').textContent        = '{{ currency }} ' + fmt(totalPaid);
+  document.getElementById('total-outstanding').textContent = '{{ currency }} ' + fmt(totalOutstanding);
+  document.getElementById('overall-rate').textContent      = rate + '%';
+
+  new Chart(document.getElementById('feeChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: {{ chart_labels|safe }},
+      datasets: [
+        {
+          label: 'Billed',
+          data: billed,
+          backgroundColor: ACCENT + '55',
+          borderColor: ACCENT,
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'Collected',
+          data: paid,
+          backgroundColor: SUCCESS + '99',
+          borderColor: SUCCESS,
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'Outstanding',
+          data: outstanding,
+          backgroundColor: WARNING + '88',
+          borderColor: WARNING,
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { labels: { color: TICK_COLOR, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': {{ currency }} ' +
+                          ctx.parsed.y.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: TICK_COLOR, font: { size: 11 } }, grid: { color: GRID_COLOR } },
+        y: {
+          ticks: {
+            color: TICK_COLOR, font: { size: 11 },
+            callback: v => '{{ currency }} ' + v.toLocaleString(),
+          },
+          grid: { color: GRID_COLOR },
+        },
+      },
+    },
+  });
+})();
+</script>
+{% endif %}
+{% endblock extra_js %}

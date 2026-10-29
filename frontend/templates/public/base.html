@@ -1,0 +1,411 @@
+{% load static %}
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="{% block meta_description %}{{ identity.motto|default:identity.name }} — {{ identity.name }}{% endblock %}">
+  <title>{% block title %}{{ identity.name }}{% endblock %} | Springfield Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="{% static 'css/public_new.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body data-theme="dark">
+
+<!-- ═══ NAVBAR ═════════════════════════════════════════════════════════════ -->
+<nav class="pub-nav" id="pub-nav">
+  <div class="pub-container">
+    <div class="pub-nav__inner">
+      <a href="{% url 'public:home' %}" class="pub-nav__brand">
+        <span class="pub-nav__dot">&#127979;</span>
+        {{ identity.name|default:"Springfield Academy" }}
+      </a>
+      <ul class="pub-nav__links">
+        {% for link in nav_links %}
+        <li><a class="pub-nav__link {% if link.is_active %}is-active{% endif %}" href="{{ link.url }}" {% if link.is_active %}aria-current="page"{% endif %}>{{ link.label }}</a></li>
+        {% endfor %}
+      </ul>
+      <div class="pub-nav__actions">
+        <button class="pub-theme-toggle" aria-label="Toggle theme" id="pubThemeToggle">&#9728;</button>
+        {% if request.user.is_authenticated %}
+        <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary pub-btn--sm">
+          &#9889; Dashboard
+        </a>
+        {% else %}
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--sm pub-btn--hide-sm">Apply Now</a>
+        <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary pub-btn--sm">
+          &#128100; Student Portal
+        </a>
+        {% endif %}
+        <button class="pub-nav__toggle" id="pubNavToggle" aria-label="Toggle menu" aria-expanded="false">
+          <span></span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="pub-nav__mobile" id="pubNavMobile">
+    {% for link in nav_links %}
+    <a class="pub-nav__link {% if link.is_active %}is-active{% endif %}" href="{{ link.url }}">{{ link.label }}</a>
+    {% endfor %}
+    <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem;">
+      <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary" style="text-align:center">&#128100; Student Portal</a>
+      <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline" style="text-align:center">Apply Now</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══ PAGE CONTENT ═══════════════════════════════════════════════════════ -->
+<main id="main-content">
+  {% if messages %}
+  <div class="pub-container" style="padding-top:1rem">
+    {% for message in messages %}
+    <div class="pub-alert pub-alert--{% if message.tags %}{{ message.tags }}{% else %}info{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ═══ FOOTER ═════════════════════════════════════════════════════════════ -->
+<footer class="pub-footer">
+  <div class="pub-container">
+    <div class="pub-footer__grid">
+
+      <!-- Brand col -->
+      <div class="pub-footer__col">
+        <div class="pub-footer__brand">
+          <span class="pub-nav__dot" style="width:34px;height:34px;font-size:1.1rem">&#127979;</span>
+          {{ identity.name|default:"Springfield Academy" }}
+        </div>
+        <p class="pub-footer__about">
+          {% if identity.motto %}{{ identity.motto }}{% else %}Nurturing confident, compassionate learners.{% endif %}
+        </p>
+        {% if identity.address or identity.phone or identity.email %}
+        <div class="pub-footer__contact">
+          {% if identity.address %}<span>&#128205; {{ identity.address }}</span>{% endif %}
+          {% if identity.phone %}<a href="tel:{{ identity.phone }}">&#128222; {{ identity.phone }}</a>{% endif %}
+          {% if identity.email %}<a href="mailto:{{ identity.email }}">&#9993; {{ identity.email }}</a>{% endif %}
+        </div>
+        {% endif %}
+        <div class="pub-footer__social">
+          <a href="#" aria-label="Facebook">f</a>
+          <a href="#" aria-label="Instagram">&#128247;</a>
+          <a href="#" aria-label="YouTube">&#9654;</a>
+          <a href="#" aria-label="LinkedIn">in</a>
+        </div>
+      </div>
+
+      <!-- Explore col -->
+      <div class="pub-footer__col">
+        <h4>Explore</h4>
+        {% for link in nav_links %}
+        <a href="{{ link.url }}">{{ link.label }}</a>
+        {% endfor %}
+      </div>
+
+      <!-- Portals col -->
+      <div class="pub-footer__col">
+        <h4><a href="{% url 'accounts:login' %}" class="pub-footer__title-link">Portal Login</a></h4>
+        {% for portal in portal_links %}
+        <a href="{{ portal.url }}">
+          <i class="pub-portal-dot" style="color:var(--pub-accent)">&#9679;</i> {{ portal.label }}
+        </a>
+        {% endfor %}
+      </div>
+
+      <!-- CTA col -->
+      <div class="pub-footer__col">
+        <h4>Join Us</h4>
+        <p style="font-size:0.85rem;color:var(--pub-text-muted);line-height:1.6;margin-bottom:1rem">
+          A question about admissions, fees, or a campus visit? Send us a message.
+        </p>
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary" style="width:100%;text-align:center">Contact Us</a>
+      </div>
+
+    </div>
+  </div>
+  <div class="pub-footer__bottom">
+    <p>&copy; {% now "Y" %} <strong>{{ identity.name|default:"Springfield Academy" }}</strong>. All rights reserved.</p>
+  </div>
+</footer>
+
+<button class="pub-back-top" id="pubBackTop" aria-label="Back to top">&#8593;</button>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ── Navbar scroll class ── */
+  var pubNav = document.getElementById('pub-nav');
+  if(pubNav){
+    window.addEventListener('scroll', function(){
+      pubNav.classList.toggle('scrolled', window.scrollY > 10);
+    }, {passive:true});
+  }
+
+  /* ── Navbar toggle ── */
+  var toggle = document.getElementById('pubNavToggle');
+  var nav    = document.getElementById('pub-nav');
+  var mobile = document.getElementById('pubNavMobile');
+  if(toggle){
+    toggle.addEventListener('click', function(){
+      var open = nav.classList.toggle('is-open');
+      toggle.setAttribute('aria-expanded', open);
+    });
+  }
+
+  /* ── Dark mode toggle ── */
+  var themeBtn = document.getElementById('pubThemeToggle');
+  var STORAGE_KEY = 'pub-theme';
+  var saved = localStorage.getItem(STORAGE_KEY) ||
+    (window.matchMedia('(prefers-color-scheme:light)').matches ? 'light' : 'dark');
+  function applyTheme(t){
+    document.documentElement.setAttribute('data-theme', t);
+    if(themeBtn) themeBtn.textContent = t === 'light' ? '\u263D' : '\u2600';
+  }
+  applyTheme(saved);
+  if(themeBtn){
+    themeBtn.addEventListener('click', function(){
+      var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      applyTheme(next);
+      localStorage.setItem(STORAGE_KEY, next);
+    });
+  }
+
+  /* ── Back to top ── */
+  var backBtn = document.getElementById('pubBackTop');
+  if(backBtn){
+    window.addEventListener('scroll', function(){
+      backBtn.classList.toggle('is-visible', window.scrollY > 500);
+    }, {passive:true});
+    backBtn.addEventListener('click', function(){
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+  }
+
+  /* ── Scroll reveal ── */
+  if('IntersectionObserver' in window){
+    var reveals = document.querySelectorAll('[data-reveal]');
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ e.target.classList.add('is-visible'); obs.unobserve(e.target); }
+      });
+    }, {threshold:0.12, rootMargin:'0px 0px -40px 0px'});
+    reveals.forEach(function(el){ obs.observe(el); });
+  } else {
+    document.querySelectorAll('[data-reveal]').forEach(function(el){ el.classList.add('is-visible'); });
+  }
+
+  /* ── Animated counters ── */
+  function animateCounter(el){
+    var target = parseInt(el.dataset.count, 10);
+    var suffix = el.dataset.suffix || '';
+    var dur    = 1400;
+    var start  = performance.now();
+    function step(now){
+      var p = Math.min((now - start)/dur, 1);
+      var e = 1 - Math.pow(1-p, 3);
+      el.textContent = Math.floor(e * target).toLocaleString() + suffix;
+      if(p < 1) requestAnimationFrame(step);
+      else el.textContent = target.toLocaleString() + suffix;
+    }
+    requestAnimationFrame(step);
+  }
+  if('IntersectionObserver' in window){
+    var counters = document.querySelectorAll('.pub-stat__num[data-count]');
+    var co = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ animateCounter(e.target); co.unobserve(e.target); } });
+    }, {threshold:0.5});
+    counters.forEach(function(el){ co.observe(el); });
+  }
+
+  /* ── Accordion ── */
+  document.querySelectorAll('.pub-accordion__header').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var item   = btn.closest('.pub-accordion__item');
+      var body   = item.querySelector('.pub-accordion__body');
+      var isOpen = item.classList.contains('is-open');
+      document.querySelectorAll('.pub-accordion__item').forEach(function(i){
+        i.classList.remove('is-open');
+        var b = i.querySelector('.pub-accordion__body');
+        if(b) b.style.maxHeight = null;
+      });
+      if(!isOpen){ item.classList.add('is-open'); body.style.maxHeight = body.scrollHeight + 'px'; }
+    });
+  });
+
+  /* ── Tabs ── */
+  document.querySelectorAll('.pub-tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      var key    = tab.dataset.tab;
+      var parent = tab.closest('[data-tabs]') || document;
+      parent.querySelectorAll('.pub-tab').forEach(function(t){ t.classList.remove('is-active'); });
+      parent.querySelectorAll('.pub-tab-panel').forEach(function(p){ p.classList.remove('is-active'); });
+      tab.classList.add('is-active');
+      var panel = parent.querySelector('[data-panel="'+key+'"]');
+      if(panel) panel.classList.add('is-active');
+    });
+  });
+
+  /* ── Gallery filter + lightbox ── */
+  var filterBtns = document.querySelectorAll('.pub-filter-btn');
+  var galleryItems = document.querySelectorAll('.pub-gallery__item');
+  filterBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var f = btn.dataset.filter;
+      filterBtns.forEach(function(b){ b.classList.remove('is-active'); });
+      btn.classList.add('is-active');
+      galleryItems.forEach(function(item){
+        item.style.display = (f === 'all' || item.dataset.category === f) ? '' : 'none';
+      });
+    });
+  });
+  var lightbox    = document.getElementById('pubLightbox');
+  var lbImg       = document.getElementById('pubLbImg');
+  var lbCaption   = document.getElementById('pubLbCaption');
+  var lbIndex     = 0;
+  function visibleItems(){ return Array.from(galleryItems).filter(function(i){ return i.style.display !== 'none'; }); }
+  galleryItems.forEach(function(item){
+    item.addEventListener('click', function(){
+      var vis = visibleItems();
+      lbIndex = vis.indexOf(item);
+      openLb(vis);
+    });
+  });
+  function openLb(vis){
+    if(!lightbox) return;
+    lightbox.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+    showLbImg(vis);
+    lightbox.focus();
+  }
+  function showLbImg(vis){
+    var el  = vis[lbIndex];
+    var img = el.querySelector('img');
+    var cap = el.querySelector('.pub-gallery__overlay span');
+    if(lbImg){ lbImg.src = img.src; lbImg.alt = img.alt; }
+    if(lbCaption) lbCaption.textContent = cap ? cap.textContent : img.alt;
+  }
+  function closeLb(){ if(lightbox){ lightbox.classList.remove('is-open'); document.body.style.overflow = ''; } }
+  function lbNav(dir){ var vis = visibleItems(); lbIndex = (lbIndex + dir + vis.length) % vis.length; showLbImg(vis); }
+  var lbClose = document.getElementById('pubLbClose');
+  var lbPrev  = document.getElementById('pubLbPrev');
+  var lbNext  = document.getElementById('pubLbNext');
+  if(lbClose) lbClose.addEventListener('click', closeLb);
+  if(lbPrev)  lbPrev.addEventListener('click', function(){ lbNav(-1); });
+  if(lbNext)  lbNext.addEventListener('click', function(){ lbNav(1); });
+  if(lightbox) lightbox.addEventListener('click', function(e){ if(e.target === lightbox) closeLb(); });
+  document.addEventListener('keydown', function(e){
+    if(!lightbox || !lightbox.classList.contains('is-open')) return;
+    if(e.key === 'Escape') closeLb();
+    if(e.key === 'ArrowLeft') lbNav(-1);
+    if(e.key === 'ArrowRight') lbNav(1);
+  });
+
+  /* ── Hero carousel ── */
+  var carousel = document.querySelector('.pub-carousel');
+  if(carousel){
+    var track  = carousel.querySelector('.pub-carousel__track');
+    var slides = carousel.querySelectorAll('.pub-carousel__slide');
+    var dotsC  = carousel.querySelector('.pub-carousel__dots');
+    var prevBtn = carousel.querySelector('.pub-carousel__btn--prev');
+    var nextBtn = carousel.querySelector('.pub-carousel__btn--next');
+    var idx = 0, timer;
+    if(dotsC && slides.length > 1){
+      slides.forEach(function(_,i){
+        var d = document.createElement('button');
+        d.className = 'pub-carousel__dot' + (i===0?' is-active':'');
+        d.setAttribute('aria-label','Slide '+(i+1));
+        d.addEventListener('click', function(){ goTo(i); reset(); });
+        dotsC.appendChild(d);
+      });
+    }
+    var dots = carousel.querySelectorAll('.pub-carousel__dot');
+    function goTo(i){
+      idx = (i + slides.length) % slides.length;
+      if(track) track.style.transform = 'translateX(-' + (idx*100) + '%)';
+      dots.forEach(function(d,di){ d.classList.toggle('is-active', di===idx); });
+    }
+    function next(){ goTo(idx+1); }
+    function prev(){ goTo(idx-1); }
+    function start(){ timer = setInterval(next, 5000); }
+    function reset(){ clearInterval(timer); start(); }
+    if(prevBtn) prevBtn.addEventListener('click', function(){ prev(); reset(); });
+    if(nextBtn) nextBtn.addEventListener('click', function(){ next(); reset(); });
+    carousel.addEventListener('mouseenter', function(){ clearInterval(timer); });
+    carousel.addEventListener('mouseleave', start);
+    var tx = 0;
+    carousel.addEventListener('touchstart', function(e){ tx = e.touches[0].clientX; }, {passive:true});
+    carousel.addEventListener('touchend',   function(e){ var dx = e.changedTouches[0].clientX - tx; if(Math.abs(dx)>50){ dx<0?next():prev(); reset(); } }, {passive:true});
+    if(slides.length > 1) start();
+  }
+
+  /* ── Testimonial slider ── */
+  var tslider = document.querySelector('.pub-testimonials');
+  if(tslider){
+    var ttrack  = tslider.querySelector('.pub-testimonial-track');
+    var tslides = tslider.querySelectorAll('.pub-testimonial');
+    var tdotsC  = tslider.querySelector('.pub-testimonial__dots');
+    var tidx    = 0;
+    if(tdotsC && tslides.length > 1){
+      tslides.forEach(function(_,i){
+        var d = document.createElement('button');
+        d.className = 'pub-testimonial__dot' + (i===0?' is-active':'');
+        d.setAttribute('aria-label','Testimonial '+(i+1));
+        d.addEventListener('click', function(){ tGoTo(i); });
+        tdotsC.appendChild(d);
+      });
+    }
+    var tdots = tslider.querySelectorAll('.pub-testimonial__dot');
+    function tGoTo(i){
+      tidx = (i + tslides.length) % tslides.length;
+      if(ttrack) ttrack.style.transform = 'translateX(-'+(tidx*100)+'%)';
+      tdots.forEach(function(d,di){ d.classList.toggle('is-active', di===tidx); });
+    }
+    if(tslides.length > 1) setInterval(function(){ tGoTo(tidx+1); }, 6000);
+  }
+
+  /* ── Inquiry form validation ── */
+  var form = document.getElementById('pub-inquiry-form');
+  if(form){
+    var successMsg = form.querySelector('.pub-form-success');
+    function showErr(name, msg){
+      var inp = form.querySelector('[name="'+name+'"]');
+      var err = form.querySelector('[data-error="'+name+'"]');
+      if(inp) inp.classList.add('is-invalid');
+      if(err){ err.textContent = msg; err.classList.add('is-visible'); }
+    }
+    function clearErr(name){
+      var inp = form.querySelector('[name="'+name+'"]');
+      var err = form.querySelector('[data-error="'+name+'"]');
+      if(inp) inp.classList.remove('is-invalid');
+      if(err) err.classList.remove('is-visible');
+    }
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      ['name','email','phone','message'].forEach(clearErr);
+      var valid = true;
+      var name = form.querySelector('[name="name"]');
+      var email = form.querySelector('[name="email"]');
+      var phone = form.querySelector('[name="phone"]');
+      var msg   = form.querySelector('[name="message"]');
+      if(name && !name.value.trim()){ showErr('name','Please enter your name.'); valid=false; }
+      if(email && !email.value.trim()){ showErr('email','Please enter your email.'); valid=false; }
+      else if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)){ showErr('email','Enter a valid email.'); valid=false; }
+      if(phone && phone.value.trim() && !/^[\d\s()+\-]{7,20}$/.test(phone.value)){ showErr('phone','Enter a valid phone number.'); valid=false; }
+      if(msg && !msg.value.trim()){ showErr('message','Please enter a message.'); valid=false; }
+      if(!valid) return;
+      if(successMsg){ successMsg.classList.add('is-visible'); form.reset(); successMsg.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(function(){ successMsg.classList.remove('is-visible'); }, 7000); }
+    });
+  }
+
+})();
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,38 @@
+{% comment %}
+  dashboards/partials/_sidebar_nav.html
+  Renders nav_items provided by the navigation context processor.
+  Include this inside each role's _sidebar.html.
+{% endcomment %}
+{% load static %}
+{% for item in nav_items %}
+  {% if item.children %}
+    {# Parent item with sub-menu #}
+    <a href="#" class="sidebar-item has-children {% if item.active %}active open{% endif %}"
+       aria-expanded="{{ item.active|yesno:'true,false' }}"
+       role="button">
+      <i class="bi {{ item.icon }}" aria-hidden="true"></i>
+      <span>{{ item.label }}</span>
+      <i class="bi bi-chevron-right chevron" aria-hidden="true"></i>
+    </a>
+    <ul class="sidebar-submenu {% if item.active %}open{% endif %}" role="list">
+      {% for child in item.children %}
+      <li>
+        <a href="{{ child.href }}"
+           class="sidebar-subitem {% if child.active %}active{% endif %}"
+           {% if child.active %}aria-current="page"{% endif %}>
+          <i class="bi {{ child.icon }}" aria-hidden="true"></i>
+          {{ child.label }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {# Leaf item #}
+    <a href="{{ item.href }}"
+       class="sidebar-item {% if item.active %}active{% endif %}"
+       {% if item.active %}aria-current="page"{% endif %}>
+      <i class="bi {{ item.icon }}" aria-hidden="true"></i>
+      <span>{{ item.label }}</span>
+    </a>
+  {% endif %}
+{% endfor %}

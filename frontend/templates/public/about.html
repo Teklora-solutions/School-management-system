@@ -1,0 +1,184 @@
+{% extends "public/base.html" %}
+{% block title %}About {{ identity.name|default:"Springfield Academy" }}{% endblock %}
+{% block meta_description %}Learn about our story, mission, vision, values, leadership and history at {{ identity.name|default:"Springfield Academy" }}.{% endblock %}
+
+{% block content %}
+
+<!-- HERO -->
+<header class="pub-hero pub-hero--image" style="background-image:url('https://picsum.photos/seed/sfa-about-bg/1600/600')">
+  <div class="pub-hero__overlay"></div>
+  <div class="pub-container">
+    <div class="pub-hero__grid">
+      <div data-reveal>
+        {% if identity.established_year %}<span class="pub-hero__badge">&#127919; Established {{ identity.established_year }}</span>{% endif %}
+        <p class="pub-eyebrow">About Us</p>
+        <h1 class="pub-hero__title">{% if identity.years_running %}{{ identity.years_running }} Years of <span>Believing in Children</span>{% else %}Our <span>Story</span>{% endif %}</h1>
+        <p class="pub-hero__text">
+          {% if identity.about %}{{ identity.about|truncatewords:35 }}
+          {% else %}A thriving school community guided by the belief that every child deserves to be seen, challenged and celebrated.{% endif %}
+        </p>
+        <div class="pub-hero__actions">
+          <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">&#9999; Apply Now</a>
+          <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--lg">&#128197; Book a Visit</a>
+        </div>
+      </div>
+      <div data-reveal>
+        <div class="pub-hero__side-img">
+          <img src="https://picsum.photos/seed/sfa-about-students/600/450" alt="Students at {{ identity.name|default:'Springfield Academy' }}" loading="eager">
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- MISSION / VISION / VALUES -->
+<section class="pub-section">
+  <div class="pub-container">
+    <div class="pub-grid pub-grid--3">
+      <div class="pub-card" data-reveal>
+        <div class="pub-card__body">
+          <div class="pub-card__icon">&#129518;</div>
+          <h3>Our Mission</h3>
+          <p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">
+            {% if identity.mission %}{{ identity.mission|truncatewords:40 }}
+            {% else %}To provide a nurturing, inquiry-driven education that empowers every child to think critically, act compassionately and lead with confidence.{% endif %}
+          </p>
+        </div>
+      </div>
+      <div class="pub-card" data-reveal>
+        <div class="pub-card__body">
+          <div class="pub-card__icon pub-card__icon--teal">&#128065;</div>
+          <h3>Our Vision</h3>
+          <p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">
+            {% if identity.vision %}{{ identity.vision|truncatewords:40 }}
+            {% else %}To be the school our community trusts to prepare young people who are academically strong, emotionally resilient and ready to contribute to society.{% endif %}
+          </p>
+        </div>
+      </div>
+      <div class="pub-card" data-reveal>
+        <div class="pub-card__body">
+          <div class="pub-card__icon pub-card__icon--purple">&#10084;</div>
+          <h3>Our Values</h3>
+          <p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Curiosity, kindness, integrity and excellence — these four words guide every decision we make, from the playground to the boardroom.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HISTORY TIMELINE -->
+<section class="pub-section pub-section--alt">
+  <div class="pub-container">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">Our Journey</p>
+      <h2>{% if identity.years_running %}{{ identity.years_running }} Decades{% else %}Years{% endif %} of Growth</h2>
+    </div>
+    <div style="max-width:700px;margin:0 auto">
+      <div class="pub-timeline" data-reveal>
+        {% if identity.established_year %}
+        <div class="pub-timeline__item">
+          <div class="pub-timeline__dot"></div>
+          <div class="pub-timeline__year">{{ identity.established_year }}</div>
+          <h3 class="pub-timeline__title">The First Classroom</h3>
+          <p class="pub-timeline__text">{{ identity.name|default:"Springfield Academy" }} opens its doors, beginning its commitment to quality education.</p>
+        </div>
+        {% endif %}
+        <div class="pub-timeline__item">
+          <div class="pub-timeline__dot"></div>
+          <div class="pub-timeline__year">Growth</div>
+          <h3 class="pub-timeline__title">Expanding the Campus</h3>
+          <p class="pub-timeline__text">New buildings, a library and specialist classrooms open as the school grows.</p>
+        </div>
+        <div class="pub-timeline__item">
+          <div class="pub-timeline__dot"></div>
+          <div class="pub-timeline__year">Today</div>
+          <h3 class="pub-timeline__title">{{ facts.pupils|default:"Hundreds of" }} Students Strong</h3>
+          <p class="pub-timeline__text">{{ identity.name|default:"Springfield Academy" }} now serves students across {{ facts.classes|default:"multiple" }} class{{ facts.classes|pluralize:",es" }} with {{ facts.teachers|default:"dedicated" }} teacher{{ facts.teachers|pluralize:",s" }}.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AT A GLANCE -->
+<section class="pub-section">
+  <div class="pub-container">
+    <div style="display:grid;gap:2rem;align-items:start;max-width:900px;margin:0 auto" class="pub-grid pub-grid--2">
+      <div data-reveal>
+        <p class="pub-eyebrow">At a Glance</p>
+        <h2>{{ identity.name|default:"Springfield Academy" }} in Numbers</h2>
+        <div style="margin-top:1.5rem;border:1px solid var(--pub-border);border-radius:var(--pub-radius);overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.9rem 1.25rem;border-bottom:1px solid var(--pub-border)"><span style="color:var(--pub-text-muted);font-size:.85rem">Founded</span><strong>{% if identity.established_year %}{{ identity.established_year }}{% else %}—{% endif %}</strong></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.9rem 1.25rem;border-bottom:1px solid var(--pub-border)"><span style="color:var(--pub-text-muted);font-size:.85rem">Students on Roll</span><strong>{{ facts.pupils|default:"—" }}</strong></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.9rem 1.25rem;border-bottom:1px solid var(--pub-border)"><span style="color:var(--pub-text-muted);font-size:.85rem">Teachers</span><strong>{{ facts.teachers|default:"—" }}</strong></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.9rem 1.25rem;border-bottom:1px solid var(--pub-border)"><span style="color:var(--pub-text-muted);font-size:.85rem">Classes This Year</span><strong>{{ facts.classes|default:"—" }}</strong></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.9rem 1.25rem"><span style="color:var(--pub-text-muted);font-size:.85rem">Subjects Taught</span><strong>{{ facts.subjects|default:"—" }}</strong></div>
+        </div>
+      </div>
+      <div data-reveal>
+        <img src="https://picsum.photos/seed/sfa-campus-view/600/450" alt="{{ identity.name|default:'Springfield Academy' }} campus" loading="lazy" style="border-radius:var(--pub-radius-lg);width:100%;object-fit:cover">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LEADERSHIP -->
+<section class="pub-section pub-section--alt">
+  <div class="pub-container">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">Our Team</p>
+      <h2>Leadership &amp; Key Staff</h2>
+      <p>The people who make {{ identity.name|default:"Springfield" }} what it is — experienced, caring and committed to your child's growth.</p>
+    </div>
+    <div class="pub-grid pub-grid--4">
+      <div class="pub-card pub-leader-card" data-reveal>
+        <div class="pub-card__body">
+          <img src="https://picsum.photos/seed/sfa-leader1/200/200" alt="Principal" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent)">
+          <h3 style="text-align:center">Dr. Abena Owusu</h3>
+          <p style="color:var(--pub-accent);font-size:.875rem;font-weight:600;text-align:center;margin:.2rem 0 .5rem">Principal</p>
+          <p style="color:var(--pub-text-muted);font-size:.8rem;text-align:center">25 years in education. PhD in Educational Leadership.</p>
+        </div>
+      </div>
+      <div class="pub-card pub-leader-card" data-reveal>
+        <div class="pub-card__body">
+          <img src="https://picsum.photos/seed/sfa-leader2/200/200" alt="Head of Primary" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent)">
+          <h3 style="text-align:center">Mr. Kwame Asante</h3>
+          <p style="color:var(--pub-accent);font-size:.875rem;font-weight:600;text-align:center;margin:.2rem 0 .5rem">Head of Primary</p>
+          <p style="color:var(--pub-text-muted);font-size:.8rem;text-align:center">18 years teaching. Specialist in early literacy.</p>
+        </div>
+      </div>
+      <div class="pub-card pub-leader-card" data-reveal>
+        <div class="pub-card__body">
+          <img src="https://picsum.photos/seed/sfa-leader3/200/200" alt="Head of Secondary" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent)">
+          <h3 style="text-align:center">Mrs. Efua Boateng</h3>
+          <p style="color:var(--pub-accent);font-size:.875rem;font-weight:600;text-align:center;margin:.2rem 0 .5rem">Head of Secondary</p>
+          <p style="color:var(--pub-text-muted);font-size:.8rem;text-align:center">MSc in Physics. 15 years in secondary education.</p>
+        </div>
+      </div>
+      <div class="pub-card pub-leader-card" data-reveal>
+        <div class="pub-card__body">
+          <img src="https://picsum.photos/seed/sfa-leader4/200/200" alt="Director of Sports" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent)">
+          <h3 style="text-align:center">Mr. Daniel Tetteh</h3>
+          <p style="color:var(--pub-accent);font-size:.875rem;font-weight:600;text-align:center;margin:.2rem 0 .5rem">Director of Sports</p>
+          <p style="color:var(--pub-text-muted);font-size:.8rem;text-align:center">Former national athlete. 12 years coaching.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="pub-section">
+  <div class="pub-container">
+    <div class="pub-cta-band" data-reveal>
+      <h2>Come and See for Yourself</h2>
+      <p>Book a campus visit and meet the team behind {{ identity.name|default:"Springfield Academy" }}.</p>
+      <div class="pub-hero__actions">
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">Book a Visit</a>
+        <a href="{% url 'public:academics' %}" class="pub-btn pub-btn--outline pub-btn--lg">Explore Academics</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

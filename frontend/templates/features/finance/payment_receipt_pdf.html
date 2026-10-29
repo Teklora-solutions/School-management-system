@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Receipt {{ payment.receipt_number }}</title>
+  <style>
+    body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 12pt; color: #111; margin: 0; padding: 0; }
+    .page { padding: 30px 40px; }
+    .school-header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 20px; }
+    .school-name { font-size: 22pt; font-weight: 700; letter-spacing: 0.03em; }
+    .doc-title { font-size: 14pt; font-weight: 600; text-align: center; margin: 10px 0 20px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10pt; }
+    .meta-table td { padding: 4px 8px; }
+    .meta-table td:first-child { font-weight: 600; width: 150px; color: #444; }
+    .alloc-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    .alloc-table th { background: #333; color: #fff; padding: 7px 10px; font-size: 10pt; text-align: left; }
+    .alloc-table td { padding: 6px 10px; border-bottom: 1px solid #ddd; font-size: 10pt; }
+    .amount-box { border: 2px solid #333; padding: 12px 18px; display: inline-block; margin-bottom: 20px; }
+    .amount-box .label { font-size: 9pt; color: #666; }
+    .amount-box .value { font-size: 20pt; font-weight: 700; }
+    .reversed { color: #cf222e; font-weight: 700; text-transform: uppercase; }
+    .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 9pt; color: #777; text-align: center; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="school-header">
+    <div class="school-name">{{ SCHOOL_NAME }}</div>
+  </div>
+
+  <div class="doc-title">Official Payment Receipt</div>
+
+  {% if payment.is_reversed %}
+    <p class="reversed">Reversed{% if payment.reversal_reason %}: {{ payment.reversal_reason }}{% endif %}</p>
+  {% endif %}
+
+  <table class="meta-table">
+    <tr>
+      <td>Receipt No.:</td>
+      <td>{{ payment.receipt_number }}</td>
+      <td style="width:120px;font-weight:600;color:#444;">Date:</td>
+      <td>{{ payment.payment_date|date:"j M Y" }}</td>
+    </tr>
+    <tr>
+      <td>Student:</td>
+      <td>{{ payment.student.user.get_full_name }}</td>
+      <td style="font-weight:600;color:#444;">Admission No.:</td>
+      <td>{{ payment.student.admission_number }}</td>
+    </tr>
+    <tr>
+      <td>Class:</td>
+      <td>{{ payment.student.current_class.name|default:"—" }}</td>
+      <td style="font-weight:600;color:#444;">Method:</td>
+      <td>{{ payment.get_method_display }}</td>
+    </tr>
+    <tr>
+      <td>Payment Reference:</td>
+      <td colspan="3">{{ payment.reference }}</td>
+    </tr>
+  </table>
+
+  <div class="amount-box">
+    <div class="label">Amount Received</div>
+    <div class="value">{{ currency }} {{ payment.amount|floatformat:2 }}</div>
+  </div>
+
+  {% if payment.allocations.all %}
+  <table class="alloc-table">
+    <thead>
+      <tr>
+        <th>Invoice</th>
+        <th>Term</th>
+        <th style="text-align:right;">Allocated</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for allocation in payment.allocations.all %}
+      <tr>
+        <td>{{ allocation.invoice.invoice_number }}</td>
+        <td>{{ allocation.invoice.term }}</td>
+        <td style="text-align:right;">{{ currency }} {{ allocation.allocated_amount|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if payment.notes %}
+    <p style="font-size:10pt;color:#444;"><strong>Notes:</strong> {{ payment.notes }}</p>
+  {% endif %}
+
+  <p style="font-size:9pt;color:#555;">
+    Recorded by {{ payment.recorded_by.get_full_name|default:"—" }}.
+    This receipt is valid without a signature.
+  </p>
+
+  <div class="footer">
+    {{ SCHOOL_NAME }} &mdash; Confidential
+  </div>
+
+</div>
+</body>
+</html>

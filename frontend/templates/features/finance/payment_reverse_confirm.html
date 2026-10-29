@@ -1,0 +1,131 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Reverse {{ payment.receipt_number }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-arrow-counterclockwise me-2" style="color:var(--color-danger);" aria-hidden="true"></i>
+        Reverse receipt {{ payment.receipt_number }}
+      </h1>
+      <p class="page-subtitle">
+        {{ payment.student.user.full_name }} ·
+        {{ payment.student.admission_number }} ·
+        received {{ payment.payment_date|date:"j M Y" }}
+      </p>
+    </div>
+    <a href="{% url 'finance:payment_detail' payment.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back to the receipt
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0">Confirm the reversal</h2>
+      </div>
+      <div class="card-body">
+        {% if payment.is_reversed %}
+        <div class="alert alert-danger mb-0">
+          <strong>Already reversed.</strong> This receipt has no balance left to
+          give back.
+        </div>
+        {% else %}
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+          </div>
+          {% endif %}
+          <div class="mb-3">
+            <label for="{{ form.reason.id_for_label }}" class="form-label fw-600">
+              Reason for reversal <span class="text-danger">*</span>
+            </label>
+            {{ form.reason }}
+            {% if form.reason.errors %}
+            <div class="invalid-feedback d-block">{{ form.reason.errors.0 }}</div>
+            {% endif %}
+            <div class="form-text">{{ form.reason.help_text }}</div>
+          </div>
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{% url 'finance:payment_detail' payment.pk %}" class="btn btn-outline-secondary">
+              Cancel
+            </a>
+            <button type="submit" class="btn btn-danger" id="btn-confirm-reversal">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Reverse this receipt
+            </button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">
+        <h2 class="card-title mb-0">What you are reversing</h2>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr>
+              <td class="text-muted-sm">Amount received</td>
+              <td class="text-end fw-600">
+                {{ currency }} {{ payment.amount|floatformat:2|intcomma }}
+              </td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Applied to invoices</td>
+              <td class="text-end">
+                {{ currency }} {{ payment.applied_amount|floatformat:2|intcomma }}
+              </td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Held as credit</td>
+              <td class="text-end">
+                {{ currency }} {{ payment.unapplied_amount|floatformat:2|intcomma }}
+              </td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Settled into</td>
+              <td class="text-end">{{ payment.settled_into|default:"—" }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Invoices it touched</td>
+              <td class="text-end">{{ payment.allocations.all|length }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h2 class="card-title h6">
+          <i class="bi bi-exclamation-triangle me-1" style="color:var(--color-warning);" aria-hidden="true"></i>
+          Read this before you save
+        </h2>
+        <ul class="mb-0 text-muted-sm" style="padding-left:1.1rem;line-height:1.7;">
+          <li>Nothing is deleted. A reversing journal entry is posted line by
+              line against the original, this receipt is flagged as reversed and a
+              negative receipt row is created dated today.</li>
+          <li>The balances return because every fee reader excludes a reversed
+              receipt — not because its allocation rows disappear. They stay here
+              as the record of which invoice the money had been put against.</li>
+          <li>The money leaves the account it arrived in, so a receipt that
+              settled into Student Credit Balances gives the surplus back there.</li>
+          <li>Above the school’s reversal threshold, this is refused unless an
+              Admin performs it. It is not one person’s decision.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

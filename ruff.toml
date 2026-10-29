@@ -1,0 +1,9 @@
+target-version = "py313"
+line-length = 88
+
+[lint]
+ignore = [
+    # Django forms/models declare mutable class attributes (`Meta.widgets`,
+    # `unique_together`, `allowed_roles`) by design.
+    "RUF012",
+]

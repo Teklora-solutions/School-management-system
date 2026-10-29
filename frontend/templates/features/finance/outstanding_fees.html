@@ -1,0 +1,185 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Outstanding Fees | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-exclamation-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Outstanding Fees
+      </h1>
+      <p class="page-subtitle">
+        Every pupil still owing in a term, largest first. A waiver that has been
+        posted is already taken off the debt; a credit balance is not a debtor and
+        is left off this list.
+      </p>
+    </div>
+    {% if term %}
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:outstanding_export' %}?{{ request.GET.urlencode }}"
+         class="btn btn-primary btn-sm">
+        <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export to Excel
+      </a>
+      <a href="{% url 'finance:send_reminders' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-megaphone me-1"></i>Send Reminders
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-5 col-lg-4">
+        <label class="form-label text-muted-sm mb-1" for="{{ form.term.id_for_label }}">Term</label>
+        {{ form.term }}
+        {% for error in form.term.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-sm-5 col-lg-4">
+        <label class="form-label text-muted-sm mb-1" for="{{ form.school_class.id_for_label }}">
+          {{ form.school_class.label }}
+        </label>
+        {{ form.school_class }}
+      </div>
+      <div class="col-sm-2 col-lg-4">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-search me-1"></i>Show
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if term %}
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ totals.billed|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">
+          Billed{% if selected_class_name %} · {{ selected_class_name }}{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-success);">
+        <i class="bi bi-cash" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ totals.collected|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Collected against this term</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-warning);">
+        <i class="bi bi-slash-circle" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ totals.adjusted|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Waived / adjusted</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-danger);">
+        <i class="bi bi-wallet2" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;color:var(--color-danger);">
+          {{ currency }} {{ totals.outstanding|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">
+          Outstanding · {{ rows|length }} pupil{{ rows|length|pluralize }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if rows %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Adm No.</th>
+            <th scope="col">Student</th>
+            <th scope="col">Class</th>
+            <th scope="col" class="text-end">Billed</th>
+            <th scope="col" class="text-end">Paid</th>
+            <th scope="col" class="text-end">Waived</th>
+            <th scope="col" class="text-end">Owing</th>
+            <th scope="col">Last payment</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="text-muted-sm">{{ row.admission_number }}</td>
+            <td class="fw-600">{{ row.name }}</td>
+            <td class="text-muted-sm">{{ row.class }}</td>
+            <td class="text-end">{{ currency }} {{ row.total_amount|floatformat:2|intcomma }}</td>
+            <td class="text-end text-success">{{ currency }} {{ row.amount_paid|floatformat:2|intcomma }}</td>
+            <td class="text-end text-warning">{{ currency }} {{ row.amount_adjusted|floatformat:2|intcomma }}</td>
+            <td class="text-end fw-600 text-danger">
+              {{ currency }} {{ row.amount_outstanding|floatformat:2|intcomma }}
+            </td>
+            <td class="text-muted-sm">{{ row.last_payment_date|date:"j M Y"|default:"Never paid" }}</td>
+            <td class="text-end text-nowrap">
+              <a href="{% url 'finance:student_statement' row.student.pk %}?term={{ term.pk }}"
+                 class="btn btn-sm btn-outline-primary" aria-label="Open statement for {{ row.name }}">
+                <i class="bi bi-person-lines-fill"></i>
+              </a>
+              <a href="{% url 'finance:payment_record' %}?student={{ row.student.pk }}"
+                 class="btn btn-sm btn-outline-success" aria-label="Take payment from {{ row.name }}">
+                <i class="bi bi-cash-coin"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-check2-circle fs-1 d-block mb-2" style="color:var(--color-success);"></i>
+      Nobody in {{ term }}{% if selected_class_name %} ({{ selected_class_name }}){% endif %}
+      owes fees.
+    </div>
+    {% endif %}
+  </div>
+  <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+    The four figures above are the term's own totals from the finance interface, so
+    they match the Director's page. They are not the sum of these rows: a pupil
+    holding a credit is deliberately not a debtor and does not appear here.
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-calendar-question" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm mb-0">Pick a term and press Show.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

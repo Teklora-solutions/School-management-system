@@ -1,0 +1,164 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Fee Reminders | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-megaphone me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Fee Reminders
+      </h1>
+      <p class="page-subtitle">
+        Publish a fees notice to the families who still owe.
+        {% if term %}Outstanding position for {{ term }}.{% endif %}
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:outstanding_fees' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-exclamation-circle me-1"></i>Who owes what
+      </a>
+      <a href="{% url 'finance:outstanding_fees' %}{% if term %}?term={{ term.pk }}{% endif %}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export the list
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-envelope me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          The notice
+        </h2>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+          </div>
+          {% endif %}
+          {{ form.student_ids }}
+
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.title.id_for_label }}">
+              {{ form.title.label }} <span class="text-danger">*</span>
+            </label>
+            {{ form.title }}
+            {% for error in form.title.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.body.id_for_label }}">
+              {{ form.body.label }} <span class="text-danger">*</span>
+            </label>
+            {{ form.body }}
+            {% for error in form.body.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send me-1"></i>Publish Reminder
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-people me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Pupils still owing{% if term %} — {{ term }}{% endif %}
+          <span class="badge" style="background:var(--accent-light);color:#fff;">
+            {{ outstanding|length }}
+          </span>
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Adm No.</th>
+              <th scope="col">Student</th>
+              <th scope="col">Class</th>
+              <th scope="col" class="text-end">Owing</th>
+              <th scope="col">Last payment</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in outstanding|slice:":40" %}
+            <tr>
+              <td class="text-muted-sm">{{ row.admission_number }}</td>
+              <td>
+                <a href="{% url 'finance:student_statement' row.student.pk %}">{{ row.name }}</a>
+              </td>
+              <td class="text-muted-sm">{{ row.class }}</td>
+              <td class="text-end fw-600 text-danger">
+                {{ currency }} {{ row.amount_outstanding|floatformat:2|intcomma }}
+              </td>
+              <td class="text-muted-sm">{{ row.last_payment_date|date:"j M Y"|default:"Never paid" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="text-muted-sm">
+                {% if term %}
+                  Nobody owes fees in {{ term }} — or no bills have been posted for it yet.
+                {% else %}
+                  No current term is set, so there is nothing to report on.
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if outstanding|length > 40 %}
+      <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+        Showing the 40 largest debts of {{ outstanding|length }}. Use
+        <a href="{% url 'finance:outstanding_export' %}{% if term %}?term={{ term.pk }}{% endif %}">
+          the export</a> for the full list.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-mic me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Who actually receives it
+        </h2>
+      </div>
+      <div class="card-body">
+        <p class="text-muted-sm">
+          Pressing <strong>Publish</strong> creates one announcement in
+          Communications, addressed by role to <strong>students and parents</strong>.
+          Every family therefore sees the same notice, including any whose fees are
+          already clear.
+        </p>
+        <div class="alert alert-warning mb-0" role="alert" style="font-size:0.85rem;">
+          <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+          Naming specific pupils in a reminder is not wired up yet: the list beside
+          this box is who to chase, not who will be contacted. Write the notice so it
+          reads as a general call, and use the export for individual follow-up.
+        </div>
+      </div>
+      <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+        Announcements are the school's own noticeboard — no email or SMS leaves the
+        system from this page.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,78 @@
+{% extends base_template %}
+
+{% block title %}{{ student.user.full_name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-person-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ student.user.full_name }}
+    </h1>
+    <p class="page-subtitle">{{ student.admission_number }} · {{ student.current_class.name|default:"No class" }}{% if student.current_stream %} / {{ student.current_stream.name }}{% endif %}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'students:pdf' student.pk %}" class="btn btn-outline-primary" target="_blank" rel="noopener noreferrer">
+      <i class="bi bi-file-earmark-pdf me-1"></i>Admission Form (PDF)
+    </a>
+    <a href="{% url 'students:list' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header"><h2 class="card-title">Student Details</h2></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4">Admission Number</dt>
+          <dd class="col-sm-8">{{ student.admission_number }}</dd>
+
+          <dt class="col-sm-4">Email</dt>
+          <dd class="col-sm-8">{{ student.user.email }}</dd>
+
+          <dt class="col-sm-4">Gender</dt>
+          <dd class="col-sm-8">{{ student.get_gender_display|default:"—" }}</dd>
+
+          <dt class="col-sm-4">Date of Birth</dt>
+          <dd class="col-sm-8">{{ student.date_of_birth|date:"d M Y"|default:"—" }}</dd>
+
+          <dt class="col-sm-4">Class</dt>
+          <dd class="col-sm-8">{{ student.current_class.name|default:"—" }}{% if student.current_stream %} / {{ student.current_stream.name }}{% endif %}</dd>
+
+          <dt class="col-sm-4">Enrolled</dt>
+          <dd class="col-sm-8">{{ student.enrollment_date|date:"d M Y"|default:"—" }}</dd>
+
+          <dt class="col-sm-4">Status</dt>
+          <dd class="col-sm-8">{{ student.get_status_display }}</dd>
+
+          <dt class="col-sm-4">Address</dt>
+          <dd class="col-sm-8">{{ student.address|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><h2 class="card-title">Guardians</h2></div>
+      <div class="card-body">
+        {% if student.guardian_links.all %}
+        <ul class="list-unstyled mb-0">
+          {% for gl in student.guardian_links.all %}
+          <li class="py-2 {% if not forloop.last %}border-bottom{% endif %}">
+            <div class="fw-600">{{ gl.parent.user.full_name }} {% if gl.is_primary %}<span class="badge ms-1" style="background:var(--accent);color:#fff;">Primary</span>{% endif %}</div>
+            <div class="text-muted-sm">{{ gl.get_relationship_display }} · {{ gl.parent.user.email }}{% if gl.parent.user.phone %} · {{ gl.parent.user.phone }}{% endif %}</div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted-sm mb-0">No guardians linked.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,116 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}{{ staff_user.get_full_name }} | Staff | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <a href="{% url 'accounts:staff_list' %}" class="btn btn-sm btn-outline-secondary mb-2">
+      <i class="bi bi-arrow-left me-1"></i>Back to Staff
+    </a>
+    <h1 class="page-title mt-1">
+      <i class="bi bi-person-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ staff_user.get_full_name|default:staff_user.username }}
+    </h1>
+    <p class="page-subtitle">
+      <span class="badge-role badge-role-{{ staff_user.role }}">{{ staff_user.get_role_display }}</span>
+      {% if not staff_user.is_active %}<span class="badge ms-2" style="background:var(--color-danger);color:#fff;">Inactive</span>{% endif %}
+      {% if staff_user.must_change_password %}<span class="badge ms-2" style="background:var(--color-warning);color:#000;">Password Reset Pending</span>{% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {# Reset password #}
+    <form method="post" action="{% url 'accounts:staff_reset_password' staff_user.pk %}"
+          onsubmit="return confirm('Reset password for {{ staff_user.get_full_name }}?')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-warning btn-sm" id="btn-reset-pwd-{{ staff_user.pk }}">
+        <i class="bi bi-key me-1"></i>Reset Password
+      </button>
+    </form>
+    {# Activate / Deactivate #}
+    {% if staff_user.is_active %}
+      <form method="post" action="{% url 'accounts:staff_deactivate' staff_user.pk %}"
+            onsubmit="return confirm('Deactivate {{ staff_user.get_full_name }}?')">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger btn-sm" id="btn-deactivate-{{ staff_user.pk }}">
+          <i class="bi bi-person-slash me-1"></i>Deactivate
+        </button>
+      </form>
+    {% else %}
+      <form method="post" action="{% url 'accounts:staff_reactivate' staff_user.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-success btn-sm" id="btn-reactivate-{{ staff_user.pk }}">
+          <i class="bi bi-person-check me-1"></i>Reactivate
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  {# Profile card #}
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Profile</h2></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-5 text-muted-sm">Full Name</dt>
+          <dd class="col-sm-7">{{ staff_user.get_full_name|default:"—" }}</dd>
+
+          <dt class="col-sm-5 text-muted-sm">Username</dt>
+          <dd class="col-sm-7">{{ staff_user.username }}</dd>
+
+          <dt class="col-sm-5 text-muted-sm">Email</dt>
+          <dd class="col-sm-7">{{ staff_user.email }}</dd>
+
+          <dt class="col-sm-5 text-muted-sm">Phone</dt>
+          <dd class="col-sm-7">{{ staff_user.phone|default:"—" }}</dd>
+
+          <dt class="col-sm-5 text-muted-sm">Role</dt>
+          <dd class="col-sm-7">{{ staff_user.get_role_display }}</dd>
+
+          <dt class="col-sm-5 text-muted-sm">Joined</dt>
+          <dd class="col-sm-7">{{ staff_user.date_joined|date:"d M Y" }}</dd>
+
+          <dt class="col-sm-5 text-muted-sm">Last Login</dt>
+          <dd class="col-sm-7">{{ staff_user.last_login|date:"d M Y H:i"|default:"Never" }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  {# Activity / Audit #}
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header"><h2 class="card-title">Recent Audit Events</h2></div>
+      <div class="card-body p-0">
+        {% with logs=staff_user.audit_logs.all|slice:":10" %}
+        {% if logs %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th>Object</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in logs %}
+              <tr>
+                <td><code class="text-muted-sm">{{ log.action }}</code></td>
+                <td class="text-muted-sm">{{ log.content_type }}#{{ log.object_id }}</td>
+                <td class="text-muted-sm">{{ log.created_at|date:"d M H:i" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted-sm">No audit events yet.</div>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

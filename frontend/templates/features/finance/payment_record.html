@@ -1,0 +1,375 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Take Payment | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-cash-coin me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Take Payment
+      </h1>
+      <p class="page-subtitle">
+        Pick the class, find the pupil, and the page tells you what they owe.
+        The receipt is applied to their oldest open bill first; anything left
+        over is held as credit on the account.
+      </p>
+    </div>
+    <a href="{% url 'finance:payment_list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>All payments
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-7">
+    <form method="post" enctype="multipart/form-data" novalidate id="payment-form">
+      {% csrf_token %}
+      {{ form.idempotency_key }}
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="card mb-3" id="payment-picker" data-currency="{{ currency }}">
+        <div class="card-header">
+          <h2 class="card-title mb-0">
+            <i class="bi bi-person-badge me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+            Who is paying?
+          </h2>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-5">
+              <label for="class-filter" class="form-label fw-600">Class</label>
+              <select id="class-filter" class="form-select" aria-label="Filter pupils by class">
+                <option value="">All classes</option>
+                {% for option in class_options %}
+                <option value="{{ option.id }}">
+                  {{ option.name }} · {{ option.count }} pupil{{ option.count|pluralize }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-7">
+              <label for="pupil-search" class="form-label fw-600">Find a pupil</label>
+              <input type="search" id="pupil-search" class="form-control"
+                     placeholder="Name or admission number…" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label for="{{ form.student.id_for_label }}" class="form-label fw-600">
+              Student <span class="text-danger">*</span>
+            </label>
+            {{ form.student }}
+            {% if form.student.errors %}
+            <div class="invalid-feedback d-block">{{ form.student.errors.0 }}</div>
+            {% endif %}
+            <div class="form-text" id="picker-count">
+              {{ pupil_data|length }} pupil{{ pupil_data|length|pluralize }} in school.
+            </div>
+          </div>
+
+          <div class="mt-3 p-3 rounded" id="pupil-card"
+               style="background:var(--color-surface-2);border:1px solid var(--color-border);"
+               {% if not selected %}hidden{% endif %}>
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+              <div>
+                <div class="fw-600" id="card-name">{{ selected.name }}</div>
+                <div class="text-muted-sm" id="card-meta">
+                  {{ selected.admission }} · {{ selected.class_name }}
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="pay-full"
+                      {% if not selected %}disabled{% elif selected.total <= 0 %}disabled{% endif %}>
+                <i class="bi bi-wallet2 me-1"></i>Pay the whole balance
+              </button>
+            </div>
+
+            <div class="row g-2 mt-3 text-center">
+              <div class="col-4">
+                <div class="text-muted-sm" style="font-size:0.78rem;">Billed this term</div>
+                <div class="fw-600" id="card-billed">
+                  {{ currency }} {{ selected.billed|floatformat:2|intcomma }}
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="text-muted-sm" style="font-size:0.78rem;">Paid this term</div>
+                <div class="fw-600 text-success" id="card-paid">
+                  {{ currency }} {{ selected.paid|floatformat:2|intcomma }}
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="text-muted-sm" style="font-size:0.78rem;">Owes this term</div>
+                <div class="fw-600 text-danger" id="card-due">
+                  {% if selected.due is None %}—{% else %}{{ currency }} {{ selected.due|floatformat:2|intcomma }}{% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="text-muted-sm mt-2" style="font-size:0.78rem;" id="no-term-note"
+                 {% if term or not selected %}hidden{% endif %}>
+              No term is marked current, so only what is owed from earlier terms is shown.
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mt-3 pt-3"
+                 style="border-top:1px solid var(--color-border);">
+              <div>
+                <div class="text-muted-sm" style="font-size:0.78rem;">Brought forward from earlier terms</div>
+                <div class="fw-600" id="card-arrears">
+                  {{ currency }} {{ selected.arrears|floatformat:2|intcomma }}
+                </div>
+              </div>
+              <div class="text-end">
+                <div class="text-muted-sm" style="font-size:0.78rem;">Total to collect</div>
+                <div class="fw-600 fs-5" id="card-total">
+                  {{ currency }} {{ selected.total|floatformat:2|intcomma }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3 text-muted-sm" id="pupil-card-empty" {% if selected %}hidden{% endif %}>
+            Pick a pupil to see what they owe before you take the money.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title mb-0">
+            <i class="bi bi-pencil-square me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+            New receipt
+          </h2>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label for="{{ form.amount.id_for_label }}" class="form-label fw-600">
+                Amount ({{ currency }}) <span class="text-danger">*</span>
+              </label>
+              {{ form.amount }}
+              {% if form.amount.errors %}
+              <div class="invalid-feedback d-block">{{ form.amount.errors.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.method.id_for_label }}" class="form-label fw-600">
+                How it arrived <span class="text-danger">*</span>
+              </label>
+              {{ form.method }}
+              {% if form.method.errors %}
+              <div class="invalid-feedback d-block">{{ form.method.errors.0 }}</div>
+              {% endif %}
+              <div class="form-text">
+                Fees are not taken in cash — a fee always settles into Bank or
+                Mobile Money.
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-sm-7">
+              <label for="{{ form.reference.id_for_label }}" class="form-label fw-600">
+                Payment reference <span class="text-danger">*</span>
+              </label>
+              {{ form.reference }}
+              {% if form.reference.errors %}
+              <div class="invalid-feedback d-block">{{ form.reference.errors.0 }}</div>
+              {% endif %}
+              <div class="form-text">{{ form.reference.help_text }}</div>
+            </div>
+            <div class="col-sm-5">
+              <label for="{{ form.payment_date.id_for_label }}" class="form-label fw-600">
+                Date received <span class="text-danger">*</span>
+              </label>
+              {{ form.payment_date }}
+              {% if form.payment_date.errors %}
+              <div class="invalid-feedback d-block">{{ form.payment_date.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label for="{{ form.payer_name.id_for_label }}" class="form-label fw-600">
+                Who handed it in
+              </label>
+              {{ form.payer_name }}
+              {% if form.payer_name.errors %}
+              <div class="invalid-feedback d-block">{{ form.payer_name.errors.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.attachment.id_for_label }}" class="form-label fw-600">
+                Slip or confirmation
+              </label>
+              {{ form.attachment }}
+              {% if form.attachment.errors %}
+              <div class="invalid-feedback d-block">{{ form.attachment.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.notes.id_for_label }}" class="form-label fw-600">Notes</label>
+            {{ form.notes }}
+            {% if form.notes.errors %}
+            <div class="invalid-feedback d-block">{{ form.notes.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{% url 'finance:payment_list' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="btn-record-payment">
+              <i class="bi bi-check2 me-1"></i>Record payment
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-signpost-split me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          What happens when you save
+        </h2>
+      </div>
+      <div class="card-body">
+        <ul class="mb-0 text-muted-sm" style="padding-left:1.1rem;line-height:1.7;">
+          <li>A receipt number is taken from this year’s sequence, so none is
+              ever reused or skipped twice.</li>
+          <li>The posting is
+              <strong>DR the settling account / CR Fees Receivable</strong>, and
+              the settling account is stored on the receipt rather than re-derived
+              later.</li>
+          <li>Money is applied to the pupil’s oldest open invoice first — this
+              term’s and earlier terms’ alike. An overpayment is not a note: it
+              posts to Student Credit Balances and is spent on the next invoice.</li>
+          <li>A reference that already exists is refused, and submitting this form
+              twice does not post twice.</li>
+          <li>A reversal needs a reason of at least 10 characters. Above the
+              school’s threshold it is a second signature away, not a click.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ pupil_data|json_script:"pupil-data" }}
+<script>
+(function () {
+  var payload = JSON.parse(document.getElementById('pupil-data').textContent);
+  var picker = document.getElementById('payment-picker');
+  var select = document.getElementById('id_student');
+  if (!picker || !select) { return; }
+
+  var currency = picker.getAttribute('data-currency') || '';
+  var classFilter = document.getElementById('class-filter');
+  var search = document.getElementById('pupil-search');
+  var count = document.getElementById('picker-count');
+  var card = document.getElementById('pupil-card');
+  var empty = document.getElementById('pupil-card-empty');
+  var noTermNote = document.getElementById('no-term-note');
+  var payFull = document.getElementById('pay-full');
+  var amount = document.getElementById('id_amount');
+
+  var byId = {};
+  payload.forEach(function (pupil) { byId[String(pupil.id)] = pupil; });
+
+  function money(value) {
+    if (value === null) { return '—'; }
+    return currency + ' ' + Number(value).toLocaleString('en-US', {
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+  }
+
+  function labelFor(pupil) {
+    var text = pupil.admission + ' · ' + pupil.name;
+    return classFilter.value ? text : text + ' · ' + pupil.class_name;
+  }
+
+  function text(id, value) {
+    var node = document.getElementById(id);
+    if (node) { node.textContent = value; }
+  }
+
+  function show(pupil) {
+    if (!pupil) {
+      card.hidden = true;
+      empty.hidden = false;
+      return;
+    }
+    card.hidden = false;
+    empty.hidden = true;
+    text('card-name', pupil.name);
+    text('card-meta', pupil.admission + ' · ' + pupil.class_name);
+    text('card-billed', money(pupil.billed));
+    text('card-paid', money(pupil.paid));
+    text('card-due', money(pupil.due));
+    text('card-arrears', money(pupil.arrears));
+    text('card-total', money(pupil.total));
+    noTermNote.hidden = pupil.due !== null;
+    payFull.disabled = !(Number(pupil.total) > 0);
+    payFull.setAttribute('data-total', pupil.total);
+  }
+
+  function matches(pupil, needle) {
+    if (classFilter.value && String(pupil.class_id) !== classFilter.value) {
+      return false;
+    }
+    if (!needle) { return true; }
+    var haystack = (pupil.name + ' ' + pupil.admission).toLowerCase();
+    return needle.split(/\s+/).every(function (word) {
+      return haystack.indexOf(word) !== -1;
+    });
+  }
+
+  function build() {
+    var needle = (search.value || '').trim().toLowerCase();
+    var keep = select.value;
+    var visible = payload.filter(function (pupil) { return matches(pupil, needle); });
+
+    select.innerHTML = '';
+    // Never silently select the first pupil: a receipt posted against the
+    // wrong child is a correction somebody has to make by hand.
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Choose a pupil…';
+    select.appendChild(placeholder);
+    visible.forEach(function (pupil) {
+      var option = document.createElement('option');
+      option.value = String(pupil.id);
+      option.textContent = labelFor(pupil);
+      select.appendChild(option);
+    });
+    select.value = byId[keep] && matches(byId[keep], needle) ? keep : '';
+    count.textContent = visible.length + ' of ' + payload.length +
+      ' pupil' + (payload.length === 1 ? '' : 's') + ' shown.';
+    show(byId[select.value]);
+  }
+
+  // Enter in the search box must filter, not submit a half-filled receipt.
+  search.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') { event.preventDefault(); }
+  });
+  search.addEventListener('input', build);
+  classFilter.addEventListener('change', build);
+  select.addEventListener('change', function () { show(byId[select.value]); });
+
+  payFull.addEventListener('click', function () {
+    amount.value = payFull.getAttribute('data-total');
+    amount.focus();
+  });
+
+  build();
+})();
+</script>
+{% endblock content %}

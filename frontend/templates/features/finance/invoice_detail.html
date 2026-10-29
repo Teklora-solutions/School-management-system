@@ -1,0 +1,220 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Invoice {{ invoice.invoice_number }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-file-earmark-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Invoice {{ invoice.invoice_number }}
+      </h1>
+      <p class="page-subtitle">
+        {{ invoice.student.user.full_name }} · {{ invoice.student.admission_number }} ·
+        {{ invoice.student.current_class.name|default:"No class" }} — {{ invoice.term }}
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:payment_record' %}?student={{ invoice.student.pk }}"
+         class="btn btn-primary btn-sm">
+        <i class="bi bi-cash-coin me-1"></i>Take Payment
+      </a>
+      <a href="{% url 'finance:adjustment_create' %}?student={{ invoice.student.pk }}&invoice={{ invoice.pk }}"
+         class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-slash-circle me-1"></i>Waive / Adjust
+      </a>
+      <a href="{% url 'finance:student_statement' invoice.student.pk %}?term={{ invoice.term.pk }}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-person-lines-fill me-1"></i>Statement
+      </a>
+    </div>
+  </div>
+</div>
+
+{% if invoice.status != 'posted' %}
+<div class="alert alert-warning d-flex align-items-center gap-2" role="status">
+  <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+  <div>
+    This invoice is <strong>{{ invoice.get_status_display|lower }}</strong>. Only posted
+    bills are counted as billed, so none of the figures on the overview or class pages
+    include it.
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ invoice.total_amount|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Billed</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-success);">
+        <i class="bi bi-cash" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ invoice.paid_here|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Paid here</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-warning);">
+        <i class="bi bi-slash-circle" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ invoice.adjusted_here|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Waived / adjusted</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:{% if invoice.outstanding_here > 0 %}var(--color-danger){% else %}var(--color-success){% endif %};">
+        <i class="bi bi-wallet2" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ invoice.outstanding_here|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">
+          {% if invoice.outstanding_here < 0 %}Credit on this bill{% else %}Still owing{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-list-ul me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          What this bill is made of
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Item</th>
+              <th scope="col">Due</th>
+              <th scope="col" class="text-end">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in invoice.lines.all %}
+            <tr>
+              <td>{{ line.label }}</td>
+              <td class="text-muted-sm">{{ line.due_date|date:"j M Y"|default:"—" }}</td>
+              <td class="text-end">{{ currency }} {{ line.amount|floatformat:2|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="3" class="text-muted-sm">No fee lines were recorded on this bill.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-info-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Record
+        </h2>
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5 text-muted-sm">Status</dt>
+          <dd class="col-7">{{ invoice.get_status_display }}</dd>
+          <dt class="col-5 text-muted-sm">Issued</dt>
+          <dd class="col-7">{{ invoice.issued_date|date:"j M Y" }}</dd>
+          <dt class="col-5 text-muted-sm">Due</dt>
+          <dd class="col-7">{{ invoice.due_date|date:"j M Y"|default:"Not set" }}</dd>
+          <dt class="col-5 text-muted-sm">Fee structure</dt>
+          <dd class="col-7">
+            <a href="{% url 'finance:fee_structure_detail' invoice.fee_structure.pk %}">
+              {{ invoice.fee_structure }} (v{{ invoice.fee_structure.version }})
+            </a>
+          </dd>
+          <dt class="col-5 text-muted-sm">Posted by</dt>
+          <dd class="col-7">{{ invoice.posted_by.full_name|default:"—" }}</dd>
+          <dt class="col-5 text-muted-sm">Posted at</dt>
+          <dd class="col-7">{{ invoice.posted_at|date:"j M Y H:i"|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-receipt me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Receipts applied to this bill
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Receipt</th>
+              <th scope="col">Method</th>
+              <th scope="col" class="text-end">Applied</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alloc in invoice.allocations.all %}
+            <tr {% if alloc.payment.is_reversed %}class="text-muted"{% endif %}>
+              <td class="text-muted-sm">{{ alloc.payment.payment_date|date:"j M Y" }}</td>
+              <td>
+                <a href="{% url 'finance:payment_detail' alloc.payment.pk %}" class="fw-600">
+                  {{ alloc.payment.receipt_number }}
+                </a>
+                {% if alloc.payment.is_reversed %}
+                <span class="badge" style="background:var(--color-danger);color:#fff;"
+                      title="This receipt was given back, so its allocation is not counted in Paid here.">
+                  reversed
+                </span>
+                {% endif %}
+              </td>
+              <td class="text-muted-sm">{{ alloc.payment.get_method_display }}</td>
+              <td class="text-end {% if not alloc.payment.is_reversed %}text-success{% endif %}">
+                {{ currency }} {{ alloc.allocated_amount|floatformat:2|intcomma }}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-muted-sm">Nothing has been paid against this bill yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+        Reversed receipts are listed so the history stays visible, but “Paid here”
+        counts only the receipts that still stand.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

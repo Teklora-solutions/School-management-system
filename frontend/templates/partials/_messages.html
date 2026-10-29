@@ -1,0 +1,23 @@
+{# partials/_messages.html #}
+{# Django messages rendered as auto-dismissing toasts in bottom-right corner #}
+{% if messages %}
+<div class="messages-container" role="alert" aria-live="polite">
+  {% for message in messages %}
+  <div class="toast-msg msg-{{ message.tags|default:'info' }}">
+    <span class="toast-icon">
+      {% if message.tags == 'success' %}<i class="bi bi-check-circle-fill" style="color:var(--color-success);"></i>
+      {% elif message.tags == 'warning' %}<i class="bi bi-exclamation-triangle-fill" style="color:var(--color-warning);"></i>
+      {% elif message.tags == 'error' %}<i class="bi bi-x-circle-fill" style="color:var(--color-danger);"></i>
+      {% else %}<i class="bi bi-info-circle-fill" style="color:var(--color-info);"></i>
+      {% endif %}
+    </span>
+    <span class="flex-1" style="font-size:0.875rem;">{{ message }}</span>
+    <button class="toast-close" type="button"
+            style="background:none;border:none;color:var(--color-muted);cursor:pointer;padding:0;line-height:1;"
+            aria-label="Close notification">
+      <i class="bi bi-x"></i>
+    </button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

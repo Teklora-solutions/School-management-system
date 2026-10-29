@@ -1,0 +1,558 @@
+{% extends base_template %}
+
+{% block title %}{% if mode == "edit" %}Edit homework{% else %}New homework{% endif %} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .hw-dropzone {
+    border: 2px dashed var(--color-border);
+    border-radius: 14px;
+    padding: 1.4rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+    background: rgba(255, 255, 255, .02);
+  }
+  .hw-dropzone:hover,
+  .hw-dropzone:focus-visible {
+    border-color: var(--accent-light);
+    background: rgba(99, 102, 241, .07);
+    outline: none;
+  }
+  .hw-dropzone.is-dragover {
+    border-color: var(--accent-light);
+    background: rgba(99, 102, 241, .14);
+  }
+  .hw-file-row {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .45rem .6rem;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .02);
+    margin-bottom: .4rem;
+  }
+  .hw-file-row.is-removed {
+    opacity: .45;
+    border-color: var(--color-danger);
+  }
+  .hw-file-name {
+    font-size: .85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hw-file-meta { font-size: .72rem; color: var(--color-muted); }
+  .hw-chip {
+    border-radius: 999px;
+    padding: .15rem .65rem;
+    font-size: .75rem;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text);
+  }
+  .hw-chip:hover { border-color: var(--accent-light); color: var(--accent-light); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-end justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-journal-plus me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {% if mode == "edit" %}Edit homework{% else %}New homework{% endif %}
+    </h1>
+    <p class="page-subtitle">
+      {% if mode == "edit" %}
+        {{ homework.school_class.name }} · {{ homework.subject.name }}
+        {% if homework.stream %} · {{ homework.stream.name }}{% endif %}
+      {% else %}
+        Pick one of your classes and a subject you teach there, then write the work.
+      {% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if mode == "edit" %}
+    <a href="{% url 'homework:teacher_preview' homework.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-eye me-1"></i>Preview
+    </a>
+    {% endif %}
+    <a href="{% url 'homework:teacher_list' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back to Homework
+    </a>
+  </div>
+</div>
+
+{% if not has_assignments %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-journal-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    You have no subject assignments this year, so there is no class to set homework for.
+    Ask an administrator to assign you a class and subject.
+  </div>
+</div>
+{% elif not has_terms %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-calendar-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    Homework opens once an academic year and a term are configured.
+  </div>
+</div>
+{% else %}
+
+{% if form.non_field_errors %}
+<div class="alert alert-danger" role="alert">
+  {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" id="homework-form" novalidate>
+  {% csrf_token %}
+  <div class="row g-3">
+
+    {# ── Left column: what and where ──────────────────────────────── #}
+    <div class="col-lg-8">
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <h2 class="card-title">
+            <i class="bi bi-diagram-3 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+            Class &amp; subject
+          </h2>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-6 col-xl-3">
+              <label for="id_school_class" class="form-label fw-600">Class</label>
+              <select name="school_class" id="id_school_class" class="form-select" required>
+                <option value="">Choose a class</option>
+                {% for opt in form.class_options %}
+                <option value="{{ opt.pk }}" data-class-id="{{ opt.pk }}"
+                  {% if form.school_class.value|stringformat:"s" == opt.pk|stringformat:"s" %}selected{% endif %}>
+                  {{ opt.name }}
+                </option>
+                {% endfor %}
+              </select>
+              {% for error in form.school_class.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+              <label for="id_subject" class="form-label fw-600">Subject</label>
+              <select name="subject" id="id_subject" class="form-select" required>
+                <option value="">Choose a subject</option>
+                {% for opt in form.subject_options %}
+                <option value="{{ opt.id }}" data-class-id="{{ opt.class_id }}"
+                  {% if form.subject.value|stringformat:"s" == opt.id|stringformat:"s" %}selected{% endif %}>
+                  {{ opt.name }}
+                </option>
+                {% endfor %}
+              </select>
+              {% for error in form.subject.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+              <label for="id_stream" class="form-label fw-600">Stream</label>
+              <select name="stream" id="id_stream" class="form-select">
+                <option value="">All streams</option>
+                {% for opt in form.stream_options %}
+                <option value="{{ opt.id }}" data-class-id="{{ opt.class_id }}"
+                  {% if form.stream.value|stringformat:"s" == opt.id|stringformat:"s" %}selected{% endif %}>
+                  {{ opt.name }}
+                </option>
+                {% endfor %}
+              </select>
+              {% for error in form.stream.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+              <label for="id_term" class="form-label fw-600">Term</label>
+              <select name="term" id="id_term" class="form-select" required>
+                {% for opt in form.term_options %}
+                <option value="{{ opt.pk }}"
+                  {% if form.term.value|stringformat:"s" == opt.pk|stringformat:"s" %}selected{% endif %}>
+                  {{ opt.get_name_display }}
+                </option>
+                {% endfor %}
+              </select>
+              {% for error in form.term.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+          <p class="text-muted-sm mt-3 mb-0">
+            <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
+            Only your own allocations are listed. Homework goes to every active student in
+            the class{% if form.stream_options %} — or one stream, if you pick one{% endif %}.
+          </p>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <h2 class="card-title">
+            <i class="bi bi-pencil-square me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+            The work
+          </h2>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label for="id_title" class="form-label fw-600">Title</label>
+            {{ form.title }}
+            {% for error in form.title.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label for="id_description" class="form-label fw-600">Instructions</label>
+            {{ form.description }}
+            <div class="d-flex justify-content-between">
+              <div class="form-text text-muted-sm">Line breaks are kept; students see this exactly as typed.</div>
+              <div class="form-text text-muted-sm"><span id="desc-counter">0</span> characters</div>
+            </div>
+            {% for error in form.description.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+          </div>
+
+          <div>
+            <label for="id_due_date" class="form-label fw-600">Due date</label>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <div style="max-width:220px;flex:1 1 180px;">{{ form.due_date }}</div>
+              <div class="d-flex flex-wrap gap-1" role="group" aria-label="Quick due date">
+                <button type="button" class="hw-chip" data-due-days="0">Today</button>
+                <button type="button" class="hw-chip" data-due-days="1">Tomorrow</button>
+                <button type="button" class="hw-chip" data-due-days="3">In 3 days</button>
+                <button type="button" class="hw-chip" data-due-days="7">Next week</button>
+              </div>
+            </div>
+            {% for error in form.due_date.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    {# ── Right column: files and publishing ───────────────────────── #}
+    <div class="col-lg-4">
+
+      <div class="card mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h2 class="card-title mb-0">
+            <i class="bi bi-paperclip me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+            Files
+          </h2>
+          <span class="text-muted-sm" style="font-size:.75rem;">{{ max_attachments }} max</span>
+        </div>
+        <div class="card-body">
+
+          {% if existing_attachments %}
+          <div class="mb-3">
+            <div class="text-muted-sm mb-2" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;">Attached</div>
+            {% for att in existing_attachments %}
+            <div class="hw-file-row">
+              {% if att.is_image %}
+              <i class="bi bi-file-earmark-image" aria-hidden="true"></i>
+              {% elif att.is_pdf %}
+              <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+              {% else %}
+              <i class="bi bi-file-earmark-word" aria-hidden="true"></i>
+              {% endif %}
+              <div class="flex-grow-1" style="min-width:0;">
+                <div class="hw-file-name" title="{{ att }}">{{ att }}</div>
+                <div class="hw-file-meta">{{ att.size_kb }} KB</div>
+              </div>
+              <a href="{% url 'homework:attachment_file' homework.pk att.pk %}" target="_blank" rel="noopener"
+                 class="btn btn-sm btn-outline-secondary" title="Open file" aria-label="Open {{ att }}">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </a>
+              <label class="btn btn-sm btn-outline-danger mb-0 hw-remove-label" title="Remove when you save">
+                <input type="checkbox" name="remove_attachment" value="{{ att.pk }}" class="hw-remove-toggle d-none">
+                <i class="bi bi-trash"></i>
+              </label>
+            </div>
+            {% endfor %}
+            <div class="text-muted-sm" style="font-size:.75rem;">Removed files are deleted when you save.</div>
+          </div>
+          {% endif %}
+
+          <div class="hw-dropzone" id="hw-dropzone" role="button" tabindex="0"
+               aria-label="Add homework files">
+            <i class="bi bi-cloud-arrow-up fs-3 d-block mb-1" style="color:var(--accent-light);" aria-hidden="true"></i>
+            <div class="fw-600" style="font-size:.9rem;">Drop files here or click to browse</div>
+            <div class="text-muted-sm" style="font-size:.78rem;">Images, PDF or Word · 10 MB each</div>
+            <input type="file" name="attachments" id="id_attachments" class="d-none" multiple
+                   accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx">
+          </div>
+          <div id="hw-file-error" class="text-danger mt-2" style="font-size:.8rem;" role="status" aria-live="polite"></div>
+          <div id="hw-file-list" class="mt-2"></div>
+          <div class="text-muted-sm mt-1" style="font-size:.75rem;">
+            <span id="hw-file-count">0</span> file(s) ready to upload
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <i class="bi bi-send me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+            {% if mode == "edit" %}Publishing{% else %}Publish{% endif %}
+          </h2>
+        </div>
+        <div class="card-body">
+          {% if mode == "edit" %}
+            <p class="mb-3">
+              {% if homework.status == "published" %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">Published</span>
+                <span class="text-muted-sm">Students can see this homework now.</span>
+              {% else %}
+                <span class="badge" style="background:var(--color-muted);color:#fff;">Draft</span>
+                <span class="text-muted-sm">Only you can see this homework.</span>
+              {% endif %}
+            </p>
+            <button type="submit" name="action" value="save" class="btn btn-primary w-100 mb-2">
+              <i class="bi bi-save me-1"></i>Save changes
+            </button>
+            {% if homework.status == "draft" %}
+            <button type="submit" name="action" value="publish" class="btn btn-outline-primary w-100">
+              <i class="bi bi-send-check me-1"></i>Publish now
+            </button>
+            {% else %}
+            <button type="submit" name="action" value="unpublish" class="btn btn-outline-warning w-100">
+              <i class="bi bi-eye-slash me-1"></i>Unpublish
+            </button>
+            <div class="text-muted-sm mt-2" style="font-size:.75rem;">
+              Unpublishing hides it from students. The homework and its files are kept.
+            </div>
+            {% endif %}
+          {% else %}
+            <p class="text-muted-sm">
+              <strong class="text-reset">Save draft</strong> keeps it private to you.
+              <strong class="text-reset">Publish now</strong> sends it straight to the students' portal
+              and their dashboard.
+            </p>
+            <button type="submit" name="action" value="draft" class="btn btn-outline-primary w-100 mb-2">
+              <i class="bi bi-save me-1"></i>Save draft
+            </button>
+            <button type="submit" name="action" value="publish" class="btn btn-primary w-100">
+              <i class="bi bi-send-check me-1"></i>Publish now
+            </button>
+          {% endif %}
+          <div class="text-center mt-3">
+            <a href="{% url 'homework:teacher_list' %}" class="text-muted-sm">Cancel</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</form>
+{% endif %}
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+(function () {
+  "use strict";
+
+  /* ── Class → subject / stream filtering ─────────────────────── */
+  var classSelect = document.getElementById("id_school_class");
+  var subjectSelect = document.getElementById("id_subject");
+  var streamSelect = document.getElementById("id_stream");
+
+  function syncSelect(select) {
+    if (!select || !classSelect) { return; }
+    var classId = classSelect.value;
+    var valid = true;
+    Array.prototype.forEach.call(select.options, function (opt) {
+      if (!opt.value) { return; }
+      var matches = !classId || opt.getAttribute("data-class-id") === classId;
+      opt.hidden = !matches;
+      opt.disabled = !matches;
+    });
+    if (select.value) {
+      var chosen = select.options[select.selectedIndex];
+      valid = chosen && !chosen.hidden;
+      if (!valid) { select.value = ""; }
+    }
+    return valid;
+  }
+
+  function syncAll() {
+    syncSelect(subjectSelect);
+    syncSelect(streamSelect);
+  }
+
+  if (classSelect) {
+    classSelect.addEventListener("change", syncAll);
+    syncAll();
+  }
+
+  /* ── Quick due date chips ───────────────────────────────────── */
+  var dueInput = document.getElementById("id_due_date");
+  Array.prototype.forEach.call(document.querySelectorAll("[data-due-days]"), function (btn) {
+    btn.addEventListener("click", function () {
+      if (!dueInput) { return; }
+      var d = new Date();
+      d.setDate(d.getDate() + parseInt(btn.getAttribute("data-due-days"), 10));
+      var yyyy = d.getFullYear();
+      var mm = String(d.getMonth() + 1).padStart(2, "0");
+      var dd = String(d.getDate()).padStart(2, "0");
+      dueInput.value = yyyy + "-" + mm + "-" + dd;
+    });
+  });
+
+  /* ── Instructions counter ───────────────────────────────────── */
+  var desc = document.getElementById("id_description");
+  var counter = document.getElementById("desc-counter");
+  if (desc && counter) {
+    var updateCount = function () { counter.textContent = desc.value.length; };
+    desc.addEventListener("input", updateCount);
+    updateCount();
+  }
+
+  /* ── File picker / dropzone ─────────────────────────────────── */
+  var input = document.getElementById("id_attachments");
+  var dropzone = document.getElementById("hw-dropzone");
+  var listEl = document.getElementById("hw-file-list");
+  var errorEl = document.getElementById("hw-file-error");
+  var countEl = document.getElementById("hw-file-count");
+  if (!input || !dropzone || !listEl) { return; }
+
+  var MAX_FILES = {{ max_attachments }};
+  var MAX_BYTES = 10 * 1024 * 1024;
+  var ALLOWED = ["jpg", "jpeg", "png", "webp", "gif", "pdf", "doc", "docx"];
+  var pending = [];
+  var dataTransfer = new DataTransfer();
+
+  function extensionOf(name) {
+    var parts = name.split(".");
+    return parts.length > 1 ? parts.pop().toLowerCase() : "";
+  }
+
+  function sizeLabel(bytes) {
+    if (bytes >= 1024 * 1024) { return (bytes / (1024 * 1024)).toFixed(1) + " MB"; }
+    return Math.max(1, Math.round(bytes / 1024)) + " KB";
+  }
+
+  function keptExisting() {
+    var boxes = document.querySelectorAll(".hw-remove-toggle");
+    var removed = 0;
+    Array.prototype.forEach.call(boxes, function (box) { if (box.checked) { removed += 1; } });
+    return boxes.length - removed;
+  }
+
+  function allowedNew() {
+    return Math.max(0, MAX_FILES - keptExisting());
+  }
+
+  function render() {
+    listEl.innerHTML = "";
+    pending.forEach(function (file, index) {
+      var row = document.createElement("div");
+      row.className = "hw-file-row";
+
+      var icon = document.createElement("i");
+      icon.className = "bi bi-file-earmark-text";
+      icon.setAttribute("aria-hidden", "true");
+
+      var body = document.createElement("div");
+      body.className = "flex-grow-1";
+      body.style.minWidth = "0";
+      var name = document.createElement("div");
+      name.className = "hw-file-name";
+      name.textContent = file.name;
+      name.title = file.name;
+      var meta = document.createElement("div");
+      meta.className = "hw-file-meta";
+      meta.textContent = sizeLabel(file.size);
+      body.appendChild(name);
+      body.appendChild(meta);
+
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn btn-sm btn-outline-danger";
+      remove.setAttribute("aria-label", "Remove " + file.name);
+      remove.innerHTML = '<i class="bi bi-x-lg"></i>';
+      remove.addEventListener("click", function () {
+        pending.splice(index, 1);
+        sync();
+      });
+
+      row.appendChild(icon);
+      row.appendChild(body);
+      row.appendChild(remove);
+      listEl.appendChild(row);
+    });
+    countEl.textContent = pending.length;
+  }
+
+  function sync() {
+    dataTransfer.items.clear();
+    pending.forEach(function (file) { dataTransfer.items.add(file); });
+    input.files = dataTransfer.files;
+    render();
+  }
+
+  function addFiles(fileList) {
+    errorEl.textContent = "";
+    var limit = allowedNew();
+    Array.prototype.forEach.call(fileList, function (file) {
+      if (pending.length >= limit) {
+        errorEl.textContent = "You can attach at most " + MAX_FILES + " files in total.";
+        return;
+      }
+      if (ALLOWED.indexOf(extensionOf(file.name)) === -1) {
+        errorEl.textContent = file.name + " is not an image, PDF or Word document.";
+        return;
+      }
+      if (file.size > MAX_BYTES) {
+        errorEl.textContent = file.name + " is larger than 10 MB.";
+        return;
+      }
+      var duplicate = pending.some(function (other) {
+        return other.name === file.name && other.size === file.size;
+      });
+      if (!duplicate) { pending.push(file); }
+    });
+    sync();
+  }
+
+  dropzone.addEventListener("click", function () { input.click(); });
+  dropzone.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      input.click();
+    }
+  });
+  ["dragenter", "dragover"].forEach(function (type) {
+    dropzone.addEventListener(type, function (event) {
+      event.preventDefault();
+      dropzone.classList.add("is-dragover");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (type) {
+    dropzone.addEventListener(type, function (event) {
+      event.preventDefault();
+      dropzone.classList.remove("is-dragover");
+    });
+  });
+  dropzone.addEventListener("drop", function (event) {
+    if (event.dataTransfer && event.dataTransfer.files.length) {
+      addFiles(event.dataTransfer.files);
+    }
+  });
+  input.addEventListener("change", function () {
+    var files = input.files;
+    if (files.length) {
+      var chosen = Array.prototype.slice.call(files);
+      input.value = "";
+      addFiles(chosen);
+    }
+  });
+
+  /* ── Existing attachment removal ────────────────────────────── */
+  Array.prototype.forEach.call(document.querySelectorAll(".hw-remove-toggle"), function (box) {
+    box.addEventListener("change", function () {
+      var row = box.closest(".hw-file-row");
+      if (row) { row.classList.toggle("is-removed", box.checked); }
+    });
+  });
+})();
+</script>
+{% endblock %}

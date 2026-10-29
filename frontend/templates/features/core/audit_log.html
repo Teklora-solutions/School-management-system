@@ -1,0 +1,90 @@
+{% extends base_template %}
+
+{% block title %}Audit Log | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-clipboard-data me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Audit Log
+    </h1>
+    <p class="page-subtitle">Immutable trail of sensitive changes — filter by user, model, and date.</p>
+  </div>
+</div>
+
+{# ── Filters ─────────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-3">
+        {{ filter_form.actor.label_tag }}
+        {{ filter_form.actor }}
+      </div>
+      <div class="col-sm-3">
+        {{ filter_form.content_type.label_tag }}
+        {{ filter_form.content_type }}
+      </div>
+      <div class="col-sm-2">
+        {{ filter_form.date_from.label_tag }}
+        {{ filter_form.date_from }}
+      </div>
+      <div class="col-sm-2">
+        {{ filter_form.date_to.label_tag }}
+        {{ filter_form.date_to }}
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>Filter</button>
+        <a href="{% url 'core:audit_log' %}" class="btn btn-outline-secondary ms-1">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Audit table ─────────────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-body p-0">
+    {% if audit_logs %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">User</th>
+            <th scope="col">Action</th>
+            <th scope="col">Model</th>
+            <th scope="col">Object</th>
+            <th scope="col">Details</th>
+            <th scope="col">Request ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ev in audit_logs %}
+          <tr>
+            <td class="text-muted-sm" style="white-space:nowrap;">{{ ev.created_at|date:"d M Y H:i" }}</td>
+            <td class="fw-600">{{ ev.actor.full_name|default:ev.actor|default:"System" }}</td>
+            <td><span class="badge" style="background:var(--color-surface-2);color:var(--color-text);">{{ ev.action }}</span></td>
+            <td class="text-muted-sm">{{ ev.content_type }}</td>
+            <td class="text-muted-sm">#{{ ev.object_id|default:"—" }}</td>
+            <td class="text-muted-sm" style="max-width:22rem;">
+              {% for key, value in ev.change_summary.items %}
+                <div class="text-truncate">{{ key }}: {{ value }}</div>
+              {% endfor %}
+            </td>
+            <td class="text-muted-sm text-truncate" style="max-width:8rem;" title="{{ ev.request_id }}">{{ ev.request_id|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-clipboard-x fs-1 d-block mb-2"></i>
+      No audit events match these filters.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% include "partials/_pagination.html" %}
+{% endblock content %}

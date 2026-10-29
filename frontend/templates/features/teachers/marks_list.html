@@ -1,0 +1,77 @@
+{% extends base_template %}
+
+{% block title %}Enter Marks | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-pencil-square me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Enter Exam Marks
+  </h1>
+  <p class="page-subtitle">
+    {% if term %}{{ term.academic_year.name }} · {{ term.name|title }}{% else %}No current term has been set.{% endif %}
+  </p>
+</div>
+
+{% if not term %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-calendar-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    Marks entry opens once an academic year and current term are configured.
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body p-0">
+    {% if rows %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Class</th>
+            <th scope="col">Subject</th>
+            <th scope="col">Stream</th>
+            <th scope="col">Marks (this term)</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="fw-600">{{ row.school_class.name }}</td>
+            <td>{{ row.subject.name }}</td>
+            <td class="text-muted-sm">{{ row.stream.name|default:"All streams" }}</td>
+            <td>
+              {% if row.draft_count %}
+                <span class="badge bg-secondary">{{ row.draft_count }} draft</span>
+              {% endif %}
+              {% if row.submitted_count %}
+                <span class="badge" style="background:var(--color-warning);color:#000;">{{ row.submitted_count }} submitted</span>
+              {% endif %}
+              {% if row.approved_count %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">{{ row.approved_count }} approved</span>
+              {% endif %}
+              {% if not row.draft_count and not row.submitted_count and not row.approved_count %}
+                <span class="text-muted-sm">Not started</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{% url 'teachers:marks_entry' row.pk %}" class="btn btn-sm btn-primary">
+                <i class="bi bi-pencil-square me-1"></i>Enter Marks
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-journal-x fs-1 d-block mb-2" aria-hidden="true"></i>
+      You have no subject assignments this year. Ask an administrator to assign you a class and subject.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% comment %}
+  dashboards/finance/base.html
+  Role shell for Finance Officer.
+  Feature pages extend this via the base_template context variable.
+{% endcomment %}
+
+{% block sidebar %}
+  {% include "dashboards/finance/_sidebar.html" %}
+{% endblock %}
+
+{% block footer %}
+  {% include "dashboards/finance/_footer.html" %}
+{% endblock %}

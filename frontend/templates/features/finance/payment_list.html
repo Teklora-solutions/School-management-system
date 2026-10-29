@@ -1,0 +1,110 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Payments | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-cash-coin me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Payments
+      </h1>
+      <p class="page-subtitle">
+        Every receipt still standing. A reversed receipt is excluded here and
+        stays visible on its own record.
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:payment_record' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Take Payment
+      </a>
+      <a href="{% url 'finance:ledger' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-journal-text me-1"></i>Ledger
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if payments %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Receipt</th>
+            <th scope="col">Student</th>
+            <th scope="col">Class</th>
+            <th scope="col">Method</th>
+            <th scope="col">Reference</th>
+            <th scope="col" class="text-end">Amount</th>
+            <th scope="col" class="text-end">Unapplied</th>
+            <th scope="col">Recorded by</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment in payments %}
+          <tr>
+            <td class="text-muted-sm">{{ payment.payment_date|date:"j M Y" }}</td>
+            <td>
+              <a href="{% url 'finance:payment_detail' payment.pk %}" class="fw-600">
+                {{ payment.receipt_number }}
+              </a>
+            </td>
+            <td>
+              {{ payment.student.user.full_name }}
+              <div class="text-muted-sm">{{ payment.student.admission_number }}</div>
+            </td>
+            <td class="text-muted-sm">{{ payment.student.current_class.name|default:"—" }}</td>
+            <td class="text-muted-sm">{{ payment.get_method_display }}</td>
+            <td class="text-muted-sm">{{ payment.reference|default:"—" }}</td>
+            <td class="text-end fw-600 text-success">
+              {{ currency }} {{ payment.amount|floatformat:2|intcomma }}
+            </td>
+            <td class="text-end">
+              {% if payment.unapplied_amount > 0 %}
+                <span class="badge" style="background:var(--color-warning);color:#000;"
+                      title="Money received that no invoice has absorbed — the school is holding it as credit.">
+                  {{ currency }} {{ payment.unapplied_amount|floatformat:2|intcomma }}
+                </span>
+              {% elif payment.unapplied_amount < 0 %}
+                <span class="badge" style="background:var(--color-danger);color:#fff;">
+                  {{ currency }} {{ payment.unapplied_amount|floatformat:2|intcomma }}
+                </span>
+              {% else %}
+                <span class="text-muted-sm">—</span>
+              {% endif %}
+            </td>
+            <td class="text-muted-sm">{{ payment.recorded_by.full_name|default:"—" }}</td>
+            <td class="text-end text-nowrap">
+              <a href="{% url 'finance:payment_detail' payment.pk %}"
+                 class="btn btn-sm btn-outline-primary" aria-label="Open receipt {{ payment.receipt_number }}">
+                <i class="bi bi-eye"></i>
+              </a>
+              <a href="{% url 'finance:payment_receipt_pdf' payment.pk %}"
+                 class="btn btn-sm btn-outline-secondary" aria-label="Print receipt {{ payment.receipt_number }}">
+                <i class="bi bi-printer"></i>
+              </a>
+              <a href="{% url 'finance:payment_reverse' payment.pk %}"
+                 class="btn btn-sm btn-outline-danger" aria-label="Reverse receipt {{ payment.receipt_number }}">
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+      No receipts have been recorded yet.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

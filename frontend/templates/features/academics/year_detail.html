@@ -1,0 +1,145 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}{{ academic_year.name }} | Academic Years | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <a href="{% url 'academics:year_list' %}" class="btn btn-sm btn-outline-secondary mb-2">
+      <i class="bi bi-arrow-left me-1"></i>All Years
+    </a>
+    <h1 class="page-title mt-1">
+      {{ academic_year.name }}
+      {% if academic_year.is_current %}
+        <span class="badge ms-2" style="background:var(--color-success);color:#fff;">Current</span>
+      {% endif %}
+    </h1>
+    <p class="page-subtitle">{{ academic_year.start_date|date:"d M Y" }} – {{ academic_year.end_date|date:"d M Y" }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if not academic_year.is_current %}
+    <form method="post" action="{% url 'academics:year_set_current' academic_year.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-success btn-sm" id="btn-set-year-current">Set as Current</button>
+    </form>
+    {% endif %}
+    <a href="{% url 'academics:class_create' %}?year={{ academic_year.pk }}" class="btn btn-primary btn-sm" id="btn-add-class">
+      <i class="bi bi-plus me-1"></i>Add Class
+    </a>
+    {% if not academic_year.is_current %}
+    <form method="post" action="{% url 'academics:year_delete' academic_year.pk %}"
+          onsubmit="return confirm('Delete {{ academic_year.name }} with its {{ academic_year.terms.count }} term(s) and {{ academic_year.classes.count }} class(es)?')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger btn-sm" id="btn-delete-year">
+        <i class="bi bi-trash me-1"></i>Delete Year
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if not academic_year.from_calendar_picker %}
+<div class="alert alert-warning" role="alert" style="background:rgba(245,158,11,0.12);border-color:rgba(245,158,11,0.3);border-radius:var(--radius-sm);">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  This year was created before the year picker existed, so its name and dates do
+  not follow the school's September&ndash;July convention. Re-create it from
+  <a href="{% url 'academics:year_create' %}" style="color:var(--accent-light);">Add Academic Year</a>
+  once nothing is attached to it.
+</div>
+{% endif %}
+
+<div class="row g-4">
+  {# Terms #}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title">Terms</h2>
+        <a href="{% url 'academics:term_create' %}?year={{ academic_year.pk }}" class="btn btn-sm btn-outline-primary" id="btn-add-term">
+          <i class="bi bi-plus me-1"></i>Add missing term
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% with terms=academic_year.terms.all %}
+        {% if terms %}
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th>Term</th><th>Opens</th><th>Closes</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for term in terms %}
+            <tr>
+              <td class="fw-600">{{ term.get_name_display }}</td>
+              <td>
+                <form method="post" action="{% url 'academics:term_update' term.pk %}" class="d-flex align-items-center gap-2" id="term-dates-{{ term.pk }}">
+                  {% csrf_token %}
+                  <input type="date" name="start_date" value="{{ term.start_date|date:'Y-m-d' }}" required
+                         class="form-control form-control-sm" style="max-width:9.5rem;" id="id_term-{{ term.pk }}-start">
+                  <input type="date" name="end_date" value="{{ term.end_date|date:'Y-m-d' }}" required
+                         class="form-control form-control-sm" style="max-width:9.5rem;" id="id_term-{{ term.pk }}-end">
+                  <button type="submit" class="btn btn-sm btn-outline-primary" id="btn-term-save-{{ term.pk }}">Save</button>
+                </form>
+              </td>
+              <td class="text-muted-sm">{{ term.end_date|date:"d M Y" }}</td>
+              <td>
+                {% if term.is_current %}
+                  <span class="badge" style="background:var(--accent);color:#fff;">Current</span>
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% if not term.is_current %}
+                <form method="post" action="{% url 'academics:term_set_current' term.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-xs btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;" id="btn-term-set-{{ term.pk }}">Set Current</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="p-4 text-center text-muted-sm">
+          No terms yet. A year is expected to hold Term 1, Term 2 and Term 3.
+        </div>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+
+  {# Classes #}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Classes</h2></div>
+      <div class="card-body p-0">
+        {% with classes=academic_year.classes.all %}
+        {% if classes %}
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th>Class</th><th>Order</th><th>Streams</th><th>Class Teacher</th><th></th></tr></thead>
+          <tbody>
+            {% for cls in classes %}
+            <tr>
+              <td class="fw-600">{{ cls.name }}</td>
+              <td class="text-muted-sm">{{ cls.level_order }}</td>
+              <td>
+                {% for stream in cls.streams.all %}
+                  <span class="badge" style="background:var(--color-surface-2);border:1px solid var(--color-border);">{{ stream.name }}</span>
+                {% empty %}—{% endfor %}
+                <a href="{% url 'academics:stream_create' %}?class={{ cls.pk }}" class="btn btn-xs btn-outline-primary ms-1" style="font-size:0.65rem;padding:0.1rem 0.4rem;" id="btn-add-stream-{{ cls.pk }}">+</a>
+              </td>
+              <td class="text-muted-sm">{{ cls.class_teacher.get_full_name|default:"—" }}</td>
+              <td>
+                <a href="{% url 'academics:class_detail' cls.pk %}" class="btn btn-sm btn-outline-primary" id="btn-class-detail-{{ cls.pk }}">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="p-4 text-center text-muted-sm">No classes yet.</div>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

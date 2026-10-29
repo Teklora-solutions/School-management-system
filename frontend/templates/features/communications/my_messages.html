@@ -1,0 +1,85 @@
+{% extends base_template %}
+
+{% block title %}My Messages | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <h1 class="page-title mb-0">
+      <i class="bi bi-envelope-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      My Messages
+    </h1>
+    <a href="{% url 'communications:complaint_create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-circle me-1"></i>New Message
+    </a>
+  </div>
+</div>
+
+{# Status filter tabs #}
+<div class="mb-3">
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="?" class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+    {% for val, label in status_choices %}
+    <a href="?status={{ val }}" class="btn btn-sm {% if status_filter == val %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+{% if threads %}
+<div class="card">
+  <div class="card-body p-0">
+    <ul class="list-group list-group-flush" style="background:transparent;">
+      {% for thread in threads %}
+      <li class="list-group-item" style="background:transparent;border-color:var(--color-border);">
+        <a href="{% url 'communications:thread_detail' thread.pk %}" class="text-decoration-none d-flex justify-content-between align-items-start gap-3">
+          <div class="flex-grow-1">
+            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+              <span class="badge
+                {% if thread.message_type == 'complaint' %}bg-danger
+                {% elif thread.message_type == 'inquiry' %}bg-primary
+                {% else %}bg-success{% endif %}">
+                {{ thread.get_message_type_display }}
+              </span>
+              <span class="fw-600" style="color:var(--color-text);font-size:0.95rem;">{{ thread.subject }}</span>
+            </div>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+              <span class="text-muted-sm"><i class="bi bi-clock me-1"></i>
+                {% if thread.last_reply_at %}{{ thread.last_reply_at|date:"M j, Y" }}{% else %}{{ thread.created_at|date:"M j, Y" }}{% endif %}
+              </span>
+              <span class="text-muted-sm"><i class="bi bi-chat me-1"></i>{{ thread.message_count }} message{{ thread.message_count|pluralize }}</span>
+              {% if thread.assigned_to %}
+              <span class="text-muted-sm"><i class="bi bi-person-check me-1"></i>{{ thread.assigned_to.get_full_name }}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="flex-shrink-0 text-end">
+            <span class="badge
+              {% if thread.status == 'open' %}bg-warning text-dark
+              {% elif thread.status == 'in_progress' %}bg-primary
+              {% else %}bg-success{% endif %}">
+              {{ thread.get_status_display }}
+            </span>
+            <div class="mt-1"><i class="bi bi-chevron-right text-muted-sm" style="font-size:0.8rem;"></i></div>
+          </div>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-inbox" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm">No messages yet.</p>
+    <a href="{% url 'communications:complaint_create' %}" class="btn btn-outline-primary btn-sm mt-2">
+      <i class="bi bi-plus-circle me-1"></i>Send your first message
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}

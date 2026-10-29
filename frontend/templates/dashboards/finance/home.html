@@ -1,0 +1,174 @@
+{% extends "dashboards/finance/base.html" %}
+{% load humanize %}
+
+{% block title %}Finance Officer Dashboard | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-wallet2 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Finance Dashboard
+  </h1>
+  <p class="page-subtitle">
+    {% if current_term %}
+      {{ current_term.academic_year.name }} · {{ current_term.get_name_display }}
+    {% else %}
+      No current term has been set.
+    {% endif %}
+  </p>
+</div>
+
+{% if current_term %}
+<div class="row g-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-cash-coin" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.05rem;">{{ currency }} {{ collected_today|floatformat:2|intcomma }}</div>
+        <div class="stat-label">Collected Today</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-calendar-check" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.05rem;">{{ currency }} {{ collected_this_term|floatformat:2|intcomma }}</div>
+        <div class="stat-label">Collected This Term</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.05rem;">{{ currency }} {{ outstanding_total|floatformat:2|intcomma }}</div>
+        <div class="stat-label">Outstanding on Posted Invoices</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ collection_rate|floatformat:1 }}%</div>
+        <div class="stat-label">Collection Rate</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-receipt me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Recent Payments
+        </h2>
+        <a href="{% url 'finance:payment_list' %}" class="btn btn-outline-secondary btn-sm">All payments</a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_payments %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Receipt</th>
+                <th scope="col">Student</th>
+                <th scope="col">Method</th>
+                <th scope="col" class="text-end">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for payment in recent_payments %}
+              <tr>
+                <td class="text-muted-sm">{{ payment.payment_date|date:"j M Y" }}</td>
+                <td><a href="{% url 'finance:payment_detail' payment.pk %}" class="fw-600">{{ payment.receipt_number }}</a></td>
+                <td>
+                  {{ payment.student.user.full_name }}
+                  <div class="text-muted-sm">{{ payment.student.admission_number }}</div>
+                </td>
+                <td class="text-muted-sm">{{ payment.get_method_display }}</td>
+                <td class="text-end fw-600 text-success">{{ currency }} {{ payment.amount|floatformat:2|intcomma }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="p-3 text-muted-sm text-center">No payments recorded this term yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="row g-3">
+  <div class="col-12">
+    <div class="alert alert-warning mb-0" role="alert">
+      <i class="bi bi-exclamation-circle-fill me-2" aria-hidden="true"></i>
+      No current term is set, so fee totals cannot be calculated.
+      Set one under
+      <a href="{% url 'academics:year_list' %}" class="alert-link">Academic years</a>.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-lightning-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Quick Actions
+        </h2>
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'finance:payment_record' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-cash-stack me-1"></i>Record Payment
+          </a>
+          <a href="{% url 'finance:outstanding_fees' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-exclamation-circle me-1"></i>Outstanding Fees
+          </a>
+          <a href="{% url 'accounts:profile' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-person me-1"></i>My Profile
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-megaphone-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Recent Announcements
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_announcements %}
+        <ul class="list-group list-group-flush" style="background:transparent;">
+          {% for ann in recent_announcements %}
+          <li class="list-group-item {% if not ann.is_read %}fw-600{% endif %}"
+              style="background:transparent;border-color:var(--color-border);color:var(--color-text);">
+            {% if not ann.is_read %}<span class="badge bg-danger me-1" style="font-size:0.6rem;vertical-align:middle;">NEW</span>{% endif %}
+            <span style="font-size:0.9rem;">{{ ann.title }}</span>
+            <div class="text-muted-sm">{{ ann.created_at|date:"M j, Y" }}</div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="p-3 text-muted-sm text-center">No announcements yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

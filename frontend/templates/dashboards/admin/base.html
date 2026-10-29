@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% comment %}
+  dashboards/admin/base.html
+  Role shell for Admin.
+  Feature pages extend this via the base_template context variable.
+{% endcomment %}
+
+{% block sidebar %}
+  {% include "dashboards/admin/_sidebar.html" %}
+{% endblock %}
+
+{% block footer %}
+  {% include "dashboards/admin/_footer.html" %}
+{% endblock %}

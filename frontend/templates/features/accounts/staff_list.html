@@ -1,0 +1,106 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Staff Users | {{ SCHOOL_NAME }}{% endblock %}
+{% block meta_description %}Manage all staff accounts — teachers, directors, finance officers.{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-person-badge-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Staff Users
+    </h1>
+    <p class="page-subtitle">Manage teacher, director, and finance accounts.</p>
+  </div>
+  <a href="{% url 'accounts:staff_create' %}" class="btn btn-primary" id="btn-add-staff">
+    <i class="bi bi-person-plus-fill me-1"></i> Add Staff
+  </a>
+</div>
+
+{# ── Filter bar ─────────────────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" id="staff-filter-form" class="row g-2 align-items-end">
+      <div class="col-sm-5 col-md-4">
+        {{ filter_form.search.label_tag }}
+        {{ filter_form.search }}
+      </div>
+      <div class="col-sm-3 col-md-2">
+        {{ filter_form.role.label_tag }}
+        {{ filter_form.role }}
+      </div>
+      <div class="col-sm-3 col-md-2">
+        {{ filter_form.is_active.label_tag }}
+        {{ filter_form.is_active }}
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary" id="btn-filter-staff">
+          <i class="bi bi-search me-1"></i>Filter
+        </button>
+        <a href="{% url 'accounts:staff_list' %}" class="btn btn-outline-secondary ms-1">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Table ──────────────────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-body p-0">
+    {% if staff_users %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="staff-table">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Role</th>
+            <th scope="col">Email</th>
+            <th scope="col">Username</th>
+            <th scope="col">Status</th>
+            <th scope="col">Joined</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in staff_users %}
+          <tr>
+            <td>
+              <div class="fw-600">{{ u.get_full_name|default:u.username }}</div>
+              {% if u.phone %}<div class="text-muted-sm">{{ u.phone }}</div>{% endif %}
+            </td>
+            <td>
+              <span class="badge-role badge-role-{{ u.role }}">{{ u.get_role_display }}</span>
+            </td>
+            <td class="text-muted-sm">{{ u.email }}</td>
+            <td class="text-muted-sm">{{ u.username }}</td>
+            <td>
+              {% if u.is_active %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">Active</span>
+              {% else %}
+                <span class="badge" style="background:var(--color-danger);color:#fff;">Inactive</span>
+              {% endif %}
+              {% if u.must_change_password %}
+                <span class="badge ms-1" style="background:var(--color-warning);color:#000;">Pwd Reset</span>
+              {% endif %}
+            </td>
+            <td class="text-muted-sm">{{ u.date_joined|date:"d M Y" }}</td>
+            <td class="text-end">
+              <a href="{% url 'accounts:staff_detail' u.pk %}" class="btn btn-sm btn-outline-primary" id="btn-view-staff-{{ u.pk }}">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-person-x fs-1 d-block mb-2"></i>
+      No staff users found.
+      {% if request.GET %}<a href="{% url 'accounts:staff_list' %}">Clear filters</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% include "partials/_pagination.html" %}
+{% endblock content %}

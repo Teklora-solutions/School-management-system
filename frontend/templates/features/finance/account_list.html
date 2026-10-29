@@ -1,0 +1,153 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Chart of Accounts | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-diagram-2 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Chart of Accounts
+      </h1>
+      <p class="page-subtitle">
+        The accounts the books can post to. The numbered ones the system needs are
+        locked; only an expense account can be added here.
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:ledger' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-journal-text me-1"></i>Ledger
+      </a>
+      <a href="{% url 'finance:trial_balance' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-scale-loaded me-1"></i>Trial Balance
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th scope="col">Code</th>
+                <th scope="col">Account</th>
+                <th scope="col">Type</th>
+                <th scope="col">Grows on</th>
+                <th scope="col">Parent</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for account in accounts %}
+              <tr>
+                <td class="fw-600">{{ account.code }}</td>
+                <td>
+                  {{ account.name }}
+                  {% if account.is_system %}
+                  <i class="bi bi-lock-fill text-muted-sm"
+                     title="System account — the reports and postings depend on it."
+                     aria-hidden="true"></i>
+                  {% endif %}
+                  {% if account.is_contra %}
+                  <span class="badge" style="background:var(--color-muted);color:#fff;"
+                        title="Income the school gave up: it nets inside income, it is not a cost.">
+                    contra
+                  </span>
+                  {% endif %}
+                  {% if account.description %}
+                  <div class="text-muted-sm" style="font-size:0.75rem;">
+                    {{ account.description|truncatechars:110 }}
+                  </div>
+                  {% endif %}
+                </td>
+                <td class="text-muted-sm">{{ account.get_type_display }}</td>
+                <td class="text-muted-sm">{{ account.get_normal_side_display }}</td>
+                <td class="text-muted-sm">
+                  {% if account.parent %}{{ account.parent.code }} — {{ account.parent.name }}{% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if account.is_active %}
+                    <span class="badge" style="background:var(--color-success);color:#fff;">Open</span>
+                  {% else %}
+                    <span class="badge" style="background:var(--color-muted);color:#fff;">Closed</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="text-muted-sm">
+                  No accounts exist. Run the finance setup to seed the chart.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+        Closing an account stops new postings to it; it never changes what was
+        already posted.
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-plus-lg me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Add an expense account
+        </h2>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{% url 'finance:account_add_expense' %}">
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+          </div>
+          {% endif %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
+            {{ form.code }}
+            <div class="form-text">{{ form.code.help_text }}</div>
+            {% for error in form.code.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+            {{ form.name }}
+            {% for error in form.name.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.description.id_for_label }}">
+              {{ form.description.label }}
+            </label>
+            {{ form.description }}
+            {% for error in form.description.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-save me-1"></i>Create Account
+          </button>
+        </form>
+      </div>
+      <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+        A new account is an expense and grows on the debit side, like every cost.
+        Asset, liability, equity and income accounts are defined by the chart, not
+        typed in at a counter.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

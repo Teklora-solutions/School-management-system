@@ -1,0 +1,10 @@
+-r base.txt
+
+# Production database
+psycopg2-binary>=2.9,<3.0
+
+# Sentry
+sentry-sdk[django]>=2.7,<3.0
+
+# Gunicorn WSGI server
+gunicorn>=22.0,<23.0
