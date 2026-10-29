@@ -1,0 +1,111 @@
+{% extends base_template %}
+
+{% block title %}Homework | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-journal-bookmark-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Homework
+  </h1>
+  <p class="page-subtitle">Published assignments for {{ student.current_class.name|default:"your class" }}</p>
+</div>
+
+{# ── Filters ─────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-sm-auto">
+        <label class="text-muted-sm mb-1" for="id_term">Term</label>
+        <select name="term" id="id_term" class="form-select form-select-sm" style="min-width:170px;">
+          <option value="">All terms</option>
+          {% for t in terms %}
+          <option value="{{ t.pk }}" {% if selected_term_id == t.pk %}selected{% endif %}>
+            {{ t }} ({{ t.academic_year.name }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-sm-auto">
+        <label class="text-muted-sm mb-1" for="id_subject">Subject</label>
+        <select name="subject" id="id_subject" class="form-select form-select-sm" style="min-width:170px;">
+          <option value="">All subjects</option>
+          {% for sid, sname in subjects %}
+          <option value="{{ sid }}" {% if selected_subject_id == sid %}selected{% endif %}>{{ sname }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-sm-auto">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-funnel me-1"></i>Filter
+        </button>
+        <a href="{% url 'homework:list' %}" class="btn btn-outline-secondary btn-sm ms-1">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Homework list ───────────────────────────────────────────────── #}
+{% if homework_list %}
+<div class="row g-3">
+  {% for hw in homework_list %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100 {% if hw.is_overdue %}border-danger{% endif %}" style="{% if hw.is_overdue %}border-color:var(--color-danger)!important;{% endif %}">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <span class="badge"
+                style="background:var(--accent);color:#fff;font-size:0.75rem;">
+            {{ hw.subject.name }}
+          </span>
+          <span class="badge {% if hw.is_overdue %}bg-danger{% elif hw.due_date == today %}bg-warning text-dark{% else %}bg-secondary{% endif %}"
+                style="white-space:nowrap;">
+            {% if hw.is_overdue %}<i class="bi bi-exclamation-triangle-fill me-1"></i>Overdue: {% elif hw.due_date == today %}Due today: {% else %}Due: {% endif %}
+            {{ hw.due_date|date:"M j, Y" }}
+          </span>
+        </div>
+        <h2 style="font-size:0.95rem;font-weight:600;margin-bottom:0.4rem;">
+          {% if hw.is_new %}<span class="badge bg-danger me-1" style="font-size:0.6rem;vertical-align:middle;">NEW</span>{% endif %}
+          <a href="{% url 'homework:detail' hw.pk %}" class="text-decoration-none" style="color:inherit;">{{ hw.title }}</a>
+        </h2>
+        {% if hw.description %}
+        <p class="text-muted-sm mb-2" style="font-size:0.85rem;">{{ hw.description|truncatewords:25 }}</p>
+        {% endif %}
+        <div class="d-flex align-items-center gap-2 flex-wrap mt-auto pt-2">
+          {% if hw.set_by %}
+          <span class="text-muted-sm" style="font-size:0.8rem;">
+            <i class="bi bi-person me-1"></i>{{ hw.set_by.get_full_name|default:hw.set_by.username }}
+          </span>
+          {% endif %}
+          {% with file_count=hw.attachments.all|length %}
+          {% if file_count %}
+          <span class="text-muted-sm" style="font-size:0.8rem;">
+            <i class="bi bi-paperclip me-1"></i>{{ file_count }} file{{ file_count|pluralize }}
+          </span>
+          {% endif %}
+          {% endwith %}
+          <a href="{% url 'homework:detail' hw.pk %}" class="btn btn-outline-primary btn-sm ms-auto">
+            <i class="bi bi-box-arrow-in-right me-1"></i>Open
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-journal-x" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm">
+      {% if not student.current_class_id %}
+        No class is assigned to your account.
+      {% else %}
+        No published homework found for the selected filters.
+      {% endif %}
+    </p>
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}

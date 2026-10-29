@@ -1,0 +1,218 @@
+{% extends base_template %}
+
+{% block title %}Homework | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-end justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-journal-bookmark-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Homework
+    </h1>
+    <p class="page-subtitle">
+      {% if term %}{{ term.academic_year.name }} · {{ term.get_name_display }}{% else %}No current term has been set.{% endif %}
+      · Set work for the classes you teach
+    </p>
+  </div>
+  {% if has_assignments %}
+  <a href="{% url 'homework:teacher_create' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>New Homework
+  </a>
+  {% endif %}
+</div>
+
+{% if not has_assignments %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-journal-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    You have no subject assignments this year, so there is no class to set homework for.
+    Ask an administrator to assign you a class and subject.
+  </div>
+</div>
+{% else %}
+
+{# ── Counts ──────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-3">
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-pencil" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ counts.draft }}</div>
+        <div class="stat-label">Drafts</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-send-check" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ counts.published }}</div>
+        <div class="stat-label">Published</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value {% if counts.overdue %}text-danger{% endif %}">{{ counts.overdue }}</div>
+        <div class="stat-label">Past due date</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Filters ─────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-sm-auto">
+        <label class="text-muted-sm mb-1" for="id_filter_term">Term</label>
+        <select name="term" id="id_filter_term" class="form-select form-select-sm" style="min-width:170px;">
+          <option value="">All terms</option>
+          {% for t in terms %}
+          <option value="{{ t.pk }}" {% if selected_term_id == t.pk %}selected{% endif %}>
+            {{ t.get_name_display }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-sm-auto">
+        <label class="text-muted-sm mb-1" for="id_filter_class">Class</label>
+        <select name="class" id="id_filter_class" class="form-select form-select-sm" style="min-width:170px;">
+          <option value="">All classes</option>
+          {% for cls in classes %}
+          <option value="{{ cls.pk }}" {% if selected_class_id == cls.pk %}selected{% endif %}>{{ cls.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-sm-auto">
+        <label class="text-muted-sm mb-1" for="id_filter_status">Status</label>
+        <select name="status" id="id_filter_status" class="form-select form-select-sm" style="min-width:140px;">
+          <option value="">All statuses</option>
+          <option value="draft" {% if selected_status == "draft" %}selected{% endif %}>Draft</option>
+          <option value="published" {% if selected_status == "published" %}selected{% endif %}>Published</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-auto">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-funnel me-1"></i>Filter
+        </button>
+        <a href="{% url 'homework:teacher_list' %}" class="btn btn-outline-secondary btn-sm ms-1">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── List ────────────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-body p-0">
+    {% if rows %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Homework</th>
+            <th scope="col">Class &amp; subject</th>
+            <th scope="col">Due</th>
+            <th scope="col">Files</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>
+              <div class="fw-600">{{ row.title }}</div>
+              <div class="text-muted-sm">{{ row.term.get_name_display }}</div>
+            </td>
+            <td>
+              <div>{{ row.school_class.name }}</div>
+              <div class="text-muted-sm">
+                {{ row.subject.name }}{% if row.stream %} · {{ row.stream.name }}{% endif %}
+              </div>
+            </td>
+            <td style="white-space:nowrap;">
+              {{ row.due_date|date:"M j, Y" }}
+              {% if row.is_overdue %}
+              <span class="badge bg-danger d-block mt-1" style="font-size:0.65rem;">Past due</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.attachment_count %}
+              <span class="badge bg-secondary">{{ row.attachment_count }} file{{ row.attachment_count|pluralize }}</span>
+              {% else %}
+              <span class="text-muted-sm">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.status == "published" %}
+              <span class="badge" style="background:var(--color-success);color:#fff;">Published</span>
+              {% else %}
+              <span class="badge" style="background:var(--color-muted);color:#fff;">Draft</span>
+              {% endif %}
+            </td>
+            <td class="text-end" style="white-space:nowrap;">
+              {% if row.submission_count or row.status == "published" %}
+              <a href="{% url 'homework:teacher_submissions' row.pk %}" class="btn btn-sm btn-outline-secondary" title="Who has handed in">
+                <i class="bi bi-inbox"></i>
+                {% if row.submission_count %}<span class="ms-1">{{ row.submission_count }}</span>{% endif %}
+              </a>
+              {% endif %}
+              <a href="{% url 'homework:teacher_preview' row.pk %}" class="btn btn-sm btn-outline-secondary" title="Preview">
+                <i class="bi bi-eye"></i>
+              </a>
+              <a href="{% url 'homework:teacher_edit' row.pk %}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-pencil-square me-1"></i>Edit
+              </a>
+              <form method="post" action="{% url 'homework:teacher_publish' row.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                {% if row.status == "published" %}
+                <button type="submit" name="action" value="unpublish" class="btn btn-sm btn-outline-secondary" title="Hide from students">
+                  <i class="bi bi-eye-slash"></i>
+                </button>
+                {% else %}
+                <button type="submit" name="action" value="publish" class="btn btn-sm btn-primary" title="Publish to students">
+                  <i class="bi bi-send-check"></i>
+                </button>
+                {% endif %}
+              </form>
+              {% if row.status == "draft" %}
+              <form method="post" action="{% url 'homework:teacher_delete' row.pk %}" class="d-inline"
+                    onsubmit="return confirm('Delete this draft? This cannot be undone.');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete draft">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-5 text-center text-muted-sm">
+      <i class="bi bi-journal-plus fs-1 d-block mb-2" aria-hidden="true"></i>
+      No homework matches these filters.
+      <div class="mt-3">
+        <a href="{% url 'homework:teacher_create' %}" class="btn btn-primary btn-sm">
+          <i class="bi bi-plus-lg me-1"></i>Set the first homework
+        </a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<p class="text-muted-sm mt-3 mb-0">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  Drafts are private to you. Published homework appears immediately in every student's
+  Homework page and on their dashboard, and can still be edited or unpublished.
+</p>
+{% endif %}
+{% endblock content %}

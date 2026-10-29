@@ -1,0 +1,118 @@
+{% extends "public/base.html" %}
+{% block title %}Gallery &amp; School Life | {{ identity.name|default:"Springfield Academy" }}{% endblock %}
+
+{% block content %}
+
+<!-- HERO -->
+<header class="pub-hero pub-hero--image" style="background-image:url('https://picsum.photos/seed/sfa-gallery-bg/1600/600')">
+  <div class="pub-hero__overlay"></div>
+  <div class="pub-container">
+    <div data-reveal style="max-width:700px">
+      <p class="pub-eyebrow">School Life &amp; Gallery</p>
+      <h1 class="pub-hero__title">More Than <span>a Classroom</span></h1>
+      <p class="pub-hero__text">Sports, arts, science fairs, field trips and friendships — {{ identity.name|default:"Springfield" }} is a place where children discover who they are and what they love.</p>
+      <div class="pub-hero__actions">
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">&#9999; Apply Now</a>
+        <a href="#gallery" class="pub-btn pub-btn--outline pub-btn--lg">&#128247; View Gallery</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- GALLERY -->
+<section class="pub-section" id="gallery">
+  <div class="pub-container">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">Gallery</p>
+      <h2>Life at {{ identity.name|default:"Springfield" }}</h2>
+      <p>Filter by category or click any photo to view full size.</p>
+    </div>
+    <div class="pub-filters" data-reveal>
+      <button class="pub-filter-btn is-active" data-filter="all">All</button>
+      <button class="pub-filter-btn" data-filter="sports">Sports</button>
+      <button class="pub-filter-btn" data-filter="arts">Arts</button>
+      <button class="pub-filter-btn" data-filter="science">Science</button>
+      <button class="pub-filter-btn" data-filter="events">Events</button>
+    </div>
+    {% if photos %}
+    <div class="pub-gallery" data-reveal>
+      {% for photo in photos %}
+      <div class="pub-gallery__item" data-category="{{ photo.category|default:'events' }}">
+        <img src="{{ photo.image.url }}" alt="{{ photo.title }}" loading="lazy">
+        <div class="pub-gallery__overlay"><span>{{ photo.title }}</span></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <!-- Placeholder gallery when no photos uploaded yet -->
+    <div class="pub-gallery" data-reveal>
+      <div class="pub-gallery__item" data-category="sports"><img src="https://picsum.photos/seed/sfa-g1/600/450" alt="Football match" loading="lazy"><div class="pub-gallery__overlay"><span>Inter-House Football</span></div></div>
+      <div class="pub-gallery__item" data-category="science"><img src="https://picsum.photos/seed/sfa-g2/600/500" alt="Science lab" loading="lazy"><div class="pub-gallery__overlay"><span>Chemistry Practical</span></div></div>
+      <div class="pub-gallery__item" data-category="arts"><img src="https://picsum.photos/seed/sfa-g3/600/400" alt="Art class" loading="lazy"><div class="pub-gallery__overlay"><span>Painting Workshop</span></div></div>
+      <div class="pub-gallery__item" data-category="events"><img src="https://picsum.photos/seed/sfa-g4/600/480" alt="Graduation" loading="lazy"><div class="pub-gallery__overlay"><span>Class of 2025 Graduation</span></div></div>
+      <div class="pub-gallery__item" data-category="sports"><img src="https://picsum.photos/seed/sfa-g5/600/420" alt="Athletics" loading="lazy"><div class="pub-gallery__overlay"><span>Sports Day Relay</span></div></div>
+      <div class="pub-gallery__item" data-category="arts"><img src="https://picsum.photos/seed/sfa-g6/600/460" alt="Exhibition" loading="lazy"><div class="pub-gallery__overlay"><span>Winter Art Exhibition</span></div></div>
+      <div class="pub-gallery__item" data-category="science"><img src="https://picsum.photos/seed/sfa-g7/600/440" alt="Robotics" loading="lazy"><div class="pub-gallery__overlay"><span>Robotics Challenge</span></div></div>
+      <div class="pub-gallery__item" data-category="events"><img src="https://picsum.photos/seed/sfa-g8/600/500" alt="Science fair" loading="lazy"><div class="pub-gallery__overlay"><span>Annual Science Fair</span></div></div>
+      <div class="pub-gallery__item" data-category="arts"><img src="https://picsum.photos/seed/sfa-g9/600/430" alt="Music" loading="lazy"><div class="pub-gallery__overlay"><span>Spring Concert</span></div></div>
+      <div class="pub-gallery__item" data-category="sports"><img src="https://picsum.photos/seed/sfa-g10/600/460" alt="Basketball" loading="lazy"><div class="pub-gallery__overlay"><span>Basketball Finals</span></div></div>
+      <div class="pub-gallery__item" data-category="events"><img src="https://picsum.photos/seed/sfa-g11/600/400" alt="Cultural day" loading="lazy"><div class="pub-gallery__overlay"><span>Cultural Heritage Day</span></div></div>
+      <div class="pub-gallery__item" data-category="science"><img src="https://picsum.photos/seed/sfa-g12/600/480" alt="Field trip" loading="lazy"><div class="pub-gallery__overlay"><span>Biology Field Trip</span></div></div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Lightbox -->
+<div id="pubLightbox" class="pub-lightbox" role="dialog" aria-label="Image viewer" aria-modal="true" tabindex="-1">
+  <button id="pubLbClose" class="pub-lightbox__close" aria-label="Close">&#10005;</button>
+  <button id="pubLbPrev"  class="pub-lightbox__nav pub-lightbox__nav--prev" aria-label="Previous">&#8249;</button>
+  <img id="pubLbImg" class="pub-lightbox__img" src="" alt="">
+  <button id="pubLbNext"  class="pub-lightbox__nav pub-lightbox__nav--next" aria-label="Next">&#8250;</button>
+  <p id="pubLbCaption" class="pub-lightbox__caption"></p>
+</div>
+
+<!-- UPCOMING EVENTS -->
+<section class="pub-section pub-section--alt">
+  <div class="pub-container">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">Upcoming Events</p>
+      <h2>Mark Your Calendar</h2>
+    </div>
+    <div class="pub-grid pub-grid--2" style="max-width:800px;margin:0 auto">
+      {% for ev in upcoming_events %}
+      <div class="pub-key-date" data-reveal>
+        <div style="text-align:center;min-width:60px">
+          <div class="pub-key-date__day">{{ ev.date|date:"j" }}</div>
+          <div class="pub-key-date__month">{{ ev.date|date:"M" }}</div>
+        </div>
+        <div class="pub-key-date__info">
+          <div class="pub-key-date__title">{{ ev.title }}</div>
+          {% if ev.description %}<div class="pub-key-date__text">{{ ev.description }}</div>{% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Nov</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Annual Science Fair</div><div class="pub-key-date__text">9:00 AM — Main Hall. Open to all parents.</div></div></div>
+      <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">22</div><div class="pub-key-date__month">Nov</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Inter-House Sports Day</div><div class="pub-key-date__text">8:00 AM — Sports Field.</div></div></div>
+      <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">05</div><div class="pub-key-date__month">Dec</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Winter Art Exhibition</div><div class="pub-key-date__text">5:00 PM — Art Studios.</div></div></div>
+      <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">12</div><div class="pub-key-date__month">Dec</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Carol Service &amp; Concert</div><div class="pub-key-date__text">6:00 PM — Main Hall.</div></div></div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="pub-section">
+  <div class="pub-container">
+    <div class="pub-cta-band" data-reveal>
+      <h2>Want to See It in Person?</h2>
+      <p>Book a campus visit and experience {{ identity.name|default:"Springfield" }} for yourself.</p>
+      <div class="pub-hero__actions">
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">Book a Visit</a>
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--lg">Apply Now</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

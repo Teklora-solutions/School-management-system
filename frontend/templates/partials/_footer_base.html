@@ -1,0 +1,90 @@
+{% comment %}
+   partials/_footer_base.html
+
+   One footer for both sites. It renders the wide version — the school's details,
+   the page links and the portal doors — only when the view hands it
+   ``portal_links``, which only ``apps/public`` does. Every app page keeps the
+   single line it has always had, so this file is shared without the two sites
+   drifting apart.
+{% endcomment %}
+<footer class="app-footer{% if portal_links %} app-footer--wide{% endif %}" role="contentinfo">
+  {% if portal_links %}
+  <div class="container">
+    <div class="row g-4 pb-4">
+
+      <div class="col-12 col-lg-4">
+        <h2 class="footer-heading">{{ identity.name|default:SCHOOL_NAME }}</h2>
+        {% if identity.motto %}<p class="footer-motto">{{ identity.motto }}</p>{% endif %}
+        <address class="footer-details">
+          {% if identity.address %}
+          <span><i class="bi bi-geo-alt me-2" aria-hidden="true"></i>{{ identity.address|linebreaksbr }}</span>
+          {% endif %}
+          {% if identity.phone %}
+          <a href="tel:{{ identity.phone|cut:' ' }}">
+            <i class="bi bi-telephone me-2" aria-hidden="true"></i>{{ identity.phone }}
+          </a>
+          {% endif %}
+          {% if identity.email %}
+          <a href="mailto:{{ identity.email }}">
+            <i class="bi bi-envelope me-2" aria-hidden="true"></i>{{ identity.email }}
+          </a>
+          {% endif %}
+          {% if not identity.address and not identity.phone and not identity.email %}
+          <span class="footer-incomplete">
+            The school has not entered an address, phone or email yet — add them
+            under School Settings.
+          </span>
+          {% endif %}
+        </address>
+      </div>
+
+      <div class="col-6 col-lg-2">
+        <h2 class="footer-heading">Explore</h2>
+        <ul class="footer-links">
+          {% for link in nav_links %}
+          <li><a href="{{ link.url }}">{{ link.label }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="col-12 col-lg-3">
+        <h2 class="footer-heading">Sign in to a portal</h2>
+        <ul class="footer-links footer-links--portals">
+          {% for portal in portal_links %}
+          <li>
+            <a href="{{ portal.url }}">
+              <i class="bi {{ portal.icon }} me-2" aria-hidden="true"></i>{{ portal.label }}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="col-12 col-lg-3">
+        <h2 class="footer-heading">Joining us</h2>
+        <p class="footer-motto">
+          A question about classes, fees or a transfer? Send it to us and we
+          reply by email.
+        </p>
+        <a class="btn btn-primary btn-sm" href="{% url 'public:contact' %}">
+          <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>Contact us
+        </a>
+      </div>
+
+    </div>
+  </div>
+  <p class="footer-legal">
+    &copy; {% now "Y" %} <strong>{{ identity.name|default:SCHOOL_NAME }}</strong>.
+    All rights reserved.
+    &nbsp;·&nbsp;
+    School Management System
+  </p>
+  {% else %}
+  <p>
+    &copy; {% now "Y" %} <strong>{{ SCHOOL_NAME }}</strong>.
+    All rights reserved.
+    &nbsp;·&nbsp;
+    School Management System
+  </p>
+  {% endif %}
+</footer>

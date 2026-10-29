@@ -1,0 +1,137 @@
+{% extends "public/base.html" %}
+{% block title %}Academics | {{ identity.name|default:"Springfield Academy" }}{% endblock %}
+
+{% block content %}
+
+<!-- HERO -->
+<header class="pub-hero pub-hero--image" style="background-image:url('https://picsum.photos/seed/sfa-academics-bg/1600/600')">
+  <div class="pub-hero__overlay"></div>
+  <div class="pub-container">
+    <div data-reveal style="max-width:700px">
+      <span class="pub-hero__badge">&#127903; {% if overview.year %}{{ overview.year.name }}{% else %}2026/2027 Admissions Open{% endif %}</span>
+      <p class="pub-eyebrow">Academics</p>
+      <h1 class="pub-hero__title">Learning That <span>Lasts a Lifetime</span></h1>
+      <p class="pub-hero__text">From our play-based Early Years to our rigorous Secondary programme, every stage is designed to build knowledge, confidence and a genuine love of learning.</p>
+      <div class="pub-hero__actions">
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">&#9999; Apply Now</a>
+        <a href="#programs" class="pub-btn pub-btn--outline pub-btn--lg">&#128218; Explore Programs</a>
+      </div>
+      <div class="pub-hero__cards">
+        <div class="pub-hero__mini-card"><strong>3</strong><span>Programme Levels</span></div>
+        <div class="pub-hero__mini-card"><strong>{{ facts.subjects|default:"20+" }}</strong><span>Subjects</span></div>
+        <div class="pub-hero__mini-card"><strong>{{ facts.classes|default:"—" }}</strong><span>Classes</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- PROGRAMMES (TABS) -->
+<section class="pub-section" id="programs" data-tabs>
+  <div class="pub-container">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">Our Programmes</p>
+      <h2>Three Stages, One Journey</h2>
+      <p>Each programme builds on the last — with specialist teachers, age-appropriate challenge and a focus on the whole child.</p>
+    </div>
+    <div class="pub-tabs" data-reveal>
+      <button class="pub-tab is-active" data-tab="early">Early Years (Ages 3–6)</button>
+      <button class="pub-tab" data-tab="primary">Primary (Ages 6–11)</button>
+      <button class="pub-tab" data-tab="secondary">Secondary (Ages 11–18)</button>
+    </div>
+    <div class="pub-tab-panel is-active" data-panel="early">
+      <div class="pub-grid pub-grid--3">
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon">&#127979;</div><h3>Play-Based Learning</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Structured play develops language, motor skills and social-emotional foundations.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--teal">&#127909;</div><h3>Creative Arts</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Music, art and storytelling every day — imagination is the first step to understanding.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--rose">&#129490;</div><h3>Outdoor Discovery</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Our garden and outdoor classroom give children space to explore nature and build resilience.</p></div></div>
+      </div>
+    </div>
+    <div class="pub-tab-panel" data-panel="primary">
+      <div class="pub-grid pub-grid--3">
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon">&#128218;</div><h3>Strong Foundations</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Literacy, numeracy and inquiry-based science lay the groundwork for independent learners.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--purple">&#129504;</div><h3>Specialist Subjects</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">French, ICT, music and PE are taught by specialist teachers from Grade 1 onwards.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--teal">&#127941;</div><h3>Sports &amp; Clubs</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Football, swimming, chess, coding, drama — every child finds something they love.</p></div></div>
+      </div>
+    </div>
+    <div class="pub-tab-panel" data-panel="secondary">
+      <div class="pub-grid pub-grid--3">
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon">&#128300;</div><h3>Exam-Track Academics</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Rigorous preparation for BECE and WASSCE with small classes and specialist labs.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--rose">&#128187;</div><h3>Technology &amp; Innovation</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Robotics, coding and a makerspace prepare students for careers that don't exist yet.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--teal">&#127891;</div><h3>University Guidance</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">One-on-one counselling, career fairs and application support from Grade 10.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LIVE ACADEMIC CALENDAR -->
+{% if overview.terms or overview.classes %}
+<section class="pub-section pub-section--alt">
+  <div class="pub-container">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">Academic Calendar</p>
+      <h2>{% if overview.year %}{{ overview.year.name }}{% else %}Current Year{% endif %}</h2>
+    </div>
+    {% if overview.terms %}
+    <div class="pub-grid pub-grid--3" style="margin-bottom:2.5rem">
+      {% for term in overview.terms %}
+      <div class="pub-card" data-reveal>
+        <div class="pub-card__body">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+            <h3>{{ term.get_name_display }}</h3>
+            {% if term.is_current %}<span style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--pub-success);background:rgba(16,185,129,.13);border:1px solid rgba(16,185,129,.35);padding:.25rem .6rem;border-radius:99px">&#128308; Now</span>{% endif %}
+          </div>
+          <p style="color:var(--pub-text-muted);font-size:.85rem">{{ term.start_date|date:"j M Y" }} &ndash; {{ term.end_date|date:"j M Y" }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if overview.classes %}
+    <div class="pub-section-head" data-reveal style="margin-bottom:1.5rem">
+      <h3>Classes This Year</h3>
+    </div>
+    <div class="pub-grid pub-grid--4" data-reveal>
+      {% for cls in overview.classes %}
+      <div style="display:flex;align-items:center;gap:.75rem;padding:.85rem 1rem;background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:var(--pub-radius-sm)">
+        <span style="width:28px;height:28px;border-radius:50%;background:var(--pub-accent-glow);color:var(--pub-accent);display:grid;place-items:center;font-size:.75rem;font-weight:700;flex-shrink:0">{{ cls.level_order }}</span>
+        <div>
+          <div style="color:var(--pub-heading);font-weight:600;font-size:.9rem">{{ cls.name }}</div>
+          {% if cls.stream_count %}<div style="color:var(--pub-text-muted);font-size:.75rem">{{ cls.stream_count }} stream{{ cls.stream_count|pluralize }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<!-- FACILITIES -->
+<section class="pub-section">
+  <div class="pub-container">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">Our Facilities</p>
+      <h2>Built for Learning</h2>
+    </div>
+    <div class="pub-grid pub-grid--3">
+      <div class="pub-card" data-reveal><img class="pub-card__img" src="https://picsum.photos/seed/sfa-lab/600/375" alt="Science laboratory" loading="lazy"><div class="pub-card__body"><h3>Science Labs</h3><p style="color:var(--pub-text-muted);font-size:.875rem">Three dedicated labs for biology, chemistry and physics.</p></div></div>
+      <div class="pub-card" data-reveal><img class="pub-card__img" src="https://picsum.photos/seed/sfa-library/600/375" alt="School library" loading="lazy"><div class="pub-card__body"><h3>Library</h3><p style="color:var(--pub-text-muted);font-size:.875rem">12,000+ books, study spaces and a digital resource centre.</p></div></div>
+      <div class="pub-card" data-reveal><img class="pub-card__img" src="https://picsum.photos/seed/sfa-field/600/375" alt="Sports field" loading="lazy"><div class="pub-card__body"><h3>Sports Complex</h3><p style="color:var(--pub-text-muted);font-size:.875rem">Full-size pitch, athletics track and indoor courts.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="pub-section pub-section--alt">
+  <div class="pub-container">
+    <div class="pub-cta-band" data-reveal>
+      <h2>Which Programme Is Right for Your Child?</h2>
+      <p>Talk to our admissions team and we'll help you find the right fit.</p>
+      <div class="pub-hero__actions">
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">Apply Now</a>
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--lg">Book a Visit</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

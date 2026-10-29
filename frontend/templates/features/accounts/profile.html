@@ -1,0 +1,119 @@
+{% extends base_template %}
+
+{% block title %}My Profile | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">My Profile</h1>
+  <p class="page-subtitle">View your account details and change your password.</p>
+</div>
+
+<div class="row g-3">
+  {# Avatar / name card #}
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body text-center" style="padding:2rem;">
+        <div class="navbar-avatar mx-auto mb-3"
+             style="width:72px;height:72px;font-size:1.5rem;background:var(--accent);color:#fff;">
+          {{ user.first_name|first|default:user.username|first }}{{ user.last_name|first }}
+        </div>
+        <h2 style="font-size:1.1rem;margin-bottom:0.25rem;">{{ user.full_name }}</h2>
+        <p class="text-muted-sm">{{ user.email }}</p>
+        <span class="badge-role badge-role-{{ user.role }}">{{ user.get_role_display }}</span>
+      </div>
+    </div>
+
+    {# Change password #}
+    <div class="card mt-3">
+      <div class="card-header">
+        <h2 class="card-title" style="font-size:0.9rem;">Security</h2>
+      </div>
+      <div class="card-body">
+        <a href="{% url 'accounts:force_password_change' %}" class="btn btn-outline-primary btn-sm w-100">
+          <i class="bi bi-key me-1"></i>Change Password
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {# Account details #}
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Account Details</h2>
+      </div>
+      <div class="card-body">
+        <table class="table table-borderless" style="--bs-table-bg:transparent;color:var(--color-text);">
+          <tbody>
+            <tr><td style="color:var(--color-muted);width:35%;">Username</td><td>{{ user.username }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Full Name</td><td>{{ user.full_name }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Email</td><td>{{ user.email }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Phone</td><td>{{ user.phone|default:"—" }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Role</td><td>{{ user.get_role_display }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Member since</td><td>{{ user.created_at|date:"N j, Y" }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {# Student-specific #}
+    {% if student %}
+    <div class="card mt-3">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-backpack-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Student Details
+        </h2>
+      </div>
+      <div class="card-body">
+        <table class="table table-borderless" style="--bs-table-bg:transparent;color:var(--color-text);">
+          <tbody>
+            <tr><td style="color:var(--color-muted);width:35%;">Admission No.</td><td>{{ student.admission_number }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Date of Birth</td><td>{{ student.date_of_birth|date:"N j, Y"|default:"—" }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Gender</td><td>{{ student.get_gender_display|default:"—" }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Class</td><td>{{ student.current_class.name|default:"—" }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Stream</td><td>{{ student.current_stream.name|default:"—" }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Status</td><td>
+              <span class="badge {% if student.status == 'active' %}bg-success{% else %}bg-secondary{% endif %}">{{ student.get_status_display }}</span>
+            </td></tr>
+            <tr><td style="color:var(--color-muted);">Enrolled</td><td>{{ student.enrollment_date|date:"N j, Y"|default:"—" }}</td></tr>
+          </tbody>
+        </table>
+        <p class="text-muted-sm" style="font-size:0.8rem;margin-top:0.5rem;">
+          <i class="bi bi-info-circle me-1"></i>
+          To change your school records, please contact the school administration.
+        </p>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Parent-specific #}
+    {% if parent_profile %}
+    <div class="card mt-3">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-house-heart-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Guardian Details
+        </h2>
+      </div>
+      <div class="card-body">
+        <table class="table table-borderless" style="--bs-table-bg:transparent;color:var(--color-text);">
+          <tbody>
+            <tr><td style="color:var(--color-muted);width:35%;">Occupation</td><td>{{ parent_profile.occupation|default:"—" }}</td></tr>
+            <tr><td style="color:var(--color-muted);">Address</td><td>{{ parent_profile.address|default:"—" }}</td></tr>
+          </tbody>
+        </table>
+        <a href="{% url 'accounts:children' %}" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-people me-1"></i>View My Children
+        </a>
+        <p class="text-muted-sm mt-2" style="font-size:0.8rem;">
+          <i class="bi bi-info-circle me-1"></i>
+          To update your details, please contact the school administration.
+        </p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

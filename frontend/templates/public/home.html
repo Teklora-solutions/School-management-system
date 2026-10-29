@@ -1,0 +1,250 @@
+{% extends "public/base.html" %}
+{% block title %}{{ identity.name|default:"Springfield Academy" }} | Excellence in Education{% endblock %}
+
+{% block content %}
+
+<!-- HERO -->
+<header class="pub-hero">
+  <div class="pub-hero__bg"></div>
+  <div class="pub-container">
+    <div class="pub-hero__grid">
+      <div data-reveal>
+        <p class="pub-eyebrow">Welcome to {{ identity.name|default:"Springfield Academy" }}</p>
+        <h1 class="pub-hero__title">Where Curiosity Meets <span>Opportunity</span></h1>
+        {% if identity.motto %}<p class="pub-hero__motto">{{ identity.motto }}</p>{% endif %}
+        <p class="pub-hero__text">
+          {% if identity.about %}{{ identity.about|truncatewords:30 }}
+          {% else %}A vibrant learning community where every child is known, challenged and supported to discover their unique potential.{% endif %}
+        </p>
+        <div class="pub-hero__actions">
+          <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">&#9999; Apply Now</a>
+          <a href="{% url 'public:academics' %}" class="pub-btn pub-btn--outline pub-btn--lg">&#128218; Explore Programs</a>
+        </div>
+      </div>
+      <div data-reveal>
+        <div class="pub-carousel" tabindex="0" aria-label="Campus photos">
+          <div class="pub-carousel__track">
+            <div class="pub-carousel__slide">
+              <img src="https://picsum.photos/seed/sfa-classroom/900/560" alt="Students learning together" loading="eager">
+              <div class="pub-carousel__caption"><h3>Learning Together</h3><p>Collaborative classrooms from Early Years to Secondary</p></div>
+            </div>
+            <div class="pub-carousel__slide">
+              <img src="https://picsum.photos/seed/sfa-campus/900/560" alt="School campus" loading="lazy">
+              <div class="pub-carousel__caption"><h3>Our Campus</h3><p>A green, spacious campus designed for learning</p></div>
+            </div>
+            <div class="pub-carousel__slide">
+              <img src="https://picsum.photos/seed/sfa-science/900/560" alt="Science lab" loading="lazy">
+              <div class="pub-carousel__caption"><h3>Science in Action</h3><p>Hands-on labs for every year group</p></div>
+            </div>
+            <div class="pub-carousel__slide">
+              <img src="https://picsum.photos/seed/sfa-sports/900/560" alt="Sports day" loading="lazy">
+              <div class="pub-carousel__caption"><h3>Sports &amp; Spirit</h3><p>Athletics, arts, and clubs for every interest</p></div>
+            </div>
+          </div>
+          <button class="pub-carousel__btn pub-carousel__btn--prev" aria-label="Previous">&#8249;</button>
+          <button class="pub-carousel__btn pub-carousel__btn--next" aria-label="Next">&#8250;</button>
+          <div class="pub-carousel__dots"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- STATS -->
+<div class="pub-section--tight pub-section--alt">
+  <div class="pub-container">
+    <div class="pub-stats" data-reveal>
+      <div class="pub-stats__item">
+        <div class="pub-stat__num" {% if facts.pupils %}data-count="{{ facts.pupils }}"{% endif %}>{{ facts.pupils|default:"—" }}</div>
+        <div class="pub-stats__label">Students</div>
+      </div>
+      <div class="pub-stats__item">
+        <div class="pub-stat__num" {% if facts.teachers %}data-count="{{ facts.teachers }}"{% endif %}>{{ facts.teachers|default:"—" }}</div>
+        <div class="pub-stats__label">Teachers</div>
+      </div>
+      <div class="pub-stats__item">
+        <div class="pub-stat__num" {% if identity.years_running %}data-count="{{ identity.years_running }}" data-suffix="+"{% endif %}>{% if identity.years_running %}{{ identity.years_running }}+{% else %}—{% endif %}</div>
+        <div class="pub-stats__label">Years of Excellence</div>
+      </div>
+      <div class="pub-stats__item">
+        <div class="pub-stat__num" {% if facts.classes %}data-count="{{ facts.classes }}"{% endif %}>{{ facts.classes|default:"—" }}</div>
+        <div class="pub-stats__label">Classes This Year</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- WHY CHOOSE US — unique card design -->
+<section class="pub-section">
+  <div class="pub-container">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">Why Choose Us</p>
+      <h2>A School That Sees Every Child</h2>
+      <p>Four commitments that shape everything we do — from Early Years to graduation day.</p>
+    </div>
+    <div class="wcu-grid">
+
+      <div class="wcu-card wcu-card--gold" data-reveal>
+        <span class="wcu-card__num" aria-hidden="true">01</span>
+        <div class="wcu-card__icon">&#128218;</div>
+        <h3 class="wcu-card__title">Personalised Learning</h3>
+        <p class="wcu-card__text">Small class sizes and dedicated mentors mean every child gets the individual attention they need to truly thrive — academically and personally.</p>
+        <span class="wcu-card__tag">&#10003; Avg. 18 students per class</span>
+      </div>
+
+      <div class="wcu-card wcu-card--teal" data-reveal>
+        <span class="wcu-card__num" aria-hidden="true">02</span>
+        <div class="wcu-card__icon">&#129389;</div>
+        <h3 class="wcu-card__title">Whole-Child Focus</h3>
+        <p class="wcu-card__text">Academics, character, arts and athletics woven together. We develop confident, compassionate people — not just high scorers.</p>
+        <span class="wcu-card__tag">&#10003; Character &amp; wellbeing curriculum</span>
+      </div>
+
+      <div class="wcu-card wcu-card--indigo" data-reveal>
+        <span class="wcu-card__num" aria-hidden="true">03</span>
+        <div class="wcu-card__icon">&#128300;</div>
+        <h3 class="wcu-card__title">Modern Facilities</h3>
+        <p class="wcu-card__text">Purpose-built science labs, a 12,000-book library, art studios, sports fields and tech-enabled classrooms built for 21st-century learners.</p>
+        <span class="wcu-card__tag">&#10003; Renovated 2024</span>
+      </div>
+
+      <div class="wcu-card wcu-card--rose" data-reveal>
+        <span class="wcu-card__num" aria-hidden="true">04</span>
+        <div class="wcu-card__icon">&#127795;</div>
+        <h3 class="wcu-card__title">Green Campus</h3>
+        <p class="wcu-card__text">Gardens, outdoor learning spaces and a student-led sustainability programme. We teach children to care for the world they will inherit.</p>
+        <span class="wcu-card__tag">&#10003; Zero-waste initiative</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- OUR ACHIEVEMENTS — replaces "Sign In" portals section -->
+<section class="ach-section">
+  <div class="pub-container" style="position:relative;z-index:1">
+    <div class="pub-section-head" style="margin-bottom:clamp(2rem,4vw,3rem)" data-reveal>
+      <p class="pub-eyebrow ach-eyebrow">Our Track Record</p>
+      <h2 class="ach-heading">Results That Speak for Themselves</h2>
+      <p class="ach-sub">Forty years of nurturing young people. Here's what that looks like in numbers.</p>
+    </div>
+    <div class="ach-grid">
+      <div class="ach-card" data-reveal>
+        <span class="ach-card__icon">&#127891;</span>
+        <div class="ach-card__num" {% if facts.pupils %}data-count="{{ facts.pupils }}"{% endif %}>{{ facts.pupils|default:"1,200" }}</div>
+        <div class="ach-card__label">Students Enrolled</div>
+        <div class="ach-card__desc">Across Early Years, Primary &amp; Secondary</div>
+      </div>
+      <div class="ach-card" data-reveal>
+        <span class="ach-card__icon">&#127942;</span>
+        <div class="ach-card__num" data-count="98" data-suffix="%">98%</div>
+        <div class="ach-card__label">Pass Rate</div>
+        <div class="ach-card__desc">Consistent results year after year</div>
+      </div>
+      <div class="ach-card" data-reveal>
+        <span class="ach-card__icon">&#9997;&#65039;</span>
+        <div class="ach-card__num" {% if facts.teachers %}data-count="{{ facts.teachers }}"{% endif %}>{{ facts.teachers|default:"85" }}</div>
+        <div class="ach-card__label">Qualified Teachers</div>
+        <div class="ach-card__desc">Average 12 years experience</div>
+      </div>
+      <div class="ach-card" data-reveal>
+        <span class="ach-card__icon">&#127775;</span>
+        <div class="ach-card__num" {% if identity.years_running %}data-count="{{ identity.years_running }}" data-suffix="+"{% endif %}>{% if identity.years_running %}{{ identity.years_running }}+{% else %}40+{% endif %}</div>
+        <div class="ach-card__label">Years of Excellence</div>
+        <div class="ach-card__desc">Trusted by families since 1985</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NEWS PREVIEW -->
+<section class="pub-section">
+  <div class="pub-container">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">News &amp; Events</p>
+      <h2>What's Happening at {{ identity.name|default:"Springfield" }}</h2>
+    </div>
+    <div class="pub-grid pub-grid--3">
+      <div class="pub-card" data-reveal>
+        <img class="pub-card__img" src="https://picsum.photos/seed/sfa-event1/600/375" alt="Science fair" loading="lazy">
+        <div class="pub-card__body">
+          <p style="color:var(--pub-accent);font-family:var(--pub-font-h);font-size:1.5rem;font-weight:800;line-height:1">15 <span style="display:block;font-size:.75rem;color:var(--pub-text-muted);text-transform:uppercase;font-weight:600">Nov</span></p>
+          <h3 style="margin-top:.5rem">Annual Science Fair</h3>
+        </div>
+      </div>
+      <div class="pub-card" data-reveal>
+        <img class="pub-card__img" src="https://picsum.photos/seed/sfa-event2/600/375" alt="Sports day" loading="lazy">
+        <div class="pub-card__body">
+          <p style="color:var(--pub-accent);font-family:var(--pub-font-h);font-size:1.5rem;font-weight:800;line-height:1">22 <span style="display:block;font-size:.75rem;color:var(--pub-text-muted);text-transform:uppercase;font-weight:600">Nov</span></p>
+          <h3 style="margin-top:.5rem">Inter-House Sports Day</h3>
+        </div>
+      </div>
+      <div class="pub-card" data-reveal>
+        <img class="pub-card__img" src="https://picsum.photos/seed/sfa-event3/600/375" alt="Art exhibition" loading="lazy">
+        <div class="pub-card__body">
+          <p style="color:var(--pub-accent);font-family:var(--pub-font-h);font-size:1.5rem;font-weight:800;line-height:1">05 <span style="display:block;font-size:.75rem;color:var(--pub-text-muted);text-transform:uppercase;font-weight:600">Dec</span></p>
+          <h3 style="margin-top:.5rem">Winter Art Exhibition</h3>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:2rem" data-reveal>
+      <a href="{% url 'public:gallery' %}" class="pub-btn pub-btn--outline">See Gallery &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="pub-section pub-section--alt pub-testimonials">
+  <div class="pub-container">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">Parent Voices</p>
+      <h2>What Our Families Say</h2>
+    </div>
+    <div class="pub-testimonial-track">
+      <div class="pub-testimonial">
+        <div class="pub-testimonial__card" data-reveal>
+          <p class="pub-testimonial__quote">"My daughter went from shy to confident in one year. The teachers at {{ identity.name|default:"Springfield" }} don't just teach — they truly see each child and bring out their best."</p>
+          <div class="pub-testimonial__author">
+            <img class="pub-testimonial__avatar" src="https://picsum.photos/seed/sfa-parent1/100/100" alt="Sarah K.">
+            <div><div class="pub-testimonial__name">Sarah Kwarteng</div><div class="pub-testimonial__role">Parent, Grade 4</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="pub-testimonial">
+        <div class="pub-testimonial__card" data-reveal>
+          <p class="pub-testimonial__quote">"The communication from teachers is outstanding. I always know how my son is doing, what he's learning, and how I can support at home. It's a real partnership."</p>
+          <div class="pub-testimonial__author">
+            <img class="pub-testimonial__avatar" src="https://picsum.photos/seed/sfa-parent2/100/100" alt="James O.">
+            <div><div class="pub-testimonial__name">James Osei</div><div class="pub-testimonial__role">Parent, Grade 7</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="pub-testimonial">
+        <div class="pub-testimonial__card" data-reveal>
+          <p class="pub-testimonial__quote">"We chose {{ identity.name|default:"Springfield" }} for the academics but stayed for the community. My children have friends across grade levels and genuinely love coming to school."</p>
+          <div class="pub-testimonial__author">
+            <img class="pub-testimonial__avatar" src="https://picsum.photos/seed/sfa-parent3/100/100" alt="Ama M.">
+            <div><div class="pub-testimonial__name">Ama Mensah</div><div class="pub-testimonial__role">Parent, Grades 2 &amp; 9</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pub-testimonial__dots"></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="pub-section">
+  <div class="pub-container">
+    <div class="pub-cta-band" data-reveal>
+      <h2>Ready to Join {{ identity.name|default:"Springfield" }}?</h2>
+      <p>Applications are open. Book a campus visit or start your inquiry today.</p>
+      <div class="pub-hero__actions">
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">Apply Now</a>
+        <a href="{% url 'public:academics' %}" class="pub-btn pub-btn--outline pub-btn--lg">Explore Academics</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

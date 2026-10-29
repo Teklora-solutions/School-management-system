@@ -1,0 +1,96 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}{{ teacher.user.get_full_name }} | Teachers | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <a href="{% url 'teachers:list' %}" class="btn btn-sm btn-outline-secondary mb-2"><i class="bi bi-arrow-left me-1"></i>All Teachers</a>
+    <h1 class="page-title mt-1">
+      <i class="bi bi-person-badge me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ teacher.user.get_full_name }}
+    </h1>
+    <p class="page-subtitle">
+      <code>{{ teacher.staff_id }}</code>
+      {% if teacher.department %}&nbsp;&bull;&nbsp;{{ teacher.department }}{% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'accounts:staff_detail' teacher.user.pk %}" class="btn btn-sm btn-outline-secondary">Account Settings</a>
+    <a href="{% url 'teachers:assignment_create' %}?teacher={{ teacher.pk }}" class="btn btn-sm btn-primary" id="btn-add-assignment">
+      <i class="bi bi-plus me-1"></i>Add Assignment
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Profile</h2></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-6 text-muted-sm">Email</dt>
+          <dd class="col-6">{{ teacher.user.email }}</dd>
+          <dt class="col-6 text-muted-sm">Phone</dt>
+          <dd class="col-6">{{ teacher.user.phone|default:"—" }}</dd>
+          <dt class="col-6 text-muted-sm">Qualification</dt>
+          <dd class="col-6">{{ teacher.qualification|default:"—" }}</dd>
+          <dt class="col-6 text-muted-sm">Date Joined</dt>
+          <dd class="col-6">{{ teacher.date_joined|date:"d M Y"|default:"—" }}</dd>
+          <dt class="col-6 text-muted-sm">Status</dt>
+          <dd class="col-6">
+            {% if teacher.user.is_active %}
+              <span class="badge" style="background:var(--color-success);color:#fff;">Active</span>
+            {% else %}
+              <span class="badge" style="background:var(--color-danger);color:#fff;">Inactive</span>
+            {% endif %}
+          </dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title">Subject Assignments</h2>
+        <a href="{% url 'teachers:assignment_create' %}" class="btn btn-sm btn-primary" id="btn-new-assignment">
+          <i class="bi bi-plus me-1"></i>Assign
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% with assignments=teacher.assignments.all %}
+        {% if assignments %}
+        <table class="table table-hover align-middle mb-0" id="assignment-table">
+          <thead>
+            <tr><th>Year</th><th>Class</th><th>Stream</th><th>Subject</th><th class="text-end">Remove</th></tr>
+          </thead>
+          <tbody>
+            {% for a in assignments %}
+            <tr>
+              <td class="text-muted-sm">{{ a.academic_year.name }}</td>
+              <td class="fw-600">{{ a.school_class.name }}</td>
+              <td class="text-muted-sm">{{ a.stream.name|default:"All" }}</td>
+              <td>{{ a.subject.name }}</td>
+              <td class="text-end">
+                <form method="post" action="{% url 'teachers:assignment_delete' a.pk %}"
+                      onsubmit="return confirm('Remove this assignment?')">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.path }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" id="btn-del-assign-{{ a.pk }}">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="p-4 text-center text-muted-sm">No assignments yet.</div>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

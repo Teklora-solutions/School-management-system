@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+wheels/
+sdist/
+develop-eggs/
+.eggs/
+lib/
+lib64/
+parts/
+var/
+*.egg-link
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env.local
+.env.*.local
+
+# Environment variables
+.env
+!.env.example
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# Static (collected)
+staticfiles/
+collected_static/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Testing & coverage
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+
+# Ruff / Black
+.ruff_cache/
+
+# Pre-commit
+.pre-commit-cache/
+
+# Node (if any frontend tooling added later)
+node_modules/
+npm-debug.log*
+
+# Backups
+*.sql.gz
+*.dump
+db.sqlite3.bak-*
+db.*-try.sqlite3
+
+# WeasyPrint / xhtml2pdf temp
+tmp/

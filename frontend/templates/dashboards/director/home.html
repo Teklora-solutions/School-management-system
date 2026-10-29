@@ -1,0 +1,354 @@
+{% extends "dashboards/director/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Director Dashboard | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-binoculars-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Director's Dashboard
+      </h1>
+      <p class="page-subtitle">
+        School-wide analytics and oversight
+        {% if current_term %}— <strong>{{ current_term }}</strong>{% endif %}
+      </p>
+    </div>
+    {% if cached_at %}
+    <span class="text-muted-sm" style="font-size:0.78rem;margin-top:0.4rem;">
+      <i class="bi bi-clock-history me-1"></i>Updated {{ cached_at|naturaltime }}
+    </span>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Row 1: KPI cards ─────────────────────────────────────────────────── #}
+<div class="row g-3">
+
+  {# Students #}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-people-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ student_count|default:"–"|intcomma }}</div>
+        <div class="stat-label">Students</div>
+        {% if student_by_gender %}
+        <div class="text-muted-sm mt-1" style="font-size:0.72rem;">
+          {% for gender, n in student_by_gender.items %}
+            {{ gender|default:"?" }}: {{ n }}{% if not forloop.last %} &bull; {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Teachers #}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-person-badge-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ teacher_count|default:"–" }}</div>
+        <div class="stat-label">Teachers</div>
+        <div class="text-muted-sm mt-1" style="font-size:0.72rem;">{{ staff_count|default:"–" }} total staff</div>
+      </div>
+    </div>
+  </div>
+
+  {# Fees Billed #}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {% if fees_billed %}{{ currency }} {{ fees_billed|floatformat:2|intcomma }}{% else %}–{% endif %}
+        </div>
+        <div class="stat-label">Fees Billed</div>
+      </div>
+    </div>
+  </div>
+
+  {# Fees Collected #}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-success);"><i class="bi bi-cash-coin" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;color:var(--color-success);">
+          {% if fees_collected %}{{ currency }} {{ fees_collected|floatformat:2|intcomma }}{% else %}–{% endif %}
+        </div>
+        <div class="stat-label">Fees Collected</div>
+        {% if collection_rate is not None %}
+        <div class="text-muted-sm mt-1" style="font-size:0.72rem;">{{ collection_rate }}% rate</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Outstanding #}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-warning);"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;color:var(--color-warning);">
+          {% if fees_outstanding %}{{ currency }} {{ fees_outstanding|floatformat:2|intcomma }}{% else %}–{% endif %}
+        </div>
+        <div class="stat-label">Outstanding</div>
+      </div>
+    </div>
+  </div>
+
+  {# Pass Rate / Avg Score #}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--accent-light);"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{% if pass_rate is not None %}{{ pass_rate }}%{% else %}–{% endif %}</div>
+        <div class="stat-label">Pass Rate</div>
+        {% if subject_avg is not None %}
+        <div class="text-muted-sm mt-1" style="font-size:0.72rem;">Avg: {{ subject_avg }}%</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>{# /row KPI #}
+
+{% if not current_term %}
+<div class="alert alert-warning mt-3" role="alert">
+  <i class="bi bi-exclamation-circle me-2"></i>
+  No current term is set. Ask an Admin to set one in Academics.
+</div>
+{% endif %}
+
+{# ── Row 2: Charts ────────────────────────────────────────────────────── #}
+{% if student_by_class or fee_rows %}
+<div class="row g-3 mt-1">
+
+  {# Enrollment by class #}
+  {% if student_by_class %}
+  <div class="col-12 col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-people me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Enrollment by Class
+        </h2>
+      </div>
+      <div class="card-body" style="position:relative;min-height:220px;">
+        <canvas id="enrollmentChart" aria-label="Enrollment by class chart" role="img"></canvas>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Fee collection by class #}
+  {% if fee_rows %}
+  <div class="col-12 col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-cash-stack me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Fee Collection by Class
+        </h2>
+        <a href="{% url 'dashboards:director_fees' %}" class="btn btn-outline-primary btn-sm">
+          Details <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </div>
+      <div class="card-body" style="position:relative;min-height:220px;">
+        <canvas id="feeChart" aria-label="Fee collection by class chart" role="img"></canvas>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
+{# ── Row 3: Quick links ───────────────────────────────────────────────── #}
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-lightning-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Quick Actions
+        </h2>
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'dashboards:director_performance' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-bar-chart-line me-1"></i>Class Performance
+          </a>
+          <a href="{% url 'dashboards:director_fees' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-cash-stack me-1"></i>Fee Analysis
+          </a>
+          <a href="{% url 'dashboards:director_staff' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-person-badge me-1"></i>Staff Directory
+          </a>
+          <a href="{% url 'dashboards:director_books' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-journal-text me-1"></i>Books of Account
+          </a>
+          <a href="{% url 'communications:announcement_create' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-megaphone me-1"></i>New Announcement
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Row 4: Enrollment table + Recent announcements ───────────────────── #}
+<div class="row g-3 mt-1">
+
+  {% if student_by_class %}
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-table me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Students by Class
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0" aria-label="Students by class">
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th class="text-end">Students</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in student_by_class %}
+              <tr>
+                <td>{{ row.class_name }}</td>
+                <td class="text-end fw-600">{{ row.count }}</td>
+              </tr>
+              {% endfor %}
+              <tr style="border-top:2px solid var(--color-border);">
+                <td class="fw-600">Total</td>
+                <td class="text-end fw-600 text-accent">{{ student_count|intcomma }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="col-12 {% if student_by_class %}col-lg-6{% endif %}">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-megaphone-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Recent Announcements
+        </h2>
+        <a href="{% url 'communications:list' %}" class="btn btn-outline-primary btn-sm">
+          All <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </div>
+      <div class="card-body">
+        {% if recent_announcements %}
+          <ul class="list-unstyled mb-0">
+            {% for ann in recent_announcements %}
+            <li class="mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}" style="border-color:var(--color-border);">
+              <div class="fw-600" style="font-size:0.9rem;">{{ ann.title }}</div>
+              <div class="text-muted-sm mt-1">{{ ann.body|truncatewords:20 }}</div>
+              <div class="text-muted-sm mt-1" style="font-size:0.72rem;">
+                <i class="bi bi-clock me-1"></i>{{ ann.created_at|date:"M j, Y" }}
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted-sm mb-0">No announcements yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>{# /row 4 #}
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'vendor/chart.js/4.4.4/chart.umd.min.js' %}"></script>
+<script>
+(function () {
+  'use strict';
+
+  const ACCENT       = '#0ea5e9';
+  const ACCENT_LIGHT = '#38bdf8';
+  const SUCCESS      = '#10b981';
+  const WARNING      = '#f59e0b';
+  const DANGER       = '#ef4444';
+  const GRID_COLOR   = 'rgba(255,255,255,0.06)';
+  const TICK_COLOR   = '#8896b3';
+
+  const baseScales = {
+    x: { ticks: { color: TICK_COLOR, font: { size: 11 } }, grid: { color: GRID_COLOR } },
+    y: { ticks: { color: TICK_COLOR, font: { size: 11 } }, grid: { color: GRID_COLOR } },
+  };
+
+  {% if student_by_class %}
+  new Chart(document.getElementById('enrollmentChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: {{ chart_enrollment_labels|safe }},
+      datasets: [{
+        label: 'Students',
+        data: {{ chart_enrollment_data|safe }},
+        backgroundColor: ACCENT + '99',
+        borderColor: ACCENT,
+        borderWidth: 1,
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: baseScales,
+    },
+  });
+  {% endif %}
+
+  {% if fee_rows %}
+  new Chart(document.getElementById('feeChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: {{ chart_fee_labels|safe }},
+      datasets: [
+        {
+          label: 'Billed',
+          data: {{ chart_fee_billed|safe }},
+          backgroundColor: ACCENT + '55',
+          borderColor: ACCENT,
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'Paid',
+          data: {{ chart_fee_paid|safe }},
+          backgroundColor: SUCCESS + '99',
+          borderColor: SUCCESS,
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: TICK_COLOR, font: { size: 11 } } } },
+      scales: baseScales,
+    },
+  });
+  {% endif %}
+
+})();
+</script>
+{% endblock extra_js %}

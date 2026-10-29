@@ -1,0 +1,142 @@
+{% extends base_template %}
+
+{% block title %}Upload Fee Structure | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-upload me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Upload Fee Structure
+      </h1>
+      <p class="page-subtitle">
+        Load a class's fee items from a spreadsheet. The file is checked first and
+        nothing is saved until you commit it.
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:fee_structure_template' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-download me-1"></i>Download the template
+      </a>
+      <a href="{% url 'finance:fee_structure_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>All Structures
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-file-earmark-spreadsheet me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      The spreadsheet
+    </h2>
+  </div>
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+      <div class="col-12">
+        <div class="alert alert-danger mb-0">
+          {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <div class="col-md-3">
+        <label class="form-label" for="{{ form.school_class.id_for_label }}">
+          {{ form.school_class.label }} <span class="text-danger">*</span>
+        </label>
+        {{ form.school_class }}
+        {% for error in form.school_class.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="{{ form.term.id_for_label }}">
+          {{ form.term.label }} <span class="text-danger">*</span>
+        </label>
+        {{ form.term }}
+        {% for error in form.term.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="{{ form.file.id_for_label }}">
+          {{ form.file.label }} <span class="text-danger">*</span>
+        </label>
+        {{ form.file }}
+        {% for error in form.file.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-upload me-1"></i>Upload
+        </button>
+      </div>
+      <div class="col-12">
+        <div class="form-text">
+          Two columns, one row per item: <code>label</code> and <code>amount</code>.
+          Every amount must be a positive number. A class and term that already has a
+          structure gets a new version when you commit.
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-clock-history me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Recent uploads
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th scope="col">When</th>
+          <th scope="col">Class</th>
+          <th scope="col">Term</th>
+          <th scope="col">Status</th>
+          <th scope="col">By</th>
+          <th scope="col" class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in recent_jobs %}
+        <tr>
+          <td class="text-muted-sm">{{ job.created_at|date:"j M Y H:i" }}</td>
+          <td>{{ job.target_class.name|default:"—" }}</td>
+          <td class="text-muted-sm">{{ job.term|default:"—" }}</td>
+          <td>
+            {% if job.status == 'ready' %}
+              <span class="badge" style="background:var(--color-success);color:#fff;">Ready to commit</span>
+            {% elif job.status == 'committed' %}
+              <span class="badge" style="background:var(--accent-light);color:#fff;">Committed</span>
+            {% elif job.status == 'failed' %}
+              <span class="badge" style="background:var(--color-danger);color:#fff;">Rejected</span>
+            {% else %}
+              <span class="badge" style="background:var(--color-warning);color:#000;">{{ job.get_status_display }}</span>
+            {% endif %}
+          </td>
+          <td class="text-muted-sm">{{ job.uploaded_by.full_name|default:"—" }}</td>
+          <td class="text-end">
+            <a href="{% url 'finance:fee_structure_upload_preview' job.pk %}"
+               class="btn btn-sm btn-outline-primary">
+              Open<i class="bi bi-arrow-right ms-1"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-muted-sm">No files have been uploaded yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock content %}

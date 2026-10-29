@@ -1,0 +1,95 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Enquiry from {{ enquiry.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <a href="{% url 'public_admin:enquiry_list' %}" class="btn btn-sm btn-outline-secondary mb-2">
+      <i class="bi bi-arrow-left me-1"></i>All enquiries
+    </a>
+    <h1 class="page-title mt-1">
+      <i class="bi bi-envelope me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ enquiry.name }}
+    </h1>
+    <p class="page-subtitle">
+      Sent through the public Contact page on {{ enquiry.created_at|date:"M j, Y" }} at {{ enquiry.created_at|time:"H:i" }}.
+    </p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="mailto:{{ enquiry.email }}?subject=Re:%20Your%20enquiry" class="btn btn-sm btn-primary" id="btn-reply">
+      <i class="bi bi-reply me-1"></i>Reply by email
+    </a>
+    <form method="post" action="{% url 'public_admin:enquiry_handled' enquiry.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <button type="submit" class="btn btn-sm btn-outline-secondary"
+              name="action" value="{% if enquiry.handled %}reopen{% else %}handled{% endif %}" id="btn-handled">
+        {% if enquiry.handled %}Reopen{% else %}Mark handled{% endif %}
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">The sender</h2></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-6 text-muted-sm">Name</dt>
+          <dd class="col-6">{{ enquiry.name }}</dd>
+          <dt class="col-6 text-muted-sm">Email</dt>
+          <dd class="col-6"><a href="mailto:{{ enquiry.email }}">{{ enquiry.email }}</a></dd>
+          <dt class="col-6 text-muted-sm">Phone</dt>
+          <dd class="col-6">
+            {% if enquiry.phone %}
+              <a href="tel:{{ enquiry.phone }}">{{ enquiry.phone }}</a>
+            {% else %}
+              — not given
+            {% endif %}
+          </dd>
+          <dt class="col-6 text-muted-sm">Received</dt>
+          <dd class="col-6">{{ enquiry.created_at|date:"M j, Y H:i" }}</dd>
+          <dt class="col-6 text-muted-sm">Status</dt>
+          <dd class="col-6">
+            {% if enquiry.handled %}
+              <span class="badge" style="background:var(--color-success);color:#fff;">Handled</span>
+              {% if enquiry.handled_at %}
+                <div class="text-muted-sm mt-1">{{ enquiry.handled_at|date:"M j, Y H:i" }}</div>
+              {% endif %}
+            {% else %}
+              <span class="badge" style="background:var(--color-muted);color:#fff;">Open</span>
+            {% endif %}
+          </dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card mt-4">
+      <div class="card-body">
+        <p class="text-muted-sm mb-2">
+          Nothing a visitor writes here is ever shown on the website, and replying happens in your own
+          mailbox — this page only keeps the message and the office's mark on it.
+        </p>
+        <form method="post" action="{% url 'public_admin:enquiry_delete' enquiry.pk %}"
+              onsubmit="return confirm('Delete this enquiry from “{{ enquiry.name|escapejs }}”? The message goes away and only the audit log will say it existed.');">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'public_admin:enquiry_list' %}">
+          <button type="submit" class="btn btn-sm btn-outline-danger w-100" name="confirm" value="1" id="btn-del">
+            <i class="bi bi-trash me-1"></i>Delete this enquiry
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Message</h2></div>
+      <div class="card-body">
+        <div style="white-space:pre-wrap;word-break:break-word;">{{ enquiry.message }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

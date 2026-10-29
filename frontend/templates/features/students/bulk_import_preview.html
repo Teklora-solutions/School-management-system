@@ -1,0 +1,210 @@
+{% extends base_template %}
+
+{% block title %}Import Preview #{{ job.pk }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-clipboard-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Import Preview — Job #{{ job.pk }}
+    </h1>
+    <p class="page-subtitle">
+      {{ job.get_mode_display }} mode · uploaded {{ job.created_at|date:"d M Y H:i" }}
+      {% if job.target_class %} · target class {{ job.target_class.name }}{% endif %}
+    </p>
+  </div>
+  <a href="{% url 'students:bulk_import' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+
+{# ── Status / summary ────────────────────────────────────────────────────── #}
+{% if job.status == "pending" or job.status == "validating" %}
+<div class="card mb-3">
+  <div class="card-body text-center py-4">
+    <div class="spinner-border mb-2" role="status"><span class="visually-hidden">Validating…</span></div>
+    <p class="text-muted-sm mb-0">Validation is running in the background. This page refreshes automatically.</p>
+    <meta http-equiv="refresh" content="5">
+  </div>
+</div>
+{% elif job.status == "failed" %}
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="alert alert-danger mb-0" role="alert">
+      <strong>Validation failed.</strong>
+      <ul class="mb-0 mt-1">
+        {% for row in error_rows %}
+        <li>Row {{ row.row_number|default:"—" }}: {% for e in row.errors %}{{ e }}{% if not forloop.last %}; {% endif %}{% endfor %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="row g-3 mb-3">
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-plus-circle-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ job.summary.valid|default:0 }}</div>
+        <div class="stat-label">To Create</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-skip-forward-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ job.summary.skipped_existing|default:0 }}</div>
+        <div class="stat-label">Already Exist (skip)</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ job.summary.errors|default:0 }}</div>
+        <div class="stat-label">Rows with Errors</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ job.summary.total|default:0 }}</div>
+        <div class="stat-label">Total Rows</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Error rows ──────────────────────────────────────────────────────────── #}
+{% if error_rows %}
+<div class="card mb-3 border-danger">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h2 class="card-title mb-0 text-danger">
+      <i class="bi bi-exclamation-triangle-fill me-1"></i>Rows with Errors ({{ error_rows|length }})
+    </h2>
+    <a href="{% url 'students:bulk_import_errors' job.pk %}" class="btn btn-sm btn-outline-danger">
+      <i class="bi bi-download me-1"></i>Download Error Report
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Row</th>
+            <th>Admission #</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Errors</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in error_rows %}
+          <tr>
+            <td class="text-muted-sm">{{ row.row_number|default:"—" }}</td>
+            <td class="text-muted-sm">{{ row.admission_number|default:"—" }}</td>
+            <td>{{ row.first_name|default:"—" }} {{ row.last_name|default:"" }}</td>
+            <td class="text-muted-sm">{{ row.email|default:"—" }}</td>
+            <td class="text-danger">
+              {% for e in row.errors %}<div>{{ e }}</div>{% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if job.mode == "all_or_nothing" %}
+  <div class="card-body py-2 border-top">
+    <p class="text-muted-sm mb-0"><i class="bi bi-slash-circle me-1"></i>All-or-nothing mode: <strong>commit is blocked</strong> until all rows are valid. Fix the errors and re-upload (existing rows are skipped, not duplicated).</p>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── Valid rows preview ──────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-header"><h2 class="card-title">Valid Rows ({{ preview_rows|length }})</h2></div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Row</th>
+            <th>Admission #</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Gender</th>
+            <th>Stream</th>
+            <th>Guardian</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in preview_rows %}
+          <tr>
+            <td class="text-muted-sm">{{ row.row_number }}</td>
+            <td class="text-muted-sm">{{ row.admission_number }}</td>
+            <td class="fw-600">{{ row.first_name }} {{ row.last_name }}</td>
+            <td class="text-muted-sm">{{ row.email }}</td>
+            <td class="text-muted-sm">{{ row.gender|default:"—" }}</td>
+            <td class="text-muted-sm">{{ row.stream|default:"—" }}</td>
+            <td class="text-muted-sm">{{ row.guardian_first_name }} {{ row.guardian_last_name }}</td>
+            <td>
+              {% if row.action == "skip_existing" %}
+                <span class="badge" style="background:var(--color-warning);color:#000;">Skip — already exists</span>
+              {% else %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">Create</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# ── Commit ──────────────────────────────────────────────────────────────── #}
+{% if job.status == "ready" %}
+<div class="card">
+  <div class="card-header"><h2 class="card-title">Commit Import</h2></div>
+  <div class="card-body">
+    {% if job.mode == "all_or_nothing" and error_rows %}
+    <p class="text-muted-sm mb-3"><i class="bi bi-slash-circle me-1"></i>Commit is blocked — fix the {{ error_rows|length }} error row(s) above first.</p>
+    <a href="{% url 'students:bulk_import' %}" class="btn btn-primary"><i class="bi bi-arrow-repeat me-1"></i>Re-upload corrected file</a>
+    {% else %}
+    <p class="text-muted-sm mb-3">
+      {% if job.mode == "all_or_nothing" %}
+      All rows are valid. {{ job.summary.valid }} student(s) will be created; {{ job.summary.skipped_existing|default:0 }} already exist and will be skipped.
+      {% else %}
+      Partial mode: {{ job.summary.valid }} valid row(s) will be committed; the {{ error_rows|length }} error row(s) above will be skipped and reported.
+      {% endif %}
+    </p>
+    <form method="post" action="{% url 'students:bulk_import_preview' job.pk %}">
+      {% csrf_token %}
+      {{ commit_form.job_id }}
+      <button type="submit" class="btn btn-primary" id="btn-commit-import">
+        <i class="bi bi-check2-all me-1"></i>Commit {{ job.summary.valid }} Student(s)
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% elif job.status == "committed" %}
+<div class="card">
+  <div class="card-body">
+    <div class="alert alert-success mb-0" role="alert">
+      <i class="bi bi-check-circle me-1"></i>This import was committed — {{ job.summary.created|default:0 }} student(s) created, {{ job.summary.skipped_existing|default:0 }} skipped.
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock content %}

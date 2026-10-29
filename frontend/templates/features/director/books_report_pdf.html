@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Finance Report — {{ summary.term }} | {{ SCHOOL_NAME }}</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 11pt;
+      color: #1a1a2e;
+      background: #fff;
+      padding: 28mm 22mm;
+    }
+
+    /* ── School header ────────────────────────────────────────── */
+    .report-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      border-bottom: 3px solid #0ea5e9;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+    }
+
+    .school-name {
+      font-size: 17pt;
+      font-weight: 700;
+      color: #0284c7;
+      line-height: 1.2;
+    }
+
+    .school-sub {
+      font-size: 9pt;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .report-meta {
+      text-align: right;
+      font-size: 9pt;
+      color: #475569;
+    }
+
+    .report-meta .report-title {
+      font-size: 13pt;
+      font-weight: 700;
+      color: #1a1a2e;
+      display: block;
+    }
+
+    /* ── Section headings ─────────────────────────────────────── */
+    h2 {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #0284c7;
+      margin: 20px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* ── Tables ───────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 10pt;
+    }
+
+    thead th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      padding: 7px 10px;
+      text-align: left;
+      border-bottom: 2px solid #cbd5e1;
+    }
+
+    thead th.text-right { text-align: right; }
+
+    tbody td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: top;
+    }
+
+    tbody td.text-right { text-align: right; }
+
+    tfoot td {
+      padding: 8px 10px;
+      font-weight: 700;
+      border-top: 2px solid #cbd5e1;
+      background: #f8fafc;
+    }
+
+    tfoot td.text-right { text-align: right; }
+
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    /* ── Summary KPI grid ─────────────────────────────────────── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .kpi-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      background: #f8fafc;
+    }
+
+    .kpi-label {
+      font-size: 8.5pt;
+      color: #64748b;
+      margin-bottom: 3px;
+    }
+
+    .kpi-value {
+      font-size: 13pt;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .kpi-value.positive { color: #059669; }
+    .kpi-value.negative { color: #dc2626; }
+    .kpi-value.warning  { color: #d97706; }
+
+    /* ── Badges ───────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: 8pt;
+      font-weight: 600;
+    }
+
+    .badge-success { background: #d1fae5; color: #065f46; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-danger  { background: #fee2e2; color: #991b1b; }
+
+    /* ── Footer ───────────────────────────────────────────────── */
+    .report-footer {
+      margin-top: 28px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 8.5pt;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ── Page breaks ──────────────────────────────────────────── */
+    .page-break { page-break-before: always; }
+
+    @media print {
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+{# ── Header ────────────────────────────────────────────────────────────── #}
+<div class="report-header">
+  <div>
+    <div class="school-name">{{ SCHOOL_NAME }}</div>
+    {% if SCHOOL_MOTTO %}
+    <div class="school-sub">{{ SCHOOL_MOTTO }}</div>
+    {% endif %}
+  </div>
+  <div class="report-meta">
+    <span class="report-title">Finance Report</span>
+    {% if summary.term %}
+    <div>{{ summary.term }}</div>
+    {% endif %}
+    <div>Generated: {% now "N j, Y" %}</div>
+  </div>
+</div>
+
+{# ── KPI summary grid ──────────────────────────────────────────────────── #}
+<h2>Financial Summary</h2>
+
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">Fees Billed</div>
+    <div class="kpi-value">{{ currency }} {{ summary.total_billed|floatformat:2 }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Fees Collected</div>
+    <div class="kpi-value positive">{{ currency }} {{ summary.total_collected|floatformat:2 }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Outstanding</div>
+    <div class="kpi-value warning">{{ currency }} {{ summary.outstanding|floatformat:2 }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Total Income</div>
+    <div class="kpi-value">{{ currency }} {{ summary.total_income|floatformat:2 }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Total Expenses</div>
+    <div class="kpi-value negative">{{ currency }} {{ summary.total_expenses|floatformat:2 }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Net {% if summary.net >= 0 %}Surplus{% else %}Deficit{% endif %}</div>
+    <div class="kpi-value {% if summary.net >= 0 %}positive{% else %}negative{% endif %}">
+      {{ currency }} {{ summary.net|floatformat:2 }}
+    </div>
+  </div>
+</div>
+
+{# ── Income vs Expenses detail ─────────────────────────────────────────── #}
+<h2>Income &amp; Expense Detail</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th class="text-right">Amount ({{ currency }})</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Fees Billed (posted invoices)</td>
+      <td class="text-right">{{ summary.total_billed|floatformat:2 }}</td>
+    </tr>
+    <tr>
+      <td>Fees Collected (payments received)</td>
+      <td class="text-right">{{ summary.total_collected|floatformat:2 }}</td>
+    </tr>
+    {% if summary.total_adjustments %}
+    <tr>
+      <td>Adjustments &amp; Discounts</td>
+      <td class="text-right">({{ summary.total_adjustments|floatformat:2 }})</td>
+    </tr>
+    {% endif %}
+    <tr>
+      <td>Other Income</td>
+      <td class="text-right">{{ summary.total_income|floatformat:2 }}</td>
+    </tr>
+    <tr>
+      <td>Total Expenses</td>
+      <td class="text-right">({{ summary.total_expenses|floatformat:2 }})</td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr>
+      <td>Net {% if summary.net >= 0 %}Surplus{% else %}Deficit{% endif %}</td>
+      <td class="text-right">{{ summary.net|floatformat:2 }}</td>
+    </tr>
+  </tfoot>
+</table>
+
+{# ── Outstanding note ──────────────────────────────────────────────────── #}
+{% if summary.outstanding > 0 %}
+<p style="font-size:9.5pt;color:#92400e;margin-top:-6px;margin-bottom:16px;">
+  ⚠ Outstanding balance of {{ currency }} {{ summary.outstanding|floatformat:2 }} remains uncollected.
+</p>
+{% endif %}
+
+{# ── Footer ────────────────────────────────────────────────────────────── #}
+<div class="report-footer">
+  <span>{{ SCHOOL_NAME }} — Confidential</span>
+  <span>Printed {% now "N j, Y \a\t g:i A" %}</span>
+</div>
+
+</body>
+</html>

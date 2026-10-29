@@ -1,0 +1,116 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Trial Balance | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-scale-loaded me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Trial Balance
+      </h1>
+      <p class="page-subtitle">
+        Every account that has been posted to, as at {{ as_of|date:"j M Y" }}.
+        Debits and credits are the raw sums of the journal lines, not netted
+        balances.
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:ledger' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-journal-text me-1"></i>Ledger
+      </a>
+      <a href="{% url 'finance:report_summary' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-bar-graph me-1"></i>Income &amp; Expense
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-4 align-items-center">
+      <div>
+        <span class="text-muted-sm">Total debits:</span>
+        <span class="fw-600">{{ currency }} {{ total_debits|floatformat:2|intcomma }}</span>
+      </div>
+      <div>
+        <span class="text-muted-sm">Total credits:</span>
+        <span class="fw-600">{{ currency }} {{ total_credits|floatformat:2|intcomma }}</span>
+      </div>
+      <div>
+        {% if balanced %}
+        <span class="badge" style="background:var(--color-success);color:#fff;">
+          <i class="bi bi-check2 me-1"></i>Balanced
+        </span>
+        {% else %}
+        <span class="badge" style="background:var(--color-danger);color:#fff;">
+          <i class="bi bi-x-octagon me-1"></i>Out of balance — the books must never
+          do this
+        </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if rows %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Code</th>
+            <th scope="col">Account</th>
+            <th scope="col">Type</th>
+            <th scope="col" class="text-end">Debits</th>
+            <th scope="col" class="text-end">Credits</th>
+            <th scope="col" class="text-end">Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="fw-600">{{ row.account.code }}</td>
+            <td>
+              {{ row.account.name }}
+              {% if row.account.is_contra %}
+              <span class="badge" style="background:var(--color-muted);color:#fff;"
+                    title="Income the school gave up — it nets inside the income total, it is not a cost.">
+                contra
+              </span>
+              {% endif %}
+              {% if not row.account.is_active %}
+              <span class="badge" style="background:var(--color-warning);color:#000;">closed</span>
+              {% endif %}
+            </td>
+            <td class="text-muted-sm">{{ row.account.get_type_display }}</td>
+            <td class="text-end">
+              {% if row.debit_total %}{{ currency }} {{ row.debit_total|floatformat:2|intcomma }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end">
+              {% if row.credit_total %}{{ currency }} {{ row.credit_total|floatformat:2|intcomma }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end fw-600">
+              {{ currency }} {{ row.net|floatformat:2|intcomma }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+      Nothing has been posted to the books yet.
+    </div>
+    {% endif %}
+  </div>
+  <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+    “Net” is debits minus credits for that account. An expense or asset is normally
+    positive; income, liability and equity normally negative.
+  </div>
+</div>
+{% endblock content %}

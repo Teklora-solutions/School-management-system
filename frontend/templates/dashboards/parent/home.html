@@ -1,0 +1,234 @@
+{% extends "dashboards/parent/base.html" %}
+{% load humanize %}
+
+{% block title %}Parent Dashboard | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-house-heart-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Parent Portal
+    </h1>
+    <p class="page-subtitle">
+      {% if student %}Viewing: <strong>{{ student.user.full_name }}</strong>
+        {% if student.current_class %} &mdash; {{ student.current_class.name }}{% endif %}
+      {% else %}No children linked to your account yet.{% endif %}
+    </p>
+  </div>
+</div>
+
+{# ── Child switcher ───────────────────────────────────────────────── #}
+{% if children|length > 1 %}
+<div class="card mb-3" style="border-color:var(--accent-light);">
+  <div class="card-body py-2">
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <span class="text-muted-sm me-1"><i class="bi bi-people me-1"></i>Switch child:</span>
+      {% for child in children %}
+      <form method="post" action="{% url 'accounts:select_child' %}" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="student_id" value="{{ child.pk }}">
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <button type="submit"
+                class="btn btn-sm {% if selected_child and selected_child.pk == child.pk %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+          {{ child.user.first_name }} {{ child.user.last_name|truncatechars:10 }}
+          {% if child.current_class %}<span class="d-none d-sm-inline text-muted" style="font-size:0.75rem;"> ({{ child.current_class.name }})</span>{% endif %}
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Stat cards ──────────────────────────────────────────────────── #}
+{% if student %}
+<div class="row g-3">
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-bar-chart-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        {% if result_summary %}
+          <div class="stat-value">{{ result_summary.average }}%</div>
+          <div class="stat-label">Avg. Score &mdash; {{ result_summary.term }}</div>
+        {% else %}
+          <div class="stat-value">—</div>
+          <div class="stat-label">No published results</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-trophy-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        {% if result_summary and result_summary.class_position %}
+          <div class="stat-value">{{ result_summary.class_position }}<small style="font-size:0.65em;">{% if result_summary.total_in_class %}/{{ result_summary.total_in_class }}{% endif %}</small></div>
+          <div class="stat-label">Class Position</div>
+        {% else %}
+          <div class="stat-value">—</div>
+          <div class="stat-label">Class Position</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    {% if not fees_enabled %}
+      <div class="stat-card" style="display:flex;">
+        <div class="stat-icon"><i class="bi bi-receipt" aria-hidden="true"></i></div>
+        <div class="stat-body">
+          <div class="stat-value">—</div>
+          <div class="stat-label">{{ fees_disabled_message }}</div>
+        </div>
+      </div>
+    {% else %}
+      <a href="{% url 'finance:student_statement_self' %}" class="stat-card text-decoration-none" style="display:flex;">
+        <div class="stat-icon"><i class="bi bi-receipt" aria-hidden="true"></i></div>
+        <div class="stat-body">
+          {% if fee_balance is not None %}
+            <div class="stat-value {% if fee_balance > 0 %}text-danger{% else %}text-success{% endif %}">
+              {{ fee_balance|floatformat:2|intcomma }}
+            </div>
+            <div class="stat-label">{% if fee_balance > 0 %}Balance Due{% else %}Balance (Clear){% endif %}</div>
+          {% else %}
+            <div class="stat-value">—</div>
+            <div class="stat-label">Fee Balance</div>
+          {% endif %}
+        </div>
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-people-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ children_count }}</div>
+        <div class="stat-label">Linked {% if children_count == 1 %}Child{% else %}Children{% endif %}</div>
+      </div>
+    </div>
+  </div>
+
+</div>{# /row stats #}
+
+{# ── Body grid ───────────────────────────────────────────────────── #}
+<div class="row g-3 mt-1">
+
+  {# Homework #}
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-journal-bookmark me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Upcoming Homework
+        </h2>
+        <a href="{% url 'homework:list' %}" class="btn btn-outline-primary btn-sm">View all</a>
+      </div>
+      <div class="card-body p-0">
+        {% if homework_due_soon %}
+        <ul class="list-group list-group-flush" style="background:transparent;">
+          {% for hw in homework_due_soon %}
+          <li class="list-group-item" style="background:transparent;border-color:var(--color-border);color:var(--color-text);">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-600" style="font-size:0.9rem;">
+                  {% if hw.is_new %}<span class="badge bg-danger me-1" style="font-size:0.6rem;vertical-align:middle;">NEW</span>{% endif %}
+                  <a href="{% url 'homework:detail' hw.pk %}" class="text-decoration-none" style="color:inherit;">{{ hw.title }}</a>
+                </div>
+                <div class="text-muted-sm">{{ hw.subject.name }}</div>
+              </div>
+              <span class="badge {% if hw.is_overdue %}bg-danger{% else %}bg-warning text-dark{% endif %} ms-2">
+                {{ hw.due_date|date:"M j" }}
+              </span>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="p-3 text-muted-sm text-center">No homework due in the next 7 days.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Announcements #}
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-megaphone-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Announcements
+          {% if unread_announcements %}
+            <span class="badge bg-danger ms-1" style="font-size:0.7rem;">{{ unread_announcements }}</span>
+          {% endif %}
+        </h2>
+        <a href="{% url 'communications:list' %}" class="btn btn-outline-primary btn-sm">View all</a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_announcements %}
+        <ul class="list-group list-group-flush" style="background:transparent;">
+          {% for ann in recent_announcements %}
+          <li class="list-group-item {% if not ann.is_read %}fw-600{% endif %}"
+              style="background:transparent;border-color:var(--color-border);color:var(--color-text);">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                {% if not ann.is_read %}<span class="badge bg-danger me-1" style="font-size:0.6rem;vertical-align:middle;">NEW</span>{% endif %}
+                <span style="font-size:0.9rem;">{{ ann.title }}</span>
+                <div class="text-muted-sm">{{ ann.created_at|date:"M j, Y" }}</div>
+              </div>
+              {% if not ann.is_read %}
+              <form method="post" action="{% url 'communications:announcement_read' ann.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-secondary btn-sm" style="font-size:0.75rem;">Mark read</button>
+              </form>
+              {% endif %}
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="p-3 text-muted-sm text-center">No announcements yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>{# /row body #}
+
+{# ── Quick actions ───────────────────────────────────────────────── #}
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title"><i class="bi bi-lightning-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>Quick Actions</h2>
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'results:student_results' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-bar-chart me-1"></i>View Results</a>
+          {% if fees_enabled %}
+          <a href="{% url 'finance:student_statement_self' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-receipt me-1"></i>Fee Statement</a>
+          {% endif %}
+          <a href="{% url 'homework:list' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-journal-bookmark me-1"></i>Homework</a>
+          <a href="{% url 'communications:complaint_create' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-chat-square-text me-1"></i>Send a Message</a>
+          <a href="{% url 'accounts:children' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-people me-1"></i>My Children</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}{# no student #}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-person-x" style="font-size:3rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm">No children are linked to your account yet.<br>Please contact the school administration.</p>
+    <a href="{% url 'accounts:children' %}" class="btn btn-outline-primary btn-sm mt-2">View My Children</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}

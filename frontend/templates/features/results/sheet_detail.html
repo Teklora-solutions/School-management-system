@@ -1,0 +1,133 @@
+{% extends base_template %}
+
+{% block title %}Result Sheet | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-file-earmark-bar-chart-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ sheet.school_class.name }}{% if sheet.stream %} / {{ sheet.stream.name }}{% endif %}
+      — {{ sheet.subject.name }}
+    </h1>
+    <p class="page-subtitle">
+      {{ sheet.term.name|title }} · {{ sheet.term.academic_year.name }} ·
+      entered by {{ sheet.teacher.user.full_name|default:"—" }}
+    </p>
+  </div>
+  <a href="{% url 'results:sheet_list' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to sheets
+  </a>
+</div>
+
+{# ── Status + governance actions ─────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <div>
+      {% if sheet.status == "draft" %}
+        <span class="badge" style="background:var(--color-muted);color:#fff;">Draft</span>
+      {% elif sheet.status == "submitted" %}
+        <span class="badge" style="background:var(--color-warning);color:#000;">Submitted</span>
+      {% elif sheet.status == "confirmed" %}
+        <span class="badge" style="background:var(--accent);color:#fff;">Confirmed (locked)</span>
+      {% else %}
+        <span class="badge" style="background:var(--color-success);color:#fff;">Published</span>
+      {% endif %}
+      {% if sheet.submitted_at %}<span class="text-muted-sm ms-2">Submitted {{ sheet.submitted_at|date:"d M Y H:i" }}</span>{% endif %}
+      {% if sheet.confirmed_at %}<span class="text-muted-sm ms-2">Confirmed {{ sheet.confirmed_at|date:"d M Y H:i" }} by {{ sheet.confirmed_by.full_name|default:"—" }}</span>{% endif %}
+      {% if sheet.published_at %}<span class="text-muted-sm ms-2">Published {{ sheet.published_at|date:"d M Y H:i" }} by {{ sheet.published_by.full_name|default:"—" }}</span>{% endif %}
+      {% if sheet.reopen_reason %}<div class="text-muted-sm mt-1"><i class="bi bi-arrow-counterclockwise me-1"></i>Last reopen reason: {{ sheet.reopen_reason }}</div>{% endif %}
+    </div>
+    <div class="d-flex gap-2">
+      {% if can_confirm %}
+      <form method="post" action="{% url 'results:sheet_confirm' sheet.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check2-all me-1"></i>Confirm Sheet
+        </button>
+      </form>
+      {% endif %}
+      {% if can_publish %}
+      <form method="post" action="{% url 'results:sheet_publish' sheet.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success"
+                title="Publishing makes these marks visible to the student">
+          <i class="bi bi-send-check me-1"></i>Publish Sheet
+        </button>
+      </form>
+      {% endif %}
+      {% if can_reopen %}
+      <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#reopen-modal">
+        <i class="bi bi-unlock me-1"></i>Reopen
+      </button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Score entries ───────────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title"><i class="bi bi-table me-2" style="color:var(--accent-light);" aria-hidden="true"></i>Score Entries ({{ entries|length }})</h2>
+  </div>
+  <div class="card-body p-0">
+    {% if entries %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Admission #</th>
+            <th scope="col">Student</th>
+            <th scope="col">Exam Mark</th>
+            <th scope="col">Grade</th>
+            <th scope="col">Remark</th>
+            <th scope="col">Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in entries %}
+          <tr>
+            <td class="text-muted-sm">{{ entry.student.admission_number }}</td>
+            <td class="fw-600">{{ entry.student.user.full_name }}</td>
+            <td class="fw-600">{{ entry.raw_score|default_if_none:"—" }}</td>
+            <td>{{ entry.grade|default:"—" }}</td>
+            <td class="text-muted-sm">{{ entry.remark|default:"—" }}</td>
+            <td class="text-muted-sm">{{ entry.points|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-pencil-square fs-1 d-block mb-2"></i>
+      No exam marks entered yet. Teachers enter marks from the teacher portal.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Reopen modal ────────────────────────────────────────────────────────── #}
+<div class="modal fade" id="reopen-modal" tabindex="-1" aria-labelledby="reopen-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'results:sheet_reopen' sheet.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="reopen-modal-label">Reopen sheet to Draft</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted-sm">Reopening returns this sheet to <strong>Draft</strong> so scores can be corrected. A reason is required and the action is audit-logged.</p>
+          {{ reopen_form.reason }}
+          {% if reopen_form.reason.errors %}<div class="invalid-feedback d-block">{{ reopen_form.reason.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger"><i class="bi bi-unlock me-1"></i>Reopen Sheet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock content %}

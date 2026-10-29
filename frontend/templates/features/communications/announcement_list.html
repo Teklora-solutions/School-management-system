@@ -1,0 +1,87 @@
+{% extends base_template %}
+
+{% block title %}Announcements | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <h1 class="page-title mb-0">
+      <i class="bi bi-megaphone-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Announcements
+      {% if unread_count %}
+        <span class="badge bg-danger ms-1" style="font-size:0.7rem;vertical-align:middle;">{{ unread_count }} unread</span>
+      {% endif %}
+    </h1>
+    {% if unread_count %}
+    <form method="post" action="{% url 'communications:announcement_read_all' %}" class="ms-auto">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-check2-all me-1"></i>Mark all read
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if announcements %}
+<div class="row g-3">
+  {% for ann in announcements %}
+  <div class="col-12">
+    <div class="card {% if not ann.is_read %}border-start border-4{% endif %}"
+         style="{% if not ann.is_read %}border-left-color:var(--accent-light)!important;{% endif %}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3">
+          <div class="flex-grow-1">
+            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+              {% if not ann.is_read %}
+                <span class="badge bg-danger" style="font-size:0.65rem;">NEW</span>
+              {% endif %}
+              <h2 class="mb-0" style="font-size:1rem;font-weight:{% if not ann.is_read %}700{% else %}500{% endif %};">{{ ann.title }}</h2>
+            </div>
+            <p class="mb-2" style="font-size:0.92rem;color:var(--color-text-secondary,var(--color-text));">{{ ann.body|linebreaksbr }}</p>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+              <span class="text-muted-sm">
+                <i class="bi bi-person-fill me-1"></i>{{ ann.created_by.full_name|default:"School Administration" }}
+              </span>
+              <span class="text-muted-sm">
+                <i class="bi bi-clock me-1"></i>{{ ann.created_at|date:"N j, Y" }}
+              </span>
+              {% if ann.attachment %}
+              <a href="{{ ann.attachment.url }}" class="text-muted-sm" target="_blank" rel="noopener noreferrer">
+                <i class="bi bi-paperclip me-1"></i>Attachment
+              </a>
+              {% endif %}
+              {% if ann.expires_at %}
+              <span class="text-muted-sm"><i class="bi bi-calendar-x me-1"></i>Expires {{ ann.expires_at|date:"M j, Y" }}</span>
+              {% endif %}
+            </div>
+          </div>
+          {% if not ann.is_read %}
+          <form method="post" action="{% url 'communications:announcement_read' ann.pk %}" class="flex-shrink-0">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Mark as read">
+              <i class="bi bi-check2"></i>
+              <span class="d-none d-sm-inline ms-1">Read</span>
+            </button>
+          </form>
+          {% else %}
+          <i class="bi bi-check2-circle text-muted-sm flex-shrink-0" title="Read"></i>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-megaphone" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm">No announcements to display.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}

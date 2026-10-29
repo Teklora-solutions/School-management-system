@@ -1,0 +1,156 @@
+{% extends base_template %}
+
+{% block title %}Result Sheets | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-bar-chart-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Results Governance
+    </h1>
+    <p class="page-subtitle">Confirm submitted sheets, publish confirmed results per class &amp; term.</p>
+  </div>
+  <a href="{% url 'results:grading_list' %}" class="btn btn-outline-primary">
+    <i class="bi bi-sliders me-1"></i>Grading Setup
+  </a>
+</div>
+
+{# ── Status tabs ─────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <span class="text-muted-sm me-1"><i class="bi bi-funnel me-1"></i>Status:</span>
+      <a href="?{% if request.GET.year or request.GET.term or request.GET.school_class %}year={{ request.GET.year|default:'' }}&amp;term={{ request.GET.term|default:'' }}&amp;school_class={{ request.GET.school_class|default:'' }}&amp;{% endif %}"
+         class="btn btn-sm {% if not request.GET.status %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        All
+      </a>
+      {% for tab in status_tabs %}
+      <a href="?status={{ tab.value }}&amp;year={{ request.GET.year|default:'' }}&amp;term={{ request.GET.term|default:'' }}&amp;school_class={{ request.GET.school_class|default:'' }}"
+         class="btn btn-sm {% if request.GET.status == tab.value %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        {{ tab.label }} <span class="badge ms-1" style="background:var(--color-surface-3);color:var(--color-text);">{{ tab.count }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ── Filters ─────────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
+      <div class="col-sm-3">
+        {{ filter_form.year.label_tag }}
+        {{ filter_form.year }}
+      </div>
+      <div class="col-sm-3">
+        {{ filter_form.term.label_tag }}
+        {{ filter_form.term }}
+      </div>
+      <div class="col-sm-3">
+        {{ filter_form.school_class.label_tag }}
+        {{ filter_form.school_class }}
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>Filter</button>
+        <a href="{% url 'results:sheet_list' %}" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Publish panel ───────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="card-title"><i class="bi bi-megaphone-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>Publish Confirmed Results</h2>
+  </div>
+  <div class="card-body">
+    <form method="post" action="{% url 'results:publish_class_term' %}" class="row g-2 align-items-end">
+      {% csrf_token %}
+      <div class="col-sm-4">
+        {{ publish_form.school_class.label_tag }}
+        {{ publish_form.school_class }}
+        {% if publish_form.school_class.errors %}<div class="invalid-feedback d-block">{{ publish_form.school_class.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="col-sm-4">
+        {{ publish_form.term.label_tag }}
+        {{ publish_form.term }}
+        {% if publish_form.term.errors %}<div class="invalid-feedback d-block">{{ publish_form.term.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-send-check me-1"></i>Publish Class / Term
+        </button>
+      </div>
+    </form>
+    <p class="text-muted-sm mb-0 mt-2">Publishes every <strong>confirmed</strong> sheet for the chosen class and term. Published results become visible to students and parents.</p>
+  </div>
+</div>
+
+{# ── Sheet table ─────────────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-body p-0">
+    {% if sheets %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Class</th>
+            <th scope="col">Subject</th>
+            <th scope="col">Term</th>
+            <th scope="col">Teacher</th>
+            <th scope="col">Status</th>
+            <th scope="col">Entries</th>
+            <th scope="col">Updated</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sheet in sheets %}
+          <tr>
+            <td class="fw-600">{{ sheet.school_class.name }}{% if sheet.stream %} / {{ sheet.stream.name }}{% endif %}</td>
+            <td>{{ sheet.subject.code }} — {{ sheet.subject.name }}</td>
+            <td class="text-muted-sm">{{ sheet.term.name|title }} ({{ sheet.term.academic_year.name }})</td>
+            <td class="text-muted-sm">{{ sheet.teacher.user.full_name|default:"—" }}</td>
+            <td>
+              {% if sheet.status == "draft" %}
+                <span class="badge" style="background:var(--color-muted);color:#fff;">Draft</span>
+              {% elif sheet.status == "submitted" %}
+                <span class="badge" style="background:var(--color-warning);color:#000;">Submitted</span>
+              {% elif sheet.status == "confirmed" %}
+                <span class="badge" style="background:var(--accent);color:#fff;">Confirmed</span>
+              {% else %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">Published</span>
+              {% endif %}
+            </td>
+            <td class="text-muted-sm">{{ sheet.entry_count }}</td>
+            <td class="text-muted-sm">{{ sheet.updated_at|date:"d M Y H:i" }}</td>
+            <td class="text-end">
+              <a href="{% url 'results:sheet_detail' sheet.pk %}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-eye me-1"></i>View
+              </a>
+              {% if sheet.status == "submitted" %}
+              <form method="post" action="{% url 'results:sheet_confirm' sheet.pk %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-primary" title="Confirm this sheet">
+                  <i class="bi bi-check2-all me-1"></i>Confirm
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+      No result sheets match these filters.
+      {% if request.GET %}<a href="{% url 'results:sheet_list' %}">Clear filters</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

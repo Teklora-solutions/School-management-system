@@ -1,0 +1,129 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Academic Years | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-mortarboard-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Academic Years
+    </h1>
+    <p class="page-subtitle">Configure academic calendar, terms, classes, and subjects.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'academics:year_create' %}" class="btn btn-primary" id="btn-add-year">
+      <i class="bi bi-plus-circle me-1"></i>Add Year
+    </a>
+  </div>
+</div>
+
+{# Quick-link cards #}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <a href="{% url 'academics:class_list' %}" class="card text-decoration-none d-block" style="transition:var(--trans);">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="width:48px;height:48px;font-size:1.3rem;"><i class="bi bi-building"></i></div>
+        <div><div class="fw-600">Classes</div><div class="text-muted-sm">Manage classes & streams</div></div>
+      </div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <a href="{% url 'academics:subject_list' %}" class="card text-decoration-none d-block">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="width:48px;height:48px;font-size:1.3rem;"><i class="bi bi-journal-bookmark"></i></div>
+        <div><div class="fw-600">Subjects</div><div class="text-muted-sm">Add or edit subjects</div></div>
+      </div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <a href="{% url 'academics:class_subject_list' %}" class="card text-decoration-none d-block">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="width:48px;height:48px;font-size:1.3rem;"><i class="bi bi-diagram-3"></i></div>
+        <div><div class="fw-600">Class–Subject Map</div><div class="text-muted-sm">Assign subjects to classes</div></div>
+      </div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <a href="{% url 'teachers:assignment_matrix' %}" class="card text-decoration-none d-block">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="width:48px;height:48px;font-size:1.3rem;"><i class="bi bi-table"></i></div>
+        <div><div class="fw-600">Teacher Matrix</div><div class="text-muted-sm">Assign teachers to classes</div></div>
+      </div>
+    </a>
+  </div>
+</div>
+
+{# Years list #}
+{% if years %}
+<div class="row g-3">
+  {% for year in years %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title">
+          {{ year.name }}
+          {% if year.is_current %}
+            <span class="badge ms-2" style="background:var(--color-success);color:#fff;font-size:0.7rem;">Current</span>
+          {% endif %}
+          {% if not year.from_calendar_picker %}
+            <span class="badge ms-2" style="background:var(--color-warning);color:#fff;font-size:0.7rem;" title="Created before the year picker: its name and dates do not follow the September-to-July convention.">Legacy</span>
+          {% endif %}
+        </h2>
+        <a href="{% url 'academics:year_detail' year.pk %}" class="btn btn-sm btn-outline-primary" id="btn-year-detail-{{ year.pk }}">
+          <i class="bi bi-eye"></i>
+        </a>
+      </div>
+      <div class="card-body">
+        <div class="text-muted-sm mb-2">{{ year.start_date|date:"d M Y" }} – {{ year.end_date|date:"d M Y" }}</div>
+        {% with terms=year.terms.all %}
+        {% if terms %}
+        <ul class="list-unstyled mb-0">
+          {% for term in terms %}
+          <li class="d-flex align-items-center justify-content-between py-1 border-bottom" style="border-color:var(--color-border)!important;">
+            <span class="text-muted-sm">{{ term.get_name_display }}</span>
+            {% if term.is_current %}
+              <span class="badge" style="background:var(--accent);color:#fff;font-size:0.65rem;">Active</span>
+            {% else %}
+              <form method="post" action="{% url 'academics:term_set_current' term.pk %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-xs btn-outline-secondary" style="font-size:0.65rem;padding:0.1rem 0.4rem;" id="btn-term-current-{{ term.pk }}">Set Current</button>
+              </form>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-muted-sm">No terms yet.</div>
+        {% endif %}
+        {% endwith %}
+        <a href="{% url 'academics:term_create' %}?year={{ year.pk }}" class="btn btn-sm btn-outline-primary mt-3" id="btn-add-term-{{ year.pk }}">
+          <i class="bi bi-plus me-1"></i>Add Term
+        </a>
+      </div>
+      {% if not year.is_current %}
+      <div class="card-footer">
+        <form method="post" action="{% url 'academics:year_set_current' year.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-success w-100" id="btn-set-current-{{ year.pk }}">
+            <i class="bi bi-check2-circle me-1"></i>Set as Current Year
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center p-5">
+    <i class="bi bi-calendar-x fs-1 d-block mb-3 text-muted-sm"></i>
+    <h3 style="font-size:1.1rem;">No academic years yet.</h3>
+    <p class="text-muted-sm mb-3">Create your first academic year to get started.</p>
+    <a href="{% url 'academics:year_create' %}" class="btn btn-primary" id="btn-add-first-year">
+      <i class="bi bi-plus-circle me-1"></i>Add Academic Year
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

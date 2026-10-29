@@ -1,0 +1,104 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Add Academic Year | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <a href="{% url 'academics:year_list' %}" class="btn btn-sm btn-outline-secondary mb-2">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+  <h1 class="page-title mt-1">Add Academic Year</h1>
+  <p class="page-subtitle">Pick the year — its dates and its three terms are set up for you.</p>
+</div>
+<div class="row g-4 justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" id="year-form" novalidate>
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
+          {% endif %}
+
+          {% if not form.has_choices %}
+          <div class="alert alert-info" role="alert">
+            Every year up to 2030 is already created. Delete an unused one, or ask
+            for the picker to be extended.
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label for="id_start_year" class="form-label fw-600">Academic year <span class="text-danger">*</span></label>
+            {{ form.start_year }}
+            {% if form.start_year.errors %}<div class="invalid-feedback d-block">{{ form.start_year.errors.0 }}</div>{% endif %}
+          </div>
+
+          <div class="mb-3 form-check">
+            {{ form.is_current }}
+            <label class="form-check-label" for="{{ form.is_current.id_for_label }}">{{ form.is_current.label }}</label>
+            <div class="form-text">Only one year can be current at a time.</div>
+          </div>
+
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{% url 'academics:year_list' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="btn-save-year" {% if not form.has_choices %}disabled{% endif %}>
+              Create Year and Terms
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">What gets created</h2>
+      </div>
+      <div class="card-body">
+        <p class="fw-600 mb-3" id="preview-label">{{ preview.label|default:"—" }}</p>
+        <table class="table table-sm align-middle mb-0" id="preview-terms">
+          <thead><tr><th>Term</th><th>Opens</th><th>Closes</th></tr></thead>
+          <tbody>
+            {% for term in preview.terms %}
+            <tr>
+              <td class="fw-600">{{ term.name }}</td>
+              <td class="text-muted-sm">{{ term.start }}</td>
+              <td class="text-muted-sm">{{ term.end }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="form-text mt-3">
+          Terms follow the school calendar convention: 1 September to 31 July.
+          Adjust the exact dates on the year page after creating it.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{{ schedule|json_script:"year-schedule" }}
+<script>
+  /* The preview card mirrors what the server would create for the chosen year. */
+  const schedule = JSON.parse(document.getElementById("year-schedule").textContent);
+  const picker = document.getElementById("id_start_year");
+  const label = document.getElementById("preview-label");
+  const body = document.querySelector("#preview-terms tbody");
+
+  function renderPreview() {
+    const plan = schedule[picker.value];
+    if (!plan) return;
+    label.textContent = plan.label;
+    body.textContent = "";
+    for (const term of plan.terms) {
+      const row = document.createElement("tr");
+      for (const value of [term.name, term.start, term.end]) {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.appendChild(cell);
+      }
+      body.appendChild(row);
+    }
+  }
+  picker?.addEventListener("change", renderPreview);
+</script>
+{% endblock content %}

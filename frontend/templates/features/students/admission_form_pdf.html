@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Student Admission Form</title>
+  <style>
+    @page { size: A4; margin: 1.6cm 1.8cm; }
+    * { box-sizing: border-box; }
+    body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #1a1a2e; font-size: 11pt; line-height: 1.45; }
+    .header { text-align: center; border-bottom: 3px solid #1a1a2e; padding-bottom: 10px; margin-bottom: 18px; }
+    .header h1 { margin: 0; font-size: 20pt; letter-spacing: 1px; text-transform: uppercase; }
+    .header .motto { margin: 2px 0 0; font-style: italic; color: #555; font-size: 10pt; }
+    .header .contact { margin: 2px 0 0; color: #555; font-size: 9pt; }
+    h2 { font-size: 12pt; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #999; padding-bottom: 3px; margin: 16px 0 8px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+    td { padding: 6px 8px; vertical-align: top; }
+    td.label { width: 30%; font-weight: 600; color: #333; }
+    td.line { border-bottom: 1px dotted #888; min-height: 18px; }
+    .photo-box { width: 3.2cm; height: 4cm; border: 1px solid #888; float: right; text-align: center; font-size: 8pt; color: #777; padding-top: 1.7cm; }
+    .signature-row { margin-top: 28px; width: 100%; }
+    .signature-row table { margin-top: 26px; }
+    .signature-row td { width: 50%; text-align: center; }
+    .sig-line { border-top: 1px solid #1a1a2e; margin: 0 14px; padding-top: 4px; font-size: 9pt; color: #333; }
+    .official { margin-top: 20px; font-size: 9pt; color: #555; }
+    .official-box { border: 1px solid #999; padding: 8px 10px; height: 2.6cm; }
+    .footer-note { margin-top: 14px; font-size: 8.5pt; color: #666; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>{{ SCHOOL_NAME }}</h1>
+    {% if SCHOOL_MOTTO %}<p class="motto">{{ SCHOOL_MOTTO }}</p>{% endif %}
+    <p class="contact">{% if SCHOOL_PHONE %}{{ SCHOOL_PHONE }} · {% endif %}{% if SCHOOL_EMAIL %}{{ SCHOOL_EMAIL }}{% endif %}</p>
+  </div>
+
+  <h2>Student Admission Form{% if not student %} (Blank){% endif %}</h2>
+
+  <div class="photo-box">Passport<br>Photo</div>
+
+  <table>
+    <tr>
+      <td class="label">Admission Number</td>
+      <td class="line">{{ student.admission_number|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="label">Full Name</td>
+      <td class="line">{% if student %}{{ student.user.full_name }}{% endif %}</td>
+    </tr>
+    <tr>
+      <td class="label">Date of Birth</td>
+      <td class="line">{{ student.date_of_birth|date:"d F Y"|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="label">Gender</td>
+      <td class="line">{{ student.get_gender_display|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="label">Class / Stream</td>
+      <td class="line">{% if student %}{{ student.current_class.name|default:"" }}{% if student.current_stream %} / {{ student.current_stream.name }}{% endif %}{% endif %}</td>
+    </tr>
+    <tr>
+      <td class="label">Enrollment Date</td>
+      <td class="line">{{ student.enrollment_date|date:"d F Y"|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="label">Home Address</td>
+      <td class="line">{{ student.address|default:"" }}</td>
+    </tr>
+  </table>
+
+  <h2>Parent / Guardian Information</h2>
+  <table>
+    {% if student and student.guardian_links.all %}
+      {% for gl in student.guardian_links.all %}
+      <tr>
+        <td class="label">{% if forloop.first %}Primary Guardian{% else %}Guardian {{ forloop.counter }}{% endif %}</td>
+        <td class="line">{{ gl.parent.user.full_name }} ({{ gl.get_relationship_display }}) · {{ gl.parent.user.email }}{% if gl.parent.user.phone %} · {{ gl.parent.user.phone }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    {% else %}
+    <tr>
+      <td class="label">Guardian Name</td>
+      <td class="line"></td>
+    </tr>
+    <tr>
+      <td class="label">Relationship</td>
+      <td class="line"></td>
+    </tr>
+    <tr>
+      <td class="label">Phone</td>
+      <td class="line"></td>
+    </tr>
+    <tr>
+      <td class="label">Email</td>
+      <td class="line"></td>
+    </tr>
+    {% endif %}
+  </table>
+
+  <h2>Declaration</h2>
+  <p>I confirm that the information provided above is accurate, and I agree to abide by the school's rules and regulations as set out in the student handbook.</p>
+
+  <div class="signature-row">
+    <table>
+      <tr>
+        <td><div class="sig-line">Parent / Guardian Signature &amp; Date</div></td>
+        <td><div class="sig-line">Head of School Signature &amp; Date</div></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="official">
+    <strong>For official use only</strong>
+    <div class="official-box"></div>
+  </div>
+
+  <p class="footer-note">Admission numbers are unique and permanent. Please keep a copy of this form for your records.</p>
+</body>
+</html>

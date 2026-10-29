@@ -1,0 +1,137 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}General Ledger | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <a href="{% url 'dashboards:director_books' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Overview
+    </a>
+    <div>
+      <h1 class="page-title mb-0">
+        <i class="bi bi-list-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        General Ledger
+      </h1>
+      <p class="page-subtitle mb-0">Journal entries — read-only. Up to 500 rows shown.</p>
+    </div>
+  </div>
+</div>
+
+{# Filter bar #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+      <label class="text-muted-sm mb-0">Account:</label>
+      <select name="account" class="form-select form-select-sm" style="width:auto;"
+              aria-label="Filter by account">
+        <option value="">All accounts</option>
+        {% for acc in accounts %}
+        <option value="{{ acc.pk }}" {% if acc.pk == selected_account_id %}selected{% endif %}>
+          {{ acc.code }} — {{ acc.name }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <label class="text-muted-sm mb-0 ms-2">From:</label>
+      <input type="date" name="date_from" value="{{ date_from }}"
+             class="form-control form-control-sm" style="width:auto;" aria-label="Date from">
+
+      <label class="text-muted-sm mb-0">To:</label>
+      <input type="date" name="date_to" value="{{ date_to }}"
+             class="form-control form-control-sm" style="width:auto;" aria-label="Date to">
+
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-funnel me-1"></i>Filter
+      </button>
+      {% if selected_account_id or date_from or date_to %}
+      <a href="{% url 'dashboards:director_books_ledger' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x-circle me-1"></i>Clear
+      </a>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{% if lines %}
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-table me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Journal Lines
+    </h2>
+    <span class="badge" style="background:var(--accent);color:#fff;font-size:0.78rem;">
+      {{ lines|length }} rows
+    </span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0" aria-label="General ledger entries">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Reference</th>
+            <th>Account</th>
+            <th>Description</th>
+            <th class="text-end">Debit</th>
+            <th class="text-end">Credit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in lines %}
+          <tr>
+            <td class="text-muted-sm" style="white-space:nowrap;">
+              {{ line.entry.entry_date|date:"M j, Y" }}
+            </td>
+            <td>
+              <code style="font-size:0.78rem;">{{ line.entry.reference }}</code>
+            </td>
+            <td>
+              <span class="fw-600" style="font-size:0.875rem;">{{ line.account.code }}</span>
+              <span class="text-muted-sm ms-1" style="font-size:0.78rem;">{{ line.account.name }}</span>
+            </td>
+            <td style="max-width:260px;font-size:0.875rem;">
+              {{ line.entry.description|truncatechars:60 }}
+            </td>
+            <td class="text-end fw-600">
+              {% if line.debit_amount %}
+                {{ currency }} {{ line.debit_amount|floatformat:2|intcomma }}
+              {% else %}
+                <span class="text-muted-sm">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end fw-600">
+              {% if line.credit_amount %}
+                {{ currency }} {{ line.credit_amount|floatformat:2|intcomma }}
+              {% else %}
+                <span class="text-muted-sm">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if lines|length == 500 %}
+  <div class="card-body border-top" style="border-color:var(--color-border)!important;">
+    <p class="text-muted-sm mb-0">
+      <i class="bi bi-info-circle me-1"></i>
+      Showing the first 500 entries. Use date / account filters to narrow results.
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-list-check" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm">
+      No journal entries match the current filters.
+    </p>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

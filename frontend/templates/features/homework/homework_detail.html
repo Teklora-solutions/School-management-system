@@ -1,0 +1,342 @@
+{% extends base_template %}
+
+{% block title %}{{ homework.title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .hw-thumb {
+    display: block;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none;
+    background: rgba(255, 255, 255, .02);
+    transition: border-color .15s ease;
+  }
+  .hw-thumb:hover { border-color: var(--accent-light); }
+  .hw-thumb img {
+    width: 100%;
+    height: 130px;
+    object-fit: cover;
+    display: block;
+  }
+  .hw-thumb-name {
+    display: block;
+    padding: .4rem .55rem;
+    font-size: .75rem;
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hw-attachment-row {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    padding: .55rem .7rem;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .02);
+    margin-bottom: .5rem;
+  }
+  .hw-attachment-name {
+    font-size: .88rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-end justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      {{ homework.title }}
+      {% if is_new %}<span class="badge bg-danger align-middle" style="font-size:.55em;">NEW</span>{% endif %}
+    </h1>
+    <p class="page-subtitle">
+      {{ homework.school_class.name }}
+      · {{ homework.subject.name }}
+      {% if homework.stream %} · {{ homework.stream.name }}{% endif %}
+      · {{ homework.term.academic_year.name }} · {{ homework.term.get_name_display }}
+    </p>
+  </div>
+  <div class="d-flex gap-2 align-items-center flex-wrap">
+    {% if preview %}
+      {% if homework.status == "draft" %}
+      <span class="badge" style="background:var(--color-muted);color:#fff;">Draft preview</span>
+      {% else %}
+      <span class="badge" style="background:var(--color-success);color:#fff;">Published</span>
+      {% endif %}
+      <a href="{% url 'homework:teacher_edit' homework.pk %}" class="btn btn-outline-primary">
+        <i class="bi bi-pencil-square me-1"></i>Edit
+      </a>
+      <a href="{% url 'homework:teacher_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Homework
+      </a>
+    {% else %}
+      <a href="{% url 'homework:list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Homework
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if preview %}
+<div class="alert alert-info" role="status">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  This is exactly how students see the homework{% if homework.status == "draft" %} — once you publish it{% endif %}.
+</div>
+{% endif %}
+
+<div class="row g-3">
+
+  <div class="col-lg-8">
+
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-list-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Instructions
+        </h2>
+        <span class="badge {% if is_overdue %}bg-danger{% elif homework.due_date == today %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+          {% if is_overdue %}<i class="bi bi-exclamation-triangle-fill me-1"></i>Was due {% else %}Due {% endif %}
+          {{ homework.due_date|date:"M j, Y" }}
+        </span>
+      </div>
+      <div class="card-body">
+        {% if homework.description %}
+          <div style="font-size:.95rem;line-height:1.65;">{{ homework.description|linebreaks }}</div>
+        {% else %}
+          <p class="text-muted-sm mb-0">No written instructions were added for this homework.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-paperclip me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Files
+        </h2>
+        <span class="text-muted-sm">{{ attachments|length }} file{{ attachments|length|pluralize }}</span>
+      </div>
+      <div class="card-body">
+        {% if not attachments and not homework.attachment %}
+          <p class="text-muted-sm mb-0">No files were attached to this homework.</p>
+        {% endif %}
+
+        {% if images %}
+        <div class="row g-2 mb-3">
+          {% for att in images %}
+          <div class="col-6 col-md-4">
+            <a href="{% url 'homework:attachment_file' homework.pk att.pk %}#toolbar=0"
+               target="_blank" rel="noopener" class="hw-thumb" title="Open {{ att }}">
+              <img src="{% url 'homework:attachment_file' homework.pk att.pk %}"
+                   alt="{{ att }}" loading="lazy">
+              <span class="hw-thumb-name">{{ att }}</span>
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% for att in pdfs %}
+        <div class="hw-attachment-row">
+          <i class="bi bi-file-earmark-pdf fs-4" style="color:var(--color-danger);" aria-hidden="true"></i>
+          <div class="flex-grow-1" style="min-width:0;">
+            <div class="hw-attachment-name" title="{{ att }}">{{ att }}</div>
+            <div class="text-muted-sm" style="font-size:.75rem;">PDF · {{ att.size_kb }} KB</div>
+          </div>
+          <a href="{% url 'homework:attachment_file' homework.pk att.pk %}" target="_blank" rel="noopener"
+             class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-eye me-1"></i>Open
+          </a>
+          <a href="{% url 'homework:attachment_file' homework.pk att.pk %}?download=1"
+             class="btn btn-sm btn-outline-secondary" aria-label="Download {{ att }}">
+            <i class="bi bi-download"></i>
+          </a>
+        </div>
+        {% endfor %}
+
+        {% for att in documents %}
+        <div class="hw-attachment-row">
+          <i class="bi bi-file-earmark-word fs-4" style="color:var(--accent-light);" aria-hidden="true"></i>
+          <div class="flex-grow-1" style="min-width:0;">
+            <div class="hw-attachment-name" title="{{ att }}">{{ att }}</div>
+            <div class="text-muted-sm" style="font-size:.75rem;">Word document · {{ att.size_kb }} KB</div>
+          </div>
+          <a href="{% url 'homework:attachment_file' homework.pk att.pk %}?download=1"
+             class="btn btn-sm btn-primary">
+            <i class="bi bi-download me-1"></i>Download
+          </a>
+        </div>
+        {% endfor %}
+
+        {% if homework.attachment %}
+        <div class="hw-attachment-row">
+          <i class="bi bi-file-earmark-arrow-down fs-4" style="color:var(--color-muted);" aria-hidden="true"></i>
+          <div class="flex-grow-1" style="min-width:0;">
+            <div class="hw-attachment-name">Attached file</div>
+            <div class="text-muted-sm" style="font-size:.75rem;">Older single attachment</div>
+          </div>
+          <a href="{% url 'homework:attachment_download' homework.pk %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-download me-1"></i>Download
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if not preview %}
+    <div class="card mt-3" id="submission-card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-upload me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          {% if can_submit %}Your submission{% else %}{{ student.user.get_full_name|default:student.user.username }}&#8217;s submission{% endif %}
+        </h2>
+        {% if submission_state == "submitted" %}
+        <span class="badge" style="background:var(--color-success);color:#fff;">Submitted</span>
+        {% elif submission_state == "late" %}
+        <span class="badge bg-danger">Submitted late</span>
+        {% elif submission_state == "overdue" %}
+        <span class="badge bg-warning text-dark">Not submitted — overdue</span>
+        {% else %}
+        <span class="badge bg-secondary">Not submitted yet</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if submission %}
+        <p class="text-muted-sm mb-3">
+          <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
+          Handed in {{ submission.submitted_at|date:"M j, Y H:i" }}{% if submission.is_late %} · after the due date{% endif %}
+        </p>
+        {% if submission.note %}
+        <div class="mb-3" style="font-size:.92rem;">{{ submission.note|linebreaks }}</div>
+        {% endif %}
+        {% endif %}
+
+        {% if show_submission_form %}
+          {% if late_warning %}
+          <div class="alert alert-warning py-2" role="status">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            The due date has passed — anything you hand in now will be marked late.
+          </div>
+          {% endif %}
+          <form method="post" action="{% url 'homework:submit' homework.pk %}" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            {% if submission_attachments %}
+            <div class="mb-2">
+              {% for att in submission_attachments %}
+              <div class="hw-attachment-row">
+                <i class="bi bi-file-earmark fs-4" style="color:var(--accent-light);" aria-hidden="true"></i>
+                <div class="flex-grow-1" style="min-width:0;">
+                  <div class="hw-attachment-name" title="{{ att }}">{{ att }}</div>
+                  <div class="text-muted-sm" style="font-size:.75rem;">{{ att.size_kb }} KB</div>
+                </div>
+                <a href="{% url 'homework:submission_file' homework.pk submission.pk att.pk %}?download=1"
+                   class="btn btn-sm btn-outline-secondary" aria-label="Download {{ att }}">
+                  <i class="bi bi-download"></i>
+                </a>
+                <div class="form-check ms-2 mb-0">
+                  <input class="form-check-input" type="checkbox" name="remove_attachment"
+                         value="{{ att.pk }}" id="remove-att-{{ att.pk }}">
+                  <label class="form-check-label text-muted-sm" for="remove-att-{{ att.pk }}">Remove</label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <label for="id_submission_note" class="form-label">Note (optional)</label>
+            <textarea class="form-control" id="id_submission_note" name="note" rows="3"
+                      maxlength="2000" placeholder="Anything your teacher should know…">{{ submission.note|default:"" }}</textarea>
+
+            <label for="id_submission_files" class="form-label mt-3">Files</label>
+            <input class="form-control" type="file" id="id_submission_files" name="files"
+                   multiple accept="{{ accepted_types }}">
+            <div class="form-text">
+              Images, PDF or Word · up to {{ max_submission_files }} files · 10 MB each.
+              You can replace or add files until the due date.
+            </div>
+
+            <button type="submit" class="btn btn-primary mt-3">
+              <i class="bi bi-send me-1"></i>{% if submission %}Update submission{% else %}Submit homework{% endif %}
+            </button>
+          </form>
+
+        {% elif submission %}
+          {% if submission_attachments %}
+          <div class="mb-0">
+            {% for att in submission_attachments %}
+            <div class="hw-attachment-row">
+              <i class="bi bi-file-earmark fs-4" style="color:var(--accent-light);" aria-hidden="true"></i>
+              <div class="flex-grow-1" style="min-width:0;">
+                <div class="hw-attachment-name" title="{{ att }}">{{ att }}</div>
+                <div class="text-muted-sm" style="font-size:.75rem;">{{ att.size_kb }} KB</div>
+              </div>
+              <a href="{% url 'homework:submission_file' homework.pk submission.pk att.pk %}?download=1"
+                 class="btn btn-sm btn-outline-secondary" aria-label="Download {{ att }}">
+                <i class="bi bi-download me-1"></i>Download
+              </a>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted-sm mb-0">No files were attached to this submission.</p>
+          {% endif %}
+          {% if can_submit %}
+          <p class="text-muted-sm mt-3 mb-0">
+            <i class="bi bi-lock me-1" aria-hidden="true"></i>
+            The due date has passed, so this submission can no longer be changed.
+          </p>
+          {% endif %}
+
+        {% elif not can_submit %}
+          <p class="text-muted-sm mb-0">
+            {% if submission_state == "overdue" %}The due date has passed and nothing was handed in.{% else %}Nothing has been handed in yet.{% endif %}
+          </p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-info-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Details
+        </h2>
+      </div>
+      <div class="card-body">
+        <dl class="mb-0" style="font-size:.9rem;">
+          <dt class="text-muted-sm">Class</dt>
+          <dd class="mb-2">{{ homework.school_class.name }}</dd>
+          <dt class="text-muted-sm">Subject</dt>
+          <dd class="mb-2">{{ homework.subject.name }}</dd>
+          <dt class="text-muted-sm">Stream</dt>
+          <dd class="mb-2">{% if homework.stream %}{{ homework.stream.name }}{% else %}All streams{% endif %}</dd>
+          <dt class="text-muted-sm">Term</dt>
+          <dd class="mb-2">{{ homework.term.academic_year.name }} · {{ homework.term.get_name_display }}</dd>
+          <dt class="text-muted-sm">Due date</dt>
+          <dd class="mb-2 {% if is_overdue %}text-danger fw-600{% endif %}">{{ homework.due_date|date:"l, M j, Y" }}</dd>
+          {% if homework.set_by %}
+          <dt class="text-muted-sm">Set by</dt>
+          <dd class="mb-2">{{ homework.set_by.get_full_name|default:homework.set_by.username }}</dd>
+          {% endif %}
+          {% if preview and homework.published_at %}
+          <dt class="text-muted-sm">Published</dt>
+          <dd class="mb-0">{{ homework.published_at|date:"M j, Y H:i" }}</dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock content %}

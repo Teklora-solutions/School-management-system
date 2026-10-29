@@ -1,0 +1,192 @@
+{% extends base_template %}
+
+{% block title %}Class Promotion | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-arrow-up-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Class Promotion
+    </h1>
+    <p class="page-subtitle">Dry-run first: see who moves up, who repeats, who graduates — then commit.</p>
+  </div>
+  <a href="{% url 'students:promotion_history' %}" class="btn btn-outline-primary">
+    <i class="bi bi-clock-history me-1"></i>Promotion History
+  </a>
+</div>
+
+{# ── Preview form ────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-header"><h2 class="card-title">1. Build Preview</h2></div>
+  <div class="card-body">
+    <form method="post" id="promotion-preview-form" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="preview">
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label for="{{ form.from_year.id_for_label }}" class="form-label fw-600">From Academic Year <span class="text-danger">*</span></label>
+          {{ form.from_year }}
+          {% if form.from_year.errors %}<div class="invalid-feedback d-block">{{ form.from_year.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label for="{{ form.to_year.id_for_label }}" class="form-label fw-600">To Academic Year <span class="text-danger">*</span></label>
+          {{ form.to_year }}
+          {% if form.to_year.errors %}<div class="invalid-feedback d-block">{{ form.to_year.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label for="{{ form.term.id_for_label }}" class="form-label fw-600">Results Term <span class="text-danger">*</span></label>
+          {{ form.term }}
+          {% if form.term.errors %}<div class="invalid-feedback d-block">{{ form.term.errors.0 }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="{{ form.repeat_students.id_for_label }}" class="form-label fw-600">{{ form.repeat_students.label }}</label>
+        {{ form.repeat_students }}
+        {% if form.repeat_students.help_text %}<div class="form-text">{{ form.repeat_students.help_text }}</div>{% endif %}
+        {% if form.repeat_students.errors %}<div class="invalid-feedback d-block">{{ form.repeat_students.errors.0 }}</div>{% endif %}
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="btn-preview-promotion">
+        <i class="bi bi-eye me-1"></i>Run Dry-Run Preview
+      </button>
+    </form>
+  </div>
+</div>
+
+{% if preview %}
+{# ── Results gate ────────────────────────────────────────────────────────── #}
+{% if preview.results_published %}
+<div class="alert alert-success" role="alert">
+  <i class="bi bi-check-circle me-1"></i>Term results are fully published — promotion may proceed normally.
+</div>
+{% else %}
+<div class="alert alert-warning" role="alert">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  <strong>Term results are NOT fully published.</strong> Promotion is blocked unless you tick the override below and give a reason (audit-logged).
+</div>
+{% endif %}
+
+{# ── Counts ──────────────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-3">
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-arrow-up-right-circle-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ preview.counts.promote }}</div>
+        <div class="stat-label">Promote</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ preview.counts.repeat }}</div>
+        <div class="stat-label">Repeat</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-mortarboard-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ preview.counts.graduate }}</div>
+        <div class="stat-label">Graduate</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Moves table ─────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-header"><h2 class="card-title">2. Preview — {{ preview.from_year }} → {{ preview.to_year }} ({{ preview.term }})</h2></div>
+  <div class="card-body p-0">
+    {% if preview.moves %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Admission #</th>
+            <th scope="col">Student</th>
+            <th scope="col">Action</th>
+            <th scope="col">From Class</th>
+            <th scope="col">To Class</th>
+            <th scope="col">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for move in preview.moves %}
+          <tr>
+            <td class="text-muted-sm">{{ move.admission_number }}</td>
+            <td class="fw-600">{{ move.name }}</td>
+            <td>
+              {% if move.action == "promote" %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">Promote</span>
+              {% elif move.action == "repeat" %}
+                <span class="badge" style="background:var(--color-warning);color:#000;">Repeat</span>
+              {% else %}
+                <span class="badge" style="background:var(--accent);color:#fff;">Graduate</span>
+              {% endif %}
+            </td>
+            <td class="text-muted-sm">{{ move.from_class|default:"—" }}</td>
+            <td class="text-muted-sm">{{ move.to_class|default:"—" }}</td>
+            <td class="text-muted-sm">{{ move.notes|default:"" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-people fs-1 d-block mb-2"></i>
+      No students to transition between these years.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Commit form ─────────────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-header"><h2 class="card-title">3. Commit Promotion</h2></div>
+  <div class="card-body">
+    <form method="post" id="promotion-commit-form" novalidate>
+      {% csrf_token %}
+      {{ commit_form.from_year }}
+      {{ commit_form.to_year }}
+      {{ commit_form.term }}
+      {{ commit_form.repeat_students }}
+
+      {% if not preview.results_published %}
+      <div class="form-check mb-2">
+        {{ commit_form.override_unpublished }}
+        <label for="{{ commit_form.override_unpublished.id_for_label }}" class="form-check-label fw-600">
+          Override unpublished-results block
+        </label>
+      </div>
+      <div class="mb-3">
+        <label for="{{ commit_form.override_reason.id_for_label }}" class="form-label fw-600">Override reason (required when overriding)</label>
+        {{ commit_form.override_reason }}
+        {% if commit_form.override_reason.errors %}<div class="invalid-feedback d-block">{{ commit_form.override_reason.errors.0 }}</div>{% endif %}
+      </div>
+      {% else %}
+      <input type="hidden" name="override_unpublished" id="id_override_unpublished">
+      {% endif %}
+
+      <p class="text-muted-sm">Committing is transactional and idempotent — running it twice for the same year pair does nothing the second time.</p>
+      <button type="submit" name="action" value="commit" class="btn btn-primary" id="btn-commit-promotion">
+        <i class="bi bi-check2-all me-1"></i>Commit Promotion
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

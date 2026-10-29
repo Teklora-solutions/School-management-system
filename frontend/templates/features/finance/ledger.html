@@ -1,0 +1,126 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Ledger | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-journal-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Ledger
+      </h1>
+      <p class="page-subtitle">
+        Every posting the books hold, newest first. Nothing here can be edited or
+        deleted — a mistake is answered with a reversing entry.
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:trial_balance' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-scale-loaded me-1"></i>Trial Balance
+      </a>
+      <a href="{% url 'finance:report_summary' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-bar-graph me-1"></i>Income &amp; Expense
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-5 col-lg-4">
+        <label class="form-label text-muted-sm mb-1" for="{{ form.account.id_for_label }}">
+          {{ form.account.label }}
+        </label>
+        {{ form.account }}
+      </div>
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label text-muted-sm mb-1" for="{{ form.date_from.id_for_label }}">
+          {{ form.date_from.label }}
+        </label>
+        {{ form.date_from }}
+      </div>
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label text-muted-sm mb-1" for="{{ form.date_to.id_for_label }}">
+          {{ form.date_to.label }}
+        </label>
+        {{ form.date_to }}
+      </div>
+      <div class="col-sm-12 col-lg-4 d-flex gap-2">
+        <button type="submit" class="btn btn-sm btn-primary">
+          <i class="bi bi-funnel me-1"></i>Filter
+        </button>
+        <a href="{% url 'finance:ledger' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+      </div>
+    </form>
+    {% for field in form %}
+      {% for error in field.errors %}
+      <div class="text-danger small mt-2">{{ error }}</div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if lines %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Reference</th>
+            <th scope="col">Description</th>
+            <th scope="col">Account</th>
+            <th scope="col" class="text-end">Debit</th>
+            <th scope="col" class="text-end">Credit</th>
+            <th scope="col">From</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in lines %}
+          <tr>
+            <td class="text-muted-sm">{{ line.entry.entry_date|date:"j M Y" }}</td>
+            <td class="fw-600">{{ line.entry.reference }}</td>
+            <td class="text-muted-sm">{{ line.entry.description|truncatechars:80 }}</td>
+            <td>
+              <span class="text-muted-sm">{{ line.account.code }}</span>
+              {{ line.account.name }}
+              {% if line.account.is_contra %}
+              <span class="badge" style="background:var(--color-muted);color:#fff;"
+                    title="Income the school gave up — it nets inside the income total, it is not a cost.">
+                contra
+              </span>
+              {% endif %}
+            </td>
+            <td class="text-end {% if line.debit_amount %}fw-600{% endif %}">
+              {% if line.debit_amount %}{{ currency }} {{ line.debit_amount|floatformat:2|intcomma }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end {% if line.credit_amount %}fw-600{% endif %}">
+              {% if line.credit_amount %}{{ currency }} {{ line.credit_amount|floatformat:2|intcomma }}{% else %}—{% endif %}
+            </td>
+            <td class="text-muted-sm">
+              {{ line.entry.get_source_type_display }}
+              {% if line.entry.reversed_by %}
+              <span class="badge" style="background:var(--color-danger);color:#fff;">reversed</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+      No postings match these filters.
+    </div>
+    {% endif %}
+  </div>
+  <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+    Showing at most the 500 newest lines. Narrow the date range to read older ones.
+  </div>
+</div>
+{% endblock content %}

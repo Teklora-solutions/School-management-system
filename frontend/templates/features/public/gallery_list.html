@@ -1,0 +1,99 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Website gallery | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-images me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Website gallery
+    </h1>
+    <p class="page-subtitle">
+      Photographs on the school's public Gallery page, in the order visitors see them.
+      <a href="{% url 'public:gallery' %}" target="_blank" rel="noopener">See the page as a visitor <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+    </p>
+  </div>
+  <a href="{% url 'public_admin:gallery_add' %}" class="btn btn-primary" id="btn-add-photo">
+    <i class="bi bi-plus-circle me-1"></i>Add photograph
+  </a>
+</div>
+
+{% if photos %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0" id="gallery-table">
+      <thead>
+        <tr>
+          <th scope="col" style="width:96px;">Photo</th>
+          <th scope="col">Title</th>
+          <th scope="col">Order</th>
+          <th scope="col">Status</th>
+          <th scope="col" class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for photo in photos %}
+        <tr>
+          <td>
+            <img src="{{ photo.image.url }}" alt="{{ photo.title }}"
+                 style="width:80px;height:54px;object-fit:cover;border-radius:6px;background:var(--color-surface-2);">
+          </td>
+          <td>
+            <span class="fw-600">{{ photo.title }}</span>
+            {% if photo.caption %}<div class="text-muted-sm">{{ photo.caption }}</div>{% endif %}
+          </td>
+          <td><code class="fw-600" style="color:var(--accent-light);">{{ photo.display_order }}</code></td>
+          <td>
+            {% if photo.is_published %}
+              <span class="badge" style="background:var(--color-success);color:#fff;">Published</span>
+            {% else %}
+              <span class="badge" style="background:var(--color-muted);color:#fff;">Hidden</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+              <a href="{% url 'public_admin:gallery_edit' photo.pk %}" class="btn btn-sm btn-outline-primary"
+                 id="btn-edit-{{ photo.pk }}">Edit</a>
+
+              <form method="post" action="{% url 'public_admin:gallery_publish' photo.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary"
+                        name="action" value="{% if photo.is_published %}unpublish{% else %}publish{% endif %}"
+                        id="btn-publish-{{ photo.pk }}">
+                  {% if photo.is_published %}Hide{% else %}Publish{% endif %}
+                </button>
+              </form>
+
+              <form method="post" action="{% url 'public_admin:gallery_delete' photo.pk %}" class="d-inline"
+                    onsubmit="return confirm('Delete “{{ photo.title }}” from the gallery? The photograph goes away immediately.');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger" name="confirm" value="1"
+                        id="btn-del-{{ photo.pk }}">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<p class="text-muted-sm mt-2">{{ page_obj.paginator.count }} photograph{{ page_obj.paginator.count|pluralize }} in total.</p>
+{% endif %}
+{% include "partials/_pagination.html" with page_obj=page_obj %}
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center p-5">
+    <p class="text-muted mb-3">The gallery has no photographs yet.</p>
+    <a href="{% url 'public_admin:gallery_add' %}" class="btn btn-primary" id="btn-add-first-photo">
+      <i class="bi bi-plus-circle me-1"></i>Add the first photograph
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

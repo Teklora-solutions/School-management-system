@@ -1,0 +1,75 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Class–Subject Mappings | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-diagram-3-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Class–Subject Mappings
+    </h1>
+    <p class="page-subtitle">Which subjects are taught in each class.</p>
+  </div>
+  <a href="{% url 'academics:class_subject_create' %}" class="btn btn-primary" id="btn-add-mapping">
+    <i class="bi bi-plus-circle me-1"></i>Add Mapping
+  </a>
+</div>
+
+{# Filter #}
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <label class="form-label fw-600">Year</label>
+        <select name="year" class="form-select" onchange="this.form.submit()">
+          <option value="">All years</option>
+          {% for y in years %}
+          <option value="{{ y.pk }}" {% if selected_year_id == y.pk %}selected{% endif %}>{{ y.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label fw-600">Class</label>
+        <select name="class" class="form-select" onchange="this.form.submit()">
+          <option value="">All classes</option>
+          {% for c in classes %}
+          <option value="{{ c.pk }}" {% if selected_class_id == c.pk %}selected{% endif %}>{{ c.name }} ({{ c.academic_year.name }})</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if mappings %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0" id="cs-table">
+      <thead>
+        <tr><th>Class</th><th>Stream</th><th>Subject</th><th class="text-end">Remove</th></tr>
+      </thead>
+      <tbody>
+        {% for m in mappings %}
+        <tr>
+          <td class="fw-600">{{ m.school_class.name }} <span class="text-muted-sm">({{ m.school_class.academic_year.name }})</span></td>
+          <td class="text-muted-sm">{{ m.stream.name|default:"All" }}</td>
+          <td>{{ m.subject.name }} <code class="text-muted-sm">{{ m.subject.code }}</code></td>
+          <td class="text-end">
+            <form method="post" action="{% url 'academics:class_subject_remove' m.pk %}"
+                  onsubmit="return confirm('Remove this mapping?')">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger" id="btn-cs-remove-{{ m.pk }}">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="card-body text-center p-5 text-muted-sm">No mappings found.</div></div>
+{% endif %}
+{% endblock content %}

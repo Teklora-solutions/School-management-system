@@ -1,0 +1,32 @@
+{% comment %}
+The year + term filter every report page shares. ``term`` empty means "Whole
+year". The year select reloads the page on its own so the term list can never
+offer a term from the year that was just replaced; the Show button still works
+without JavaScript.
+{% endcomment %}
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="get" class="d-flex flex-wrap align-items-end gap-2">
+      <div>
+        <label class="form-label text-muted-sm mb-1" for="{{ form.year.id_for_label }}">Year</label>
+        {{ form.year }}
+        {% for error in form.year.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div>
+        <label class="form-label text-muted-sm mb-1" for="{{ form.term.id_for_label }}">Term</label>
+        {{ form.term }}
+        {% for error in form.term.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-search me-1"></i>Show
+      </button>
+    </form>
+    {% for error in form.non_field_errors %}
+    <div class="text-danger small mt-1">{{ error }}</div>
+    {% endfor %}
+  </div>
+</div>

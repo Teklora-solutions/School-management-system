@@ -1,0 +1,138 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Fee Structure · {{ structure.school_class.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-list-columns me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {{ structure.school_class.name }} — {{ structure.term }}
+      </h1>
+      <p class="page-subtitle">
+        Version {{ structure.version }} ·
+        {% if structure.is_active %}the structure new bills use{% else %}superseded by a later version{% endif %}
+        {% if structure.copied_from %} · copied from v{{ structure.copied_from.version }} of {{ structure.copied_from.term }}{% endif %}
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:invoice_generate_preview' %}?term={{ structure.term.pk }}&amp;school_class={{ structure.school_class.pk }}"
+         class="btn btn-primary btn-sm">
+        <i class="bi bi-magic me-1"></i>Preview Bills
+      </a>
+      <a href="{% url 'finance:fee_structure_create' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>New Version
+      </a>
+      <a href="{% url 'finance:fee_structure_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>All Structures
+      </a>
+    </div>
+  </div>
+</div>
+
+{% if not structure.is_active %}
+<div class="alert alert-warning d-flex align-items-center gap-2" role="status">
+  <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+  <div>
+    A newer version exists for this class and term, so posting bills now would use
+    that one instead. Creating another version supersedes it again.
+  </div>
+</div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-receipt-cutoff me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      What one pupil is billed
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th scope="col">Item</th>
+          <th scope="col">Billed to</th>
+          <th scope="col">Pay by</th>
+          <th scope="col" class="text-end">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="fw-600">{{ item.label }}</td>
+          <td>
+            {% if item.compulsory %}
+              <span class="text-muted-sm">Everyone in the class</span>
+            {% else %}
+              <span class="badge" style="background:var(--color-warning);color:#000;"
+                    title="Only the pupils ticked on this item’s page are billed for it.">
+                Selected students only
+              </span>
+              <div class="mt-1" style="font-size:0.78rem;">
+                <a href="{% url 'finance:fee_item_students' item.pk %}">
+                  {% if item.elected_count %}
+                    {{ item.elected_count }} pupil{{ item.elected_count|pluralize }} ticked
+                  {% else %}
+                    nobody ticked yet
+                  {% endif %}
+                  — choose students
+                </a>
+              </div>
+            {% endif %}
+          </td>
+          <td class="text-muted-sm">{{ item.due_date|date:"j M Y"|default:structure.due_date|date:"j M Y"|default:"Structure date" }}</td>
+          <td class="text-end">{{ currency }} {{ item.amount|floatformat:2|intcomma }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" class="text-muted-sm">This structure has no items — it would bill nothing.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row" colspan="3">Every item on this list</th>
+          <th class="text-end">{{ currency }} {{ structure.total|floatformat:2|intcomma }}</th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+    The figure above adds every item on this list. A pupil is only billed the
+    optional items they have been ticked for, so what a family owes can be less.
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-info-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Record
+    </h2>
+  </div>
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-3 text-muted-sm">Class</dt>
+      <dd class="col-sm-9">{{ structure.school_class.name }} — {{ structure.school_class.academic_year.name }}</dd>
+      <dt class="col-sm-3 text-muted-sm">Term</dt>
+      <dd class="col-sm-9">
+        {{ structure.term }} ·
+        {{ structure.term.start_date|date:"j M Y" }} to {{ structure.term.end_date|date:"j M Y" }}
+      </dd>
+      <dt class="col-sm-3 text-muted-sm">Pay by</dt>
+      <dd class="col-sm-9">{{ structure.due_date|date:"j M Y"|default:"Not set" }}</dd>
+      <dt class="col-sm-3 text-muted-sm">Created by</dt>
+      <dd class="col-sm-9">{{ structure.created_by.full_name|default:"—" }}</dd>
+      <dt class="col-sm-3 text-muted-sm">Created</dt>
+      <dd class="col-sm-9">{{ structure.created_at|date:"j M Y H:i" }}</dd>
+      {% if structure.note %}
+      <dt class="col-sm-3 text-muted-sm">Note</dt>
+      <dd class="col-sm-9">{{ structure.note }}</dd>
+      {% endif %}
+    </dl>
+  </div>
+</div>
+{% endblock content %}

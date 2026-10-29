@@ -1,0 +1,240 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}{% if item.compulsory %}{{ item.label }} · {{ structure.school_class.name }}{% else %}Who takes {{ item.label }} · {{ structure.school_class.name }}{% endif %} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-person-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {% if item.compulsory %}
+          {{ item.label }} — everybody in the class pays
+        {% else %}
+          Who takes {{ item.label }}?
+        {% endif %}
+      </h1>
+      <p class="page-subtitle">
+        {{ structure.school_class.name }} — {{ structure.term }} ·
+        {{ currency }} {{ item.amount|floatformat:2|intcomma }} per pupil per term
+      </p>
+    </div>
+    <a href="{% url 'finance:fee_structure_detail' structure.pk %}"
+       class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back to the structure
+    </a>
+  </div>
+</div>
+
+{% if item.compulsory %}
+<div class="card">
+  <div class="card-body">
+    <div class="alert alert-warning d-flex align-items-start gap-2 mb-0" role="status">
+      <i class="bi bi-exclamation-triangle-fill mt-1" aria-hidden="true"></i>
+      <div>
+        <strong>{{ item.label }} is compulsory.</strong>
+        Every pupil in {{ structure.school_class.name }} is billed it, so there is
+        nobody to pick. If one child should not pay this term, take it off their
+        bill with a <a href="{% url 'finance:adjustment_create' %}">waiver adjustment</a>
+        — that leaves a record of who decided it and why.
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info d-flex align-items-start gap-2" role="status">
+  <i class="bi bi-info-circle-fill mt-1" aria-hidden="true"></i>
+  <div>
+    Only the pupils ticked below have {{ item.label }} added to their bill.
+    Anyone left unticked is not billed for it this term.
+    {% if invoices_posted %}
+    <strong>Bills for this structure have already been posted</strong>, so a change
+    here applies to bills posted from now on — a bill already in a family’s hands
+    keeps its lines.
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-people me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ structure.school_class.name }} class list
+      <span class="text-muted-sm fw-normal" style="font-size:0.85rem;">
+        · <span id="roster-selected">{{ elected_total }} of {{ roster_total }}</span> selected
+      </span>
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <form method="post" id="election-form">
+      {% csrf_token %}
+
+      <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-3 border-bottom">
+        <div class="flex-grow-1" style="min-width:240px;">
+          <label for="roster-search" class="visually-hidden">Search this class</label>
+          <input type="search" id="roster-search" class="form-control"
+                 placeholder="Search by name or admission number…" autocomplete="off">
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-tick-visible>
+          <i class="bi bi-check2-square me-1"></i>Tick shown
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-clear-visible>
+          <i class="bi bi-square me-1"></i>Clear shown
+        </button>
+        <span class="text-muted-sm" id="roster-shown" aria-live="polite"></span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col" class="text-center" style="width:2.5rem;">
+                <input type="checkbox" class="form-check-input" id="select-all"
+                       aria-label="Tick everyone on this list">
+              </th>
+              <th scope="col">Adm No.</th>
+              <th scope="col">Student</th>
+              <th scope="col">Status</th>
+              <th scope="col">Now</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr data-roster-row
+                data-search="{{ row.admission_number|lower }} {{ row.name|lower }}">
+              <td class="text-center">
+                <input type="checkbox" class="form-check-input" name="students"
+                       value="{{ row.student.pk }}" id="pupil-{{ row.student.pk }}"
+                       {% if row.elected %}checked{% endif %}>
+              </td>
+              <td>
+                <label for="pupil-{{ row.student.pk }}" class="text-muted-sm mb-0">
+                  {{ row.admission_number }}
+                </label>
+              </td>
+              <td>
+                <label for="pupil-{{ row.student.pk }}" class="fw-600 mb-0">
+                  {{ row.name }}
+                </label>
+              </td>
+              <td class="text-muted-sm">{{ row.status }}</td>
+              <td>
+                {% if row.elected %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">Billed</span>
+                {% else %}
+                <span class="badge" style="background:var(--color-muted);color:#fff;">Not billed</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="text-muted-sm">
+                No pupil is currently in {{ structure.school_class.name }}, so there
+                is nobody to bill this item to.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-3 border-top">
+        <div class="text-muted-sm">
+          {{ currency }} {{ item.amount|floatformat:2|intcomma }} is added to each
+          ticked pupil’s next {{ structure.term }} bill.
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-save me-1"></i>Save selection
+        </button>
+      </div>
+    </form>
+  </div>
+  <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+    Only pupils still in school and in this class are listed — the same roster the
+    billing run uses. Ticking a pupil who has already been billed does not restate
+    their invoice; it changes the bills posted after this.
+  </div>
+</div>
+
+<script>
+(function () {
+  var rows = Array.prototype.slice.call(document.querySelectorAll('[data-roster-row]'));
+  var search = document.getElementById('roster-search');
+  var shownLabel = document.getElementById('roster-shown');
+  var selectedLabel = document.getElementById('roster-selected');
+  var form = document.getElementById('election-form');
+  var selectAll = document.getElementById('select-all');
+
+  function boxes() {
+    return rows.map(function (row) {
+      return row.querySelector('input[name="students"]');
+    });
+  }
+
+  function refreshSelected() {
+    var ticked = boxes().filter(function (box) { return box.checked; }).length;
+    if (selectedLabel) {
+      selectedLabel.textContent = ticked + ' of ' + rows.length;
+    }
+  }
+
+  function applyFilter() {
+    var needle = (search.value || '').trim().toLowerCase();
+    var shown = 0;
+    rows.forEach(function (row) {
+      var hit = !needle || (row.getAttribute('data-search') || '').indexOf(needle) !== -1;
+      row.hidden = !hit;
+      if (hit) { shown += 1; }
+    });
+    if (shownLabel) {
+      shownLabel.textContent = shown + ' of ' + rows.length + ' shown';
+    }
+  }
+
+  function tickVisible(checked) {
+    rows.forEach(function (row) {
+      if (!row.hidden) {
+        row.querySelector('input[name="students"]').checked = checked;
+      }
+    });
+    refreshSelected();
+  }
+
+  if (search) { search.addEventListener('input', applyFilter); }
+
+  document.querySelectorAll('[data-tick-visible]').forEach(function (btn) {
+    btn.addEventListener('click', function () { tickVisible(true); });
+  });
+  document.querySelectorAll('[data-clear-visible]').forEach(function (btn) {
+    btn.addEventListener('click', function () { tickVisible(false); });
+  });
+
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      tickVisible(selectAll.checked);
+    });
+  }
+
+  rows.forEach(function (row) {
+    row.querySelector('input[name="students"]')
+      .addEventListener('change', refreshSelected);
+  });
+
+  if (form) {
+    form.addEventListener('submit', function (event) {
+      var ticked = boxes().filter(function (box) { return box.checked; }).length;
+      if (ticked === 0 && {{ elected_total }} > 0) {
+        var message = 'Nobody will be billed for {{ item.label|escapejs }}. ' +
+                      'Clear the selection?';
+        if (!window.confirm(message)) { event.preventDefault(); }
+      }
+    });
+  }
+
+  applyFilter();
+  refreshSelected();
+})();
+</script>
+{% endif %}
+{% endblock content %}

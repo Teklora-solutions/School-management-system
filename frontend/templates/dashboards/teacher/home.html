@@ -1,0 +1,136 @@
+{% extends "dashboards/teacher/base.html" %}
+
+{% block title %}Teacher Dashboard | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-person-workspace me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Teacher Dashboard
+  </h1>
+  <p class="page-subtitle">
+    {% if current_term %}
+      {{ current_term.academic_year.name }} · {{ current_term.get_name_display }}
+    {% else %}
+      No current term has been set.
+    {% endif %}
+  </p>
+</div>
+
+<div class="row g-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-easel-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ class_count }}</div>
+        <div class="stat-label">My Classes</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-people-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ student_count }}</div>
+        <div class="stat-label">Students in My Classes</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <a href="{% url 'teachers:marks_list' %}" class="text-decoration-none">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="bi bi-pencil-square" aria-hidden="true"></i></div>
+        <div class="stat-body">
+          <div class="stat-value">{{ draft_sheet_count }}</div>
+          <div class="stat-label">Marks Sheets in Draft</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <a href="{% url 'teachers:marks_list' %}" class="text-decoration-none">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="bi bi-hourglass-split" aria-hidden="true"></i></div>
+        <div class="stat-body">
+          <div class="stat-value">{{ submitted_sheet_count }}</div>
+          <div class="stat-label">Awaiting Admin</div>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+{% if submitted_sheet_count %}
+<div class="alert alert-warning mt-3 mb-0" role="alert">
+  <i class="bi bi-lock-fill me-2" aria-hidden="true"></i>
+  {{ submitted_sheet_count }} sheet{{ submitted_sheet_count|pluralize }} submitted and locked.
+  An administrator must reopen a sheet before you can change its marks.
+</div>
+{% endif %}
+
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-lightning-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Quick Actions
+        </h2>
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'teachers:marks_list' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-pencil-square me-1"></i>Enter Marks
+          </a>
+          <a href="{% url 'homework:teacher_create' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-journal-plus me-1"></i>Set Homework
+          </a>
+          <a href="{% url 'teachers:my_classes' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-people me-1"></i>My Classes
+          </a>
+          <a href="{% url 'accounts:profile' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-person me-1"></i>My Profile
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-megaphone-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Recent Announcements
+        </h2>
+        <a href="{% url 'communications:list' %}" class="btn btn-outline-secondary btn-sm">View all</a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_announcements %}
+        <ul class="list-group list-group-flush" style="background:transparent;">
+          {% for ann in recent_announcements %}
+          <li class="list-group-item {% if not ann.is_read %}fw-600{% endif %}"
+              style="background:transparent;border-color:var(--color-border);color:var(--color-text);">
+            {% if not ann.is_read %}<span class="badge bg-danger me-1" style="font-size:0.6rem;vertical-align:middle;">NEW</span>{% endif %}
+            <span style="font-size:0.9rem;">{{ ann.title }}</span>
+            <div class="text-muted-sm">{{ ann.created_at|date:"M j, Y" }}</div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="p-3 text-muted-sm text-center">No announcements yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if approved_sheet_count %}
+<p class="text-muted-sm mt-3 mb-0">
+  <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>
+  {{ approved_sheet_count }} sheet{{ approved_sheet_count|pluralize }} already approved by the admin this term.
+</p>
+{% endif %}
+{% endblock content %}

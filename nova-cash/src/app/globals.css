@@ -1,0 +1,218 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-ink: #171734;
+  --color-ink-soft: #25254a;
+  --color-brand: #4f46e5;
+  --color-brand-deep: #2b2670;
+  --color-brand-soft: #eef0ff;
+  --color-accent: #c9f75a;
+  --color-accent-strong: #aee92f;
+  --color-mist: #f5f4fb;
+  --color-muted: #6b6f8e;
+  --color-line: #e6e4f2;
+  --color-success: #0f9f6e;
+  --color-danger: #dc2648;
+
+  --radius-card: 1.25rem;
+  --radius-panel: 2rem;
+  --shadow-card: 0 18px 40px -24px rgba(23, 23, 52, 0.28),
+    0 8px 18px -12px rgba(23, 23, 52, 0.12);
+  --shadow-float: 0 30px 70px -30px rgba(23, 23, 52, 0.45);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    background: var(--color-mist);
+  }
+
+  body {
+    background:
+      radial-gradient(58rem 36rem at 88% -8%, rgba(201, 247, 90, 0.16), transparent 60%),
+      radial-gradient(52rem 34rem at 4% 2%, rgba(79, 70, 229, 0.09), transparent 58%),
+      var(--color-mist);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+
+  button,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .animate-fade-up {
+    animation: fade-up 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-fade-down {
+    animation: fade-down 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-pop {
+    animation: pop 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-slide-in {
+    animation: slide-in 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-shimmer {
+    background-size: 220% 100%;
+    animation: shimmer 2.4s linear infinite;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #cfccdf transparent;
+  }
+
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: #cfccdf;
+    border-radius: 999px;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .grid-fade {
+    background-image:
+      linear-gradient(to right, rgba(23, 23, 52, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(23, 23, 52, 0.05) 1px, transparent 1px);
+    background-size: 34px 34px;
+    mask-image: radial-gradient(circle at 50% 40%, black, transparent 72%);
+  }
+}
+
+input[type="range"].range-brand {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"].range-brand::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 5px solid var(--color-brand);
+  box-shadow: 0 6px 14px rgba(43, 38, 112, 0.3);
+  cursor: grab;
+  transition: transform 0.15s ease;
+}
+
+input[type="range"].range-brand::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.08);
+}
+
+input[type="range"].range-brand::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 5px solid var(--color-brand);
+  box-shadow: 0 6px 14px rgba(43, 38, 112, 0.3);
+  cursor: grab;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

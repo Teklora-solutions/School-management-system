@@ -1,0 +1,158 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}{{ school_class.name }} Debtors | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <a href="{% url 'dashboards:director_fees' %}{% if selected_term_id %}?term={{ selected_term_id }}{% endif %}"
+       class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+    <div>
+      <h1 class="page-title mb-0">
+        <i class="bi bi-exclamation-triangle-fill me-2" style="color:var(--color-warning);" aria-hidden="true"></i>
+        {{ school_class.name }} — Outstanding Fees
+      </h1>
+      <p class="page-subtitle mb-0">Students with an unpaid balance for the selected term.</p>
+    </div>
+  </div>
+</div>
+
+{# Term selector #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+      <label for="term-select" class="text-muted-sm mb-0">Term:</label>
+      <select id="term-select" name="term" class="form-select form-select-sm" style="width:auto;"
+              onchange="this.form.submit()">
+        <option value="">— Select term —</option>
+        {% for t in all_terms %}
+        <option value="{{ t.pk }}" {% if t.pk == selected_term_id %}selected{% endif %}>
+          {{ t }} — {{ t.academic_year.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+</div>
+
+{% if debtors %}
+
+{# Summary strip #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-4">
+      <div>
+        <div class="text-muted-sm">Debtors</div>
+        <div class="fw-700 text-warning">{{ debtors|length }} student{{ debtors|length|pluralize }}</div>
+      </div>
+      <div>
+        <div class="text-muted-sm">Total Outstanding</div>
+        <div class="fw-700 text-warning" id="total-owed">{{ currency }} —</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-table me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Debtor List
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table mb-0" aria-label="Debtor students">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Admission No.</th>
+            <th>Student Name</th>
+            <th class="text-end">Billed</th>
+            <th class="text-end">Paid</th>
+            <th class="text-end">Outstanding</th>
+            <th class="text-center">% Paid</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in debtors %}
+          {% with pct=item.collected|floatformat:0 %}
+          <tr>
+            <td class="text-muted-sm">{{ forloop.counter }}</td>
+            <td><code>{{ item.student.admission_number }}</code></td>
+            <td class="fw-600">{{ item.name }}</td>
+            <td class="text-end">{{ currency }} {{ item.billed|floatformat:2|intcomma }}</td>
+            <td class="text-end text-success">{{ currency }} {{ item.collected|floatformat:2|intcomma }}</td>
+            <td class="text-end text-warning fw-600">{{ currency }} {{ item.outstanding|floatformat:2|intcomma }}</td>
+            <td class="text-center">
+              {% if item.billed %}
+                {% widthratio item.collected item.billed 100 as pct_paid %}
+                <div class="d-flex align-items-center gap-1 justify-content-center">
+                  <span class="text-muted-sm" style="font-size:0.78rem;min-width:2.5rem;">{{ pct_paid }}%</span>
+                  <div style="width:60px;background:var(--color-surface-2);border-radius:4px;height:6px;overflow:hidden;">
+                    <div style="width:{{ pct_paid }}%;height:100%;
+                      background:{% if pct_paid >= 80 %}var(--color-success){% elif pct_paid >= 50 %}var(--color-warning){% else %}var(--color-danger){% endif %};
+                      border-radius:4px;"></div>
+                  </div>
+                </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% elif selected_term_id %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    {% if fees_enabled %}
+    <i class="bi bi-check-circle" style="font-size:2.5rem;color:var(--color-success);"></i>
+    <p class="mt-3 text-muted-sm">No outstanding balances in this class for the selected term.</p>
+    {% else %}
+    <i class="bi bi-cash-stack" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm">{{ fees_disabled_message }}</p>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-4">
+    <p class="text-muted-sm mb-0">Select a term above to see debtors.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}
+
+{% block extra_js %}
+{% if debtors %}
+<script>
+(function () {
+  'use strict';
+  // Sum outstanding from table data-values to populate summary strip
+  const rows = document.querySelectorAll('table tbody tr');
+  let total = 0;
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length >= 6) {
+      // outstanding cell is index 5, strip currency symbol and commas
+      const raw = cells[5].textContent.replace(/[^\d.]/g, '');
+      total += parseFloat(raw) || 0;
+    }
+  });
+  const el = document.getElementById('total-owed');
+  if (el) {
+    el.textContent = '{{ currency }} ' + total.toLocaleString(undefined, {
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    });
+  }
+})();
+</script>
+{% endif %}
+{% endblock extra_js %}

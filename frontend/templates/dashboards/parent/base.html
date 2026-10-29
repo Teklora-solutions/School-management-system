@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% comment %}
+  dashboards/parent/base.html
+  Role shell for Parent / Guardian.
+  Feature pages extend this via the base_template context variable.
+{% endcomment %}
+
+{% block sidebar %}
+  {% include "dashboards/parent/_sidebar.html" %}
+{% endblock %}
+
+{% block footer %}
+  {% include "dashboards/parent/_footer.html" %}
+{% endblock %}

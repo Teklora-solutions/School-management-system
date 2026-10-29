@@ -1,0 +1,184 @@
+{% extends base_template %}
+
+{% block title %}New Fee Structure | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-plus-lg me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        New Fee Structure
+      </h1>
+      <p class="page-subtitle">
+        One structure per class and term. Saving over an existing one creates a new
+        version and retires the old — invoices already posted keep their own amounts.
+      </p>
+    </div>
+    <a href="{% url 'finance:fee_structure_list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<form method="post" class="card">
+  {% csrf_token %}
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-collection me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Class, term and items
+    </h2>
+  </div>
+  <div class="card-body">
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">
+      {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <label class="form-label" for="{{ form.school_class.id_for_label }}">
+          {{ form.school_class.label }} <span class="text-danger">*</span>
+        </label>
+        {{ form.school_class }}
+        {% for error in form.school_class.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="{{ form.term.id_for_label }}">
+          {{ form.term.label }} <span class="text-danger">*</span>
+        </label>
+        {{ form.term }}
+        {% for error in form.term.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="{{ form.due_date.id_for_label }}">{{ form.due_date.label }}</label>
+        {{ form.due_date }}
+        <div class="form-text">{{ form.due_date.help_text }}</div>
+        {% for error in form.due_date.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm align-middle" id="fee-items">
+        <thead>
+          <tr>
+            <th scope="col" style="width:40%;">Item</th>
+            <th scope="col" style="width:20%;">Amount</th>
+            <th scope="col" style="width:25%;">Billed to</th>
+            <th scope="col" style="width:15%;"></th>
+          </tr>
+        </thead>
+        <tbody id="fee-rows">
+          <tr>
+            <td>
+              <input type="text" class="form-control" name="label_0" placeholder="e.g. Tuition">
+            </td>
+            <td>
+              <input type="number" class="form-control" name="amount_0" step="0.01" min="0.01"
+                     placeholder="e.g. 500.00">
+            </td>
+            <td>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="compulsory_0" id="compulsory_0" checked>
+                <label class="form-check-label text-muted-sm" for="compulsory_0">
+                  Everyone in the class
+                </label>
+              </div>
+            </td>
+            <td class="text-end">
+              <button type="button" class="btn btn-sm btn-outline-danger remove-row" aria-label="Remove row">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <button type="button" class="btn btn-sm btn-outline-primary mb-3" id="add-row">
+      <i class="bi bi-plus-lg me-1"></i>Add another item
+    </button>
+
+    <div class="mb-0">
+      <label class="form-label" for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+      {{ form.note }}
+      <div class="form-text">
+        An item left unticked is optional: only pupils entered for it are billed.
+        Blank rows are ignored, and at least one row needs both a name and an amount.
+      </div>
+    </div>
+  </div>
+  <div class="card-footer d-flex justify-content-end gap-2">
+    <a href="{% url 'finance:fee_structure_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-save me-1"></i>Save Structure
+    </button>
+  </div>
+</form>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+(function () {
+  'use strict';
+  const tbody = document.getElementById('fee-rows');
+
+  // The view reads contiguous label_0, amount_0, … pairs and stops at the first
+  // gap, so every add or delete has to renumber the whole body.
+  function renumber() {
+    Array.prototype.forEach.call(tbody.querySelectorAll('tr'), function (row, i) {
+      const label = row.querySelector('[name^="label_"]');
+      const amount = row.querySelector('[name^="amount_"]');
+      const check = row.querySelector('[name^="compulsory_"]');
+      label.name = 'label_' + i;
+      amount.name = 'amount_' + i;
+      check.name = 'compulsory_' + i;
+      check.id = 'compulsory_' + i;
+      row.querySelector('label').htmlFor = 'compulsory_' + i;
+      label.removeAttribute('id');
+      amount.removeAttribute('id');
+    });
+  }
+
+  document.getElementById('add-row').addEventListener('click', function () {
+    const next = tbody.querySelectorAll('tr').length;
+    const row = document.createElement('tr');
+    row.innerHTML =
+      '<td><input type="text" class="form-control" name="label_' + next +
+      '" placeholder="e.g. Transport"></td>' +
+      '<td><input type="number" class="form-control" name="amount_' + next +
+      '" step="0.01" min="0.01" placeholder="e.g. 50.00"></td>' +
+      '<td><div class="form-check">' +
+      '<input class="form-check-input" type="checkbox" name="compulsory_' + next +
+      '" id="compulsory_' + next + '">' +
+      '<label class="form-check-label text-muted-sm" for="compulsory_' + next +
+      '">Everyone in the class</label></div></td>' +
+      '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row"' +
+      ' aria-label="Remove row"><i class="bi bi-trash"></i></button></td>';
+    tbody.appendChild(row);
+    renumber();
+  });
+
+  tbody.addEventListener('click', function (event) {
+    const button = event.target.closest('.remove-row');
+    if (!button) return;
+    if (tbody.querySelectorAll('tr').length === 1) {
+      // Keep one blank row so the field names the view expects never vanish.
+      tbody.querySelector('[name^="label_"]').value = '';
+      tbody.querySelector('[name^="amount_"]').value = '';
+      renumber();
+      return;
+    }
+    button.closest('tr').remove();
+    renumber();
+  });
+}());
+</script>
+{% endblock extra_js %}

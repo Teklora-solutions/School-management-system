@@ -1,0 +1,338 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Statement · {{ student.admission_number }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-person-lines-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {{ student.user.full_name }}
+      </h1>
+      <p class="page-subtitle">
+        {{ student.admission_number }} ·
+        {{ student.current_class.name|default:"No class" }} ·
+        {% if term %}{{ term }}{% else %}All terms to date{% endif %}
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:student_statement_pdf' student.pk %}{% if term %}?term={{ term.pk }}{% endif %}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-printer me-1"></i>Print statement
+      </a>
+      {% if is_finance_reader %}
+      <a href="{% url 'finance:payment_record' %}?student={{ student.pk }}"
+         class="btn btn-primary btn-sm">
+        <i class="bi bi-cash-coin me-1"></i>Take Payment
+      </a>
+      <a href="{% url 'finance:adjustment_create' %}?student={{ student.pk }}"
+         class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-slash-circle me-1"></i>Waive / Adjust
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<form method="get" class="card mb-3">
+  <div class="card-body py-3 d-flex flex-wrap align-items-end gap-2">
+    <div>
+      <label class="form-label text-muted-sm mb-1" for="filter_term">Term</label>
+      <select class="form-select form-select-sm" id="filter_term" name="term">
+        <option value="">All terms</option>
+        {% for t in all_terms %}
+        <option value="{{ t.pk }}" {% if term and term.pk == t.pk %}selected{% endif %}>
+          {{ t.name }} — {{ t.academic_year.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-funnel me-1"></i>Filter
+    </button>
+  </div>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ total_billed|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Billed</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-success);">
+        <i class="bi bi-cash" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ total_paid|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Paid</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-warning);">
+        <i class="bi bi-slash-circle" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ total_adjusted|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Waived / adjusted</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:{% if balance > 0 %}var(--color-danger){% else %}var(--color-success){% endif %};">
+        <i class="bi bi-wallet2" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ balance|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">{% if balance < 0 %}Credit on the account{% else %}Balance owing{% endif %}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if student.sponsor or student.payment_plan_notes %}
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-heart me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Sponsor &amp; agreed plan
+    </h2>
+  </div>
+  <div class="card-body">
+    {% if student.sponsor %}
+    <p class="mb-2"><span class="text-muted-sm">Sponsor:</span> <strong>{{ student.sponsor }}</strong></p>
+    {% endif %}
+    {% if student.payment_plan_notes %}
+    <p class="mb-0 text-muted-sm" style="white-space:pre-line;">{{ student.payment_plan_notes }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-file-earmark-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Bills
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Invoice</th>
+            <th scope="col">Term</th>
+            <th scope="col">Issued</th>
+            <th scope="col">Due</th>
+            <th scope="col" class="text-end">Billed</th>
+            <th scope="col" class="text-end">Paid</th>
+            <th scope="col" class="text-end">Waived</th>
+            <th scope="col" class="text-end">Outstanding</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for invoice in invoices %}
+          <tr>
+            <td>
+              {% if is_finance_reader %}
+              <a href="{% url 'finance:invoice_detail' invoice.pk %}" class="fw-600">
+                {{ invoice.invoice_number }}
+              </a>
+              {% else %}
+              <span class="fw-600">{{ invoice.invoice_number }}</span>
+              {% endif %}
+              {% if invoice.status != 'posted' %}
+              <span class="badge" style="background:var(--color-muted);color:#fff;">
+                {{ invoice.get_status_display }}
+              </span>
+              {% endif %}
+            </td>
+            <td class="text-muted-sm">{{ invoice.term }}</td>
+            <td class="text-muted-sm">{{ invoice.issued_date|date:"j M Y" }}</td>
+            <td class="text-muted-sm">{{ invoice.due_date|date:"j M Y"|default:"—" }}</td>
+            <td class="text-end">{{ currency }} {{ invoice.total_amount|floatformat:2|intcomma }}</td>
+            <td class="text-end text-success">{{ currency }} {{ invoice.paid_here|floatformat:2|intcomma }}</td>
+            <td class="text-end text-warning">{{ currency }} {{ invoice.adjusted_here|floatformat:2|intcomma }}</td>
+            <td class="text-end fw-600 {% if invoice.outstanding_here > 0 %}text-danger{% endif %}">
+              {{ currency }} {{ invoice.outstanding_here|floatformat:2|intcomma }}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-muted-sm">
+              No bills have been raised{% if term %} for {{ term }}{% endif %}.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-receipt me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Receipts
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Receipt</th>
+              <th scope="col">Method</th>
+              <th scope="col" class="text-end">Amount</th>
+              <th scope="col">Applied to</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for payment in payments %}
+            <tr {% if payment.is_reversed %}class="text-muted"{% endif %}>
+              <td class="text-muted-sm">{{ payment.payment_date|date:"j M Y" }}</td>
+              <td>
+                {% if is_finance_reader %}
+                <a href="{% url 'finance:payment_detail' payment.pk %}" class="fw-600">
+                  {{ payment.receipt_number }}
+                </a>
+                {% else %}
+                <span class="fw-600">{{ payment.receipt_number }}</span>
+                {% endif %}
+                {% if payment.is_reversed %}
+                <span class="badge" style="background:var(--color-danger);color:#fff;">reversed</span>
+                {% endif %}
+              </td>
+              <td class="text-muted-sm">{{ payment.get_method_display }}</td>
+              <td class="text-end {% if not payment.is_reversed %}text-success{% endif %}">
+                {{ currency }} {{ payment.amount|floatformat:2|intcomma }}
+              </td>
+              <td class="text-muted-sm">
+                {% for alloc in payment.allocations.all %}
+                  {{ alloc.invoice.invoice_number }}
+                  <span style="font-size:0.75rem;">
+                    ({{ currency }} {{ alloc.allocated_amount|floatformat:2|intcomma }})
+                  </span>{% if not forloop.last %}, {% endif %}
+                {% empty %}
+                  held as credit
+                {% endfor %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted-sm">No payments recorded.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+        “Paid” counts the money still standing: a reversed receipt is listed here
+        for the record but is not added to it.
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-slash-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Waivers &amp; adjustments
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Type</th>
+              <th scope="col">Invoice</th>
+              <th scope="col" class="text-end">Amount</th>
+              <th scope="col">Reason</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for adj in adjustments %}
+            <tr>
+              <td class="fw-600">{{ adj.get_adjustment_type_display }}</td>
+              <td class="text-muted-sm">{{ adj.invoice.invoice_number|default:"General" }}</td>
+              <td class="text-end">{{ currency }} {{ adj.amount|floatformat:2|intcomma }}</td>
+              <td class="text-muted-sm">{{ adj.reason }}</td>
+              <td>
+                {% if adj.status == 'posted' %}
+                  <span class="badge" style="background:var(--color-success);color:#fff;">Posted</span>
+                {% elif adj.status == 'pending' %}
+                  <span class="badge" style="background:var(--color-warning);color:#000;">Awaiting approval</span>
+                {% else %}
+                  <span class="badge" style="background:var(--color-danger);color:#fff;">{{ adj.get_status_display }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted-sm">No waivers or write-offs.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+        Only a posted waiver reduces the balance. One awaiting an Admin signature is
+        shown here but still counted as owing.
+      </div>
+    </div>
+
+    {% if is_finance_reader %}
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-pencil me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Finance notes
+        </h2>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{% url 'finance:student_finance_notes' student.pk %}">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label" for="id_sponsor">{{ notes_form.sponsor.label }}</label>
+            {{ notes_form.sponsor }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="id_payment_plan_notes">
+              {{ notes_form.payment_plan_notes.label }}
+            </label>
+            {{ notes_form.payment_plan_notes }}
+            <div class="form-text">
+              An agreement written here is a note, not a payment plan — it does not
+              move money or change what is owed.
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-save me-1"></i>Save notes
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

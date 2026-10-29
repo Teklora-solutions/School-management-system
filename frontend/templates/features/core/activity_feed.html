@@ -1,0 +1,108 @@
+{% extends base_template %}
+
+{% block title %}Activity Feed | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-activity me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Activity Feed
+    </h1>
+    <p class="page-subtitle">What is happening across the school, newest first — payments, invoice runs and published results.</p>
+  </div>
+</div>
+
+{# ── Filters ─────────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-3">
+        {{ filter_form.category.label_tag }}
+        {{ filter_form.category }}
+      </div>
+      <div class="col-sm-3">
+        {{ filter_form.event_type.label_tag }}
+        {{ filter_form.event_type }}
+      </div>
+      <div class="col-sm-2">
+        {{ filter_form.date_from.label_tag }}
+        {{ filter_form.date_from }}
+      </div>
+      <div class="col-sm-2">
+        {{ filter_form.date_to.label_tag }}
+        {{ filter_form.date_to }}
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>Filter</button>
+        <a href="{% url 'core_activity:feed' %}" class="btn btn-outline-secondary ms-1">Reset</a>
+        <a href="{% url 'core_activity:daily_report' %}" class="btn btn-outline-secondary ms-1">
+          <i class="bi bi-calendar-day me-1"></i>Daily report
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Day-by-day feed ─────────────────────────────────────────────────────── #}
+{% if days %}
+  {% for group in days %}
+  <div class="card mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <h2 class="card-title mb-0">
+        <i class="bi bi-calendar3 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {{ group.day|date:"D, d M Y" }}
+      </h2>
+      <span class="text-muted-sm">{{ group.events|length }} event{{ group.events|length|pluralize }}</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Time</th>
+              <th scope="col">Activity</th>
+              <th scope="col">Area</th>
+              <th scope="col">User</th>
+              <th scope="col">Student</th>
+              <th scope="col">Details</th>
+              <th scope="col">Request ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ev in group.events %}
+            <tr>
+              <td class="text-muted-sm" style="white-space:nowrap;">{{ ev.created_at|date:"H:i" }}</td>
+              <td>
+                <div class="fw-600">{{ ev.message }}</div>
+                <div class="text-muted-sm" style="font-size:.75rem;">{{ ev.type }}</div>
+              </td>
+              <td><span class="badge" style="background:var(--color-surface-2);color:var(--color-text);">{{ ev.category|title }}</span></td>
+              <td class="text-muted-sm">{{ ev.actor.full_name|default:"System" }}</td>
+              <td class="text-muted-sm">{{ ev.student.user.full_name|default:"—" }}</td>
+              <td class="text-muted-sm" style="max-width:20rem;">
+                {% for key, value in ev.data.items %}
+                  <div class="text-truncate">{{ key }}: {{ value }}</div>
+                {% endfor %}
+              </td>
+              <td class="text-muted-sm text-truncate" style="max-width:8rem;" title="{{ ev.request_id }}">{{ ev.request_id|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+<div class="card">
+  <div class="p-4 text-center text-muted-sm">
+    <i class="bi bi-broadcast fs-1 d-block mb-2"></i>
+    No activity matches these filters. Events appear here as payments are
+    recorded, invoices posted and results published.
+  </div>
+</div>
+{% endif %}
+
+{% include "partials/_pagination.html" %}
+{% endblock content %}

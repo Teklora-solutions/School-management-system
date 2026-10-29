@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Report Card &mdash; {{ student.user.full_name }}</title>
+  <style>
+    body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 12pt; color: #111; margin: 0; padding: 0; }
+    .page { padding: 30px 40px; }
+    .school-header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 20px; }
+    .school-name { font-size: 22pt; font-weight: 700; letter-spacing: 0.03em; }
+    .school-motto { font-size: 10pt; color: #555; margin-top: 2px; }
+    .doc-title { font-size: 14pt; font-weight: 600; text-align: center; margin: 10px 0 20px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10pt; }
+    .meta-table td { padding: 4px 8px; }
+    .meta-table td:first-child { font-weight: 600; width: 150px; color: #444; }
+    .results-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    .results-table th { background: #333; color: #fff; padding: 7px 10px; font-size: 10pt; text-align: left; }
+    .results-table th.center, .results-table td.center { text-align: center; }
+    .results-table td { padding: 6px 10px; border-bottom: 1px solid #ddd; font-size: 10pt; }
+    .results-table tr:nth-child(even) td { background: #f7f7f7; }
+    .summary-box { border: 1px solid #ccc; padding: 12px 16px; border-radius: 4px; display: inline-block; margin-bottom: 20px; }
+    .summary-box .label { font-size: 9pt; color: #666; }
+    .summary-box .value { font-size: 18pt; font-weight: 700; }
+    .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 9pt; color: #777; text-align: center; }
+    .grade-a { color: #1a7f37; font-weight: 700; }
+    .grade-b { color: #0550ae; font-weight: 700; }
+    .grade-c { color: #7d4e00; font-weight: 700; }
+    .grade-f { color: #cf222e; font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="school-header">
+    <div class="school-name">{{ SCHOOL_NAME }}</div>
+    {% if SCHOOL_MOTTO %}<div class="school-motto">{{ SCHOOL_MOTTO }}</div>{% endif %}
+  </div>
+
+  <div class="doc-title">Academic Report Card</div>
+
+  <table class="meta-table">
+    <tr>
+      <td>Student Name:</td>
+      <td>{{ student.user.get_full_name }}</td>
+      <td style="width:100px;font-weight:600;color:#444;">Admission No.:</td>
+      <td>{{ student.admission_number }}</td>
+    </tr>
+    <tr>
+      <td>Class:</td>
+      <td>{{ student.current_class.name|default:"—" }}</td>
+      <td style="font-weight:600;color:#444;">Stream:</td>
+      <td>{{ student.current_stream.name|default:"—" }}</td>
+    </tr>
+    <tr>
+      <td>Term:</td>
+      <td>{{ term }}</td>
+      <td style="font-weight:600;color:#444;">Academic Year:</td>
+      <td>{{ term.academic_year.name }}</td>
+    </tr>
+  </table>
+
+  {# Summary boxes #}
+  <div style="display:flex;gap:24px;margin-bottom:24px;flex-wrap:wrap;">
+    <div class="summary-box">
+      <div class="label">Overall Average</div>
+      <div class="value">{{ average }}%</div>
+    </div>
+    <div class="summary-box">
+      <div class="label">Subjects Taken</div>
+      <div class="value">{{ entries|length }}</div>
+    </div>
+  </div>
+
+  <table class="results-table">
+    <thead>
+      <tr>
+        <th>Subject</th>
+        <th class="center">Total Score</th>
+        <th class="center">Grade</th>
+        <th>Remark</th>
+        <th class="center">Position</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr>
+        <td>{{ entry.result_sheet.subject.name }}</td>
+        <td class="center">{% if entry.total is not None %}{{ entry.total|floatformat:1 }}%{% else %}—{% endif %}</td>
+        <td class="center
+          {% if entry.grade == 'A' or entry.grade == 'A+' %}grade-a
+          {% elif entry.grade == 'B' or entry.grade == 'B+' %}grade-b
+          {% elif entry.grade == 'C' %}grade-c
+          {% elif entry.grade == 'F' %}grade-f
+          {% endif %}">
+          {{ entry.grade|default:"—" }}
+        </td>
+        <td>{{ entry.remark|default:"—" }}</td>
+        <td class="center">
+          {% for k, v in positions.items %}
+            {% if k == entry.pk %}{{ v.position }}/{{ v.total_in_class }}{% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p style="font-size:9pt;color:#555;margin-top:8px;">
+    This report card shows <strong>published</strong> results only. Results not yet confirmed by the school administration are not included.
+  </p>
+
+  <div class="footer">
+    Printed {{ request.META.HTTP_HOST }} &mdash; {{ SCHOOL_NAME }} &mdash; Confidential
+  </div>
+
+</div>
+</body>
+</html>

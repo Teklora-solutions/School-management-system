@@ -1,0 +1,179 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}{{ school_class.name }} Fees | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-diagram-3 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {{ school_class.name }}
+      </h1>
+      <p class="page-subtitle">
+        {% if summary.term %}
+          {{ summary.term }} — {{ summary.year.name }} ·
+          {{ summary.student_count }} pupil{{ summary.student_count|pluralize }} on this fee list
+        {% elif summary %}
+          Whole year — {{ summary.year.name }} ·
+          {{ summary.student_count }} pupil{{ summary.student_count|pluralize }} billed or paid across the year
+        {% else %}
+          Pick a year — and a term, or leave the term on Whole year — then press Show.
+        {% endif %}
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if summary %}
+      <a href="{% url 'finance:invoice_generate_preview' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-magic me-1"></i>Post Invoices
+      </a>
+      {% endif %}
+      <a href="{% url 'finance:class_reports' %}{% if year %}?year={{ year.pk }}{% if term %}&term={{ term.pk }}{% endif %}{% endif %}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-list-columns me-1"></i>All classes
+      </a>
+      <a href="{% url 'finance:school_summary' %}{% if year %}?year={{ year.pk }}{% if term %}&term={{ term.pk }}{% endif %}{% endif %}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-building me-1"></i>School Summary
+      </a>
+    </div>
+  </div>
+</div>
+
+{% include "features/finance/_period_filter.html" %}
+
+{% if summary %}
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ summary.total_billed|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Billed</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-success);">
+        <i class="bi bi-cash" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ summary.total_paid|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Collected</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-warning);">
+        <i class="bi bi-slash-circle" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ summary.total_adjusted|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Waived / adjusted</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:{% if summary.outstanding > 0 %}var(--color-danger){% else %}var(--color-success){% endif %};">
+        <i class="bi bi-wallet2" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.1rem;">
+          {{ currency }} {{ summary.outstanding|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">
+          Outstanding
+          {% if summary.collection_rate is not None %}· {{ summary.collection_rate }}% collected{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-people me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Per pupil — {% if summary.term %}{{ summary.term }}{% else %}Whole year · {{ summary.year.name }}{% endif %}
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Adm No.</th>
+            <th scope="col">Student</th>
+            <th scope="col" class="text-end">Billed</th>
+            <th scope="col" class="text-end">Paid</th>
+            <th scope="col" class="text-end">Waived</th>
+            <th scope="col" class="text-end">Outstanding</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in summary.per_student %}
+          <tr>
+            <td class="text-muted-sm">{{ row.student.admission_number }}</td>
+            <td class="fw-600">{{ row.student.user.full_name }}</td>
+            <td class="text-end">{{ currency }} {{ row.billed|floatformat:2|intcomma }}</td>
+            <td class="text-end text-success">{{ currency }} {{ row.paid|floatformat:2|intcomma }}</td>
+            <td class="text-end text-warning">{{ currency }} {{ row.adjusted|floatformat:2|intcomma }}</td>
+            <td class="text-end fw-600 {% if row.outstanding > 0 %}text-danger{% endif %}">
+              {{ currency }} {{ row.outstanding|floatformat:2|intcomma }}
+            </td>
+            <td class="text-end text-nowrap">
+              <a href="{% url 'finance:student_statement' row.student.pk %}{% if summary.term %}?term={{ summary.term.pk }}{% endif %}"
+                 class="btn btn-sm btn-outline-primary"
+                 aria-label="Open statement for {{ row.student.user.full_name }}">
+                <i class="bi bi-person-lines-fill"></i>
+              </a>
+              <a href="{% url 'finance:payment_record' %}?student={{ row.student.pk }}"
+                 class="btn btn-sm btn-outline-success"
+                 aria-label="Take payment from {{ row.student.user.full_name }}">
+                <i class="bi bi-cash-coin"></i>
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-muted-sm">
+              Nobody in this class has been billed in this period, so there is no
+              fee list to show.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+    A pupil billed twice in the period appears once, with both bills added together.
+    Pupils with nothing billed and nothing paid are not listed.
+    {% if not summary.term %}
+    The statement button opens the pupil's full history, because a statement runs
+    over terms rather than whole years.
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-calendar-question" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm mb-0">
+      Pick a year — and a term, or leave the term on Whole year — then press Show.
+    </p>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

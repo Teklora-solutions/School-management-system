@@ -1,0 +1,201 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Post Invoices | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-magic me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Post Invoices
+      </h1>
+      <p class="page-subtitle">
+        Turn the fee structures of a term into bills. Preview first: nothing is
+        written until you press <strong>Post</strong>.
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:invoice_list' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-list-ul me-1"></i>Invoices
+      </a>
+      <a href="{% url 'finance:fee_structure_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-list-columns me-1"></i>Fee Structures
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-funnel me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      1 · Choose the term
+    </h2>
+  </div>
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label" for="{{ form.term.id_for_label }}">Term</label>
+        {{ form.term }}
+        {% for error in form.term.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="{{ form.school_class.id_for_label }}">
+          {{ form.school_class.label }}
+        </label>
+        {{ form.school_class }}
+        {% for error in form.school_class.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-eye me-1"></i>Preview
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if preview %}
+<div class="card mb-3">
+  <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-clipboard-data me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      2 · What would be posted — {{ preview.term }} · {{ preview.class }}
+    </h2>
+    {% if preview.counts.create %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="term" value="{{ form.term.value|default:'' }}">
+      <input type="hidden" name="school_class" value="{{ form.school_class.value|default:'' }}">
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-lightning-charge me-1"></i>
+        Post {{ preview.counts.create }} invoice{{ preview.counts.create|pluralize }}
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="text-muted-sm">Would be posted</div>
+        <div class="fs-4 fw-600">{{ preview.counts.create }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted-sm">Already billed</div>
+        <div class="fs-4 fw-600">{{ preview.counts.skip_existing }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted-sm">No fee structure</div>
+        <div class="fs-4 {% if preview.counts.skip_no_structure %}text-warning{% endif %}">
+          {{ preview.counts.skip_no_structure }}
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted-sm">Nothing billable</div>
+        <div class="fs-4 {% if preview.counts.skip_no_fee %}text-warning{% endif %}">
+          {{ preview.counts.skip_no_fee }}
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-4 align-items-center py-2 border-top">
+      <div>
+        <span class="text-muted-sm">Billed:</span>
+        <span class="fw-600">{{ currency }} {{ preview.billed|floatformat:2|intcomma }}</span>
+      </div>
+      <div>
+        <span class="text-muted-sm">Waived by rules:</span>
+        <span class="fw-600">{{ currency }} {{ preview.waived|floatformat:2|intcomma }}</span>
+      </div>
+      <div>
+        <span class="text-muted-sm">Each pupil owes:</span>
+        <span class="fw-600">{{ currency }} {{ preview.net|floatformat:2|intcomma }}</span>
+      </div>
+    </div>
+    <p class="text-muted-sm mb-0 mt-2" style="font-size:0.78rem;">
+      “Already billed” pupils are skipped — posting is idempotent per
+      pupil/term/structure, so running this twice cannot double a debt or burn a
+      second invoice number.
+    </p>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Adm No.</th>
+            <th scope="col">Student</th>
+            <th scope="col">Class</th>
+            <th scope="col">Structure</th>
+            <th scope="col" class="text-end">Billed</th>
+            <th scope="col" class="text-end">Waived</th>
+            <th scope="col" class="text-end">Net</th>
+            <th scope="col">Due</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in preview.rows|slice:":150" %}
+          <tr>
+            <td class="text-muted-sm">{{ row.admission_number }}</td>
+            <td class="fw-600">{{ row.name }}</td>
+            <td class="text-muted-sm">{{ row.class }}</td>
+            <td class="text-muted-sm">{{ row.structure|default:"—" }}</td>
+            <td class="text-end">{{ currency }} {{ row.total_amount|floatformat:2|intcomma }}</td>
+            <td class="text-end {% if row.reductions %}text-warning{% endif %}">
+              {{ currency }} {{ row.waived|floatformat:2|intcomma }}
+              {% if row.reductions %}
+              <i class="bi bi-info-circle" title="{% for r in row.reductions %}{{ r.name }}: {{ r.amount }} {% endfor %}"
+                 aria-hidden="true"></i>
+              {% endif %}
+            </td>
+            <td class="text-end fw-600">{{ currency }} {{ row.net|floatformat:2|intcomma }}</td>
+            <td class="text-muted-sm">{{ row.due_date|date:"j M Y"|default:"—" }}</td>
+            <td>
+              {% if row.action == 'create' %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">Post</span>
+              {% elif row.action == 'skip_existing' %}
+                <span class="badge" style="background:var(--color-muted);color:#fff;">
+                  Already billed
+                </span>
+              {% elif row.action == 'skip_no_structure' %}
+                <span class="badge" style="background:var(--color-warning);color:#000;">
+                  Set a fee structure
+                </span>
+              {% else %}
+                <span class="badge" style="background:var(--color-warning);color:#000;">
+                  Structure totals zero
+                </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if preview.rows|length > 150 %}
+    <div class="p-3 text-muted-sm" style="font-size:0.8rem;">
+      Showing the first 150 of {{ preview.rows|length }} rows. The figures above
+      cover every row, not just the ones listed.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-clipboard-x" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm mb-0">
+      Pick a term above and press <strong>Preview</strong> to see exactly which
+      bills would be posted, before anything is written.
+    </p>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

@@ -1,0 +1,221 @@
+{% extends "dashboards/admin/base.html" %}
+{% load humanize %}
+
+{% block title %}Admin Dashboard | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-shield-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    School Administration Panel
+  </h1>
+  <p class="page-subtitle">Manage the entire school from one place.</p>
+</div>
+
+{# ── Stat cards ──────────────────────────────────────────────────────────── #}
+<div class="row g-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-people-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ student_count|default:"0" }}</div>
+        <div class="stat-label">Active Students</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-person-badge-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ teacher_count|default:"0" }}</div>
+        <div class="stat-label">Teachers</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-easel-fill" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ class_count|default:"0" }}</div>
+        <div class="stat-label">Classes (current year)</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <a href="{% url 'results:sheet_list' %}?status=submitted" class="text-decoration-none">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="bi bi-hourglass-split" aria-hidden="true"></i></div>
+        <div class="stat-body">
+          <div class="stat-value">{{ results_awaiting_confirmation|default:"0" }}</div>
+          <div class="stat-label">Results Awaiting Confirmation</div>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+{# ── Fee position for the current term ───────────────────────────────────── #}
+{% if current_term %}
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-cash-stack me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Fees — {{ current_term.get_name_display }} · {{ current_term.academic_year.name }}
+        </h2>
+        <span class="text-muted-sm">{{ current_term.start_date|date:"M j" }} – {{ current_term.end_date|date:"M j, Y" }}</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-4">
+            <div class="stat-card">
+              <div class="stat-icon" style="color:var(--color-success);"><i class="bi bi-cash-coin" aria-hidden="true"></i></div>
+              <div class="stat-body">
+                <div class="stat-value" style="font-size:1.1rem;color:var(--color-success);">
+                  {{ currency }} {{ fees_collected|floatformat:2|intcomma }}
+                </div>
+                <div class="stat-label">Collected this term</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="stat-card">
+              <div class="stat-icon" style="color:var(--color-warning);"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
+              <div class="stat-body">
+                <div class="stat-value" style="font-size:1.1rem;color:var(--color-warning);">
+                  {{ currency }} {{ fees_outstanding|floatformat:2|intcomma }}
+                </div>
+                <div class="stat-label">Outstanding on posted invoices</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="stat-card">
+              <div class="stat-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></div>
+              <div class="stat-body">
+                <div class="stat-value" style="font-size:1.1rem;">
+                  {{ currency }} {{ fees_collected_today|floatformat:2|intcomma }}
+                </div>
+                <div class="stat-label">Collected today</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="alert alert-warning mb-0" role="alert">
+      <i class="bi bi-exclamation-circle-fill me-2" aria-hidden="true"></i>
+      No current term is set, so fee totals cannot be calculated.
+      Set one under
+      <a href="{% url 'academics:year_list' %}" class="alert-link">Academic years</a>.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Quick actions ───────────────────────────────────────────────────────── #}
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-lightning-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Quick Actions
+        </h2>
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'accounts:staff_create' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-person-plus-fill me-1"></i>Add Staff
+          </a>
+          <a href="{% url 'students:add' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-person-plus me-1"></i>Add Student
+          </a>
+          <a href="{% url 'students:bulk_import' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-upload me-1"></i>Bulk Import
+          </a>
+          <a href="{% url 'results:sheet_list' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-bar-chart me-1"></i>Results Governance
+          </a>
+          <a href="{% url 'results:grading_list' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-sliders me-1"></i>Grading Setup
+          </a>
+          <a href="{% url 'students:promote' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-arrow-up-circle me-1"></i>Promote Classes
+          </a>
+          <a href="{% url 'communications:announcement_create' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-megaphone me-1"></i>New Announcement
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  {# ── Recent announcements ──────────────────────────────────────────────── #}
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-megaphone-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Recent Announcements
+        </h2>
+        <a href="{% url 'communications:list' %}" class="btn btn-sm btn-outline-secondary">View all</a>
+      </div>
+      <div class="card-body">
+        {% if recent_announcements %}
+        <ul class="list-unstyled mb-0">
+          {% for ann in recent_announcements %}
+          <li class="d-flex justify-content-between align-items-start gap-2 py-2 {% if not forloop.last %}border-bottom{% endif %}">
+            <div>
+              <div class="fw-600">{{ ann.title }}</div>
+              <div class="text-muted-sm">{{ ann.created_by.full_name|default:"System" }} · {{ ann.created_at|date:"M j, Y" }}</div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted-sm mb-0">No announcements yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Recent audit events ───────────────────────────────────────────────── #}
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-clipboard-data me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Recent Audit Events
+        </h2>
+        <a href="{% url 'core:audit_log' %}" class="btn btn-sm btn-outline-secondary">Audit log</a>
+      </div>
+      <div class="card-body">
+        {% if recent_audit_events %}
+        <ul class="list-unstyled mb-0">
+          {% for ev in recent_audit_events %}
+          <li class="py-2 {% if not forloop.last %}border-bottom{% endif %}">
+            <div class="fw-600">{{ ev.action }}</div>
+            <div class="text-muted-sm">
+              {{ ev.actor.full_name|default:ev.actor|default:"System" }} →
+              {{ ev.content_type }}#{{ ev.object_id }} · {{ ev.created_at|date:"M j, Y H:i" }}
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted-sm mb-0">No audit events recorded yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

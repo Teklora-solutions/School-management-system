@@ -1,0 +1,86 @@
+{% extends "dashboards/admin/base.html" %}
+{% load core_extras %}
+{% block title %}Teacher–Class–Subject Matrix | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-table me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Assignment Matrix
+    </h1>
+    <p class="page-subtitle">Who teaches what in each class. One teacher per class/subject cell.</p>
+  </div>
+  <a href="{% url 'teachers:assignment_create' %}" class="btn btn-primary" id="btn-add-assignment">
+    <i class="bi bi-plus me-1"></i>Add Assignment
+  </a>
+</div>
+
+{# Year selector #}
+<form method="get" class="card mb-4">
+  <div class="card-body d-flex gap-3 align-items-end">
+    <div>
+      <label class="form-label fw-600">Academic Year</label>
+      <select name="year" class="form-select" style="min-width:180px;" onchange="this.form.submit()">
+        <option value="">— Select year —</option>
+        {% for y in years %}
+        <option value="{{ y.pk }}" {% if selected_year_id == y.pk %}selected{% endif %}>{{ y.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <a href="{% url 'teachers:assignment_create' %}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-plus-circle me-1"></i>Assign Subject to Teacher
+    </a>
+  </div>
+</form>
+
+{% if matrix and matrix.rows %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle mb-0" id="matrix-table" style="font-size:0.85rem;">
+        <thead style="position:sticky;top:0;z-index:2;background:var(--color-surface);">
+          <tr>
+            <th style="min-width:130px;">Class</th>
+            {% for subj in matrix.subjects %}
+            <th class="text-center" style="min-width:110px;">{{ subj }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in matrix.rows %}
+          <tr>
+            <td class="fw-600">{{ row.class.name }}</td>
+            {% for subj in matrix.subjects %}
+            <td class="text-center" id="cell-{{ row.class.pk }}-{{ subj|slugify }}">
+              {% if row.cells|dict_get:subj %}
+                <span style="color:var(--color-success);font-size:0.8rem;">{{ row.cells|dict_get:subj }}</span>
+              {% else %}
+                <span class="text-muted-sm">—</span>
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% elif selected_year_id %}
+<div class="card"><div class="card-body text-center p-5 text-muted-sm">
+  No assignments for this year yet. <a href="{% url 'teachers:assignment_create' %}">Add one.</a>
+</div></div>
+{% else %}
+<div class="card"><div class="card-body text-center p-5 text-muted-sm">
+  Select an academic year above to view the matrix.
+</div></div>
+{% endif %}
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// Simple dict_get filter shim for the template tag
+// (real filter defined in core templatetags)
+</script>
+{% endblock %}

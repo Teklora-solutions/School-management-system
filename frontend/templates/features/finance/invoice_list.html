@@ -1,0 +1,145 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Invoices | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-file-earmark-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Invoices
+      </h1>
+      <p class="page-subtitle">
+        A bill is only counted once it is posted. “Waived” is a posted adjustment —
+        it releases debt without any money arriving.
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:invoice_generate_preview' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-magic me-1"></i>Post Invoices
+      </a>
+      <a href="{% url 'finance:fee_structure_list' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-list-columns me-1"></i>Fee Structures
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label text-muted-sm mb-1" for="filter_term">Term</label>
+        <select class="form-select form-select-sm" id="filter_term" name="term">
+          <option value="">All terms</option>
+          {% for t in all_terms %}
+          <option value="{{ t.pk }}" {% if selected_term_id == t.pk %}selected{% endif %}>
+            {{ t.name }} — {{ t.academic_year.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label text-muted-sm mb-1" for="filter_class">Class</label>
+        <select class="form-select form-select-sm" id="filter_class" name="class">
+          <option value="">All classes</option>
+          {% for c in all_classes %}
+          <option value="{{ c.pk }}" {% if selected_class_id == c.pk %}selected{% endif %}>
+            {{ c.name }} — {{ c.academic_year.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label text-muted-sm mb-1" for="filter_status">Status</label>
+        <select class="form-select form-select-sm" id="filter_status" name="status">
+          <option value="">Any status</option>
+          {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-12 col-lg-3 d-flex gap-2">
+        <button type="submit" class="btn btn-sm btn-primary">
+          <i class="bi bi-funnel me-1"></i>Filter
+        </button>
+        <a href="{% url 'finance:invoice_list' %}" class="btn btn-sm btn-outline-secondary">
+          Reset
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if invoices %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Invoice</th>
+            <th scope="col">Student</th>
+            <th scope="col">Class</th>
+            <th scope="col">Term</th>
+            <th scope="col">Issued</th>
+            <th scope="col">Due</th>
+            <th scope="col" class="text-end">Billed</th>
+            <th scope="col" class="text-end">Paid</th>
+            <th scope="col" class="text-end">Waived</th>
+            <th scope="col" class="text-end">Outstanding</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for invoice in invoices %}
+          <tr>
+            <td>
+              <a href="{% url 'finance:invoice_detail' invoice.pk %}" class="fw-600">
+                {{ invoice.invoice_number }}
+              </a>
+            </td>
+            <td>
+              <a href="{% url 'finance:student_statement' invoice.student.pk %}">
+                {{ invoice.student.user.full_name }}
+              </a>
+              <div class="text-muted-sm">{{ invoice.student.admission_number }}</div>
+            </td>
+            <td class="text-muted-sm">{{ invoice.student.current_class.name|default:"—" }}</td>
+            <td class="text-muted-sm">{{ invoice.term }}</td>
+            <td class="text-muted-sm">{{ invoice.issued_date|date:"j M Y" }}</td>
+            <td class="text-muted-sm">{{ invoice.due_date|date:"j M Y"|default:"—" }}</td>
+            <td class="text-end">{{ currency }} {{ invoice.total_amount|floatformat:2|intcomma }}</td>
+            <td class="text-end text-success">{{ currency }} {{ invoice.paid_here|floatformat:2|intcomma }}</td>
+            <td class="text-end text-warning">{{ currency }} {{ invoice.adjusted_here|floatformat:2|intcomma }}</td>
+            <td class="text-end fw-600 {% if invoice.outstanding_here > 0 %}text-danger{% endif %}">
+              {{ currency }} {{ invoice.outstanding_here|floatformat:2|intcomma }}
+            </td>
+            <td>
+              {% if invoice.status == 'posted' %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">Posted</span>
+              {% elif invoice.status == 'draft' %}
+                <span class="badge" style="background:var(--color-warning);color:#000;">Draft</span>
+              {% else %}
+                <span class="badge" style="background:var(--color-muted);color:#fff;">Cancelled</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+      No invoices match these filters. Post a term's bills from
+      <a href="{% url 'finance:invoice_generate_preview' %}">Post Invoices</a>.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

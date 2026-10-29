@@ -1,0 +1,320 @@
+{% extends base_template %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Books of Account | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-journal-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Books of Account
+      </h1>
+      <p class="page-subtitle">Read-only finance overview — income, expenses, and balances.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'dashboards:director_books_ledger' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-list-check me-1"></i>Ledger
+      </a>
+      <a href="{% url 'dashboards:director_books_trial_balance' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-balance-scale me-1"></i>Trial Balance
+      </a>
+      <a href="{% url 'dashboards:director_export_books_pdf' %}{% if selected_term_id %}?term={{ selected_term_id }}{% endif %}"
+         class="btn btn-primary btn-sm">
+        <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
+      </a>
+    </div>
+  </div>
+</div>
+
+{# Term selector #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+      <label for="term-select" class="text-muted-sm mb-0">Term:</label>
+      <select id="term-select" name="term" class="form-select form-select-sm" style="width:auto;"
+              onchange="this.form.submit()">
+        <option value="">— Select term —</option>
+        {% for t in all_terms %}
+        <option value="{{ t.pk }}" {% if t.pk == selected_term_id %}selected{% endif %}>
+          {{ t }} — {{ t.academic_year.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+</div>
+
+{% if summary %}
+{# ── Finance KPI Cards ────────────────────────────────────────────────── #}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1rem;">
+          {{ currency }} {{ summary.total_billed|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Total Billed</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-success);"><i class="bi bi-cash-coin" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1rem;color:var(--color-success);">
+          {{ currency }} {{ summary.total_collected|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Collected</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-warning);"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1rem;color:var(--color-warning);">
+          {{ currency }} {{ summary.outstanding|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Outstanding</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:var(--color-danger);"><i class="bi bi-arrow-down-circle" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1rem;color:var(--color-danger);">
+          {{ currency }} {{ summary.total_expenses|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Expenses</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-arrow-up-circle" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1rem;">
+          {{ currency }} {{ summary.total_income|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Total Income</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-icon" style="color:{% if summary.net >= 0 %}var(--color-success){% else %}var(--color-danger){% endif %};">
+        <i class="bi bi-{% if summary.net >= 0 %}graph-up-arrow{% else %}graph-down-arrow{% endif %}" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1rem;color:{% if summary.net >= 0 %}var(--color-success){% else %}var(--color-danger){% endif %};">
+          {{ currency }} {{ summary.net|floatformat:2|intcomma }}
+        </div>
+        <div class="stat-label">Net {% if summary.net >= 0 %}Surplus{% else %}Deficit{% endif %}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Summary detail card ──────────────────────────────────────────────── #}
+<div class="row g-3 mb-3">
+  <div class="col-12 col-md-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-file-earmark-bar-graph me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Income &amp; Expense Summary
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0" aria-label="Income and expense summary">
+          <tbody>
+            <tr>
+              <td class="text-muted-sm">Fees Billed</td>
+              <td class="text-end fw-600">{{ currency }} {{ summary.total_billed|floatformat:2|intcomma }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Fees Collected</td>
+              <td class="text-end fw-600 text-success">{{ currency }} {{ summary.total_collected|floatformat:2|intcomma }}</td>
+            </tr>
+            {% if summary.total_adjustments %}
+            <tr>
+              <td class="text-muted-sm">Adjustments / Discounts</td>
+              <td class="text-end fw-600 text-warning">− {{ currency }} {{ summary.total_adjustments|floatformat:2|intcomma }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+              <td class="text-muted-sm">Outstanding</td>
+              <td class="text-end fw-600 text-warning">{{ currency }} {{ summary.outstanding|floatformat:2|intcomma }}</td>
+            </tr>
+            <tr style="border-top:2px solid var(--color-border);">
+              <td class="text-muted-sm">Total Income</td>
+              <td class="text-end fw-600">{{ currency }} {{ summary.total_income|floatformat:2|intcomma }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted-sm">Total Expenses</td>
+              <td class="text-end fw-600 text-danger">{{ currency }} {{ summary.total_expenses|floatformat:2|intcomma }}</td>
+            </tr>
+            <tr style="background:var(--color-surface-2);">
+              <td class="fw-700">Net {% if summary.net >= 0 %}Surplus{% else %}Deficit{% endif %}</td>
+              <td class="text-end fw-700 {% if summary.net >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {{ currency }} {{ summary.net|floatformat:2|intcomma }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# Monthly income vs expense chart #}
+  {% if chart_monthly_labels %}
+  <div class="col-12 col-md-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-graph-up me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Monthly Income vs Expenses
+          {% if current_year %}<span class="text-muted-sm" style="font-size:0.78rem;"> — {{ current_year.name }}</span>{% endif %}
+        </h2>
+      </div>
+      <div class="card-body" style="position:relative;min-height:240px;">
+        <canvas id="monthlyChart" aria-label="Monthly income vs expenses chart" role="img"></canvas>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+{# Quick nav to sub-reports #}
+<div class="row g-3">
+  <div class="col-12 col-md-4">
+    <a href="{% url 'dashboards:director_books_ledger' %}" class="card text-decoration-none"
+       style="transition:border-color 0.15s;" aria-label="Go to ledger">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="width:44px;height:44px;"><i class="bi bi-list-check" aria-hidden="true"></i></div>
+        <div>
+          <div class="fw-600">General Ledger</div>
+          <div class="text-muted-sm" style="font-size:0.8rem;">Detailed journal entries</div>
+        </div>
+        <i class="bi bi-arrow-right ms-auto text-muted-sm"></i>
+      </div>
+    </a>
+  </div>
+  <div class="col-12 col-md-4">
+    <a href="{% url 'dashboards:director_books_trial_balance' %}" class="card text-decoration-none"
+       aria-label="Go to trial balance">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="width:44px;height:44px;"><i class="bi bi-balance-scale" aria-hidden="true"></i></div>
+        <div>
+          <div class="fw-600">Trial Balance</div>
+          <div class="text-muted-sm" style="font-size:0.8rem;">Debit / credit totals</div>
+        </div>
+        <i class="bi bi-arrow-right ms-auto text-muted-sm"></i>
+      </div>
+    </a>
+  </div>
+  <div class="col-12 col-md-4">
+    <a href="{% url 'dashboards:director_export_books_pdf' %}{% if selected_term_id %}?term={{ selected_term_id }}{% endif %}"
+       class="card text-decoration-none" aria-label="Download PDF report">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="width:44px;height:44px;color:var(--color-danger);">
+          <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+        </div>
+        <div>
+          <div class="fw-600">Finance Report PDF</div>
+          <div class="text-muted-sm" style="font-size:0.8rem;">Download term summary</div>
+        </div>
+        <i class="bi bi-download ms-auto text-muted-sm"></i>
+      </div>
+    </a>
+  </div>
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-journal-text" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    {% if fees_enabled %}
+    <p class="mt-3 text-muted-sm">Select a term above to view the financial summary.</p>
+    {% else %}
+    <p class="mt-3 text-muted-sm">{{ fees_disabled_message }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock content %}
+
+{% block extra_js %}
+{% if chart_monthly_labels %}
+<script src="{% static 'vendor/chart.js/4.4.4/chart.umd.min.js' %}"></script>
+<script>
+(function () {
+  'use strict';
+  const ACCENT     = '#0ea5e9';
+  const DANGER     = '#ef4444';
+  const GRID_COLOR = 'rgba(255,255,255,0.06)';
+  const TICK_COLOR = '#8896b3';
+
+  new Chart(document.getElementById('monthlyChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: {{ chart_monthly_labels|safe }},
+      datasets: [
+        {
+          label: 'Income',
+          data: {{ chart_monthly_income|safe }},
+          borderColor: ACCENT,
+          backgroundColor: ACCENT + '22',
+          borderWidth: 2,
+          pointBackgroundColor: ACCENT,
+          pointRadius: 4,
+          tension: 0.3,
+          fill: true,
+        },
+        {
+          label: 'Expenses',
+          data: {{ chart_monthly_expense|safe }},
+          borderColor: DANGER,
+          backgroundColor: DANGER + '22',
+          borderWidth: 2,
+          pointBackgroundColor: DANGER,
+          pointRadius: 4,
+          tension: 0.3,
+          fill: true,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { labels: { color: TICK_COLOR, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': {{ currency }} ' +
+                          ctx.parsed.y.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: TICK_COLOR, font: { size: 11 }, maxRotation: 30 }, grid: { color: GRID_COLOR } },
+        y: {
+          ticks: {
+            color: TICK_COLOR, font: { size: 11 },
+            callback: v => '{{ currency }} ' + v.toLocaleString(),
+          },
+          grid: { color: GRID_COLOR },
+        },
+      },
+    },
+  });
+})();
+</script>
+{% endif %}
+{% endblock extra_js %}

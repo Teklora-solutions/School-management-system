@@ -1,0 +1,103 @@
+{% extends base_template %}
+
+{% block title %}My Classes | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-easel-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    My Classes
+  </h1>
+  <p class="page-subtitle">
+    {% if term %}{{ term.academic_year.name }} · {{ term.name }}{% else %}No current term has been set.{% endif %}
+  </p>
+</div>
+
+{% if not term %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-calendar-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    Classes appear here once an academic year and current term are configured.
+  </div>
+</div>
+{% else %}
+
+<div class="row g-3">
+  {# ── Homeroom classes ───────────────────────────────────────────────────── #}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-house-door-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Classes I Am the Form Teacher For
+        </h2>
+      </div>
+      <div class="card-body {% if homeroom %}p-0{% endif %}">
+        {% if homeroom %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th scope="col">Class</th>
+                <th scope="col">Academic Year</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for class in homeroom %}
+              <tr>
+                <td class="fw-600">{{ class.name }}</td>
+                <td>{{ class.academic_year.name }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted-sm mb-0">You are not the form teacher of any class this year.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Subject assignments ────────────────────────────────────────────────── #}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-journal-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Subjects I Teach
+        </h2>
+      </div>
+      <div class="card-body {% if teaching %}p-0{% endif %}">
+        {% if teaching %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th scope="col">Class</th>
+                <th scope="col">Subjects</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in teaching %}
+              <tr>
+                <td class="fw-600">{{ row.class.name }}</td>
+                <td>
+                  {% for subject in row.subjects %}
+                  <span class="badge me-1" style="background:var(--accent);color:#fff;">{{ subject }}</span>
+                  {% endfor %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted-sm mb-0">You have no subject assignments this year.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

@@ -1,0 +1,46 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Subjects | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-journal-bookmark-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Subjects
+    </h1>
+    <p class="page-subtitle">Manage all subjects offered by the school.</p>
+  </div>
+  <a href="{% url 'academics:subject_create' %}" class="btn btn-primary" id="btn-add-subject">
+    <i class="bi bi-plus-circle me-1"></i>Add Subject
+  </a>
+</div>
+
+{% if subjects %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0" id="subject-table">
+      <thead>
+        <tr><th>Code</th><th>Name</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for subj in subjects %}
+        <tr>
+          <td><code class="fw-600" style="color:var(--accent-light);">{{ subj.code }}</code></td>
+          <td>{{ subj.name }}</td>
+          <td>
+            {% if subj.is_active %}
+              <span class="badge" style="background:var(--color-success);color:#fff;">Active</span>
+            {% else %}
+              <span class="badge" style="background:var(--color-muted);color:#fff;">Inactive</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="card-body text-center p-5 text-muted-sm">No subjects yet.</div></div>
+{% endif %}
+{% endblock content %}

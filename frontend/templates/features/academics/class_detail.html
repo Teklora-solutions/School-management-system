@@ -1,0 +1,119 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}{{ school_class.name }} | Classes | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <a href="{% url 'academics:class_list' %}" class="btn btn-sm btn-outline-secondary mb-2">
+      <i class="bi bi-arrow-left me-1"></i>All Classes
+    </a>
+    <h1 class="page-title mt-1">{{ school_class.name }}</h1>
+    <p class="page-subtitle">{{ school_class.academic_year.name }} &mdash; Level {{ school_class.level_order }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'academics:stream_create' %}?class={{ school_class.pk }}" class="btn btn-sm btn-outline-primary" id="btn-add-stream">
+      <i class="bi bi-plus me-1"></i>Add Stream
+    </a>
+    <a href="{% url 'academics:class_subject_create' %}?class={{ school_class.pk }}" class="btn btn-sm btn-primary" id="btn-add-subject">
+      <i class="bi bi-plus me-1"></i>Map Subject
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  {# Class info #}
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Info</h2></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-6 text-muted-sm">Academic Year</dt>
+          <dd class="col-6">{{ school_class.academic_year.name }}</dd>
+          <dt class="col-6 text-muted-sm">Class Teacher</dt>
+          <dd class="col-6">
+            {{ school_class.class_teacher.get_full_name|default:"Not assigned" }}
+          </dd>
+        </dl>
+
+        {# Streams #}
+        <hr style="border-color:var(--color-border);">
+        <h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:.05em;color:var(--color-muted);">Streams</h3>
+        {% with streams=school_class.streams.all %}
+        {% if streams %}
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            {% for s in streams %}
+            <span class="badge py-2 px-3" style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.85rem;">{{ s.name }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-sm mt-2">No streams (single-stream class).</p>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+
+    {# Set class teacher #}
+    <div class="card mt-3">
+      <div class="card-header"><h2 class="card-title">Set Class Teacher</h2></div>
+      <div class="card-body">
+        <form method="post" action="{% url 'teachers:set_class_teacher' school_class.pk %}" id="form-class-teacher">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="id_teacher_user" class="form-label fw-600">Teacher</label>
+            <select name="teacher_user" id="id_teacher_user" class="form-select">
+              <option value="">— Remove class teacher —</option>
+              {% for t in teachers %}
+              <option value="{{ t.pk }}" {% if school_class.class_teacher_id == t.pk %}selected{% endif %}>{{ t.get_full_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary w-100" id="btn-save-class-teacher">Save</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# Subjects mapped to this class #}
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title">Mapped Subjects</h2>
+        <a href="{% url 'academics:class_subject_create' %}?class={{ school_class.pk }}" class="btn btn-sm btn-primary" id="btn-map-subject-top">
+          <i class="bi bi-plus me-1"></i>Map Subject
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% if class_subjects %}
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr><th>Subject</th><th>Stream</th><th class="text-end">Remove</th></tr>
+          </thead>
+          <tbody>
+            {% for cs in class_subjects %}
+            <tr>
+              <td class="fw-600">{{ cs.subject.name }} <span class="text-muted-sm">({{ cs.subject.code }})</span></td>
+              <td class="text-muted-sm">{{ cs.stream.name|default:"All streams" }}</td>
+              <td class="text-end">
+                <form method="post" action="{% url 'academics:class_subject_remove' cs.pk %}"
+                      onsubmit="return confirm('Remove {{ cs.subject.code }} from this class?')">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{% url 'academics:class_detail' school_class.pk %}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" id="btn-remove-cs-{{ cs.pk }}">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="p-4 text-center text-muted-sm">
+          No subjects mapped yet. <a href="{% url 'academics:class_subject_create' %}?class={{ school_class.pk }}">Map a subject.</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

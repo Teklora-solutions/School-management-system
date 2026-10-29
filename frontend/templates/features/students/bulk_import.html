@@ -1,0 +1,144 @@
+{% extends base_template %}
+
+{% block title %}Bulk Import Students | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-upload me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Bulk Import Students
+  </h1>
+  <p class="page-subtitle">Download the template, fill it in, upload it, review the validation preview, then commit.</p>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Upload Excel File</h2></div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data" id="bulk-import-form" novalidate>
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger" role="alert">
+            {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label for="{{ form.file.id_for_label }}" class="form-label fw-600">Excel file (.xlsx) <span class="text-danger">*</span></label>
+            {{ form.file }}
+            {% if form.file.errors %}<div class="invalid-feedback d-block">{{ form.file.errors.0 }}</div>{% endif %}
+            <div class="form-text">Column headers must match the downloadable template. Admission number is the unique key — existing students are skipped, never duplicated.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.target_class.id_for_label }}" class="form-label fw-600">Assign class <span class="text-danger">*</span></label>
+            {{ form.target_class }}
+            {% if form.target_class.errors %}<div class="invalid-feedback d-block">{{ form.target_class.errors.0 }}</div>{% endif %}
+            <div class="form-text">Every student in the file is placed in this class. The class is not a column in the file — pick it here. A row's <code>stream</code> must be a stream that exists on this class.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-600">Error handling mode <span class="text-danger">*</span></label>
+            {% for radio in form.mode %}
+            <div class="form-check">
+              {{ radio.tag }}
+              <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+            </div>
+            {% endfor %}
+            {% if form.mode.errors %}<div class="invalid-feedback d-block">{{ form.mode.errors.0 }}</div>{% endif %}
+          </div>
+
+          <div class="d-flex gap-2 justify-content-end mt-4">
+            <a href="{% url 'students:list' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="btn-upload-import">
+              <i class="bi bi-cloud-arrow-up me-1"></i>Upload &amp; Validate
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><h2 class="card-title">Template</h2></div>
+      <div class="card-body">
+        <p class="text-muted-sm">Download the Excel template with the expected columns and one example row:</p>
+        <a href="{% url 'students:bulk_import_template' %}" class="btn btn-outline-primary">
+          <i class="bi bi-file-earmark-excel me-1"></i>Download Template (.xlsx)
+        </a>
+        <hr>
+        <p class="text-muted-sm mb-1"><i class="bi bi-info-circle me-1"></i>Validation runs in the background. You will be taken to a preview page showing:</p>
+        <ul class="text-muted-sm small mb-0">
+          <li>Rows that will be created</li>
+          <li>Rows that already exist (skipped — no duplicates)</li>
+          <li>Row-level errors with a downloadable error report</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Recent jobs ─────────────────────────────────────────────────────────── #}
+<div class="card mt-3">
+  <div class="card-header"><h2 class="card-title">Recent Uploads</h2></div>
+  <div class="card-body p-0">
+    {% if jobs %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Job</th>
+            <th scope="col">Uploaded</th>
+            <th scope="col">Mode</th>
+            <th scope="col">Status</th>
+            <th scope="col">Summary</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+          <tr>
+            <td class="fw-600">#{{ job.pk }}</td>
+            <td class="text-muted-sm">{{ job.created_at|date:"d M Y H:i" }}</td>
+            <td class="text-muted-sm">{{ job.get_mode_display }}</td>
+            <td>
+              {% if job.status == "ready" %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">Ready</span>
+              {% elif job.status == "committed" %}
+                <span class="badge" style="background:var(--accent);color:#fff;">Committed</span>
+              {% elif job.status == "failed" %}
+                <span class="badge" style="background:var(--color-danger);color:#fff;">Failed</span>
+              {% else %}
+                <span class="badge" style="background:var(--color-warning);color:#000;">{{ job.get_status_display }}</span>
+              {% endif %}
+            </td>
+            <td class="text-muted-sm">
+              {% if job.summary %}
+                {% if job.summary.created is not None %}{{ job.summary.created }} created · {% endif %}
+                {% if job.summary.valid is not None %}{{ job.summary.valid }} valid · {% endif %}
+                {% if job.summary.skipped_existing is not None %}{{ job.summary.skipped_existing }} skipped · {% endif %}
+                {{ job.summary.errors|default:0 }} errors
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{% url 'students:bulk_import_preview' job.pk %}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-eye me-1"></i>View
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-cloud-upload fs-1 d-block mb-2"></i>
+      No uploads yet.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

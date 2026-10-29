@@ -1,0 +1,94 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}{% if photo %}Edit photograph | {% else %}Add photograph | {% endif %}{{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <a href="{% url 'public_admin:gallery_list' %}" class="btn btn-sm btn-outline-secondary mb-2">
+    <i class="bi bi-arrow-left me-1"></i>Back to gallery
+  </a>
+  <h1 class="page-title mt-1">
+    <i class="bi bi-camera me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    {% if photo %}Edit photograph{% else %}Add photograph{% endif %}
+  </h1>
+  <p class="page-subtitle">
+    {% if photo %}
+      This image is live on the school's public Gallery page the moment it is marked Published.
+    {% else %}
+      The photograph appears on the school's public Gallery page as soon as it is saved as Published.
+    {% endif %}
+  </p>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" id="gallery-photo-form" enctype="multipart/form-data" novalidate>
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger" role="alert">
+            {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+          </div>
+          {% endif %}
+
+          {% if photo %}
+          <div class="mb-3">
+            <span class="form-label fw-600 d-block mb-1">Current photograph</span>
+            <img src="{{ photo.image.url }}" alt="{{ photo.title }}"
+                 style="max-width:100%;max-height:260px;border-radius:8px;background:var(--color-surface-2);">
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label for="{{ form.title.id_for_label }}" class="form-label fw-600">Title <span class="text-danger">*</span></label>
+            {{ form.title }}
+            {% if form.title.errors %}<div class="invalid-feedback d-block">{{ form.title.errors.0 }}</div>{% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.caption.id_for_label }}" class="form-label fw-600">Caption</label>
+            {{ form.caption }}
+            {% if form.caption.errors %}<div class="invalid-feedback d-block">{{ form.caption.errors.0 }}</div>{% endif %}
+            <div class="form-text">One line under the photo on the website. Leave blank for none.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.image.id_for_label }}" class="form-label fw-600">
+              {% if photo %}Replace with{% else %}Photograph{% endif %} <span class="text-danger">*</span>
+            </label>
+            {{ form.image }}
+            {% if form.image.errors %}<div class="invalid-feedback d-block">{{ form.image.errors.0 }}</div>{% endif %}
+            <div class="form-text">
+              {% if photo %}
+                Choose a file only to swap this photograph for another. Leaving the box empty keeps the one above.
+                To remove this photograph entirely, delete it from the gallery list.
+              {% else %}
+                A JPG, PNG or WebP image.
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.display_order.id_for_label }}" class="form-label fw-600">Order</label>
+            {{ form.display_order }}
+            {% if form.display_order.errors %}<div class="invalid-feedback d-block">{{ form.display_order.errors.0 }}</div>{% endif %}
+            <div class="form-text">Lowest number first. Photos sharing a number show newest first.</div>
+          </div>
+
+          <div class="mb-3 form-check">
+            {{ form.is_published }}
+            <label class="form-check-label" for="{{ form.is_published.id_for_label }}">Published on the website</label>
+          </div>
+
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{% url 'public_admin:gallery_list' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="btn-save-photo">
+              {% if photo %}Save changes{% else %}Add to gallery{% endif %}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

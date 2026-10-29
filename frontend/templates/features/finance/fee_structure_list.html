@@ -1,0 +1,129 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Fee Structures | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-list-columns me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Fee Structures
+      </h1>
+      <p class="page-subtitle">
+        What each class is billed for each term. Editing one never moves an invoice
+        that was already posted — a bill keeps the amounts it was raised with.
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'finance:fee_structure_create' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>New Structure
+      </a>
+      <a href="{% url 'finance:fee_structure_upload' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-upload me-1"></i>Upload Excel
+      </a>
+      <a href="{% url 'finance:invoice_generate_preview' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-magic me-1"></i>Post Invoices
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-5 col-lg-4">
+        <label class="form-label text-muted-sm mb-1" for="filter_term">Term</label>
+        <select class="form-select form-select-sm" id="filter_term" name="term">
+          <option value="">All terms</option>
+          {% for t in all_terms %}
+          <option value="{{ t.pk }}" {% if selected_term_id == t.pk %}selected{% endif %}>
+            {{ t.name }} — {{ t.academic_year.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-5 col-lg-4">
+        <label class="form-label text-muted-sm mb-1" for="filter_class">Class</label>
+        <select class="form-select form-select-sm" id="filter_class" name="class">
+          <option value="">All classes</option>
+          {% for c in all_classes %}
+          <option value="{{ c.pk }}" {% if selected_class_id == c.pk %}selected{% endif %}>
+            {{ c.name }} — {{ c.academic_year.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-2 col-lg-4 d-flex gap-2">
+        <button type="submit" class="btn btn-sm btn-primary">
+          <i class="bi bi-funnel me-1"></i>Filter
+        </button>
+        <a href="{% url 'finance:fee_structure_list' %}" class="btn btn-sm btn-outline-secondary">
+          Reset
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if structures %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Class</th>
+            <th scope="col">Term</th>
+            <th scope="col">Version</th>
+            <th scope="col">Status</th>
+            <th scope="col">Items</th>
+            <th scope="col" class="text-end">Total per pupil</th>
+            <th scope="col">Pay by</th>
+            <th scope="col">Created by</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fs in structures %}
+          <tr>
+            <td class="fw-600">
+              <a href="{% url 'finance:fee_structure_detail' fs.pk %}">{{ fs.school_class.name }}</a>
+            </td>
+            <td class="text-muted-sm">{{ fs.term }}</td>
+            <td>v{{ fs.version }}</td>
+            <td>
+              {% if fs.is_active %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">Active</span>
+              {% else %}
+                <span class="badge" style="background:var(--color-muted);color:#fff;">Superseded</span>
+              {% endif %}
+            </td>
+            <td class="text-muted-sm">
+              {% for item in fs.items.all %}
+                {{ item.label }}{% if not item.compulsory %} (optional){% endif %}{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                —
+              {% endfor %}
+            </td>
+            <td class="text-end fw-600">
+              {{ currency }} {{ fs.total|floatformat:2|intcomma }}
+            </td>
+            <td class="text-muted-sm">{{ fs.due_date|date:"j M Y"|default:"—" }}</td>
+            <td class="text-muted-sm">{{ fs.created_by.full_name|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+      No fee structures match these filters.
+      <a href="{% url 'finance:fee_structure_create' %}">Create one</a> before posting
+      invoices — a class with no structure is skipped, not billed for nothing.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

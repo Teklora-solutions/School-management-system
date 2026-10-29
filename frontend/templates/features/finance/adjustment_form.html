@@ -1,0 +1,151 @@
+{% extends base_template %}
+{% load humanize %}
+
+{% block title %}Waive or Adjust Fees | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-slash-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Waive or Adjust Fees
+      </h1>
+      <p class="page-subtitle">
+        Reduces what a pupil owes without any money arriving. This is the only honest
+        way to clear debt the school has decided not to collect.
+      </p>
+    </div>
+    <a href="{% url 'finance:outstanding_fees' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-exclamation-circle me-1"></i>Outstanding Fees
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-pencil me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          The adjustment
+        </h2>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.student.id_for_label }}">
+              {{ form.student.label }} <span class="text-danger">*</span>
+            </label>
+            {{ form.student }}
+            {% for error in form.student.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.invoice.id_for_label }}">{{ form.invoice.label }}</label>
+            {{ form.invoice }}
+            <div class="form-text">{{ form.invoice.help_text }}</div>
+            {% for error in form.invoice.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.adjustment_type.id_for_label }}">
+                {{ form.adjustment_type.label }} <span class="text-danger">*</span>
+              </label>
+              {{ form.adjustment_type }}
+              {% for error in form.adjustment_type.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.amount.id_for_label }}">
+                {{ form.amount.label }} <span class="text-danger">*</span>
+              </label>
+              {{ form.amount }}
+              <div class="form-text">Amount, not a percentage.</div>
+              {% for error in form.amount.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.reason.id_for_label }}">
+              {{ form.reason.label }} <span class="text-danger">*</span>
+            </label>
+            {{ form.reason }}
+            <div class="form-text">
+              Who asked, why it was granted, and on what authority — this is what an
+              auditor reads.
+            </div>
+            {% for error in form.reason.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2 me-1"></i>Apply Adjustment
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-shield-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          What happens when you save
+        </h2>
+      </div>
+      <div class="card-body">
+        <ul class="mb-0 text-muted-sm" style="padding-left:1.2rem;">
+          <li class="mb-2">
+            A discount, scholarship, waiver or other reduction posts straight away:
+            the debt drops and the ledger records it against
+            <strong>Discounts</strong>, which is contra income — money the school gave
+            up, not a cost it paid out.
+          </li>
+          <li class="mb-2">
+            A <strong>write-off</strong> — bad debt, a decision to stop chasing — is
+            saved as a request. It changes nothing until an <strong>Admin</strong>
+            posts it, so an outstanding figure cannot quietly disappear on one
+            signature.
+          </li>
+          <li class="mb-2">
+            A pending write-off still shows on the pupil's statement, marked
+            <em>Awaiting approval</em>, and is <strong>not</strong> taken off the
+            balance.
+          </li>
+          <li class="mb-2">
+            Pick an invoice to reduce that bill. Leaving it blank adjusts the pupil's
+            general account instead.
+          </li>
+          <li class="mb-0">
+            Nothing here can be edited afterwards — a mistake is answered with a new
+            adjustment, and both stay visible.
+          </li>
+        </ul>
+      </div>
+      <div class="card-footer">
+        <a href="{% url 'finance:payment_record' %}" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-cash-coin me-1"></i>Record a real payment instead
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,72 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Teacher Assignments | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">Teacher Assignments</h1>
+    <p class="page-subtitle">All teacher–class–subject assignments.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'teachers:assignment_matrix' %}" class="btn btn-outline-primary">Matrix View</a>
+    <a href="{% url 'teachers:assignment_create' %}" class="btn btn-primary" id="btn-add-assign">
+      <i class="bi bi-plus me-1"></i>Add Assignment
+    </a>
+  </div>
+</div>
+
+{# Filter #}
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <label class="form-label fw-600">Year</label>
+        <select name="year" class="form-select" onchange="this.form.submit()">
+          <option value="">All years</option>
+          {% for y in years %}<option value="{{ y.pk }}" {% if selected_year_id == y.pk %}selected{% endif %}>{{ y.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label fw-600">Class</label>
+        <select name="class" class="form-select" onchange="this.form.submit()">
+          <option value="">All classes</option>
+          {% for c in classes %}<option value="{{ c.pk }}" {% if selected_class_id == c.pk %}selected{% endif %}>{{ c.name }} ({{ c.academic_year.name }})</option>{% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if assignments %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0" id="assignment-table">
+      <thead><tr><th>Teacher</th><th>Year</th><th>Class</th><th>Stream</th><th>Subject</th><th class="text-end">Remove</th></tr></thead>
+      <tbody>
+        {% for a in assignments %}
+        <tr>
+          <td class="fw-600">{{ a.teacher.user.get_full_name }}</td>
+          <td class="text-muted-sm">{{ a.academic_year.name }}</td>
+          <td>{{ a.school_class.name }}</td>
+          <td class="text-muted-sm">{{ a.stream.name|default:"All" }}</td>
+          <td>{{ a.subject.name }}</td>
+          <td class="text-end">
+            <form method="post" action="{% url 'teachers:assignment_delete' a.pk %}"
+                  onsubmit="return confirm('Remove this assignment?')">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger" id="btn-del-{{ a.pk }}">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/_pagination.html" %}
+{% else %}
+<div class="card"><div class="card-body text-center p-5 text-muted-sm">No assignments found.</div></div>
+{% endif %}
+{% endblock content %}
