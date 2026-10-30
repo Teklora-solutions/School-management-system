@@ -9,7 +9,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from django.db.models import Q, QuerySet
 
-from apps.academics.models import SchoolClass
+from apps.academics.models import AcademicYear, SchoolClass
 
 from .models import TeacherAssignment, TeacherProfile
 
@@ -100,6 +100,301 @@ def assignment_matrix(year_id: int) -> dict:
             }
         )
     return {"classes": classes, "subjects": subjects, "rows": rows}
+
+
+def assignment_picker(*, year_id: int | None) -> dict:
+    """
+    Option lists the assign form filters through in the browser.
+
+    ``taken`` holds the (class, subject) pairs the service refuses within one
+    academic year, so the dropdown hides exactly what a save would reject.
+    Stream is not part of the key: one teacher owns the subject for the whole
+    class no matter which stream (if any) the assignment is scoped to.
+    """
+    from apps.academics.models import Stream, Subject
+
+    if not year_id:
+        return {"classes": [], "streams": [], "subjects": [], "taken": []}
+
+    classes = SchoolClass.objects.filter(academic_year_id=year_id).order_by(
+        "level_order", "name"
+    )
+    streams = Stream.objects.filter(
+        school_class__academic_year_id=year_id
+    ).select_related("school_class")
+    return {
+        "classes": [{"id": c.pk, "label": str(c)} for c in classes],
+        "streams": [
+            {"id": s.pk, "label": str(s), "class": s.school_class_id}
+            for s in streams
+        ],
+        "subjects": [
+            {"id": s.pk, "label": str(s)}
+            for s in Subject.objects.filter(is_active=True).order_by("name")
+        ],
+        "taken": [
+            list(row)
+            for row in TeacherAssignment.objects.filter(
+                academic_year_id=year_id
+            ).values_list("school_class_id", "subject_id")
+        ],
+    }
+
+
+def _display_name(user) -> str:
+    return user.get_full_name() or user.email or user.username
+
+
+def subject_distribution(*, year_id: int) -> dict:
+    """
+    Every class in a year with the subjects it offers and who teaches each one.
+
+    A subject row comes from either side of the data: the class's mapped
+    subjects (``ClassSubject``) and any actual teacher assignment. A subject
+    mapped but never assigned shows as unassigned; a subject taught without a
+    mapping still appears, because a card that hides it would be lying about
+    what happens in that classroom.
+
+    The database enforces one teacher per class+subject+year, so a row has at
+    most one teacher — ``state`` is ``ok`` or ``unassigned``.
+    """
+    from apps.academics.models import ClassSubject
+
+    classes = list(
+        SchoolClass.objects.filter(academic_year_id=year_id)
+        .select_related("class_teacher")
+        .order_by("level_order", "name")
+    )
+
+    mapped: dict[tuple[int, int], dict] = {}
+    for cs in ClassSubject.objects.filter(
+        school_class__academic_year_id=year_id
+    ).select_related("subject", "stream"):
+        row = mapped.setdefault(
+            (cs.school_class_id, cs.subject_id),
+            {"subject": cs.subject, "streams": set(), "mapped": True},
+        )
+        if cs.stream_id:
+            row["streams"].add(cs.stream.name)
+
+    assigned: dict[tuple[int, int], dict] = {}
+    for a in TeacherAssignment.objects.filter(
+        academic_year_id=year_id
+    ).select_related("teacher__user", "subject", "stream"):
+        key = (a.school_class_id, a.subject_id)
+        entry = assigned.setdefault(
+            key,
+            {
+                "teacher": a.teacher,
+                "name": _display_name(a.teacher.user),
+                "streams": set(),
+            },
+        )
+        if a.stream_id:
+            entry["streams"].add(a.stream.name)
+        if key not in mapped:
+            mapped[key] = {"subject": a.subject, "streams": set(), "mapped": False}
+
+    cards = []
+    for cls in classes:
+        rows = []
+        for (class_id, subject_id), meta in mapped.items():
+            if class_id != cls.pk:
+                continue
+            teacher = assigned.get((class_id, subject_id))
+            if teacher:
+                teacher["streams"] = sorted(teacher["streams"])
+            rows.append(
+                {
+                    "subject": meta["subject"],
+                    "streams": sorted(meta["streams"]),
+                    "mapped": meta["mapped"],
+                    "teacher": teacher,
+                    "teacher_name": teacher["name"] if teacher else "",
+                    "state": "unassigned" if teacher is None else "ok",
+                }
+            )
+        rows.sort(key=lambda r: r["subject"].name)
+        cards.append(
+            {
+                "class": cls,
+                "class_teacher": cls.class_teacher,
+                "class_teacher_name": (
+                    _display_name(cls.class_teacher) if cls.class_teacher else ""
+                ),
+                "rows": rows,
+                "unassigned_count": sum(1 for r in rows if r["state"] == "unassigned"),
+            }
+        )
+
+    return {
+        "cards": cards,
+        "class_count": len(cards),
+        "subject_count": sum(len(c["rows"]) for c in cards),
+        "unassigned_count": sum(c["unassigned_count"] for c in cards),
+    }
+
+
+def teacher_workload(*, year_id: int) -> dict:
+    """
+    One row per teacher: homeroom class, classes and subjects taught, pupils.
+
+    Includes teachers with nothing assigned in the year (zeros, sorted last) so
+    the page answers "who is idle" as well as "who is overloaded". Students are
+    counted once per teacher even when they teach two subjects in the same class.
+    """
+    from django.db.models import Count
+
+    from apps.students.models import Student
+
+    teachers = list(
+        TeacherProfile.objects.select_related("user").order_by(
+            "user__last_name", "user__first_name"
+        )
+    )
+
+    per_teacher: dict[int, dict] = {}
+    for a in TeacherAssignment.objects.filter(
+        academic_year_id=year_id
+    ).select_related("school_class", "subject"):
+        row = per_teacher.setdefault(
+            a.teacher_id, {"classes": {}, "subjects": set(), "assignment_count": 0}
+        )
+        row["classes"][a.school_class_id] = a.school_class
+        row["subjects"].add(a.subject.name)
+        row["assignment_count"] += 1
+
+    homeroom: dict[int, list] = {}
+    for cls in SchoolClass.objects.filter(
+        academic_year_id=year_id, class_teacher__isnull=False
+    ).order_by("level_order", "name"):
+        homeroom.setdefault(cls.class_teacher_id, []).append(cls)
+
+    class_ids = {cid for row in per_teacher.values() for cid in row["classes"]}
+    student_counts: dict[int, int] = {}
+    if class_ids:
+        for record in (
+            Student.objects.filter(
+                current_class_id__in=class_ids,
+                status__in=[Student.Status.ACTIVE, Student.Status.REPEATING],
+            )
+            .values("current_class_id")
+            .annotate(n=Count("id"))
+        ):
+            student_counts[record["current_class_id"]] = record["n"]
+
+    rows = []
+    for teacher in teachers:
+        stats = per_teacher.get(teacher.pk, {"classes": {}, "subjects": set(), "assignment_count": 0})
+        classes = sorted(
+            stats["classes"].values(), key=lambda c: (c.level_order, c.name)
+        )
+        rows.append(
+            {
+                "teacher": teacher,
+                "name": _display_name(teacher.user),
+                "homeroom": homeroom.get(teacher.user_id, []),
+                "classes": [c.name for c in classes],
+                "class_count": len(classes),
+                "subjects": sorted(stats["subjects"]),
+                "subject_count": len(stats["subjects"]),
+                "assignment_count": stats["assignment_count"],
+                "student_count": sum(
+                    student_counts.get(c.pk, 0) for c in classes
+                ),
+            }
+        )
+    rows.sort(
+        key=lambda r: (
+            r["assignment_count"] == 0,
+            r["teacher"].user.last_name,
+            r["teacher"].user.first_name,
+        )
+    )
+    return {
+        "rows": rows,
+        "teacher_count": len(rows),
+        "assigned_count": sum(1 for r in rows if r["assignment_count"]),
+        "homeroom_count": sum(1 for r in rows if r["homeroom"]),
+    }
+
+
+def teacher_detail_groups(*, teacher_pk: int) -> list[dict]:
+    """
+    A teacher's assignments grouped by academic year, then class.
+
+    Current year first, so the detail page opens on the year that matters; older
+    years stay visible below instead of disappearing from the history.
+    """
+    teacher = get_teacher(teacher_pk)
+    by_year: dict[int, dict] = {}
+    for a in teacher.assignments.all():
+        group = by_year.setdefault(
+            a.academic_year_id, {"year": a.academic_year, "classes": {}}
+        )
+        per_class = group["classes"].setdefault(
+            a.school_class_id, {"class": a.school_class, "assignments": []}
+        )
+        per_class["assignments"].append(a)
+
+    groups = []
+    for group in by_year.values():
+        classes = sorted(
+            group["classes"].values(),
+            key=lambda c: (c["class"].level_order, c["class"].name),
+        )
+        for per_class in classes:
+            per_class["assignments"].sort(
+                key=lambda a: (a.subject.name, a.stream.name if a.stream_id else "")
+            )
+            per_class["is_homeroom"] = (
+                per_class["class"].class_teacher_id == teacher.user_id
+            )
+            per_class["subjects"] = sorted(
+                {a.subject.name for a in per_class["assignments"]}
+            )
+        groups.append({"year": group["year"], "classes": classes})
+
+    groups.sort(key=lambda g: g["year"].start_date, reverse=True)
+    groups.sort(key=lambda g: not g["year"].is_current)
+    return groups
+
+
+def teacher_profile_summary(*, teacher_pk: int, year_id: int | None) -> dict:
+    """The numbers above a teacher's assignment list, scoped to one year."""
+    from apps.students.models import Student
+
+    summary = {
+        "year": None,
+        "homeroom_count": 0,
+        "class_count": 0,
+        "subject_count": 0,
+        "student_count": 0,
+        "homeroom": [],
+    }
+    if not year_id:
+        return summary
+
+    teacher = get_teacher(teacher_pk)
+    summary["year"] = AcademicYear.objects.filter(pk=year_id).first()
+
+    assignments = teacher.assignments.filter(academic_year_id=year_id)
+    class_ids = {a.school_class_id for a in assignments}
+    summary["class_count"] = len(class_ids)
+    summary["subject_count"] = len({a.subject_id for a in assignments})
+    if class_ids:
+        summary["student_count"] = Student.objects.filter(
+            current_class_id__in=class_ids,
+            status__in=[Student.Status.ACTIVE, Student.Status.REPEATING],
+        ).count()
+
+    summary["homeroom"] = list(
+        SchoolClass.objects.filter(
+            academic_year_id=year_id, class_teacher_id=teacher.user_id
+        ).order_by("level_order", "name")
+    )
+    summary["homeroom_count"] = len(summary["homeroom"])
+    return summary
 
 
 def current_year_classes_for_teacher(*, teacher_user_id: int) -> dict:

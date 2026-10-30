@@ -1,0 +1,94 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Teacher Workload | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-person-lines-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Teacher Workload
+    </h1>
+    <p class="page-subtitle">Who teaches what this year, and who is a class teacher.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'teachers:subject_distribution' %}{% if selected_year_id %}?year={{ selected_year_id }}{% endif %}" class="btn btn-outline-primary" id="btn-subject-distribution">
+      <i class="bi bi-grid-3x3-gap me-1"></i>Subject Distribution
+    </a>
+    <a href="{% url 'teachers:assignment_create' %}" class="btn btn-primary" id="btn-add-assignment">
+      <i class="bi bi-plus me-1"></i>Add Assignment
+    </a>
+  </div>
+</div>
+
+<form method="get" class="card mb-4">
+  <div class="card-body d-flex gap-3 align-items-end flex-wrap">
+    <div>
+      <label class="form-label fw-600" for="id_year">Academic Year</label>
+      <select name="year" id="id_year" class="form-select" style="min-width:180px;" onchange="this.form.submit()">
+        {% for y in years %}
+        <option value="{{ y.pk }}" {% if selected_year_id == y.pk %}selected{% endif %}>{{ y.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="d-flex gap-4 ms-auto text-muted-sm">
+      <span><strong>{{ teacher_count }}</strong> teachers</span>
+      <span><strong>{{ assigned_count }}</strong> teaching</span>
+      <span><strong>{{ homeroom_count }}</strong> class teachers</span>
+    </div>
+  </div>
+</form>
+
+{% if rows %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="workload-table">
+        <thead>
+          <tr>
+            <th>Teacher</th>
+            <th>Department</th>
+            <th>Homeroom</th>
+            <th class="text-center">Classes</th>
+            <th>Subjects</th>
+            <th class="text-center">Pupils</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr id="workload-row-{{ row.teacher.pk }}">
+            <td>
+              <a href="{% url 'teachers:detail' row.teacher.pk %}" class="fw-600 text-decoration-none">{{ row.name }}</a>
+              <div class="text-muted-sm"><code>{{ row.teacher.staff_id }}</code></div>
+            </td>
+            <td class="text-muted-sm">{{ row.teacher.department|default:"—" }}</td>
+            <td>
+              {% for cls in row.homeroom %}
+              <span class="badge me-1 mb-1" style="background:var(--color-surface-2);border:1px solid var(--color-border);">
+                <i class="bi bi-house-door me-1"></i>{{ cls.name }}
+              </span>
+              {% empty %}
+              <span class="text-muted-sm">—</span>
+              {% endfor %}
+            </td>
+            <td class="text-center">
+              {{ row.class_count }}
+              {% if row.classes %}<div class="text-muted-sm">{{ row.classes|join:", " }}</div>{% endif %}
+            </td>
+            <td>
+              {{ row.subject_count }}
+              {% if row.subjects %}<div class="text-muted-sm">{{ row.subjects|join:", " }}</div>{% endif %}
+            </td>
+            <td class="text-center">{{ row.student_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="card-body text-center p-5 text-muted-sm">
+  No teachers on record yet. <a href="{% url 'accounts:staff_create' %}">Add a teacher.</a>
+</div></div>
+{% endif %}
+{% endblock content %}

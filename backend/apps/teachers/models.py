@@ -31,8 +31,11 @@ class TeacherProfile(BaseModel):
 
 class TeacherAssignment(BaseModel):
     """
-    Teacher ? Class ? Subject assignment.
-    Duplicates are prevented by unique_together.
+    Teacher ↔ Class ↔ Subject assignment.
+
+    One teacher per class+subject per academic year, enforced at the database
+    level. ``stream`` only narrows that teacher's own scope (marks entry,
+    homework); it never allows a second teacher on the same subject.
     """
 
     teacher = models.ForeignKey(
@@ -67,29 +70,13 @@ class TeacherAssignment(BaseModel):
         db_table = "teachers_assignment"
         constraints = [
             models.UniqueConstraint(
-                fields=[
-                    "teacher",
-                    "school_class",
-                    "subject",
-                    "stream",
-                    "academic_year",
-                ],
-                name="uniq_teacher_class_subject_stream_year",
-            ),
-            models.UniqueConstraint(
                 fields=["teacher", "school_class", "subject", "academic_year"],
-                condition=models.Q(stream__isnull=True),
-                name="uniq_teacher_class_subject_year_no_stream",
+                name="uniq_teacher_class_subject_year",
             ),
-            # One teacher per class+subject(+stream) per year
-            models.UniqueConstraint(
-                fields=["school_class", "subject", "stream", "academic_year"],
-                name="uniq_class_subject_stream_year_teacher",
-            ),
+            # One teacher per class+subject per year — stream does not count.
             models.UniqueConstraint(
                 fields=["school_class", "subject", "academic_year"],
-                condition=models.Q(stream__isnull=True),
-                name="uniq_class_subject_year_teacher_no_stream",
+                name="uniq_class_subject_year_teacher",
             ),
         ]
 
