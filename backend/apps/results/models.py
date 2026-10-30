@@ -310,3 +310,44 @@ class ScoreEntry(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.student.admission_number} on sheet#{self.result_sheet_id}"
+
+
+class ClassTeacherRemark(BaseModel):
+    """
+    The class teacher's free-text overall remark for one student in one term.
+
+    Shown on the report card below the results table. One row per
+    (student, term); written by the student's class teacher (entry UI lives in
+    the teacher portal), so a card printed before the remark is written simply
+    has no remark section.
+    """
+
+    student = models.ForeignKey(
+        "students.Student",
+        on_delete=models.CASCADE,
+        related_name="class_teacher_remarks",
+    )
+    term = models.ForeignKey(
+        "academics.Term",
+        on_delete=models.CASCADE,
+        related_name="class_teacher_remarks",
+    )
+    remark = models.TextField(blank=True)
+    class_teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="written_ct_remarks",
+    )
+
+    class Meta:
+        db_table = "results_class_teacher_remark"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "term"], name="uniq_ct_remark_student_term"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"CT remark: {self.student.admission_number} / {self.term}"
