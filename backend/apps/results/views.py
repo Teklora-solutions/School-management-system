@@ -166,6 +166,8 @@ class ReportCardPdfView(LoginRequiredMixin, View):
     Generate a printable PDF report card for a student's published results
     in a given term.
 
+    The header carries the school's identity from School Settings (logo, name,
+    motto, contacts) so the card matches the school's website on any install.
     Access: student (own only) | parent (own children only) | staff (any).
     """
 
@@ -191,13 +193,33 @@ class ReportCardPdfView(LoginRequiredMixin, View):
             Term.objects.select_related("academic_year"), pk=term_id
         )
 
-        # Compute summary data for the PDF header
-        from django.db.models import Avg
+        # Summary numbers for the header band
+        from django.db.models import Avg, Sum
 
-        avg_result = entries.aggregate(avg=Avg("total"))
-        avg = round(float(avg_result["avg"] or 0), 1)
+        aggregates = entries.aggregate(avg=Avg("total"), total=Sum("total"))
+        average = round(float(aggregates["avg"] or 0), 1)
+        grand_total = aggregates["total"] or 0
 
-        from django.conf import settings as _settings
+        overall_grade = ""
+        class_teacher_name = ""
+        if student.current_class_id:
+            overall_grade, _, _ = services.resolve_grade_for_school_class(
+                student.current_class, average, term.academic_year_id
+            )
+            ct = student.current_class.class_teacher
+            if ct:
+                class_teacher_name = ct.get_full_name() or ct.email or ct.username
+
+        identity = selectors.result_identity(request=request)
+        term_position = (
+            selectors.student_term_position(student_id=student.pk, term_id=term_id)
+            if identity["show_positions"]
+            else None
+        )
+        ct_remark = selectors.class_teacher_remark(
+            student_id=student.pk, term_id=term_id
+        )
+
         from django.template.loader import render_to_string
 
         html = render_to_string(
@@ -207,9 +229,13 @@ class ReportCardPdfView(LoginRequiredMixin, View):
                 "term": term,
                 "entries": list(entries),
                 "positions": positions,
-                "average": avg,
-                "SCHOOL_NAME": _settings.SCHOOL_NAME,
-                "SCHOOL_MOTTO": getattr(_settings, "SCHOOL_MOTTO", ""),
+                "average": average,
+                "grand_total": grand_total,
+                "overall_grade": overall_grade,
+                "term_position": term_position,
+                "class_teacher_name": class_teacher_name,
+                "ct_remark": ct_remark,
+                "identity": identity,
                 "request": request,
             },
         )

@@ -446,3 +446,87 @@ def student_class_positions(*, student_id: int, term_id: int) -> dict[int, dict]
             "total_in_class": total_in_class,
         }
     return positions
+
+
+# ---------------------------------------------------------------------------
+# Report card identity + overall standing (RC1)
+# ---------------------------------------------------------------------------
+
+
+def result_identity(*, request) -> dict:
+    """
+    The school identity for a PDF header: name, motto, contacts, the
+    show/hide-positions flag, and an absolute logo URL when a logo is uploaded.
+
+    Identity comes from the ``SchoolSettings`` row exactly like every other
+    page (blank fields fall back to the ``SCHOOL_*`` settings), so a report
+    card always matches the school's own website. The logo URL is made
+    absolute against the request because WeasyPrint resolves images against
+    the ``base_url`` it is given.
+    """
+    from apps.core.models import SchoolSettings
+    from apps.core.selectors import school_settings_values
+
+    values = school_settings_values(request)
+    row = SchoolSettings.objects.filter(pk=SchoolSettings.SINGLETON_PK).first()
+    logo = getattr(row, "logo", None) if row else None
+    return {
+        "name": values["name"] or "My School",
+        "motto": values["motto"],
+        "phone": values["phone"],
+        "email": values["email"],
+        "show_positions": values["show_positions"],
+        "logo_url": request.build_absolute_uri(logo.url) if logo else "",
+    }
+
+
+def student_term_position(*, student_id: int, term_id: int) -> dict | None:
+    """
+    The student's overall standing in their current class for one term:
+    {"position": int, "total_in_class": int} by average of published totals.
+
+    Mirrors ``student_latest_result_summary`` but scoped to a chosen term, so
+    the report card can print "Position 3 of 27" for the term it covers.
+    Ties share a position (same strictly-greater-count rule as elsewhere).
+    None when the student has no class or no published results in the term.
+    """
+    from apps.students.models import Student
+
+    student = (
+        Student.objects.select_related("current_class")
+        .filter(pk=student_id)
+        .first()
+    )
+    if student is None or student.current_class_id is None:
+        return None
+
+    own_avg = ScoreEntry.objects.filter(
+        student_id=student_id,
+        result_sheet__term_id=term_id,
+        result_sheet__status=ResultSheet.Status.PUBLISHED,
+    ).aggregate(avg=Avg("total"))["avg"]
+    if own_avg is None:
+        return None
+
+    peers = (
+        ScoreEntry.objects.filter(
+            result_sheet__term_id=term_id,
+            result_sheet__status=ResultSheet.Status.PUBLISHED,
+            student__current_class_id=student.current_class_id,
+        )
+        .values("student_id")
+        .annotate(avg_total=Avg("total"))
+    )
+    above = sum(1 for p in peers if (p["avg_total"] or 0) > own_avg)
+    return {"position": above + 1, "total_in_class": peers.count()}
+
+
+def class_teacher_remark(*, student_id: int, term_id: int):
+    """The class teacher's remark row for the card, or None."""
+    from .models import ClassTeacherRemark
+
+    return (
+        ClassTeacherRemark.objects.filter(student_id=student_id, term_id=term_id)
+        .select_related("class_teacher")
+        .first()
+    )
