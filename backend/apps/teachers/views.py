@@ -12,7 +12,7 @@ from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.views.generic import DetailView, ListView, TemplateView
 
-from apps.academics.models import SchoolClass, Term
+from apps.academics.models import AcademicYear, SchoolClass, Stream, Term
 from apps.academics.selectors import academic_year_list, get_current_year
 from apps.core.mixins import AdminRequiredMixin, SchoolReadMixin, TeacherRequiredMixin
 from apps.results import services as results_services
@@ -25,6 +25,14 @@ from .forms import TeacherAssignmentForm, TeacherFilterForm
 from .models import TeacherAssignment
 
 User = get_user_model()
+
+
+def _selected_year_id(raw) -> int | None:
+    """The year a page is showing: the queried one if valid, else the current year."""
+    if raw and str(raw).isdigit() and AcademicYear.objects.filter(pk=int(raw)).exists():
+        return int(raw)
+    current = get_current_year()
+    return current.pk if current else None
 
 
 class TeacherListView(SchoolReadMixin, ListView):
@@ -54,20 +62,60 @@ class TeacherDetailView(AdminRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        year_id = _selected_year_id(self.request.GET.get("year"))
         ctx["years"] = academic_year_list()
+        ctx["selected_year_id"] = year_id
+        ctx["groups"] = selectors.teacher_detail_groups(teacher_pk=self.kwargs["pk"])
+        ctx["summary"] = selectors.teacher_profile_summary(
+            teacher_pk=self.kwargs["pk"], year_id=year_id
+        )
         return ctx
 
 
 class TeacherAssignmentCreateView(AdminRequiredMixin, View):
     template_name = "features/teachers/assignment_form.html"
 
+    @staticmethod
+    def _year_id(request) -> int | None:
+        """The year the dropdowns are scoped to: the submitted or queried one, else current."""
+        raw = request.POST.get("academic_year") or request.GET.get("year")
+        if raw and str(raw).isdigit():
+            year_id = int(raw)
+            if AcademicYear.objects.filter(pk=year_id).exists():
+                return year_id
+        current = get_current_year()
+        return current.pk if current else None
+
+    def _context(self, form, year_id):
+        picker = selectors.assignment_picker(year_id=year_id)
+        picker["bound"] = form.is_bound
+        return {"form": form, "picker": picker}
+
     def get(self, request):
-        form = TeacherAssignmentForm(
-            initial={
-                "academic_year": get_current_year(),
-            }
-        )
-        return render(request, self.template_name, {"form": form})
+        year_id = self._year_id(request)
+        initial = {"academic_year": year_id}
+        # A class page can open this form already scoped; the class must belong
+        # to the year the dropdowns are showing.
+        class_id = request.GET.get("class")
+        if (
+            class_id
+            and str(class_id).isdigit()
+            and SchoolClass.objects.filter(
+                pk=int(class_id), academic_year_id=year_id
+            ).exists()
+        ):
+            initial["school_class"] = int(class_id)
+            stream_id = request.GET.get("stream")
+            if (
+                stream_id
+                and str(stream_id).isdigit()
+                and Stream.objects.filter(
+                    pk=int(stream_id), school_class_id=int(class_id)
+                ).exists()
+            ):
+                initial["stream"] = int(stream_id)
+        form = TeacherAssignmentForm(initial=initial)
+        return render(request, self.template_name, self._context(form, year_id))
 
     def post(self, request):
         form = TeacherAssignmentForm(request.POST)
@@ -95,7 +143,11 @@ class TeacherAssignmentCreateView(AdminRequiredMixin, View):
                     "teachers:assignment_list"
                 )
                 return redirect(next_url)
-        return render(request, self.template_name, {"form": form})
+        return render(
+            request,
+            self.template_name,
+            self._context(form, self._year_id(request)),
+        )
 
 
 class TeacherAssignmentListView(AdminRequiredMixin, ListView):
@@ -149,6 +201,48 @@ class AssignmentMatrixView(AdminRequiredMixin, View):
                 "selected_year_id": int(year_id) if year_id else None,
             },
         )
+
+
+class SubjectDistributionView(AdminRequiredMixin, TemplateView):
+    """Every class in a year and who teaches which of its subjects."""
+
+    template_name = "features/teachers/subject_distribution.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        year_id = _selected_year_id(self.request.GET.get("year"))
+        ctx["years"] = academic_year_list()
+        ctx["selected_year_id"] = year_id
+        if year_id:
+            ctx.update(selectors.subject_distribution(year_id=year_id))
+        else:
+            ctx.update(
+                {
+                    "cards": [],
+                    "class_count": 0,
+                    "subject_count": 0,
+                    "unassigned_count": 0,
+                    "conflict_count": 0,
+                }
+            )
+        return ctx
+
+
+class TeacherWorkloadView(AdminRequiredMixin, TemplateView):
+    """All teachers for a year: homeroom, classes, subjects and pupil counts."""
+
+    template_name = "features/teachers/workload.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        year_id = _selected_year_id(self.request.GET.get("year"))
+        ctx["years"] = academic_year_list()
+        ctx["selected_year_id"] = year_id
+        if year_id:
+            ctx.update(selectors.teacher_workload(year_id=year_id))
+        else:
+            ctx.update({"rows": [], "teacher_count": 0, "assigned_count": 0, "homeroom_count": 0})
+        return ctx
 
 
 class SetClassTeacherView(AdminRequiredMixin, View):

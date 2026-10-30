@@ -9,9 +9,16 @@ from django.contrib.auth import get_user_model
 
 from apps.academics.models import AcademicYear, SchoolClass, Stream, Subject
 
-from .models import TeacherProfile
+from .models import TeacherAssignment, TeacherProfile
 
 User = get_user_model()
+
+
+def _as_id(value):
+    """Accept a pk, a model instance, or a form string; anything else is None."""
+    if value in (None, ""):
+        return None
+    return getattr(value, "pk", value)
 
 
 class TeacherAssignmentForm(forms.Form):
@@ -41,6 +48,39 @@ class TeacherAssignmentForm(forms.Form):
         empty_label="All streams",
         widget=forms.Select(attrs={"class": "form-select"}),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.is_bound:
+            # A submitted form keeps the full lists. Narrowing them here would
+            # answer a duplicate with "Select a valid choice" instead of the
+            # service's "already assigned to another teacher".
+            return
+
+        year_id = _as_id(self.initial.get("academic_year"))
+        class_id = _as_id(self.initial.get("school_class"))
+
+        if year_id:
+            self.fields["school_class"].queryset = self.fields[
+                "school_class"
+            ].queryset.filter(academic_year_id=year_id)
+
+        if class_id:
+            self.fields["stream"].queryset = self.fields["stream"].queryset.filter(
+                school_class_id=class_id
+            )
+            # One teacher per class+subject per year regardless of stream, so a
+            # subject claimed in any stream is gone for the whole class.
+            taken = TeacherAssignment.objects.filter(
+                academic_year_id=year_id,
+                school_class_id=class_id,
+            ).values_list("subject_id", flat=True)
+            self.fields["subject"].queryset = self.fields["subject"].queryset.exclude(
+                pk__in=taken
+            )
+        else:
+            # Streams only mean something once a class is chosen.
+            self.fields["stream"].queryset = Stream.objects.none()
 
 
 class TeacherFilterForm(forms.Form):

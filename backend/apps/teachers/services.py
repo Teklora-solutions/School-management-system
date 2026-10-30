@@ -59,7 +59,6 @@ def assign_subject_to_teacher(
         school_class=school_class,
         subject=subject,
         academic_year=academic_year,
-        stream=stream,
     ).first()
     if existing and existing.teacher_id != teacher.pk:
         raise ValidationError(

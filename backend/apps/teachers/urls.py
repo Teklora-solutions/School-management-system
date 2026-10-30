@@ -33,6 +33,12 @@ urlpatterns = [
     ),
     path("matrix/", views.AssignmentMatrixView.as_view(), name="assignment_matrix"),
     path(
+        "distribution/",
+        views.SubjectDistributionView.as_view(),
+        name="subject_distribution",
+    ),
+    path("workload/", views.TeacherWorkloadView.as_view(), name="workload"),
+    path(
         "classes/<int:pk>/set-teacher/",
         views.SetClassTeacherView.as_view(),
         name="set_class_teacher",

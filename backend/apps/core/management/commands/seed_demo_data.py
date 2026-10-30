@@ -538,7 +538,6 @@ class Command(BaseCommand):
                     school_class=school_class,
                     subject=subject,
                     academic_year=year,
-                    stream__isnull=True,
                 ).exists():
                     teachers_services.assign_subject_to_teacher(
                         teacher=profile,

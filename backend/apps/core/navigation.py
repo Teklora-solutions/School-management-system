@@ -77,7 +77,38 @@ NAVIGATION: dict[str, list[dict]] = {
                 },
             ],
         },
-        {"label": "Teachers", "icon": "bi-easel", "url_name": "teachers:list"},
+        {
+            "label": "Teachers",
+            "icon": "bi-easel",
+            "url_name": "teachers:list",
+            "children": [
+                {
+                    "label": "All Teachers",
+                    "icon": "bi-people",
+                    "url_name": "teachers:list",
+                },
+                {
+                    "label": "Teacher Workload",
+                    "icon": "bi-person-lines-fill",
+                    "url_name": "teachers:workload",
+                },
+                {
+                    "label": "Subject Distribution",
+                    "icon": "bi-grid-3x3-gap",
+                    "url_name": "teachers:subject_distribution",
+                },
+                {
+                    "label": "Assignments",
+                    "icon": "bi-list-check",
+                    "url_name": "teachers:assignment_list",
+                },
+                {
+                    "label": "Assignment Matrix",
+                    "icon": "bi-table",
+                    "url_name": "teachers:assignment_matrix",
+                },
+            ],
+        },
         {
             "label": "Results",
             "icon": "bi-bar-chart",

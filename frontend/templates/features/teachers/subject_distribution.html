@@ -1,0 +1,101 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Subject Distribution | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-grid-3x3-gap me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Subject Distribution by Class
+    </h1>
+    <p class="page-subtitle">Every class, the subjects it offers, and who teaches each one.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'teachers:workload' %}{% if selected_year_id %}?year={{ selected_year_id }}{% endif %}" class="btn btn-outline-primary" id="btn-teacher-workload">
+      <i class="bi bi-person-lines-fill me-1"></i>Teacher Workload
+    </a>
+    <a href="{% url 'teachers:assignment_create' %}" class="btn btn-primary" id="btn-add-assignment">
+      <i class="bi bi-plus me-1"></i>Add Assignment
+    </a>
+  </div>
+</div>
+
+<form method="get" class="card mb-4">
+  <div class="card-body d-flex gap-3 align-items-end flex-wrap">
+    <div>
+      <label class="form-label fw-600" for="id_year">Academic Year</label>
+      <select name="year" id="id_year" class="form-select" style="min-width:180px;" onchange="this.form.submit()">
+        {% for y in years %}
+        <option value="{{ y.pk }}" {% if selected_year_id == y.pk %}selected{% endif %}>{{ y.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="d-flex gap-4 ms-auto text-muted-sm">
+      <span><strong>{{ class_count }}</strong> classes</span>
+      <span><strong>{{ subject_count }}</strong> subject slots</span>
+      <span><strong>{{ unassigned_count }}</strong> unassigned</span>
+    </div>
+  </div>
+</form>
+
+{% if cards %}
+<div class="row g-4" id="distribution-grid">
+  {% for card in cards %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100" id="dist-card-{{ card.class.pk }}">
+      <div class="card-header d-flex align-items-start justify-content-between gap-2">
+        <div>
+          <h2 class="card-title mb-0">
+            <a href="{% url 'academics:class_detail' card.class.pk %}" class="text-decoration-none">{{ card.class.name }}</a>
+          </h2>
+          <div class="text-muted-sm">{{ card.class.academic_year.name }}</div>
+        </div>
+        {% if card.class_teacher_name %}
+        <span class="badge" style="background:var(--color-surface-2);border:1px solid var(--color-border);">
+          <i class="bi bi-house-door me-1"></i>{{ card.class_teacher_name }}
+        </span>
+        {% else %}
+        <span class="badge" style="background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-muted);">
+          No class teacher
+        </span>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        <ul class="list-unstyled mb-0" id="dist-list-{{ card.class.pk }}">
+          {% for row in card.rows %}
+          <li class="d-flex justify-content-between align-items-start gap-2 px-3 py-2"
+              style="border-bottom:1px solid var(--color-border);color:var(--color-text);" id="dist-row-{{ card.class.pk }}-{{ row.subject.pk }}">
+            <div>
+              <div>{{ row.subject.name }}</div>
+              <div class="text-muted-sm">
+                {{ row.subject.code }}{% if row.streams %} &middot; {{ row.streams|join:", " }}{% endif %}
+              </div>
+            </div>
+            <div class="text-end">
+              {% if row.state == "unassigned" %}
+              <span class="badge" style="background:var(--color-danger);color:#fff;">Unassigned</span>
+              {% else %}
+              <span>{{ row.teacher_name }}</span>
+              {% endif %}
+            </div>
+          </li>
+          {% empty %}
+          <li class="px-3 py-4 text-center text-muted-sm">No subjects mapped to this class yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% if card.unassigned_count %}
+      <div class="card-footer text-muted-sm">
+        {{ card.unassigned_count }} subject{{ card.unassigned_count|pluralize }} with no teacher.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="card-body text-center p-5 text-muted-sm">
+  No classes in this year. <a href="{% url 'academics:class_list' %}">Create a class first.</a>
+</div></div>
+{% endif %}
+{% endblock content %}

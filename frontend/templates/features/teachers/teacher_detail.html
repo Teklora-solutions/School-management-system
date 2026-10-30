@@ -8,6 +8,11 @@
     <h1 class="page-title mt-1">
       <i class="bi bi-person-badge me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
       {{ teacher.user.get_full_name }}
+      {% for cls in summary.homeroom %}
+      <span class="badge align-middle ms-2" style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.7rem;">
+        <i class="bi bi-house-door me-1"></i>Class teacher &middot; {{ cls.name }}
+      </span>
+      {% endfor %}
     </h1>
     <p class="page-subtitle">
       <code>{{ teacher.staff_id }}</code>
@@ -19,6 +24,40 @@
     <a href="{% url 'teachers:assignment_create' %}?teacher={{ teacher.pk }}" class="btn btn-sm btn-primary" id="btn-add-assignment">
       <i class="bi bi-plus me-1"></i>Add Assignment
     </a>
+  </div>
+</div>
+
+{# Current-year numbers #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body" style="color:var(--color-text);">
+      <div class="text-muted-sm">Homeroom</div>
+      <div class="fs-4 fw-600">{{ summary.homeroom_count }}</div>
+      <div class="text-muted-sm">
+        {% for cls in summary.homeroom %}{{ cls.name }}{% if not forloop.last %}, {% endif %}{% empty %}Not a class teacher{% endfor %}
+      </div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body" style="color:var(--color-text);">
+      <div class="text-muted-sm">Classes</div>
+      <div class="fs-4 fw-600">{{ summary.class_count }}</div>
+      <div class="text-muted-sm">{{ summary.year.name|default:"No current year" }}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body" style="color:var(--color-text);">
+      <div class="text-muted-sm">Subjects</div>
+      <div class="fs-4 fw-600">{{ summary.subject_count }}</div>
+      <div class="text-muted-sm">taught this year</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body" style="color:var(--color-text);">
+      <div class="text-muted-sm">Pupils</div>
+      <div class="fs-4 fw-600">{{ summary.student_count }}</div>
+      <div class="text-muted-sm">in those classes</div>
+    </div></div>
   </div>
 </div>
 
@@ -57,21 +96,37 @@
           <i class="bi bi-plus me-1"></i>Assign
         </a>
       </div>
+    </div>
+
+    {% for group in groups %}
+    <div class="card mt-3" id="year-group-{{ group.year.pk }}">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">
+          {{ group.year.name }}
+          {% if group.year.is_current %}
+          <span class="badge ms-1" style="background:var(--color-success);color:#fff;">Current</span>
+          {% endif %}
+        </h3>
+        <span class="text-muted-sm">{{ group.classes|length }} class{{ group.classes|length|pluralize:"es" }}</span>
+      </div>
       <div class="card-body p-0">
-        {% with assignments=teacher.assignments.all %}
-        {% if assignments %}
-        <table class="table table-hover align-middle mb-0" id="assignment-table">
-          <thead>
-            <tr><th>Year</th><th>Class</th><th>Stream</th><th>Subject</th><th class="text-end">Remove</th></tr>
-          </thead>
+        {% for per_class in group.classes %}
+        <div class="d-flex align-items-center gap-2 px-3 pt-3 pb-1">
+          <a href="{% url 'academics:class_detail' per_class.class.pk %}" class="fw-600 text-decoration-none">{{ per_class.class.name }}</a>
+          {% if per_class.is_homeroom %}
+          <span class="badge" style="background:var(--color-surface-2);border:1px solid var(--color-border);">
+            <i class="bi bi-house-door me-1"></i>Class teacher
+          </span>
+          {% endif %}
+          <span class="text-muted-sm ms-auto">{{ per_class.subjects|join:", " }}</span>
+        </div>
+        <table class="table table-sm table-hover align-middle mb-0" id="assignment-table-{{ per_class.class.pk }}-{{ group.year.pk }}">
           <tbody>
-            {% for a in assignments %}
+            {% for a in per_class.assignments %}
             <tr>
-              <td class="text-muted-sm">{{ a.academic_year.name }}</td>
-              <td class="fw-600">{{ a.school_class.name }}</td>
-              <td class="text-muted-sm">{{ a.stream.name|default:"All" }}</td>
-              <td>{{ a.subject.name }}</td>
-              <td class="text-end">
+              <td>{{ a.subject.name }} <span class="text-muted-sm">({{ a.subject.code }})</span></td>
+              <td class="text-muted-sm" style="width:30%;">{{ a.stream.name|default:"All streams" }}</td>
+              <td class="text-end" style="width:10%;">
                 <form method="post" action="{% url 'teachers:assignment_delete' a.pk %}"
                       onsubmit="return confirm('Remove this assignment?')">
                   {% csrf_token %}
@@ -85,12 +140,12 @@
             {% endfor %}
           </tbody>
         </table>
-        {% else %}
-        <div class="p-4 text-center text-muted-sm">No assignments yet.</div>
-        {% endif %}
-        {% endwith %}
+        {% endfor %}
       </div>
     </div>
+    {% empty %}
+    <div class="card mt-3"><div class="card-body text-center p-4 text-muted-sm">No assignments yet.</div></div>
+    {% endfor %}
   </div>
 </div>
 {% endblock content %}

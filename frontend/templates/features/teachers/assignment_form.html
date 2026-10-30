@@ -24,14 +24,18 @@
           <div class="mb-3">
             <label for="{{ form.school_class.id_for_label }}" class="form-label fw-600">Class <span class="text-danger">*</span></label>
             {{ form.school_class }}
+            {% for error in form.school_class.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
           </div>
           <div class="mb-3">
             <label for="{{ form.subject.id_for_label }}" class="form-label fw-600">Subject <span class="text-danger">*</span></label>
             {{ form.subject }}
+            {% for error in form.subject.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            <div class="form-text" id="assignment-note">Choose a class to see the subjects still free.</div>
           </div>
           <div class="mb-3">
             <label for="{{ form.stream.id_for_label }}" class="form-label fw-600">Stream (optional)</label>
             {{ form.stream }}
+            {% for error in form.stream.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
           </div>
           <div class="d-flex gap-2 justify-content-end">
             <a href="{% url 'teachers:assignment_list' %}" class="btn btn-outline-secondary">Cancel</a>
@@ -42,4 +46,106 @@
     </div>
   </div>
 </div>
+{{ picker|json_script:"assignment-picker" }}
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const picker = JSON.parse(document.getElementById("assignment-picker").textContent || "{}");
+  const yearSel = document.getElementById("id_academic_year");
+  const classSel = document.getElementById("id_school_class");
+  const streamSel = document.getElementById("id_stream");
+  const subjectSel = document.getElementById("id_subject");
+  const note = document.getElementById("assignment-note");
+  const saveBtn = document.getElementById("btn-save-assignment");
+
+  const classes = picker.classes || [];
+  const streams = picker.streams || [];
+  const subjects = picker.subjects || [];
+  const taken = picker.taken || [];
+
+  function fill(select, items, placeholder) {
+    const previous = select.value;
+    select.innerHTML = "";
+    if (placeholder !== null) {
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = placeholder;
+      select.appendChild(blank);
+    }
+    items.forEach(function (item) {
+      const option = document.createElement("option");
+      option.value = String(item.id);
+      option.textContent = item.label;
+      select.appendChild(option);
+    });
+    if (items.some(function (item) { return String(item.id) === previous; })) {
+      select.value = previous;
+    }
+  }
+
+  function freeSubjects() {
+    const classId = classSel.value;
+    if (!classId) return [];
+    const used = new Set(
+      taken
+        .filter(function (row) { return String(row[0]) === classId; })
+        .map(function (row) { return String(row[1]); })
+    );
+    return subjects.filter(function (subject) { return !used.has(String(subject.id)); });
+  }
+
+  function refreshSubjects(chosenClass) {
+    const free = freeSubjects();
+    fill(subjectSel, free, "---------");
+    const className = chosenClass ? chosenClass.label : "";
+    if (!classSel.value) {
+      note.textContent = "Choose a class to see the subjects still free.";
+    } else if (!free.length) {
+      note.textContent = "Every subject is already assigned for " + className +
+        ". Remove one from the assignment list before adding another.";
+    } else {
+      note.textContent = free.length + " subject" + (free.length === 1 ? "" : "s") +
+        " still free for " + className + ".";
+    }
+    updateSaveState();
+  }
+
+  function updateSaveState() {
+    saveBtn.disabled = !classSel.value || !subjectSel.value;
+  }
+
+  function chosenClass() {
+    return classes.find(function (c) { return String(c.id) === classSel.value; }) || null;
+  }
+
+  function refreshStreams() {
+    const classId = classSel.value;
+    fill(
+      streamSel,
+      classId ? streams.filter(function (s) { return String(s.class) === classId; }) : [],
+      "All streams"
+    );
+  }
+
+  yearSel.addEventListener("change", function () {
+    window.location.search = "?year=" + encodeURIComponent(yearSel.value);
+  });
+
+  classSel.addEventListener("change", function () {
+    refreshStreams();
+    refreshSubjects(chosenClass());
+  });
+
+  subjectSel.addEventListener("change", updateSaveState);
+
+  // No year to scope to, or a rejected submission: leave the rendered lists
+  // exactly as the server sent them, so the admin still sees what they chose.
+  if (!classes.length || picker.bound) return;
+
+  refreshStreams();
+  refreshSubjects(chosenClass());
+})();
+</script>
+{% endblock extra_js %}
