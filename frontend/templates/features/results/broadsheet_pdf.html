@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Broadsheet &mdash; {{ broadsheet.school_class.name }} &mdash; {{ broadsheet.exam.name }}</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm 12mm 14mm 12mm; }
+    * { box-sizing: border-box; }
+    body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 9pt; color: #1a1a1a; margin: 0; }
+
+    /* ── Identity header ─────────────────────────────────────────────── */
+    .identity { display: flex; align-items: center; gap: 14px; border-bottom: 3px solid #1f3a5f; padding-bottom: 8px; }
+    .identity .crest { width: 58px; height: 58px; object-fit: contain; flex: 0 0 auto; }
+    .identity .crest-placeholder { width: 58px; height: 58px; flex: 0 0 auto; border: 2px solid #1f3a5f; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-weight: 700; color: #1f3a5f; font-size: 15pt; }
+    .identity .who { flex: 1 1 auto; text-align: center; }
+    .identity .school-name { font-size: 17pt; font-weight: 700; letter-spacing: 0.02em; color: #1f3a5f; }
+    .identity .school-motto { font-size: 9pt; font-style: italic; color: #555; margin-top: 2px; }
+    .identity .contacts { font-size: 8pt; color: #666; margin-top: 4px; }
+
+    .doc-title { background: #1f3a5f; color: #fff; text-align: center; font-size: 11pt; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 0; margin: 12px 0; }
+
+    /* ── Topper + summary line ───────────────────────────────────────── */
+    .topper { display: flex; align-items: baseline; gap: 10px; border: 1px solid #1f3a5f; border-radius: 6px;
+      background: #eef1f6; padding: 8px 14px; margin-bottom: 12px; page-break-inside: avoid; }
+    .topper .label { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7686; }
+    .topper .name { font-size: 12pt; font-weight: 700; color: #1f3a5f; }
+    .topper .figures { font-size: 10pt; color: #333; }
+    .summary-line { font-size: 8.5pt; color: #666; margin: 0 0 10px; }
+    .summary-line strong { color: #1a1a1a; }
+
+    /* ── Broadsheet table ────────────────────────────────────────────── */
+    table.sheet { width: 100%; border-collapse: collapse; }
+    table.sheet thead { display: table-header-group; }
+    table.sheet th { background: #1f3a5f; color: #fff; padding: 6px 8px; font-size: 8.5pt; text-align: left;
+      border: 1px solid #1f3a5f; }
+    table.sheet th.center, table.sheet td.center { text-align: center; }
+    table.sheet th .sub { display: block; font-weight: 400; font-size: 7pt; color: #c9d4e4; }
+    table.sheet td { padding: 5px 8px; border: 1px solid #dde3ea; font-size: 8.5pt; }
+    table.sheet tbody tr:nth-child(even) td { background: #f4f6f9; }
+    table.sheet td.pos { font-weight: 700; color: #1f3a5f; }
+    table.sheet tfoot td { border-top: 2px solid #1f3a5f; font-weight: 700; background: #eef1f6; }
+    .grade-a { color: #1a7f37; font-weight: 700; }
+    .grade-b { color: #0550ae; font-weight: 700; }
+    .grade-c { color: #7d4e00; font-weight: 700; }
+    .grade-f { color: #cf222e; font-weight: 700; }
+
+    .footer { margin-top: 18px; border-top: 1px solid #ccc; padding-top: 6px; font-size: 7.5pt; color: #888; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="identity">
+    {% if identity.logo_url %}
+    <img class="crest" src="{{ identity.logo_url }}" alt="School crest">
+    {% else %}
+    <div class="crest-placeholder">{{ identity.name|slice:":1" }}</div>
+    {% endif %}
+    <div class="who">
+      <div class="school-name">{{ identity.name }}</div>
+      {% if identity.motto %}<div class="school-motto">&ldquo;{{ identity.motto }}&rdquo;</div>{% endif %}
+      {% if identity.phone or identity.email %}
+      <div class="contacts">
+        {% if identity.phone %}Tel: {{ identity.phone }}{% if identity.email %} &middot; {% endif %}{% endif %}
+        {% if identity.email %}{{ identity.email }}{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <div style="flex:0 0 58px;"></div>
+  </div>
+
+  <div class="doc-title">
+    Class Broadsheet &mdash; {{ broadsheet.school_class.name }} &middot;
+    {{ broadsheet.term.name }} {{ broadsheet.term.academic_year.name }} &middot;
+    {{ broadsheet.exam.name }}
+  </div>
+
+  {% if topper %}
+  <div class="topper">
+    <span class="label">Top of class</span>
+    <span class="name">{{ topper.student.user.full_name }}</span>
+    <span class="figures">
+      {{ topper.total|floatformat:"-2" }} total &middot; {{ topper.mean|floatformat:1 }}% mean &middot; Grade {{ topper.grade }}
+    </span>
+  </div>
+  {% endif %}
+
+  <p class="summary-line">
+    <strong>{{ broadsheet.roster_size }}</strong> student{{ broadsheet.roster_size|pluralize }} &middot;
+    <strong>{{ broadsheet.sheets_count }}</strong> sheet{{ broadsheet.sheets_count|pluralize }} &middot;
+    Status: <strong>{{ broadsheet.status.label }}</strong> &middot;
+    {% if broadsheet.class_mean_pct is not None %}
+      Class mean: <strong>{{ broadsheet.class_mean_pct|floatformat:1 }}%</strong>
+    {% else %}
+      Class mean: &mdash;
+    {% endif %}
+    &middot; Printed {{ request.META.HTTP_HOST }}
+  </p>
+
+  <table class="sheet">
+    <thead>
+      <tr>
+        <th class="center" style="width:26px;">#</th>
+        <th style="width:70px;">Admission #</th>
+        <th>Student</th>
+        {% for col in broadsheet.columns %}
+        <th class="center">
+          {{ col.subject.code }}
+          <span class="sub">{{ col.subject.name }}</span>
+        </th>
+        {% endfor %}
+        <th class="center">Total</th>
+        <th class="center">Mean</th>
+        <th class="center">Grade</th>
+        {% if identity.show_positions %}<th class="center">Pos</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in ranked_students %}
+      <tr>
+        <td class="center text-muted">{{ forloop.counter }}</td>
+        <td>{{ row.student.admission_number }}</td>
+        <td>{{ row.student.user.full_name }}</td>
+        {% for cell in row.cells %}
+        <td class="center">
+          {% if cell.score is not None %}
+            {{ cell.score|floatformat:"-2" }}{% if cell.grade %} <span>{{ cell.grade }}</span>{% endif %}
+          {% else %}
+            &mdash;
+          {% endif %}
+        </td>
+        {% endfor %}
+        <td class="center" style="font-weight:700;">
+          {% if row.total is not None %}{{ row.total|floatformat:"-2" }}{% else %}&mdash;{% endif %}
+        </td>
+        <td class="center">
+          {% if row.mean is not None %}{{ row.mean|floatformat:1 }}{% else %}&mdash;{% endif %}
+        </td>
+        <td class="center
+          {% if row.grade == 'A' or row.grade == 'A+' %}grade-a
+          {% elif row.grade == 'B' or row.grade == 'B+' %}grade-b
+          {% elif row.grade == 'C' %}grade-c
+          {% elif row.grade == 'F' %}grade-f
+          {% endif %}">{{ row.grade|default:"&mdash;" }}</td>
+        {% if identity.show_positions %}
+        <td class="center pos">{{ row.position|default:"&mdash;" }}</td>
+        {% endif %}
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="{{ broadsheet.columns|length|add:7 }}">No active students are on this class roll.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% if broadsheet.columns %}
+    <tfoot>
+      <tr>
+        <td colspan="3">Subject mean</td>
+        {% for col in broadsheet.columns %}
+        <td class="center">
+          {% if col.mean is not None %}{{ col.mean|floatformat:1 }}{% else %}&mdash;{% endif %}
+        </td>
+        {% endfor %}
+        <td class="center">
+          {% if broadsheet.class_mean_total is not None %}{{ broadsheet.class_mean_total|floatformat:1 }}{% else %}&mdash;{% endif %}
+        </td>
+        <td class="center">
+          {% if broadsheet.class_mean_pct is not None %}{{ broadsheet.class_mean_pct|floatformat:1 }}{% else %}&mdash;{% endif %}
+        </td>
+        <td{% if identity.show_positions %} colspan="2"{% endif %}></td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+
+  <div class="footer">
+    {{ identity.name }} &mdash; Broadsheet generated by the school management system &mdash; Confidential
+  </div>
+
+</body>
+</html>

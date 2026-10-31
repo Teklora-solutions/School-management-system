@@ -18,6 +18,11 @@ urlpatterns = [
     path(
         "broadsheet/", views.ClassBroadsheetView.as_view(), name="broadsheet"
     ),
+    path(
+        "broadsheet/pdf/",
+        views.BroadsheetPdfView.as_view(),
+        name="broadsheet_pdf",
+    ),
     path("sheets/", views.ResultSheetListView.as_view(), name="sheet_list"),
     path(
         "sheets/<int:pk>/", views.ResultSheetDetailView.as_view(), name="sheet_detail"
