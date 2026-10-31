@@ -294,88 +294,159 @@ class ResultSheetListView(AdminRequiredMixin, TemplateView):
         return ctx
 
 
+def _get_int(request, key: str) -> int | None:
+    try:
+        return int(request.GET.get(key))
+    except (TypeError, ValueError):
+        return None
+
+
+def _pick(options: list, key: str, request):
+    wanted = _get_int(request, key)
+    for option in options:
+        if wanted is not None and option.pk == wanted:
+            return option
+    return options[0] if options else None
+
+
+def _resolve_broadsheet_scope(request) -> dict:
+    """
+    Resolve the year → class → term → exam cascade for the broadsheet screens
+    from GET parameters. One implementation shared by the on-screen broadsheet
+    and its PDF export, so the download always matches what is on the page.
+    """
+    from apps.academics.models import SchoolClass, Term
+
+    years = list(AcademicYear.objects.order_by("-start_date"))
+    wanted_year = _get_int(request, "year")
+    year = next((y for y in years if y.pk == wanted_year), None)
+    if year is None:
+        year = next((y for y in years if y.is_current), years[0] if years else None)
+
+    class_options: list = []
+    school_class = None
+    term_options: list = []
+    term = None
+    exam_options: list = []
+    exam = None
+    broadsheet = None
+
+    if year is not None:
+        class_options = list(
+            SchoolClass.objects.filter(academic_year=year).order_by(
+                "level_order", "name"
+            )
+        )
+        school_class = _pick(class_options, "class", request)
+
+    if school_class is not None:
+        term_options = list(Term.objects.filter(academic_year=year).order_by("name"))
+        wanted_term = _get_int(request, "term")
+        term = next((t for t in term_options if t.pk == wanted_term), None)
+        if term is None:
+            term = next(
+                (t for t in term_options if t.is_current),
+                term_options[0] if term_options else None,
+            )
+
+    if term is not None:
+        exam_options = services.ensure_exams_for_term(term)
+        exam = _pick(exam_options, "exam", request)
+
+    if school_class is not None and term is not None and exam is not None:
+        broadsheet = selectors.exam_broadsheet(
+            school_class=school_class, term=term, exam=exam
+        )
+
+    return {
+        "years": years,
+        "year": year,
+        "class_options": class_options,
+        "school_class": school_class,
+        "term_options": term_options,
+        "term": term,
+        "exam_options": exam_options,
+        "exam": exam,
+        "broadsheet": broadsheet,
+    }
+
+
 class ClassBroadsheetView(AdminRequiredMixin, TemplateView):
     """Admin: class broadsheet for one year + class + term + exam."""
 
     template_name = "features/results/broadsheet.html"
 
-    @staticmethod
-    def _get_int(request, key: str) -> int | None:
-        try:
-            return int(request.GET.get(key))
-        except (TypeError, ValueError):
-            return None
-
-    def _pick(self, options: list, key: str, request):
-        wanted = self._get_int(request, key)
-        for option in options:
-            if wanted is not None and option.pk == wanted:
-                return option
-        return options[0] if options else None
-
     def get_context_data(self, **kwargs):
-        from apps.academics.models import SchoolClass, Term
-
         ctx = super().get_context_data(**kwargs)
-        request = self.request
-
-        years = list(AcademicYear.objects.order_by("-start_date"))
-        wanted_year = self._get_int(request, "year")
-        year = next((y for y in years if y.pk == wanted_year), None)
-        if year is None:
-            year = next((y for y in years if y.is_current), years[0] if years else None)
-
-        class_options: list = []
-        school_class = None
-        term_options: list = []
-        term = None
-        exam_options: list = []
-        exam = None
-        broadsheet = None
-
-        if year is not None:
-            class_options = list(
-                SchoolClass.objects.filter(academic_year=year).order_by(
-                    "level_order", "name"
-                )
-            )
-            school_class = self._pick(class_options, "class", request)
-
-        if school_class is not None:
-            term_options = list(
-                Term.objects.filter(academic_year=year).order_by("name")
-            )
-            wanted_term = self._get_int(request, "term")
-            term = next((t for t in term_options if t.pk == wanted_term), None)
-            if term is None:
-                term = next(
-                    (t for t in term_options if t.is_current),
-                    term_options[0] if term_options else None,
-                )
-
-        if term is not None:
-            exam_options = services.ensure_exams_for_term(term)
-            exam = self._pick(exam_options, "exam", request)
-
-        if school_class is not None and term is not None and exam is not None:
-            broadsheet = selectors.exam_broadsheet(
-                school_class=school_class, term=term, exam=exam
-            )
-
+        scope = _resolve_broadsheet_scope(self.request)
         ctx.update(
             {
-                "years": years,
-                "selected_year": year,
-                "class_options": class_options,
-                "selected_class": school_class,
-                "term_options": term_options,
-                "selected_term": term,
-                "exam_options": exam_options,
-                "selected_exam": exam,
-                "broadsheet": broadsheet,
+                "years": scope["years"],
+                "selected_year": scope["year"],
+                "class_options": scope["class_options"],
+                "selected_class": scope["school_class"],
+                "term_options": scope["term_options"],
+                "selected_term": scope["term"],
+                "exam_options": scope["exam_options"],
+                "selected_exam": scope["exam"],
+                "broadsheet": scope["broadsheet"],
             }
         )
         return ctx
+
+
+class BroadsheetPdfView(AdminRequiredMixin, View):
+    """
+    Download the class broadsheet as a PDF, honouring the same filters as the
+    on-screen page. Landscape A4 with the school identity header, a topper
+    callout, the ranked table with positions, and the subject-means row.
+    """
+
+    def get(self, request, *args, **kwargs):
+        scope = _resolve_broadsheet_scope(request)
+        broadsheet = scope["broadsheet"]
+        if broadsheet is None:
+            messages.info(
+                request,
+                "Choose a year, class, term and exam with data before downloading.",
+            )
+            return redirect("results:broadsheet")
+
+        identity = selectors.result_identity(request=request)
+        ranked_students = sorted(
+            broadsheet["students"],
+            key=lambda row: (
+                row["position"] is None,
+                row["position"] or 0,
+                row["student"].admission_number,
+            ),
+        )
+        topper = next(
+            (row for row in ranked_students if row["position"] == 1), None
+        )
+
+        from django.template.loader import render_to_string
+
+        html = render_to_string(
+            "features/results/broadsheet_pdf.html",
+            {
+                "broadsheet": broadsheet,
+                "ranked_students": ranked_students,
+                "topper": topper,
+                "identity": identity,
+                "request": request,
+            },
+        )
+        from apps.core.pdf import pdf_response
+
+        slug = f"{broadsheet['school_class'].name}_{broadsheet['exam'].name}".replace(
+            " ", "_"
+        )
+        return pdf_response(
+            html=html,
+            filename=f"broadsheet_{slug}.pdf",
+            base_url=request.build_absolute_uri("/"),
+        )
 
 
 class ResultSheetDetailView(AdminRequiredMixin, TemplateView):

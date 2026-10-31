@@ -111,15 +111,25 @@
         ({{ broadsheet.progress.pct }}%)
       </span>
     </div>
-    <div class="text-end">
-      <div class="text-muted-sm">Class mean</div>
-      <div class="fw-600 fs-5">
-        {% if broadsheet.class_mean_pct is not None %}
-          {{ broadsheet.class_mean_pct|floatformat:1 }}%
-        {% else %}
-          —
-        {% endif %}
+    <div class="text-end d-flex align-items-center gap-3">
+      <div>
+        <div class="text-muted-sm">Class mean</div>
+        <div class="fw-600 fs-5">
+          {% if broadsheet.class_mean_pct is not None %}
+            {{ broadsheet.class_mean_pct|floatformat:1 }}%
+          {% else %}
+            —
+          {% endif %}
+        </div>
       </div>
+      {% if selected_year and selected_class and selected_term and selected_exam %}
+      <a
+        href="{% url 'results:broadsheet_pdf' %}?year={{ selected_year.pk }}&class={{ selected_class.pk }}&term={{ selected_term.pk }}&exam={{ selected_exam.pk }}"
+        class="btn btn-primary btn-sm"
+      >
+        <i class="bi bi-file-earmark-pdf me-1"></i>Download PDF
+      </a>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -145,6 +155,9 @@
             <th scope="col" class="text-center">Mean</th>
             <th scope="col" class="text-center">Grade</th>
             <th scope="col" class="text-center">Pos</th>
+            {% if broadsheet.status.tone == "success" %}
+            <th scope="col" class="text-center">Card</th>
+            {% endif %}
           </tr>
         </thead>
         <tbody>
@@ -171,6 +184,17 @@
             </td>
             <td class="text-center">{{ row.grade|default:"—" }}</td>
             <td class="text-center fw-600">{{ row.position|default:"—" }}</td>
+            {% if broadsheet.status.tone == "success" %}
+            <td class="text-center">
+              <a
+                href="{% url 'results:report_card_pdf' row.student.pk selected_term.pk %}"
+                class="btn btn-outline-secondary btn-sm py-0 px-1"
+                title="Download report card PDF for {{ row.student.user.full_name }}"
+              >
+                <i class="bi bi-file-earmark-pdf"></i>
+              </a>
+            </td>
+            {% endif %}
           </tr>
           {% endfor %}
         </tbody>
@@ -188,7 +212,11 @@
             <td class="text-center text-muted-sm">
               {% if broadsheet.class_mean_pct is not None %}{{ broadsheet.class_mean_pct|floatformat:1 }}{% else %}—{% endif %}
             </td>
+            {% if broadsheet.status.tone == "success" %}
+            <td colspan="3"></td>
+            {% else %}
             <td colspan="2"></td>
+            {% endif %}
           </tr>
         </tfoot>
       </table>
