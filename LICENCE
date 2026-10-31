@@ -1,0 +1,126 @@
+Proprietary License
+===================
+
+Copyright (c) 2026 Teklora Solutions
+https://teklora.co.ke/
+
+All rights reserved.
+
+Teklora Solutions is the sole owner and copyright holder of the Software described
+below and of every right in it. Enquiries, deployments and licences are handled by
+Teklora Solutions only (see "CONTACT AND LICENSING" at the end of this file).
+
+
+NO LICENSE IS GRANTED
+---------------------
+
+This repository, including all source code, templates, static assets, database
+migrations, documentation, scripts and sample data (the "Software"), is the
+exclusive property of Teklora Solutions, the copyright holder named above.
+
+Nothing in this repository, and nothing in any README, documentation file,
+comment or commit message, grants you any right to the Software. In particular,
+you have NO right to:
+
+  1. copy, reproduce or archive the Software, except as described below;
+  2. modify, adapt, translate or create derivative works from the Software;
+  3. publish, distribute, sublicense, lease, lend or otherwise make the
+     Software available to any third party;
+  4. sell, resell, host as a service, monetise or commercially exploit the
+     Software or any part of it;
+  5. reverse engineer, decompile or disassemble the Software, or attempt to
+     derive its source code from an executable or hosted deployment, except to
+     the extent that applicable law forbids this restriction;
+  6. remove, obscure or alter any copyright, attribution or licence notice.
+
+Access to this repository for the purpose of operating, maintaining or developing
+the Software under an explicit written agreement with Teklora Solutions is
+permitted. That agreement — not this file — defines what you may do, for how long,
+and on what terms. Where a written agreement and this file conflict, the written
+agreement prevails.
+
+
+SCHOOL USE
+----------
+
+A school that has been granted a deployment licence by Teklora Solutions may
+install and run the Software for its own internal administration only. This does
+not permit redistribution to other schools, branches or affiliates unless the
+written agreement says so. It does not permit removing the school's own branding,
+logo or copyright notices from reports, receipts or the public website, and it
+does not permit removing the attribution to Teklora Solutions.
+
+
+DATA AND PRIVACY
+----------------
+
+The Software is designed to hold personal data about identified children, their
+guardians, and staff, together with financial records. Whoever deploys it is the
+data controller and is solely responsible for:
+
+  - lawfulness, purpose limitation and retention of the data it holds;
+  - the confidentiality of `backend/db.sqlite3` (or the production database),
+    `backend/media/`, `.env`, and every `db.sqlite3.bak-*` snapshot;
+  - changing or deleting the seeded demo accounts and their documented
+    passwords (`REMOVED-DEMO-PASSWORD`, `REMOVED-DEMO-PASSWORD`, `REMOVED-DEMO-PASSWORD`, `REMOVED-DEMO-PASSWORD`,
+    `REMOVED-DEMO-PASSWORD`, `REMOVED-DEMO-PASSWORD`) before any real or public deployment;
+  - backups, restore drills and breach notification.
+
+Teklora Solutions accepts no liability for data loss, disclosure or regulatory
+consequences arising from a deployment.
+
+
+THIRD-PARTY COMPONENTS
+----------------------
+
+The Software is built on components licensed separately, which remain governed by
+their own terms. They are not re-licensed by this file.
+
+  Component                                   Licence
+  ------------------------------------------- ------------------------------------
+  Django                                      Three-Clause BSD Licence
+  Django REST framework                       Apache Licence 2.0 / BSD (per release)
+  djangorestframework, django-environ,
+  django-axes, django-q2, whitenoise          BSD / Apache 2.0 (see each project)
+  Pillow                                      MIT-CMU Licence
+  WeasyPrint                                  GNU LGPL 3.0
+  xhtml2pdf, reportlab (transitive)           MIT / BSD-style, LGPL components
+  openpyxl, pandas, python-dateutil           MIT / BSD-style
+  python-json-logger                          BSD 3-Clause
+  sentry-sdk                                  MIT Licence
+  psycopg2-binary                             LGPL 3.0 / GCC Exception
+  gunicorn                                    MIT Licence
+  Bootstrap 5.3.3 (vendored)                  MIT Licence
+  Bootstrap Icons 1.11.3 (vendored)           MIT Licence (fonts: SIL OFL 1.1)
+  Chart.js 4.4.4 (vendored)                   MIT Licence
+  Inter, Plus Jakarta Sans (Google Fonts)     SIL Open Font Licence 1.1
+
+Binaries under `frontend/static/vendor/` are unmodified copies of their upstream
+release, retained for offline operation. Their licence texts must accompany any
+redistribution that the written agreement permits.
+
+
+NO WARRANTY
+-----------
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, ACCURACY OF COMPUTED FIGURES, AND NON-INFRINGEMENT.
+
+The Software computes financial and academic records. Verification of any figure
+produced by it — balances, receipts, grades, positions, transcripts — against the
+issuer's own records remains the operator's responsibility. Teklora Solutions is
+not liable for any loss, damage or claim arising from its use or inability to use
+it, including decisions made on reports it produced.
+
+
+CONTACT AND LICENSING
+---------------------
+
+Requests for a deployment licence, a source-licence, a modification right, support,
+or the removal of any part of these terms, should be addressed in writing to:
+
+  Teklora Solutions
+  https://teklora.co.ke/
+
+Version: 1.1 — 2026-10-31

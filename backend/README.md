@@ -380,8 +380,10 @@ closed-period or backdated postings.
 `Adjustment` (discount/scholarship/waiver/write_off/other against a student, optionally one invoice;
 status pending/posted/rejected — pending holds no ledger line, and `AdjustmentQuerySet.live()` = POSTED
 so a pending write-off never lowers a balance). `Vendor` (deliberately not a User). `Expense` (account,
-vendor or payee name, sequenced reference, pending/posted/rejected, `paid_via` cash/bank, always credits
-`1000` Cash). `Budget` (one number per term+expense account; variance is never stored — it is journal
+vendor or payee name, sequenced reference, pending/posted/rejected, and `paid_via` — `cash` or `bank`,
+and the credit side follows the claim: `BANK` credits `1010` Bank, `CASH` credits `1000` Cash, chosen by
+`_post_expense_entry` and never defaulted; `test_postings.py:275` walks every `PaymentVia` value).
+`Budget` (one number per term+expense account; variance is never stored — it is journal
 debits minus this number).
 
 `FinancialPeriod` (term or month, open/closed, created lazily; a posting date is checked against
@@ -424,11 +426,14 @@ the pupil's **current** class. Two deliberately **unmerged** bases exist: alloca
 Any screen showing one must name its basis.
 
 ### Known finance gaps
-No refunds · no manual-journal UI · no bank-paid expenses · `Invoice.Status.CANCELLED` exists but no
-flow writes it · invoice-less adjustments are invisible to fee totals ·
+No refunds · no manual-journal UI · `Invoice.Status.CANCELLED` exists but no
+flow writes it · invoice-less adjustments are invisible to fee totals · **late fees are computed but go
+nowhere** — `selectors.late_fee_proposals` (`apps/finance/selectors.py:1671`) builds the rows and the
+`late_fees_enabled` help text (`models.py:1664`) says so itself ("nothing is posted automatically"), but
+no view, template or service consumes it: the only callers are tests and the `interface` re-export ·
 `Invoice.due_date` is only ever as good as the fee items it was billed from — `FeeItem.due_date` is
 optional, and when the items are blank the invoice header **and every line** are `null`, so aging and
-the late-fee preview fall back to `issued_date` (`due_date or issued_date`,
+the late-fee proposal fall back to `issued_date` (`due_date or issued_date`,
 `apps/finance/selectors.py:1707`). In the seeded demo database 0 of 120 invoices carry a due date ·
 overpayment stays unallocated while the journal credits the full
 amount · **re-billing after revising a fee structure doubles `billed`** · fee reminders ignore the
