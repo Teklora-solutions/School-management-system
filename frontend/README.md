@@ -291,5 +291,3 @@ needed locally**. Run `python manage.py collectstatic` only for deployment — i
 - `../school-website/` is an unreferenced static mockup of a different school ("Springfield Academy")
   kept for design reference. It is not served and nothing imports it; the live public site is
   `templates/public/` + `public_new.css`.
-- `../nova-cash/` is an unrelated Next.js demo app with its own toolchain. Nothing in this folder talks
-  to it.

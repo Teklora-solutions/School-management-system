@@ -8,8 +8,13 @@ No Docker, no JS build step, no managed services required — it runs on one sma
 
 - **Backend:** `backend/` — Django project (`config/`) + 12 local apps (`backend/apps/`) → [backend/README.md](backend/README.md)
 - **Frontend:** `frontend/` — Django templates + static assets (no SPA) → [frontend/README.md](frontend/README.md)
+- **Planning and history:** [ROADMAP.md](ROADMAP.md) (the working queue) · [CHANGELOG.md](CHANGELOG.md) (dated history)
+- **Licence:** [LICENCE](LICENCE) — proprietary, all rights reserved. Owned by
+  **Teklora Solutions** ([https://teklora.co.ke/](https://teklora.co.ke/))
 - **Deeper reference:** [docs/SYSTEM_GUIDE.md](docs/SYSTEM_GUIDE.md) (architecture handbook),
   [docs/performance.md](docs/performance.md), [docs/decisions/observability.md](docs/decisions/observability.md)
+  — note the guide has drifted from the tree in several places; see [CHANGELOG.md](CHANGELOG.md) for the
+  corrected claims
 
 ---
 
@@ -461,13 +466,15 @@ Stated plainly, because they will bite someone:
   streams and subjects are create-only (years have detail / delete / set-current, terms have edit /
   set-current); class-subjects can be removed but not edited. Fixes go through `/django-admin/`, which
   registers only academics and accounts.
-- **Finance edges:** no refunds, no manual-journal UI, no bank-paid expenses (expenses always credit
-  the Cash account), and `Invoice.Status.CANCELLED` exists but no flow ever writes it. Invoice-less
-  adjustments are invisible to fee totals. An invoice's deadline is only as good as the fee items it was
-  billed from: `FeeItem.due_date` is optional, and where the items are blank the invoice and all its
-  lines are `null`, so aging falls back to `issued_date` (0 of 120 invoices in the seeded demo DB carry a
-  due date). Overpayment is deliberately left unallocated while the journal credits the full
-  amount. **Re-billing after revising a fee structure doubles `billed`.**
+- **Finance edges:** no refunds, no manual-journal UI, and `Invoice.Status.CANCELLED` exists but no
+  flow ever writes it. Expenses do honour `paid_via` — a bank-paid claim credits `1010` Bank, a cash one
+  credits `1000` Cash (`_post_expense_entry` in `backend/apps/finance/services.py:2627`) — but **late fees
+  stop at proposals**: `selectors.late_fee_proposals` computes them from `FinanceSettings` and nothing
+  posts or displays them. Invoice-less adjustments are invisible to fee totals. An invoice's deadline is
+  only as good as the fee items it was billed from: `FeeItem.due_date` is optional, and where the items
+  are blank the invoice and all its lines are `null`, so aging falls back to `issued_date` (0 of 120
+  invoices in the seeded demo DB carry a due date). Overpayment is deliberately left unallocated while
+  the journal credits the full amount. **Re-billing after revising a fee structure doubles `billed`.**
 - **Fee reminders broadcast to every student/parent** regardless of the selection —
   `apps/finance/tasks.py` ignores `student_ids`.
 - **The `fees` feature switch is partial, by design.** `SchoolSettings.fees_enabled`, read through
@@ -523,22 +530,23 @@ school-management-system/
 │
 ├── samples/                  # pre-generated import fixtures (.xlsx)
 ├── school-website/           # static "Springfield Academy" design prototype; unreferenced by the app
-├── nova-cash/                # unrelated Next.js instant-loan demo — see its own README
 ├── locustfile.py             # load test; credentials must match the seeder
 ├── ruff.toml                 # line-length 88, target py313
+├── ROADMAP.md                # the working queue: Now / Next / Later, deferred defects, quality backlog
+├── CHANGELOG.md              # dated history: what shipped, what was verified, what was corrected
+├── LICENCE                   # proprietary — owned by Teklora Solutions, all rights reserved
 ├── .env.example              # tracked; copy to .env
 └── .gitignore
 ```
 
-### Two directories that are not part of the school system
-- **`nova-cash/`** is an independent Next.js 16.4.3 / React 19.3.0 demo of an instant-loan product
-  (Tailwind v4, ESLint 9, Vitest with 66 tests). It shares nothing with this project — no API, no
-  database (it keeps its own `nova-cash/data/novacash.db` and a JSON ledger), no code. Run it with
-  `cd nova-cash && npm install && cp .env.example .env.local && npm run dev` → http://localhost:3000.
-  Its demo mode works with zero credentials. Do not edit the Django app to "fix NovaCash".
+### The directory that is not part of the school system
 - **`school-website/`** is a hand-written static mockup kept for design reference. Nothing in
   `backend/`, `frontend/` or `docs/` references it. The live public site is `apps/public` plus
-  `frontend/templates/public/` and `static/css/public_new.css`.
+  `frontend/templates/public/` and `static/css/public_new.css`. Whether to delete it or adopt it as a
+  design reference is open — [ROADMAP.md](ROADMAP.md) · Q-4.
+
+A Next.js instant-loan demo (`nova-cash/`) briefly shared this repository and was removed on 2026-10-31;
+it never contributed code, data or routes to the school system.
 
 ---
 
@@ -590,7 +598,8 @@ Chart-of-accounts changes ship as a new migration plus a test that keeps `chart_
 sync with it.
 
 ### Git
-The repository is git-tracked (520+ files). `db.sqlite3*`, `media/`, `staticfiles/`, `.env` and
+The repository is git-tracked — 493 files as of 2026-10-31, across four commits (`9ad7f9c` baseline,
+`85bdbf6`, `c7b8700`, `29d953b`), no tags yet. `db.sqlite3*`, `media/`, `staticfiles/`, `.env` and
 `node_modules/` are ignored — so the working database you seed is **not** under version control and
 tests are the only safety net for behaviour. Keep `git status` clean before a checkpoint and expect
 `makemigrations --check` to be part of review.
