@@ -12,8 +12,8 @@ x-app-environment: &app-environment
   ALLOWED_HOSTS: ${PUBLIC_HOSTNAME:?Set PUBLIC_HOSTNAME in .env},localhost,127.0.0.1
   CSRF_TRUSTED_ORIGINS: https://${PUBLIC_HOSTNAME}
   # Production settings read the raw password separately (no URL escaping needed).
-  DATABASE_URL: postgres://${APP_DB_USER:-school}@db:5432/${POSTGRES_DB:-school}
-  APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+  DATABASE_URL: postgres://${POSTGRES_USER:?Set POSTGRES_USER in .env}@db:5432/school
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set your own POSTGRES_PASSWORD in .env}
   CACHE_URL: redis://redis:6379/1
   MEDIA_ROOT: /data/media
   STATIC_ROOT: /data/static
@@ -58,22 +58,14 @@ services:
     image: postgres:17-bookworm
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-school}
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      APP_DB_USER: ${APP_DB_USER:-school}
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+      POSTGRES_DB: school
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set your own POSTGRES_PASSWORD in .env}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - type: bind
         source: ./data/postgres
         target: /var/lib/postgresql/data
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ./deploy/postgres-init.sh
-        target: /docker-entrypoint-initdb.d/01-app-role.sh
-        read_only: true
         bind:
           create_host_path: false
     healthcheck:

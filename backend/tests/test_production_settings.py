@@ -13,7 +13,7 @@ class ProductionSettingsTests(SimpleTestCase):
             os.environ,
             SECRET_KEY="deployment-settings-test-only",
             DATABASE_URL="postgres://school@db:5432/school",
-            APP_DB_PASSWORD="raw@password:with/reserved#characters",
+            POSTGRES_PASSWORD="raw@password:with/reserved#characters",
             ALLOWED_HOSTS="school.example.com",
             CSRF_TRUSTED_ORIGINS="https://school.example.com",
             MEDIA_ROOT="/data/media",
@@ -24,7 +24,7 @@ class ProductionSettingsTests(SimpleTestCase):
 import os
 from pathlib import Path
 from config.settings import prod
-assert prod.DATABASES['default']['PASSWORD'] == os.environ['APP_DB_PASSWORD']
+assert prod.DATABASES['default']['PASSWORD'] == os.environ['POSTGRES_PASSWORD']
 assert prod.DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql'
 assert prod.MEDIA_ROOT == Path('/data/media')
 assert prod.STATIC_ROOT == Path('/data/static')

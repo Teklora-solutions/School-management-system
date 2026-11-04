@@ -15,7 +15,9 @@ There are **no published host ports**, host networking, or router port forwards.
 internal network; app/worker have separate outbound access for SMTP/integrations.
 Nginx bridges the backend and tunnel networks. Cloudflared cannot reach the DB.
 
-PostgreSQL 17 uses a separate non-superuser application database owner. Redis
+PostgreSQL 17 uses the username and password you supply. As with the standard
+PostgreSQL image, this is the bootstrap database owner (a PostgreSQL superuser on
+fresh initialization), so keep the database on its private network. Redis
 shares the cache; Django-Q retains its PostgreSQL ORM broker. One `app-init` job
 runs migrations and collects static assets before app/worker start. Gunicorn and
 Django-Q run as UID/GID 10001. The build-only uv installer is not in the runtime;
@@ -34,12 +36,10 @@ The script:
 
 - Creates `data/` as your user, with mode 0700, before Docker is invoked.
 - Creates every data bind-mount source directory on the host.
-- Creates root **`.env`** from **`.env.example`**, generates placeholder secrets,
-  and sets its permissions to 0600.
-- Preserves existing `.env` values and adds missing configuration keys. For an
-  older installation, missing values are imported from `data/compose.env` so
-  existing PostgreSQL passwords are **not** regenerated. That old file is left
-  untouched as an ignored backup; Compose no longer uses it.
+- Creates root **`.env`** from **`.env.example`**, generates only the Django
+  secret, and sets its permissions to 0600.
+- Preserves existing `.env` values and adds missing configuration keys. Database
+  passwords are never generated, imported, replaced or rotated by setup.
 - Creates an empty `data/secrets/cloudflared-token` if missing.
 - Refuses to run as root or use a top-level `data/` owned by another UID.
 - Never imports, deletes or modifies the old `backend/db.sqlite3` database.
@@ -75,28 +75,26 @@ Edit root `.env`:
 
 ```dotenv
 PUBLIC_HOSTNAME=school.your-domain.com
+POSTGRES_USER=school
+POSTGRES_PASSWORD=your-chosen-password
 ```
 
 Use only a hostname (no scheme/path/port).
 
 **Do not write a database URL or Redis URL. Both services are included.**
-Compose automatically connects Django to PostgreSQL at `db:5432` and Redis at
-`redis:6379/1`. Before the first startup, you can choose the application login:
+Compose automatically connects Django to PostgreSQL at `db:5432` (database
+`school`) and Redis at `redis:6379/1`. **The only database fields are
+`POSTGRES_USER` and `POSTGRES_PASSWORD`.** Enter your own password; setup never
+generates one. Compose refuses to start with a blank username or password.
+Keep usernames to simple letters, digits and underscores.
 
-```dotenv
-APP_DB_USER=school
-APP_DB_PASSWORD=your-strong-password
-```
+If the database is already initialized, use its current login credentials unless
+you also rotate the actual PostgreSQL role password (see below). Earlier versions
+of this deployment used a separate application login: use that existing role and
+its password in these two fields. This configuration change does not alter roles
+or reset existing data. Do not delete `data/` to switch configuration.
 
-The initializer generates the password if you leave its placeholder. Normally
-leave `POSTGRES_DB=school` unchanged. `POSTGRES_PASSWORD` is a separate,
-auto-generated administrator secret; you do not need to set it manually and
-Django never receives it. Keep DB/user names to simple letters, digits and
-underscores. Do not use `postgres` as `APP_DB_USER`.
-
-If the database is already initialized, keep its current credentials unless you
-also rotate the actual PostgreSQL role password (see below). Configure SMTP if
-sending real email; the default console backend only logs messages.
+Configure SMTP if sending real email; the default console backend only logs messages.
 
 Docker Compose automatically reads root `.env`: **no `--env-file` is needed**.
 Compose explicitly uses PostgreSQL, Redis and Django production settings, ignoring
