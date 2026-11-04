@@ -9,11 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSIGNMENT = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
-PLACEHOLDERS = {
-    "SECRET_KEY": "GENERATE_DJANGO_SECRET",
-    "POSTGRES_PASSWORD": "GENERATE_ADMIN_PASSWORD",
-    "APP_DB_PASSWORD": "GENERATE_DATABASE_PASSWORD",
-}
+PLACEHOLDERS = {"SECRET_KEY": "GENERATE_DJANGO_SECRET"}
 
 
 def assignments(content):
@@ -34,20 +30,13 @@ def prepare_environment():
     example = (ROOT / ".env.example").read_text()
     defaults = assignments(example)
 
-    # One-time compatibility with the earlier deployment layout. Import missing
-    # values instead of generating new passwords for an already initialized DB.
-    legacy_path = ROOT / "data/compose.env"
-    legacy = assignments(legacy_path.read_text()) if legacy_path.is_file() else {}
     if original:
-        additions = [f"{key}={legacy.get(key, value)}" for key, value in defaults.items() if key not in existing]
+        additions = [f"{key}={value}" for key, value in defaults.items() if key not in existing]
         content = original
         if additions:
             content = content.rstrip("\n") + "\n\n# Added by scripts/init_docker.py\n" + "\n".join(additions) + "\n"
     else:
         content = example
-        for key, value in defaults.items():
-            if key in legacy:
-                content = content.replace(f"{key}={value}\n", f"{key}={legacy[key]}\n")
 
     lines = []
     for line in content.splitlines(keepends=True):
@@ -96,7 +85,8 @@ def main():
     else:
         print("Kept existing cloudflared token file unchanged.")
 
-    print("Set PUBLIC_HOSTNAME in .env, then run: docker compose up -d --build")
+    print("Set PUBLIC_HOSTNAME, POSTGRES_USER and your own POSTGRES_PASSWORD in .env.")
+    print("Then run: docker compose up -d --build")
     print("No database was modified and no tunnel was connected.")
 
 
