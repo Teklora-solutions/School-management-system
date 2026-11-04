@@ -189,7 +189,7 @@ services:
     logging: *logging
 
   cloudflared:
-    image: cloudflare/cloudflared:2026.10.0
+    image: cloudflare/cloudflared:2026.10.7
     command: [tunnel, --no-autoupdate, run, --token-file, /run/secrets/cloudflared_token]
     restart: unless-stopped
     secrets:
