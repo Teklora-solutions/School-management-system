@@ -8,13 +8,13 @@
   <div class="pub-hero__overlay"></div>
   <div class="pub-container">
     <div data-reveal style="max-width:700px">
-      <span class="pub-hero__badge">&#127903; {% if overview.year %}{{ overview.year.name }}{% else %}2026/2027 Admissions Open{% endif %}</span>
+      <span class="pub-hero__badge"><i class="bi bi-ticket-perforated" aria-hidden="true"></i> {% if overview.year %}{{ overview.year.name }}{% else %}2026/2027 Admissions Open{% endif %}</span>
       <p class="pub-eyebrow">Academics</p>
       <h1 class="pub-hero__title">Learning That <span>Lasts a Lifetime</span></h1>
       <p class="pub-hero__text">From our play-based Early Years to our rigorous Secondary programme, every stage is designed to build knowledge, confidence and a genuine love of learning.</p>
       <div class="pub-hero__actions">
-        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">&#9999; Apply Now</a>
-        <a href="#programs" class="pub-btn pub-btn--outline pub-btn--lg">&#128218; Explore Programs</a>
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg"><i class="bi bi-pencil" aria-hidden="true"></i> Apply Now</a>
+        <a href="#programs" class="pub-btn pub-btn--outline pub-btn--lg"><i class="bi bi-book" aria-hidden="true"></i> Explore Programs</a>
       </div>
       <div class="pub-hero__cards">
         <div class="pub-hero__mini-card"><strong>3</strong><span>Programme Levels</span></div>
@@ -40,23 +40,23 @@
     </div>
     <div class="pub-tab-panel is-active" data-panel="early">
       <div class="pub-grid pub-grid--3">
-        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon">&#127979;</div><h3>Play-Based Learning</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Structured play develops language, motor skills and social-emotional foundations.</p></div></div>
-        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--teal">&#127909;</div><h3>Creative Arts</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Music, art and storytelling every day — imagination is the first step to understanding.</p></div></div>
-        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--rose">&#129490;</div><h3>Outdoor Discovery</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Our garden and outdoor classroom give children space to explore nature and build resilience.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon"><i class="bi bi-building" aria-hidden="true"></i></div><h3>Play-Based Learning</h3><p class="pub-card__description">Structured play develops language, motor skills and social-emotional foundations.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--teal"><i class="bi bi-palette" aria-hidden="true"></i></div><h3>Creative Arts</h3><p class="pub-card__description">Music, art and storytelling every day — imagination is the first step to understanding.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--rose"><i class="bi bi-compass" aria-hidden="true"></i></div><h3>Outdoor Discovery</h3><p class="pub-card__description">Our garden and outdoor classroom give children space to explore nature and build resilience.</p></div></div>
       </div>
     </div>
     <div class="pub-tab-panel" data-panel="primary">
       <div class="pub-grid pub-grid--3">
-        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon">&#128218;</div><h3>Strong Foundations</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Literacy, numeracy and inquiry-based science lay the groundwork for independent learners.</p></div></div>
-        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--purple">&#129504;</div><h3>Specialist Subjects</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">French, ICT, music and PE are taught by specialist teachers from Grade 1 onwards.</p></div></div>
-        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--teal">&#127941;</div><h3>Sports &amp; Clubs</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Football, swimming, chess, coding, drama — every child finds something they love.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon"><i class="bi bi-book" aria-hidden="true"></i></div><h3>Strong Foundations</h3><p class="pub-card__description">Literacy, numeracy and inquiry-based science lay the groundwork for independent learners.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--purple"><i class="bi bi-lightbulb" aria-hidden="true"></i></div><h3>Specialist Subjects</h3><p class="pub-card__description">French, ICT, music and PE are taught by specialist teachers from Grade 1 onwards.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--teal"><i class="bi bi-award" aria-hidden="true"></i></div><h3>Sports &amp; Clubs</h3><p class="pub-card__description">Football, swimming, chess, coding, drama — every child finds something they love.</p></div></div>
       </div>
     </div>
     <div class="pub-tab-panel" data-panel="secondary">
       <div class="pub-grid pub-grid--3">
-        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon">&#128300;</div><h3>Exam-Track Academics</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Rigorous preparation for BECE and WASSCE with small classes and specialist labs.</p></div></div>
-        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--rose">&#128187;</div><h3>Technology &amp; Innovation</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Robotics, coding and a makerspace prepare students for careers that don't exist yet.</p></div></div>
-        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--teal">&#127891;</div><h3>University Guidance</h3><p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">One-on-one counselling, career fairs and application support from Grade 10.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon"><i class="bi bi-eyedropper" aria-hidden="true"></i></div><h3>Exam-Track Academics</h3><p class="pub-card__description">Rigorous preparation for BECE and WASSCE with small classes and specialist labs.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--rose"><i class="bi bi-laptop" aria-hidden="true"></i></div><h3>Technology &amp; Innovation</h3><p class="pub-card__description">Robotics, coding and a makerspace prepare students for careers that don't exist yet.</p></div></div>
+        <div class="pub-card"><div class="pub-card__body"><div class="pub-card__icon pub-card__icon--teal"><i class="bi bi-mortarboard" aria-hidden="true"></i></div><h3>University Guidance</h3><p class="pub-card__description">One-on-one counselling, career fairs and application support from Grade 10.</p></div></div>
       </div>
     </div>
   </div>
@@ -77,7 +77,7 @@
         <div class="pub-card__body">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
             <h3>{{ term.get_name_display }}</h3>
-            {% if term.is_current %}<span style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--pub-success);background:rgba(16,185,129,.13);border:1px solid rgba(16,185,129,.35);padding:.25rem .6rem;border-radius:99px">&#128308; Now</span>{% endif %}
+            {% if term.is_current %}<span style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--pub-success);background:rgba(16,185,129,.13);border:1px solid rgba(16,185,129,.35);padding:.25rem .6rem;border-radius:99px"><i class="bi bi-circle-fill" aria-hidden="true"></i> Now</span>{% endif %}
           </div>
           <p style="color:var(--pub-text-muted);font-size:.85rem">{{ term.start_date|date:"j M Y" }} &ndash; {{ term.end_date|date:"j M Y" }}</p>
         </div>

@@ -258,7 +258,7 @@
 {# ── Outstanding note ──────────────────────────────────────────────────── #}
 {% if summary.outstanding > 0 %}
 <p style="font-size:9.5pt;color:#92400e;margin-top:-6px;margin-bottom:16px;">
-  ⚠ Outstanding balance of {{ currency }} {{ summary.outstanding|floatformat:2 }} remains uncollected.
+  Warning: Outstanding balance of {{ currency }} {{ summary.outstanding|floatformat:2 }} remains uncollected.
 </p>
 {% endif %}
 

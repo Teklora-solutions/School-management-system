@@ -6,7 +6,7 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">
-    <i class="bi bi-shield-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    <i class="bi bi-shield-fill me-2 text-accent" aria-hidden="true"></i>
     School Administration Panel
   </h1>
   <p class="page-subtitle">Manage the entire school from one place.</p>
@@ -61,7 +61,7 @@
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h2 class="card-title mb-0">
-          <i class="bi bi-cash-stack me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          <i class="bi bi-cash-stack me-2 text-accent" aria-hidden="true"></i>
           Fees — {{ current_term.get_name_display }} · {{ current_term.academic_year.name }}
         </h2>
         <span class="text-muted-sm">{{ current_term.start_date|date:"M j" }} – {{ current_term.end_date|date:"M j, Y" }}</span>
@@ -70,9 +70,9 @@
         <div class="row g-3">
           <div class="col-sm-4">
             <div class="stat-card">
-              <div class="stat-icon" style="color:var(--color-success);"><i class="bi bi-cash-coin" aria-hidden="true"></i></div>
+              <div class="stat-icon status-success"><i class="bi bi-cash-coin" aria-hidden="true"></i></div>
               <div class="stat-body">
-                <div class="stat-value" style="font-size:1.1rem;color:var(--color-success);">
+                <div class="stat-value stat-value--compact status-success">
                   {{ currency }} {{ fees_collected|floatformat:2|intcomma }}
                 </div>
                 <div class="stat-label">Collected this term</div>
@@ -81,9 +81,9 @@
           </div>
           <div class="col-sm-4">
             <div class="stat-card">
-              <div class="stat-icon" style="color:var(--color-warning);"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
+              <div class="stat-icon status-warning"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
               <div class="stat-body">
-                <div class="stat-value" style="font-size:1.1rem;color:var(--color-warning);">
+                <div class="stat-value stat-value--compact status-warning">
                   {{ currency }} {{ fees_outstanding|floatformat:2|intcomma }}
                 </div>
                 <div class="stat-label">Outstanding on posted invoices</div>
@@ -94,7 +94,7 @@
             <div class="stat-card">
               <div class="stat-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></div>
               <div class="stat-body">
-                <div class="stat-value" style="font-size:1.1rem;">
+                <div class="stat-value stat-value--compact">
                   {{ currency }} {{ fees_collected_today|floatformat:2|intcomma }}
                 </div>
                 <div class="stat-label">Collected today</div>
@@ -125,7 +125,7 @@
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">
-          <i class="bi bi-lightning-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          <i class="bi bi-lightning-fill me-2 text-accent" aria-hidden="true"></i>
           Quick Actions
         </h2>
       </div>
@@ -164,7 +164,7 @@
     <div class="card h-100">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h2 class="card-title mb-0">
-          <i class="bi bi-megaphone-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          <i class="bi bi-megaphone-fill me-2 text-accent" aria-hidden="true"></i>
           Recent Announcements
         </h2>
         <a href="{% url 'communications:list' %}" class="btn btn-sm btn-outline-secondary">View all</a>
@@ -193,7 +193,7 @@
     <div class="card h-100">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h2 class="card-title mb-0">
-          <i class="bi bi-clipboard-data me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          <i class="bi bi-clipboard-data me-2 text-accent" aria-hidden="true"></i>
           Recent Audit Events
         </h2>
         <a href="{% url 'core:audit_log' %}" class="btn btn-sm btn-outline-secondary">Audit log</a>

@@ -78,6 +78,33 @@ fonts offline — and it is **shrink-only** (a test asserts every listed entry i
 
 ---
 
+### Styling and icon conventions
+
+- Keep the portal and public-site themes separate: `base.css` owns portal styles;
+  `public_new.css` owns public styles (prefixed `pub-`). Both use the locally
+  vendored Bootstrap Icons stylesheet. The public site does not load Bootstrap CSS.
+- Put static presentation in CSS classes. Shared shell details (user menu, toast
+  messages and pagination) belong to their component classes; public card copy,
+  contact details and event dates have reusable `pub-*` classes.
+- Keep truly dynamic values, such as a data-driven progress width, inline. Do not
+  replace them with a class for every possible value.
+- Use Bootstrap Icons, not emoji or text approximations. For an icon alongside
+  visible text: `<i class="bi bi-book" aria-hidden="true"></i>`. For icon-only
+  controls, put an accessible `aria-label` on the button or link. A meaningful
+  status without visible text also needs a visually hidden label.
+- Choose icons that actually exist in the vendored **1.11.3** font. Do not assume
+  an icon from the latest upstream release is available locally.
+- Theme-toggle JavaScript changes the icon class and accessible label, not the
+  button's text content. PDF-only reports use explicit text (such as `Warning:`)
+  rather than relying on a browser icon font.
+
+The initial cleanup covers the shared shells, admin home, public home and common
+public components. Other feature pages still contain legacy inline styles; migrate
+those component-by-component rather than applying broad CSS overrides. The
+unreferenced `school-website/` mockup is not the running Django public site.
+
+Regression checks: `tests.test_styling_contract` and `tests.test_static_assets`.
+
 ## 3. The app shell
 
 `templates/base.html` lays out a CSS grid: a 260px sidebar × 64px navbar over the main column.
