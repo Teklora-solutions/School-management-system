@@ -1,0 +1,225 @@
+name: school-management
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-environment: &app-environment
+  DJANGO_SETTINGS_MODULE: config.settings.prod
+  SECRET_KEY: ${SECRET_KEY:?Run python3 scripts/init_docker.py to prepare .env and data/}
+  ALLOWED_HOSTS: ${PUBLIC_HOSTNAME:?Set PUBLIC_HOSTNAME in .env},localhost,127.0.0.1
+  CSRF_TRUSTED_ORIGINS: https://${PUBLIC_HOSTNAME}
+  # Production settings read the raw password separately (no URL escaping needed).
+  DATABASE_URL: postgres://${APP_DB_USER:-school}@db:5432/${POSTGRES_DB:-school}
+  APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+  CACHE_URL: redis://redis:6379/1
+  MEDIA_ROOT: /data/media
+  STATIC_ROOT: /data/static
+  LOG_FORMAT: json
+  EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+  EMAIL_HOST: ${EMAIL_HOST:-localhost}
+  EMAIL_PORT: ${EMAIL_PORT:-25}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-False}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@school.example.com}
+
+x-app: &app
+  image: school-management-app:local
+  build: .
+  environment: *app-environment
+  restart: unless-stopped
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=256m,mode=1777
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  logging: *logging
+  volumes:
+    - type: bind
+      source: ./data/media
+      target: /data/media
+      bind:
+        create_host_path: false
+    - type: bind
+      source: ./data/static
+      target: /data/static
+      read_only: true
+      bind:
+        create_host_path: false
+  networks: [backend, egress]
+
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-school}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      APP_DB_USER: ${APP_DB_USER:-school}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - type: bind
+        source: ./data/postgres
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./deploy/postgres-init.sh
+        target: /docker-entrypoint-initdb.d/01-app-role.sh
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [backend]
+    logging: *logging
+
+  redis:
+    image: redis:7.4-alpine
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec]
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ./data/redis
+        target: /data
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+    logging: *logging
+
+  # Migrations and collectstatic run once, not concurrently in web/worker startup.
+  app-init:
+    <<: *app
+    user: "0:0"
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE]
+    restart: "no"
+    command: [sh, -c, "python manage.py migrate --noinput && python manage.py collectstatic --noinput"]
+    volumes:
+      - type: bind
+        source: ./data/media
+        target: /data/media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./data/static
+        target: /data/static
+        bind:
+          create_host_path: false
+    networks: [backend]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  app:
+    <<: *app
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz/', headers={'Host':'localhost','X-Forwarded-Proto':'https'}); urllib.request.urlopen(r, timeout=5)"
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    <<: *app
+    command: [python, manage.py, qcluster]
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    volumes:
+      - type: bind
+        source: ./deploy/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./data/static
+        target: /srv/static
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./data/media
+        target: /srv/media
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/healthz/]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [backend, tunnel]
+    logging: *logging
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.0
+    command: [tunnel, --no-autoupdate, run, --token-file, /run/secrets/cloudflared_token]
+    restart: unless-stopped
+    secrets:
+      - cloudflared_token
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    depends_on:
+      web:
+        condition: service_healthy
+    networks: [tunnel]
+    logging: *logging
+
+# Intentionally no ports: entries anywhere. Only cloudflared provides ingress.
+networks:
+  backend:
+    internal: true
+  # App/worker need outbound connections for SMTP and integrations.
+  egress:
+  tunnel:
+
+secrets:
+  cloudflared_token:
+    file: ./data/secrets/cloudflared-token

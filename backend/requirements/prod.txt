@@ -3,6 +3,12 @@
 # Production database
 psycopg2-binary>=2.9,<3.0
 
+# Django's built-in Redis cache backend (shared by all web workers)
+redis>=5.0,<6.0
+
+# WeasyPrint 62 uses the pydyf 0.10 API; newer pydyf breaks PDF exports.
+pydyf>=0.10,<0.11
+
 # Sentry
 sentry-sdk[django]>=2.7,<3.0
 
