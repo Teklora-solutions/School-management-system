@@ -652,3 +652,27 @@ a:hover { color: #fff; }
 .surface       { background: var(--color-surface); }
 .surface-2     { background: var(--color-surface-2); }
 .border-subtle { border: 1px solid var(--color-border); }
+.status-success { color: var(--color-success); }
+.status-warning { color: var(--color-warning); }
+.stat-value--compact { font-size: 1.1rem; }
+
+/* Shared shell components. Keep these scoped so Bootstrap states elsewhere
+   retain their existing appearance. */
+.navbar-avatar__image { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.user-menu { background: var(--color-surface); border-color: var(--color-border); min-width: 200px; }
+.user-menu__header { border-bottom: 1px solid var(--color-border); }
+.user-menu__name { color: #fff; font-size: 0.875rem; }
+.user-menu .dropdown-item { color: var(--color-text); }
+.user-menu .user-menu__logout { color: var(--color-danger); }
+.user-menu .dropdown-divider { border-color: var(--color-border); }
+
+.app-pagination { gap: 0.25rem; }
+.app-pagination .page-link { background: var(--color-surface-2); border-color: var(--color-border); color: var(--color-text); }
+.app-pagination .active > .page-link { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.toast-icon { color: var(--color-info); }
+.msg-success .toast-icon { color: var(--color-success); }
+.msg-warning .toast-icon { color: var(--color-warning); }
+.msg-error .toast-icon { color: var(--color-danger); }
+.toast-msg__text { font-size: 0.875rem; }
+.toast-close { background: none; border: none; color: var(--color-muted); cursor: pointer; padding: 0; line-height: 1; }

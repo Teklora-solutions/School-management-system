@@ -10,7 +10,7 @@
   <div class="pub-container">
     <div class="pub-hero__grid">
       <div data-reveal>
-        {% if identity.established_year %}<span class="pub-hero__badge">&#127919; Established {{ identity.established_year }}</span>{% endif %}
+        {% if identity.established_year %}<span class="pub-hero__badge"><i class="bi bi-bullseye" aria-hidden="true"></i> Established {{ identity.established_year }}</span>{% endif %}
         <p class="pub-eyebrow">About Us</p>
         <h1 class="pub-hero__title">{% if identity.years_running %}{{ identity.years_running }} Years of <span>Believing in Children</span>{% else %}Our <span>Story</span>{% endif %}</h1>
         <p class="pub-hero__text">
@@ -18,8 +18,8 @@
           {% else %}A thriving school community guided by the belief that every child deserves to be seen, challenged and celebrated.{% endif %}
         </p>
         <div class="pub-hero__actions">
-          <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">&#9999; Apply Now</a>
-          <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--lg">&#128197; Book a Visit</a>
+          <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg"><i class="bi bi-pencil" aria-hidden="true"></i> Apply Now</a>
+          <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--lg"><i class="bi bi-calendar-event" aria-hidden="true"></i> Book a Visit</a>
         </div>
       </div>
       <div data-reveal>
@@ -37,9 +37,9 @@
     <div class="pub-grid pub-grid--3">
       <div class="pub-card" data-reveal>
         <div class="pub-card__body">
-          <div class="pub-card__icon">&#129518;</div>
+          <div class="pub-card__icon"><i class="bi bi-bullseye" aria-hidden="true"></i></div>
           <h3>Our Mission</h3>
-          <p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">
+          <p class="pub-card__description">
             {% if identity.mission %}{{ identity.mission|truncatewords:40 }}
             {% else %}To provide a nurturing, inquiry-driven education that empowers every child to think critically, act compassionately and lead with confidence.{% endif %}
           </p>
@@ -47,9 +47,9 @@
       </div>
       <div class="pub-card" data-reveal>
         <div class="pub-card__body">
-          <div class="pub-card__icon pub-card__icon--teal">&#128065;</div>
+          <div class="pub-card__icon pub-card__icon--teal"><i class="bi bi-eye" aria-hidden="true"></i></div>
           <h3>Our Vision</h3>
-          <p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">
+          <p class="pub-card__description">
             {% if identity.vision %}{{ identity.vision|truncatewords:40 }}
             {% else %}To be the school our community trusts to prepare young people who are academically strong, emotionally resilient and ready to contribute to society.{% endif %}
           </p>
@@ -57,9 +57,9 @@
       </div>
       <div class="pub-card" data-reveal>
         <div class="pub-card__body">
-          <div class="pub-card__icon pub-card__icon--purple">&#10084;</div>
+          <div class="pub-card__icon pub-card__icon--purple"><i class="bi bi-heart" aria-hidden="true"></i></div>
           <h3>Our Values</h3>
-          <p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Curiosity, kindness, integrity and excellence — these four words guide every decision we make, from the playground to the boardroom.</p>
+          <p class="pub-card__description">Curiosity, kindness, integrity and excellence — these four words guide every decision we make, from the playground to the boardroom.</p>
         </div>
       </div>
     </div>

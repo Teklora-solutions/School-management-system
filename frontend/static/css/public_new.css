@@ -433,7 +433,28 @@ main{padding-top:68px}
 .pub-footer__social a:hover{background:var(--pub-accent);color:#0f172a}
 .pub-footer__bottom{margin-top:clamp(2rem,4vw,3rem);padding:1.25rem 0;border-top:1px solid var(--pub-border);text-align:center;color:var(--pub-text-muted);font-size:.78rem}
 .pub-footer__bottom a{color:var(--pub-accent)}
-.pub-portal-dot{font-size:.6rem;margin-right:.15rem}
+.pub-portal-dot{font-size:.6rem;margin-right:.15rem;color:var(--pub-accent)}
+
+/* Shared template details: public-site classes stay separate from the portal. */
+.pub-nav__mobile-actions{display:flex;flex-direction:column;gap:.5rem;margin-top:.5rem}
+.pub-nav__mobile-actions .pub-btn{text-align:center}
+.pub-messages{padding-top:1rem}
+.pub-nav__dot--footer{width:34px;height:34px;font-size:1.1rem}
+.pub-footer__inquiry{font-size:.85rem;color:var(--pub-text-muted);line-height:1.6;margin-bottom:1rem}
+.pub-footer__col .pub-btn--block{width:100%;text-align:center}
+.pub-achievements__content{position:relative;z-index:1}
+.pub-achievements__heading{margin-bottom:clamp(2rem,4vw,3rem)}
+.pub-event-date{color:var(--pub-accent);font-family:var(--pub-font-h);font-size:1.5rem;font-weight:800;line-height:1}
+.pub-event-date__month{display:block;font-size:.75rem;color:var(--pub-text-muted);text-transform:uppercase;font-weight:600}
+.pub-event-title{margin-top:.5rem}
+.pub-section-action{text-align:center;margin-top:2rem}
+.pub-form-success--static{display:block;margin-bottom:1.5rem}
+.pub-contact-detail{display:flex;align-items:flex-start;gap:.75rem}
+.pub-contact-detail__icon{font-size:1.4rem;color:var(--pub-accent)}
+.pub-contact-detail__label{color:var(--pub-heading);display:block}
+.pub-text-muted{color:var(--pub-text-muted)}
+.pub-map-icon{font-size:3rem;display:block;margin-bottom:.5rem}
+.pub-card__description{color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem}
 
 /* ── Back to top ── */
 .pub-back-top{position:fixed;bottom:2rem;right:2rem;z-index:90;width:48px;height:48px;border-radius:50%;background:var(--pub-accent);color:#0f172a;display:grid;place-items:center;font-size:1.3rem;box-shadow:var(--pub-shadow);opacity:0;pointer-events:none;transition:opacity .25s,transform .2s}
