@@ -29,6 +29,11 @@ urlpatterns = [
     path("staff/add/", views.StaffUserCreateView.as_view(), name="staff_create"),
     path("staff/<int:pk>/", views.StaffUserDetailView.as_view(), name="staff_detail"),
     path(
+        "staff/<int:pk>/edit/",
+        views.StaffUserUpdateView.as_view(),
+        name="staff_update",
+    ),
+    path(
         "staff/<int:pk>/deactivate/",
         views.StaffUserDeactivateView.as_view(),
         name="staff_deactivate",
@@ -42,5 +47,10 @@ urlpatterns = [
         "staff/<int:pk>/reset-password/",
         views.StaffResetPasswordView.as_view(),
         name="staff_reset_password",
+    ),
+    path(
+        "staff/<int:pk>/delete/",
+        views.StaffUserDeleteView.as_view(),
+        name="staff_delete",
     ),
 ]

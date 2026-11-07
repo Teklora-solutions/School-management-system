@@ -13,8 +13,10 @@ from typing import TYPE_CHECKING
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 
 from apps.core.audit_log import log_action
+from apps.core.deletion import count_protected, count_relations, phrase
 
 from .models import AdminProfile, DirectorProfile, FinanceProfile
 
@@ -37,6 +39,132 @@ PROFILE_MAP = {
     User.Role.DIRECTOR: DirectorProfile,
     User.Role.FINANCE: FinanceProfile,
 }
+
+# staff_id lives on the role's profile row, not on User.
+PROFILE_RELATED_NAME = {
+    User.Role.ADMIN: "admin_profile",
+    User.Role.DIRECTOR: "director_profile",
+    User.Role.FINANCE: "finance_profile",
+    User.Role.TEACHER: "teacher_profile",
+}
+
+
+def staff_profile(user: UserType):
+    """The profile row that owns this staff member's ``staff_id``, or None."""
+    related = PROFILE_RELATED_NAME.get(user.role)
+    if not related:
+        return None
+    return getattr(user, related, None)
+
+
+@transaction.atomic
+def update_staff_user(
+    *,
+    user: UserType,
+    first_name: str,
+    last_name: str,
+    email: str,
+    phone: str = "",
+    staff_id: str = "",
+    actor: UserType | None = None,
+    request: HttpRequest | None = None,
+) -> UserType:
+    """
+    Edit a staff account's identity details.
+
+    Deliberately excluded: **role** (moving a user between roles means moving
+    their profile row and re-deriving what they can see, which no route here is
+    able to do safely) and **password** (``reset_user_password`` is the audited
+    path, and it is the only one that emails the new credentials).
+
+    Note what an email change costs: staff sign in *with their email*
+    (``EmailOrAdmissionBackend`` looks the account up by email), so the old
+    address stops working the moment this saves. The username is left alone — it
+    is the stable internal handle, and renaming it would break nothing but also
+    fix nothing.
+    """
+    email = email.strip().lower()
+    if User.objects.filter(email=email).exclude(pk=user.pk).exists():
+        raise ValidationError({"email": "Another user already signs in with this email."})
+
+    staff_id = staff_id.strip()
+    profile = staff_profile(user)
+    if not staff_id:
+        # A blank field never erases the ID an account already has. A teacher
+        # with no profile row yet gets the generated one, because
+        # TeacherProfile.staff_id cannot be blank; the other roles allow blank.
+        if profile:
+            staff_id = profile.staff_id
+        elif user.role == User.Role.TEACHER:
+            staff_id = f"TCH-{user.pk:05d}"
+
+    profile_cls = type(profile) if profile else PROFILE_MAP.get(user.role)
+    if profile_cls is None:
+        if user.role == User.Role.TEACHER:
+            from apps.teachers.models import TeacherProfile
+
+            profile_cls = TeacherProfile
+        else:
+            raise ValidationError(
+                {"role": f"{user.get_role_display()} is not a staff role."}
+            )
+    if profile_cls.objects.filter(staff_id=staff_id).exclude(
+        pk=getattr(profile, "pk", None)
+    ).exists():
+        raise ValidationError(
+            {
+                "staff_id": "This staff ID is already in use."
+                if staff_id
+                else "Enter a staff ID — another account is already saved without one."
+            }
+        )
+
+    before = {
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "phone": user.phone,
+        "staff_id": getattr(profile, "staff_id", ""),
+    }
+    user.first_name = first_name.strip()
+    user.last_name = last_name.strip()
+    user.email = email
+    user.phone = phone.strip()
+    user.save(
+        update_fields=[
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "updated_at",
+        ]
+    )
+
+    if profile:
+        profile.staff_id = staff_id
+        profile.save(update_fields=["staff_id", "updated_at"])
+    else:
+        # Created plainly rather than through ``ensure_teacher_profile``: that
+        # helper is an update_or_create and would reset
+        # qualification/department to their defaults.
+        profile = profile_cls.objects.create(user=user, staff_id=staff_id)
+
+    after = {
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "phone": user.phone,
+        "staff_id": profile.staff_id,
+    }
+    log_action(
+        actor=actor,
+        action="user.staff_updated",
+        content_type="accounts.User",
+        object_id=user.pk,
+        change_summary={"before": before, "after": after},
+        request=request,
+    )
+    return user
 
 
 def _generate_temp_password(length: int = 12) -> str:
@@ -265,3 +393,136 @@ def reset_user_password(
     if send_credentials:
         enqueue_credentials_email(user, temp_password)
     return temp_password
+
+
+# ─── Deleting a staff account ─────────────────────────────────────────────────
+
+# CASCADE refs: these disappear with the account.
+STAFF_DELETE_DESTROYED = {
+    "student_profile": "pupil record",
+    "parent_profile": "parent record",
+    "notifications": "inbox message",
+    "message_threads_sent": "message thread started",
+    "thread_messages": "message posted",
+    "announcement_reads": "read receipt",
+    "logentry_set": "django-admin log entry",
+}
+# SET_NULL refs: the row stays, the name on it goes. This is the part people
+# only notice afterwards, so it is stated before the button is offered.
+STAFF_DELETE_BLANKED = {
+    "invoices_posted": "invoice",
+    "payments_recorded": "payment receipt",
+    "journal_entries": "journal entry",
+    "expenses_recorded": "expense",
+    "adjustments_applied": "fee adjustment",
+    "payment_plans_agreed": "payment plan",
+    "homework_set": "homework",
+    "confirmed_sheets": "result sheet confirmation",
+    "published_sheets": "result sheet publication",
+    "written_ct_remarks": "class-teacher remark",
+    "attendance_registers_recorded": "attendance register",
+    "homeroom_classes": "class",
+    "announcements_created": "announcement",
+    "audit_logs": "audit log row",
+}
+
+
+def staff_delete_forecast(user: UserType) -> dict:
+    """What disappears with this account, and what loses its author."""
+    destroyed = count_relations(STAFF_DELETE_DESTROYED, user)
+    profile = staff_profile(user)
+    if profile is not None:
+        destroyed["staff profile (staff ID, qualification, department)"] = 1
+        assignments = getattr(profile, "assignments", None)
+        if assignments is not None:
+            count = assignments.count()
+            if count:
+                destroyed["class-subject assignment"] = count
+    return {
+        "destroyed": destroyed,
+        "blanked": count_relations(STAFF_DELETE_BLANKED, user),
+    }
+
+
+def staff_delete_refusals(user: UserType, actor: UserType | None = None) -> list[str]:
+    """Every reason this account must not be deleted yet, as plain sentences.
+
+    The confirm page needs them before anyone presses the button, and
+    ``delete_staff_user`` raises with the same list — one rule, one place.
+    """
+    reasons = []
+    if user.pk == getattr(actor, "pk", None):
+        reasons.append("You cannot delete your own account.")
+    if user.is_active:
+        reasons.append(
+            f"{user.full_name} is still an active account. Deactivate it first — "
+            "deleting is permanent, deactivating is not."
+        )
+    if user.role == User.Role.ADMIN and (
+        User.objects.filter(role=User.Role.ADMIN, is_active=True)
+        .exclude(pk=user.pk)
+        .count()
+        == 0
+    ):
+        reasons.append(
+            "This is the only active administrator, so it cannot be deleted — the "
+            "school would be left with no account able to manage staff or pupils."
+        )
+    return reasons
+
+
+@transaction.atomic
+def delete_staff_user(
+    *,
+    user: UserType,
+    actor: UserType | None = None,
+    request: HttpRequest | None = None,
+) -> str:
+    """Delete a staff account, or refuse and say why.
+
+    Three guards run before anything is touched, because this one is not
+    reversible: only an **already deactivated** account may be deleted, so an
+    account still in use cannot be wiped by one stray click; nobody deletes their
+    own; and the last active administrator cannot be deleted, since no remaining
+    account would be able to manage staff or pupils.
+
+    Deleting the ``User`` removes their profile row too, and every money, results
+    and attendance row they posted survives but stops naming who did it — those
+    columns are ``SET_NULL``. The forecast puts that in writing on the confirm
+    page, because afterwards it cannot be undone.
+    """
+    label = f"{user.full_name} ({user.get_role_display()})"
+    reasons = staff_delete_refusals(user, actor)
+    if reasons:
+        raise ValidationError(reasons)
+
+    snapshot = {
+        "username": user.username,
+        "email": user.email,
+        "name": user.full_name,
+        "role": user.role,
+        "staff_id": getattr(staff_profile(user), "staff_id", ""),
+    }
+    forecast = staff_delete_forecast(user)
+
+    try:
+        with transaction.atomic():
+            user.delete()
+    except ProtectedError as exc:
+        named = count_protected(
+            user, {**STAFF_DELETE_DESTROYED, **STAFF_DELETE_BLANKED}, exc.protected_objects
+        )
+        raise ValidationError(
+            f"{label} still has {phrase(named)} attached, so the account cannot be "
+            "deleted. That refusal is the protection working."
+        ) from exc
+
+    log_action(
+        actor=actor,
+        action="user.deleted",
+        content_type="accounts.User",
+        object_id=user.pk,
+        change_summary={"removed": snapshot, "destroyed": forecast["destroyed"]},
+        request=request,
+    )
+    return label

@@ -31,6 +31,13 @@ urlpatterns = [
     path("streams/add/", views.StreamCreateView.as_view(), name="stream_create"),
     path("subjects/", views.SubjectListView.as_view(), name="subject_list"),
     path("subjects/add/", views.SubjectCreateView.as_view(), name="subject_create"),
+    path("subjects/<int:pk>/edit/", views.SubjectUpdateView.as_view(), name="subject_update"),
+    path(
+        "subjects/<int:pk>/toggle/",
+        views.SubjectToggleActiveView.as_view(),
+        name="subject_toggle_active",
+    ),
+    path("subjects/<int:pk>/delete/", views.SubjectDeleteView.as_view(), name="subject_delete"),
     path(
         "class-subjects/",
         views.ClassSubjectListView.as_view(),
@@ -40,6 +47,11 @@ urlpatterns = [
         "class-subjects/add/",
         views.ClassSubjectCreateView.as_view(),
         name="class_subject_create",
+    ),
+    path(
+        "class-subjects/<int:pk>/edit/",
+        views.ClassSubjectUpdateView.as_view(),
+        name="class_subject_update",
     ),
     path(
         "class-subjects/<int:pk>/remove/",

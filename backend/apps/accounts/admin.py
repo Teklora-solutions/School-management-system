@@ -24,7 +24,8 @@ class UserAdmin(BaseUserAdmin):
         ("School Info", {"fields": ("email", "role")}),
     )
 
-    # Users are deactivated, never deleted — history and audit logs depend on them.
+    # The admin site is not a way to erase people: history and audit logs name
+    # these rows. The portal's guarded delete page is the only sanctioned door.
     def has_delete_permission(self, request, obj=None):
         return False
 

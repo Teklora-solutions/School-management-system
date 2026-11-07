@@ -46,7 +46,7 @@
   <div class="card-body p-0">
     <table class="table table-hover align-middle mb-0" id="cs-table">
       <thead>
-        <tr><th>Class</th><th>Stream</th><th>Subject</th><th class="text-end">Remove</th></tr>
+        <tr><th>Class</th><th>Stream</th><th>Subject</th><th class="text-end">Actions</th></tr>
       </thead>
       <tbody>
         {% for m in mappings %}
@@ -55,13 +55,21 @@
           <td class="text-muted-sm">{{ m.stream.name|default:"All" }}</td>
           <td>{{ m.subject.name }} <code class="text-muted-sm">{{ m.subject.code }}</code></td>
           <td class="text-end">
-            <form method="post" action="{% url 'academics:class_subject_remove' m.pk %}"
-                  onsubmit="return confirm('Remove this mapping?')">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-outline-danger" id="btn-cs-remove-{{ m.pk }}">
-                <i class="bi bi-x-lg"></i>
-              </button>
-            </form>
+            <div class="d-inline-flex gap-1">
+              <a href="{% url 'academics:class_subject_update' m.pk %}?next={{ request.get_full_path }}"
+                 class="btn btn-sm btn-outline-secondary" id="btn-cs-edit-{{ m.pk }}"
+                 title="Edit mapping" aria-label="Edit {{ m.subject.code }} in {{ m.school_class.name }}">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{% url 'academics:class_subject_remove' m.pk %}"
+                    onsubmit="return confirm('Remove this mapping?')">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger" id="btn-cs-remove-{{ m.pk }}">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </form>
+            </div>
           </td>
         </tr>
         {% endfor %}

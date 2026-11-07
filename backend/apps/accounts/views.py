@@ -25,6 +25,7 @@ from .forms import (
     LoginForm,
     StaffUserCreateForm,
     StaffUserFilterForm,
+    StaffUserUpdateForm,
 )
 from .models import User
 from .portals import PORTALS
@@ -41,15 +42,20 @@ STAFF_ROLES = frozenset(
 )
 
 
-def _safe_next(request) -> str:
+def _safe_next(request, include_post: bool = False) -> str:
     """
     The ``next`` query parameter, but only if it points back at this site.
 
     Every gated page hands us ``/login/?next=/finance/…``, and the chooser has
     to carry that through to the role page it links to — so the check belongs in
-    one place rather than at each redirect.
+    one place rather than at each redirect. ``include_post`` extends that to a
+    form's hidden ``next`` field, which is how the staff edit page returns an
+    admin to the filtered list they came from.
     """
-    raw = request.GET.get("next") or ""
+    raw = ""
+    if include_post:
+        raw = request.POST.get("next") or ""
+    raw = raw or request.GET.get("next") or ""
     if not raw:
         return ""
     if url_has_allowed_host_and_scheme(
@@ -59,6 +65,16 @@ def _safe_next(request) -> str:
     ):
         return raw
     return ""
+
+
+def _add_service_errors(form, exc: ValidationError) -> None:
+    """Put a service-layer ``ValidationError`` onto the matching form fields."""
+    if hasattr(exc, "message_dict"):
+        for field, errs in exc.message_dict.items():
+            for err in errs:
+                form.add_error(field if field in form.fields else None, err)
+    else:
+        form.add_error(None, exc)
 
 
 class PortalChooserView(View):
@@ -374,12 +390,7 @@ class StaffUserCreateView(AdminRequiredMixin, View):
                     request=request,
                 )
             except ValidationError as exc:
-                if hasattr(exc, "message_dict"):
-                    for field, errs in exc.message_dict.items():
-                        for err in errs:
-                            form.add_error(field if field in form.fields else None, err)
-                else:
-                    form.add_error(None, exc)
+                _add_service_errors(form, exc)
             else:
                 messages.success(
                     request,
@@ -406,6 +417,85 @@ class StaffUserDetailView(AdminRequiredMixin, DetailView):
             pk=self.kwargs["pk"],
         )
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        # staff_id lives on the role's profile row, so the template cannot read
+        # it off the user without knowing which row to look at.
+        ctx["staff_id"] = getattr(services.staff_profile(ctx["staff_user"]), "staff_id", "")
+        return ctx
+
+
+class StaffUserUpdateView(AdminRequiredMixin, View):
+    """
+    ``/staff/<pk>/edit/`` — correct a staff member's name, email, phone or staff
+    ID. Role and password are not on this form: see ``services.update_staff_user``.
+    """
+
+    template_name = "features/accounts/staff_edit.html"
+
+    def _staff_user(self):
+        return get_object_or_404(selectors.staff_user_list(), pk=self.kwargs["pk"])
+
+    def _initial(self, user) -> dict:
+        profile = services.staff_profile(user)
+        return {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "phone": user.phone,
+            "staff_id": getattr(profile, "staff_id", ""),
+        }
+
+    def _render(self, request, user, form):
+        return render(
+            request,
+            self.template_name,
+            {
+                "staff_user": user,
+                "form": form,
+                "back_url": _safe_next(request) or reverse_lazy("accounts:staff_list"),
+            },
+        )
+
+    def get(self, request, pk):
+        user = self._staff_user()
+        return self._render(request, user, StaffUserUpdateForm(initial=self._initial(user)))
+
+    def post(self, request, pk):
+        user = self._staff_user()
+        form = StaffUserUpdateForm(request.POST)
+        if form.is_valid():
+            previous_email = user.email
+            try:
+                services.update_staff_user(
+                    user=user,
+                    first_name=form.cleaned_data["first_name"],
+                    last_name=form.cleaned_data["last_name"],
+                    email=form.cleaned_data["email"],
+                    phone=form.cleaned_data.get("phone") or "",
+                    staff_id=form.cleaned_data.get("staff_id") or "",
+                    actor=request.user,
+                    request=request,
+                )
+            except ValidationError as exc:
+                _add_service_errors(form, exc)
+            else:
+                messages.success(request, f"Staff account updated for {user.full_name}.")
+                if user.email != previous_email:
+                    # The email is the credential, so this is the one edit that
+                    # can lock someone out of an account they did not know had
+                    # changed.
+                    messages.warning(
+                        request,
+                        f"{user.full_name} now signs in with {user.email}. "
+                        f"{previous_email} no longer works.",
+                    )
+                next_url = _safe_next(request, include_post=True)
+                if next_url:
+                    return redirect(next_url)
+                return redirect("accounts:staff_detail", pk=user.pk)
+        return self._render(request, user, form)
+
 
 class StaffUserDeactivateView(AdminRequiredMixin, View):
     def post(self, request, pk):
@@ -424,6 +514,39 @@ class StaffUserReactivateView(AdminRequiredMixin, View):
         services.reactivate_user(user=user, actor=request.user, request=request)
         messages.success(request, f"{user.full_name} has been reactivated.")
         return redirect("accounts:staff_detail", pk=pk)
+
+
+class StaffUserDeleteView(AdminRequiredMixin, View):
+    """Show what a staff delete would cost, then perform it or refuse."""
+
+    def _render(self, request, user, forecast):
+        return render(
+            request,
+            "features/accounts/staff_delete_confirm.html",
+            {
+                "staff_user": user,
+                "forecast": forecast,
+                # Same rule the service raises with, shown before the button.
+                "refusals": services.staff_delete_refusals(user, request.user),
+            },
+        )
+
+    def get(self, request, pk):
+        user = get_object_or_404(selectors.staff_user_list(), pk=pk)
+        return self._render(request, user, services.staff_delete_forecast(user))
+
+    def post(self, request, pk):
+        user = get_object_or_404(selectors.staff_user_list(), pk=pk)
+        try:
+            label = services.delete_staff_user(
+                user=user, actor=request.user, request=request
+            )
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+            # Nothing was removed, so the same account is still on screen.
+            return self._render(request, user, services.staff_delete_forecast(user))
+        messages.success(request, f"{label} and their login were deleted.")
+        return redirect("accounts:staff_list")
 
 
 class StaffResetPasswordView(AdminRequiredMixin, View):

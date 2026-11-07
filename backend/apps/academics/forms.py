@@ -162,3 +162,21 @@ class ClassSubjectForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["stream"].required = False
         self.fields["stream"].queryset = Stream.objects.select_related("school_class")
+
+    def clean(self):
+        cleaned = super().clean()
+        school_class = cleaned.get("school_class")
+        subject = cleaned.get("subject")
+        stream = cleaned.get("stream")
+        if school_class and subject:
+            clash = ClassSubject.objects.filter(
+                school_class=school_class, subject=subject, stream=stream
+            )
+            # Editing must not collide with the very row being edited.
+            if self.instance.pk:
+                clash = clash.exclude(pk=self.instance.pk)
+            if clash.exists():
+                self.add_error(
+                    "subject", "This class–subject mapping already exists."
+                )
+        return cleaned

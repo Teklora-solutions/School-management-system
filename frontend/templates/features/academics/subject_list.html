@@ -20,7 +20,7 @@
   <div class="card-body p-0">
     <table class="table table-hover align-middle mb-0" id="subject-table">
       <thead>
-        <tr><th>Code</th><th>Name</th><th>Status</th></tr>
+        <tr><th>Code</th><th>Name</th><th>Status</th><th class="text-end">Actions</th></tr>
       </thead>
       <tbody>
         {% for subj in subjects %}
@@ -33,6 +33,29 @@
             {% else %}
               <span class="badge" style="background:var(--color-muted);color:#fff;">Inactive</span>
             {% endif %}
+          </td>
+          <td class="text-end">
+            <div class="d-inline-flex gap-1">
+              <a href="{% url 'academics:subject_update' subj.pk %}" class="btn btn-sm btn-outline-secondary"
+                 id="btn-subject-edit-{{ subj.pk }}" title="Edit {{ subj.code }}" aria-label="Edit {{ subj.code }}">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{% url 'academics:subject_toggle_active' subj.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-warning" id="btn-subject-toggle-{{ subj.pk }}"
+                        title="{% if subj.is_active %}Deactivate{% else %}Activate{% endif %}">
+                  <i class="bi {% if subj.is_active %}bi-slash-circle{% else %}bi-check-circle{% endif %}"></i>
+                </button>
+              </form>
+              <form method="post" action="{% url 'academics:subject_delete' subj.pk %}"
+                    onsubmit="return confirm('Delete {{ subj.code }}? This only works if nothing has been recorded against it yet.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger" id="btn-subject-delete-{{ subj.pk }}"
+                        title="Delete {{ subj.code }}" aria-label="Delete {{ subj.code }}">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
           </td>
         </tr>
         {% endfor %}

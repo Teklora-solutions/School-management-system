@@ -13,11 +13,13 @@ from typing import TYPE_CHECKING, Any
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
 from apps.accounts.models import ParentProfile
 from apps.accounts.services import enqueue_credentials_email
 from apps.core.audit_log import log_action
+from apps.core.deletion import count_protected, count_relations, phrase
 
 from .models import (
     BulkImportJob,
@@ -240,6 +242,300 @@ def create_student_with_guardian(
             enqueue_credentials_email(parent_profile.user, parent_password, True)
 
     return student
+
+
+# ─── Editing an enrolled student ──────────────────────────────────────────────
+
+
+@transaction.atomic
+def update_student(
+    *,
+    student: Student,
+    first_name: str,
+    last_name: str,
+    email: str,
+    admission_number: str,
+    gender: str = "",
+    date_of_birth: date | None = None,
+    enrollment_date: date | None = None,
+    current_class: SchoolClass | None = None,
+    current_stream: Stream | None = None,
+    address: str = "",
+    status: str | None = None,
+    actor: UserType | None = None,
+    request: HttpRequest | None = None,
+) -> Student:
+    """
+    Correct a student record after enrolment: name, email, admission number,
+    date of birth, gender, class/stream, enrolment date, address and status.
+
+    Deliberately excluded: **password** (an override belongs to the add form, and
+    this is a typo fix rather than a re-issue — no credentials email is sent
+    here), and **``sponsor`` / ``payment_plan_notes``**, which Finance owns
+    behind its own write gate in ``finance.services.update_student_finance_notes``.
+    Guardians are not touched either: those live on ``StudentGuardian`` rows.
+
+    The admission number is the sensitive field. A pupil signs in with it, and the
+    account's username is ``student_username_for(admission_number)`` — the login
+    form turns the number typed on the admission letter back into that username.
+    So a rename moves both, in this transaction, or the account stops being
+    reachable by its own paperwork. When the derived username already belongs to
+    another account the rename is *refused* rather than suffix-solved:
+    ``_unique_username``'s counter would leave the printed number and the stored
+    login name disagreeing, which is the bug this guards against.
+    """
+    user = student.user
+    admission_number = admission_number.strip().upper()
+    if not admission_number:
+        raise ValidationError({"admission_number": "An admission number is required."})
+    if (
+        Student.objects.filter(admission_number=admission_number)
+        .exclude(pk=student.pk)
+        .exists()
+    ):
+        raise ValidationError(
+            {"admission_number": "Another student already has this admission number."}
+        )
+
+    email = email.strip().lower()
+    if User.objects.filter(email=email).exclude(pk=user.pk).exists():
+        raise ValidationError({"email": "Another account already uses this email."})
+
+    renamed = admission_number != student.admission_number
+    if renamed:
+        derived = student_username_for(admission_number)
+        if User.objects.filter(username=derived).exclude(pk=user.pk).exists():
+            raise ValidationError(
+                {
+                    "admission_number": (
+                        f"'{admission_number}' cannot be used: its login name "
+                        f"'{derived}' already belongs to another account."
+                    )
+                }
+            )
+
+    if current_stream and current_class and current_stream.school_class_id != current_class.pk:
+        raise ValidationError(
+            {
+                "current_stream": f"{current_stream.name} is not a stream of "
+                f"{current_class.name}; pick a stream from that class or clear it."
+            }
+        )
+
+    before = {
+        "admission_number": student.admission_number,
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "gender": student.gender,
+        "date_of_birth": str(student.date_of_birth or ""),
+        "enrollment_date": str(student.enrollment_date or ""),
+        "class": student.current_class.name if student.current_class else "",
+        "stream": student.current_stream.name if student.current_stream else "",
+        "status": student.status,
+        "address": student.address,
+    }
+
+    if renamed:
+        user.username = derived
+    user.first_name = first_name.strip()
+    user.last_name = last_name.strip()
+    user.email = email
+    user.save(update_fields=["first_name", "last_name", "email", "username", "updated_at"])
+
+    student.admission_number = admission_number
+    student.gender = gender or ""
+    student.date_of_birth = date_of_birth
+    student.enrollment_date = enrollment_date
+    student.current_class = current_class
+    student.current_stream = current_stream
+    student.address = address.strip()
+    if status:
+        student.status = status
+    student.save(
+        update_fields=[
+            "admission_number",
+            "gender",
+            "date_of_birth",
+            "enrollment_date",
+            "current_class",
+            "current_stream",
+            "address",
+            "status",
+            "updated_at",
+        ]
+    )
+
+    after = {
+        "admission_number": student.admission_number,
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "gender": student.gender,
+        "date_of_birth": str(student.date_of_birth or ""),
+        "enrollment_date": str(student.enrollment_date or ""),
+        "class": student.current_class.name if student.current_class else "",
+        "stream": student.current_stream.name if student.current_stream else "",
+        "status": student.status,
+        "address": student.address,
+    }
+    log_action(
+        actor=actor,
+        action="student.updated",
+        content_type="students.Student",
+        object_id=student.pk,
+        change_summary={"before": before, "after": after},
+        request=request,
+    )
+    if renamed:
+        # Its own event, so "who moved this pupil's identity?" is one filter away.
+        log_action(
+            actor=actor,
+            action="student.admission_number_changed",
+            content_type="students.Student",
+            object_id=student.pk,
+            change_summary={
+                "from": before["admission_number"],
+                "to": student.admission_number,
+                "username": user.username,
+            },
+            request=request,
+        )
+    return student
+
+
+@transaction.atomic
+def set_student_login_active(
+    *,
+    student: Student,
+    active: bool,
+    actor: UserType | None = None,
+    request: HttpRequest | None = None,
+) -> Student:
+    """Switch a pupil's portal login on or off, leaving the record alone.
+
+    ``Student.status`` is a listing decision, not an access one: a withdrawn or
+    graduated pupil keeps a working sign-in until this runs, which is why the
+    admin needs a separate lever. Only ``User.is_active`` changes, so marks,
+    fees, attendance and guardian links are untouched and re-enabling restores
+    exactly what was there.
+
+    Disabling also drops a session the pupil is already sitting in — Django's
+    ``ModelBackend.get_user`` re-checks ``is_active`` on every request, not only
+    at login.
+    """
+    user = student.user
+    if user.is_active == active:
+        # Nothing to write: a stale tab or a double POST must not invent an
+        # audit row for a state that never changed.
+        return student
+    previous = user.is_active
+    user.is_active = active
+    user.save(update_fields=["is_active", "updated_at"])
+    log_action(
+        actor=actor,
+        action="student.login_enabled" if active else "student.login_disabled",
+        content_type="students.Student",
+        object_id=student.pk,
+        change_summary={
+            "username": user.username,
+            "admission_number": student.admission_number,
+            "is_active": {"before": previous, "after": active},
+        },
+        request=request,
+    )
+    return student
+
+
+# ─── Deleting a pupil ─────────────────────────────────────────────────────────
+
+# PROTECT refs: these make the delete impossible, they are not "attached history".
+STUDENT_DELETE_BLOCKERS = {
+    "invoices": "fee invoice",
+    "payments": "payment receipt",
+    "adjustments": "fee adjustment",
+    "payment_plans": "payment plan",
+    "attendance_entries": "attendance mark",
+}
+# CASCADE refs: these disappear with the pupil.
+STUDENT_DELETE_DESTROYED = {
+    "score_entries": "marks entry",
+    "class_teacher_remarks": "class-teacher remark",
+    "homework_submissions": "homework submission",
+    "guardian_links": "guardian link",
+    "promotion_records": "promotion record",
+    "fee_elections": "fee election",
+}
+# M2M: the rule itself stays, the pupil simply stops being named in it.
+STUDENT_DELETE_LINKS = {"fee_discount_rules": "fee discount rule"}
+
+
+def student_delete_forecast(student: Student) -> dict:
+    """What blocks deleting this pupil, and what would go with them.
+
+    Advisory only — the database keeps the final say in ``delete_student``.
+    """
+    return {
+        "blockers": count_relations(STUDENT_DELETE_BLOCKERS, student),
+        "destroyed": count_relations(STUDENT_DELETE_DESTROYED, student),
+        "links": count_relations(STUDENT_DELETE_LINKS, student),
+    }
+
+
+@transaction.atomic
+def delete_student(
+    *,
+    student: Student,
+    actor: UserType | None = None,
+    request: HttpRequest | None = None,
+) -> str:
+    """Delete a pupil's account, or refuse and name what blocks it.
+
+    The row deleted is the ``User``, not the ``Student``: the one-to-one runs
+    User → Student, so removing the profile alone would leave a live login with
+    no pupil behind it. Fees and attendance PROTECT the pupil, so a delete that
+    would break the money trail is refused by the database — ``ProtectedError``
+    becomes a refusal naming those rows rather than a 500 page.
+
+    The snapshot is taken before the delete and logged after it succeeds, because
+    afterwards there is no record left to describe what was removed. A failed
+    delete must not leave an audit trail claiming it happened.
+    """
+    user = student.user
+    label = f"{user.full_name} ({student.admission_number})"
+    snapshot = {
+        "admission_number": student.admission_number,
+        "username": user.username,
+        "email": user.email,
+        "name": user.full_name,
+        "class": student.current_class.name if student.current_class else "",
+        "status": student.status,
+        "login_active": user.is_active,
+    }
+    forecast = student_delete_forecast(student)
+
+    try:
+        with transaction.atomic():
+            user.delete()
+    except ProtectedError as exc:
+        named = count_protected(student, STUDENT_DELETE_BLOCKERS, exc.protected_objects)
+        raise ValidationError(
+            f"{label} still has {phrase(named)} on record, so the account cannot "
+            "be deleted. That refusal is the protection working: delete those rows "
+            "only if they were entered in error, otherwise disable the login."
+        ) from exc
+
+    log_action(
+        actor=actor,
+        action="student.deleted",
+        content_type="students.Student",
+        object_id=student.pk,
+        change_summary={"removed": snapshot, "destroyed": forecast["destroyed"]},
+        request=request,
+    )
+    return label
 
 
 # ─── Bulk import ──────────────────────────────────────────────────────────────

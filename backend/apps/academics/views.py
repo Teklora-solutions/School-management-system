@@ -7,7 +7,8 @@ Admin CRUD for academic structure. Thin views → services / selectors.
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import DetailView, ListView
 
@@ -23,7 +24,21 @@ from .forms import (
     TermDatesForm,
     TermForm,
 )
-from .models import AcademicYear, ClassSubject, Term
+from .models import AcademicYear, ClassSubject, Subject, Term
+
+
+def _safe_next(request) -> str:
+    """A ?next= / form "next" value, but only if it points back at this site."""
+    raw = request.POST.get("next") or request.GET.get("next") or ""
+    if not raw:
+        return ""
+    if url_has_allowed_host_and_scheme(
+        url=raw,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return raw
+    return ""
 
 
 def _schedule_payload() -> dict[str, dict]:
@@ -306,7 +321,11 @@ class SubjectCreateView(AdminRequiredMixin, View):
     success_url = reverse_lazy("academics:subject_list")
 
     def get(self, request):
-        return render(request, self.template_name, {"form": SubjectForm()})
+        return render(
+            request,
+            self.template_name,
+            {"form": SubjectForm(), "heading": "Add Subject", "save_label": "Save Subject"},
+        )
 
     def post(self, request):
         form = SubjectForm(request.POST)
@@ -326,7 +345,84 @@ class SubjectCreateView(AdminRequiredMixin, View):
             else:
                 messages.success(request, f"Subject {subject.code} created.")
                 return redirect(self.success_url)
-        return render(request, self.template_name, {"form": form})
+        return render(
+            request,
+            self.template_name,
+            {"form": form, "heading": "Add Subject", "save_label": "Save Subject"},
+        )
+
+
+class SubjectUpdateView(AdminRequiredMixin, View):
+    """Correct a subject's name, code or active flag."""
+
+    template_name = "features/academics/subject_form.html"
+
+    def _subject(self, pk):
+        return get_object_or_404(Subject, pk=pk)
+
+    def _context(self, subject, form):
+        return {
+            "form": form,
+            "subject": subject,
+            "heading": f"Edit {subject.code}",
+            "save_label": "Save Changes",
+            "back_url": reverse("academics:subject_update", args=[subject.pk]),
+        }
+
+    def get(self, request, pk):
+        subject = self._subject(pk)
+        return render(
+            request, self.template_name, self._context(subject, SubjectForm(instance=subject))
+        )
+
+    def post(self, request, pk):
+        subject = self._subject(pk)
+        form = SubjectForm(request.POST, instance=subject)
+        if form.is_valid():
+            try:
+                services.update_subject(
+                    subject=subject,
+                    name=form.cleaned_data["name"],
+                    code=form.cleaned_data["code"],
+                    is_active=form.cleaned_data["is_active"],
+                    actor=request.user,
+                    request=request,
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(request, f"Subject {subject.code} updated.")
+                return redirect("academics:subject_list")
+        return render(request, self.template_name, self._context(subject, form))
+
+
+class SubjectToggleActiveView(AdminRequiredMixin, View):
+    """Hide a subject from new pickers without touching its history."""
+
+    def post(self, request, pk):
+        subject = get_object_or_404(Subject, pk=pk)
+        services.set_subject_active(
+            subject=subject,
+            is_active=not subject.is_active,
+            actor=request.user,
+            request=request,
+        )
+        state = "activated" if subject.is_active else "deactivated"
+        messages.success(request, f"Subject {subject.code} {state}.")
+        return redirect("academics:subject_list")
+
+
+class SubjectDeleteView(AdminRequiredMixin, View):
+    def post(self, request, pk):
+        subject = get_object_or_404(Subject, pk=pk)
+        label = subject.code
+        try:
+            services.delete_subject(subject=subject, actor=request.user, request=request)
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+            return redirect("academics:subject_list")
+        messages.success(request, f"Subject {label} deleted.")
+        return redirect("academics:subject_list")
 
 
 class ClassSubjectListView(SchoolReadMixin, ListView):
@@ -390,6 +486,56 @@ class ClassSubjectCreateView(AdminRequiredMixin, View):
         return render(request, self.template_name, {"form": form})
 
 
+class ClassSubjectUpdateView(AdminRequiredMixin, View):
+    """Re-point a mapping at a different class, subject or stream."""
+
+    template_name = "features/academics/class_subject_form.html"
+
+    def _context(self, mapping, form, request):
+        return {
+            "form": form,
+            "mapping": mapping,
+            "heading": f"Edit Mapping — {mapping}",
+            "save_label": "Save Changes",
+            "back_url": _safe_next(request),
+        }
+
+    def _back(self, request, mapping):
+        next_url = _safe_next(request)
+        if next_url:
+            return redirect(next_url)
+        return redirect("academics:class_subject_list")
+
+    def get(self, request, pk):
+        mapping = get_object_or_404(ClassSubject, pk=pk)
+        form = ClassSubjectForm(instance=mapping)
+        return render(
+            request, self.template_name, self._context(mapping, form, request)
+        )
+
+    def post(self, request, pk):
+        mapping = get_object_or_404(ClassSubject, pk=pk)
+        form = ClassSubjectForm(request.POST, instance=mapping)
+        if form.is_valid():
+            try:
+                services.update_class_subject(
+                    mapping=mapping,
+                    school_class=form.cleaned_data["school_class"],
+                    subject=form.cleaned_data["subject"],
+                    stream=form.cleaned_data.get("stream"),
+                    actor=request.user,
+                    request=request,
+                )
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+            else:
+                messages.success(request, f"Mapping updated: {mapping}.")
+            return self._back(request, mapping)
+        return render(
+            request, self.template_name, self._context(mapping, form, request)
+        )
+
+
 class ClassSubjectRemoveView(AdminRequiredMixin, View):
     def post(self, request, pk):
         mapping = get_object_or_404(ClassSubject, pk=pk)
@@ -398,7 +544,7 @@ class ClassSubjectRemoveView(AdminRequiredMixin, View):
             mapping=mapping, actor=request.user, request=request
         )
         messages.success(request, "Class–subject mapping removed.")
-        next_url = request.POST.get("next")
+        next_url = _safe_next(request)
         if next_url:
             return redirect(next_url)
         return redirect("academics:class_detail", pk=class_id)

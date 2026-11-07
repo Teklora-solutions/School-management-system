@@ -172,75 +172,27 @@ class ReportCardPdfView(LoginRequiredMixin, View):
     """
 
     def get(self, request, student_id: int, term_id: int, *args, **kwargs):
-        student = _resolve_student_for_results(request, student_id=student_id)
-
-        # Ensure there are published results for this term
-        entries = selectors.student_published_results(
-            student_id=student.pk, term_id=term_id
-        )
-        if not entries.exists():
-            from django.http import Http404
-
-            raise Http404("No published results for this term.")
-
-        positions = selectors.student_class_positions(
-            student_id=student.pk, term_id=term_id
-        )
+        from django.http import Http404
+        from django.template.loader import render_to_string
 
         from apps.academics.models import Term
+        from apps.core.pdf import pdf_response
 
+        student = _resolve_student_for_results(request, student_id=student_id)
         term = get_object_or_404(
             Term.objects.select_related("academic_year"), pk=term_id
         )
-
-        # Summary numbers for the header band
-        from django.db.models import Avg, Sum
-
-        aggregates = entries.aggregate(avg=Avg("total"), total=Sum("total"))
-        average = round(float(aggregates["avg"] or 0), 1)
-        grand_total = aggregates["total"] or 0
-
-        overall_grade = ""
-        class_teacher_name = ""
-        if student.current_class_id:
-            overall_grade, _, _ = services.resolve_grade_for_school_class(
-                student.current_class, average, term.academic_year_id
-            )
-            ct = student.current_class.class_teacher
-            if ct:
-                class_teacher_name = ct.get_full_name() or ct.email or ct.username
-
         identity = selectors.result_identity(request=request)
-        term_position = (
-            selectors.student_term_position(student_id=student.pk, term_id=term_id)
-            if identity["show_positions"]
-            else None
+        card = selectors.report_card_context(
+            student=student, term=term, identity=identity
         )
-        ct_remark = selectors.class_teacher_remark(
-            student_id=student.pk, term_id=term_id
-        )
-
-        from django.template.loader import render_to_string
+        if card is None:
+            raise Http404("No published results for this term.")
 
         html = render_to_string(
             "features/results/report_card_pdf.html",
-            {
-                "student": student,
-                "term": term,
-                "entries": list(entries),
-                "positions": positions,
-                "average": average,
-                "grand_total": grand_total,
-                "overall_grade": overall_grade,
-                "term_position": term_position,
-                "class_teacher_name": class_teacher_name,
-                "ct_remark": ct_remark,
-                "identity": identity,
-                "request": request,
-            },
+            {"card": card, "identity": identity, "request": request},
         )
-        from apps.core.pdf import pdf_response
-
         return pdf_response(
             html=html,
             filename=f"report_card_{student.admission_number}_{term_id}.pdf",

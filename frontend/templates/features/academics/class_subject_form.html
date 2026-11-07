@@ -1,10 +1,10 @@
 {% extends "dashboards/admin/base.html" %}
-{% block title %}Map Class to Subject | {{ SCHOOL_NAME }}{% endblock %}
+{% block title %}{{ heading|default:"Map Class to Subject" }} | {{ SCHOOL_NAME }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <a href="{% url 'academics:class_subject_list' %}" class="btn btn-sm btn-outline-secondary mb-2"><i class="bi bi-arrow-left me-1"></i>Back</a>
-  <h1 class="page-title mt-1">Map Class to Subject</h1>
+  <a href="{% if back_url %}{{ back_url }}{% else %}{% url 'academics:class_subject_list' %}{% endif %}" class="btn btn-sm btn-outline-secondary mb-2"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  <h1 class="page-title mt-1">{{ heading|default:"Map Class to Subject" }}</h1>
 </div>
 <div class="row justify-content-center">
   <div class="col-lg-6">
@@ -16,19 +16,22 @@
           <div class="mb-3">
             <label for="{{ form.school_class.id_for_label }}" class="form-label fw-600">Class <span class="text-danger">*</span></label>
             {{ form.school_class }}
+            {% if form.school_class.errors %}<div class="text-danger small mt-1">{{ form.school_class.errors.0 }}</div>{% endif %}
           </div>
           <div class="mb-3">
             <label for="{{ form.subject.id_for_label }}" class="form-label fw-600">Subject <span class="text-danger">*</span></label>
             {{ form.subject }}
+            {% if form.subject.errors %}<div class="text-danger small mt-1">{{ form.subject.errors.0 }}</div>{% endif %}
           </div>
           <div class="mb-3">
             <label for="{{ form.stream.id_for_label }}" class="form-label fw-600">Stream (optional)</label>
             {{ form.stream }}
             <div class="form-text">Leave blank if this subject applies to all streams.</div>
+            {% if form.stream.errors %}<div class="text-danger small mt-1">{{ form.stream.errors.0 }}</div>{% endif %}
           </div>
           <div class="d-flex gap-2 justify-content-end">
-            <a href="{% url 'academics:class_subject_list' %}" class="btn btn-outline-secondary">Cancel</a>
-            <button type="submit" class="btn btn-primary" id="btn-save-cs">Save Mapping</button>
+            <a href="{% if back_url %}{{ back_url }}{% else %}{% url 'academics:class_subject_list' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="btn-save-cs">{{ save_label|default:"Save Mapping" }}</button>
           </div>
         </form>
       </div>
