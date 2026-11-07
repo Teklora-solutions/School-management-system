@@ -1,7 +1,7 @@
 """
 apps/results/tests/test_report_card.py
 ---------------------------------------
-RC1 — the redesigned report card PDF.
+RC1 — the redesigned report card PDF, and R1 — one card, one place.
 
 Covers:
   - result_identity reads SchoolSettings (row wins, blanks fall back to env,
@@ -10,6 +10,10 @@ Covers:
   - ClassTeacherRemark is one row per (student, term)
   - the PDF template carries the identity header, summary band, class
     teacher name, remark box, signature block, and honours show_positions
+  - report_card_context is the single source of the card's fields: it returns
+    None when there is nothing published, agrees with pre-fetched rows, and
+    the page partial renders the same markup whether it is a lone card or one
+    card inside a pack
 """
 
 from __future__ import annotations
@@ -21,6 +25,8 @@ from unittest.mock import patch
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
+from django.template import Context, Template
+from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
@@ -37,7 +43,7 @@ from apps.dashboards.tests.fixtures import (
 )
 
 from .. import selectors
-from ..models import ClassTeacherRemark
+from ..models import ClassTeacherRemark, ResultSheet, ScoreEntry
 
 #: 1x1 transparent PNG.
 PNG_BYTES = (
@@ -278,3 +284,176 @@ class ReportCardPdfTests(TestCase):
         )
         html = self._html_as(self.admin)
         self.assertIn("A steady, focused term.", html)
+
+
+class ReportCardContextTests(TestCase):
+    """R1 — the card's numbers and names are built by one selector."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.year = make_year()
+        cls.term = make_term(cls.year)
+        make_grading_config(cls.year)
+        cls.teacher = make_user("teacher", first_name="Ama", last_name="Boateng")
+        cls.school_class = make_class(cls.year, class_teacher=cls.teacher)
+        cls.math = make_subject("MATH", "Mathematics")
+        cls.eng = make_subject("ENG", "English")
+
+        cls.student = make_student_user(cls.school_class, admission_number="CTX-001")
+        cls.peer = make_student_user(cls.school_class, admission_number="CTX-002")
+        make_published_score(cls.school_class, cls.math, cls.term, cls.student, Decimal(90))
+        make_published_score(cls.school_class, cls.eng, cls.term, cls.student, Decimal(85))
+        make_published_score(cls.school_class, cls.math, cls.term, cls.peer, Decimal(60))
+        make_published_score(cls.school_class, cls.eng, cls.term, cls.peer, Decimal(55))
+
+        # A pupil whose only sheet is still a draft — a pack must skip them.
+        cls.quiet = make_student_user(cls.school_class, admission_number="CTX-003")
+        draft = ResultSheet.objects.create(
+            school_class=cls.school_class,
+            subject=make_subject("BIO", "Biology"),
+            term=cls.term,
+            status=ResultSheet.Status.DRAFT,
+        )
+        ScoreEntry.objects.create(
+            result_sheet=draft, student=cls.quiet, total=Decimal(70)
+        )
+
+        cls.identity = {
+            "name": "Test School",
+            "motto": "",
+            "phone": "",
+            "email": "",
+            "show_positions": True,
+            "logo_url": "",
+        }
+
+    def _card(self, student, **extra):
+        return selectors.report_card_context(
+            student=student, term=self.term, identity=self.identity, **extra
+        )
+
+    def test_the_context_holds_every_field_the_page_reads(self):
+        card = self._card(self.student)
+        self.assertEqual(
+            set(card),
+            {
+                "student",
+                "term",
+                "entries",
+                "positions",
+                "average",
+                "grand_total",
+                "overall_grade",
+                "class_teacher_name",
+                "term_position",
+                "ct_remark",
+            },
+        )
+        self.assertEqual([entry.total for entry in card["entries"]], [Decimal("85.00"), Decimal("90.00")])
+        self.assertEqual(card["average"], 87.5)
+        self.assertEqual(card["grand_total"], Decimal("175.00"))
+        self.assertEqual(card["overall_grade"], "A")
+        self.assertEqual(card["class_teacher_name"], "Ama Boateng")
+        self.assertEqual(card["term_position"], {"position": 1, "total_in_class": 2})
+
+    def test_a_pupil_with_nothing_published_has_no_card(self):
+        self.assertIsNone(self._card(self.quiet))
+
+    def test_pre_fetched_rows_build_the_identical_card(self):
+        entries = list(
+            selectors.student_published_results(
+                student_id=self.student.pk, term_id=self.term.pk
+            )
+        )
+        positions = selectors.student_class_positions(
+            student_id=self.student.pk, term_id=self.term.pk
+        )
+        self.assertEqual(
+            self._card(self.student),
+            self._card(self.student, entries=entries, positions=positions),
+        )
+
+    def test_an_unmarked_row_does_not_move_the_average(self):
+        """The hand-computed mean ignores a NULL exactly as ``Avg`` did."""
+        science = make_subject("SCI", "Science")
+        sheet = ResultSheet.objects.create(
+            school_class=self.school_class,
+            subject=science,
+            term=self.term,
+            status=ResultSheet.Status.PUBLISHED,
+        )
+        ScoreEntry.objects.create(result_sheet=sheet, student=self.student)
+        entries = list(
+            selectors.student_published_results(
+                student_id=self.student.pk, term_id=self.term.pk
+            )
+        )
+        card = self._card(self.student, entries=entries, positions={})
+        self.assertEqual(len(card["entries"]), 3)
+        self.assertEqual(card["average"], 87.5)
+        self.assertEqual(card["grand_total"], Decimal("175.00"))
+
+    def test_the_class_position_is_skipped_when_positions_are_hidden(self):
+        card = selectors.report_card_context(
+            student=self.student,
+            term=self.term,
+            identity={**self.identity, "show_positions": False},
+        )
+        self.assertIsNone(card["term_position"])
+
+
+class ReportCardPartialTests(TestCase):
+    """R1 — one partial serves the single card and a multi-card pack alike."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.year = make_year()
+        cls.term = make_term(cls.year)
+        make_grading_config(cls.year)
+        cls.school_class = make_class(cls.year)
+        cls.math = make_subject("MATH", "Mathematics")
+        cls.student = make_student_user(cls.school_class, admission_number="PART-001")
+        cls.peer = make_student_user(cls.school_class, admission_number="PART-002")
+        make_published_score(cls.school_class, cls.math, cls.term, cls.student, Decimal(90))
+        make_published_score(cls.school_class, cls.math, cls.term, cls.peer, Decimal(60))
+
+    def _context(self, *cards):
+        request = RequestFactory().get("/")
+        return {
+            "cards": list(cards),
+            "identity": selectors.result_identity(request=request),
+            "request": request,
+        }
+
+    def _card(self, student):
+        context = self._context()
+        return selectors.report_card_context(
+            student=student, term=self.term, identity=context["identity"]
+        )
+
+    def test_a_pack_page_is_the_single_card_page_word_for_word(self):
+        card = self._card(self.student)
+        single = render_to_string(
+            "features/results/report_card_page.html",
+            {"card": card, **self._context(card)},
+        )
+        pack = Template(
+            '{% for card in cards %}'
+            '{% include "features/results/report_card_page.html" %}'
+            "{% endfor %}"
+        ).render(Context(self._context(card, self._card(self.peer))))
+
+        self.assertIn(single.strip(), pack)
+        self.assertEqual(pack.count('class="page"'), 2)
+        self.assertIn("PART-002", pack)
+
+    def test_the_document_carries_the_page_break_rule_for_a_pack(self):
+        card = self._card(self.student)
+        html = render_to_string(
+            "features/results/report_card_pdf.html",
+            self._context(card) | {"card": card},
+        )
+        self.assertIn("<!doctype html>", html)
+        self.assertIn("Report Card &mdash;", html)
+        self.assertIn(".page + .page { break-before: page; }", html)
+        self.assertIn("PART-001", html)

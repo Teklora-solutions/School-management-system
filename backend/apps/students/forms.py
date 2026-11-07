@@ -1,7 +1,7 @@
 """
 apps/students/forms.py
 ----------------------
-Student add / bulk-import / promotion forms.
+Student add / edit / bulk-import / promotion forms.
 """
 
 from __future__ import annotations
@@ -11,6 +11,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.validators import FileExtensionValidator
 
 from apps.academics.models import AcademicYear, SchoolClass, Stream, Term
+
+from .models import Student
 
 
 class StudentCreateForm(forms.Form):
@@ -126,6 +128,69 @@ class StudentCreateForm(forms.Form):
                 "password_confirm", "Confirm the password, or leave both blank."
             )
         return cleaned
+
+
+class StudentUpdateForm(forms.Form):
+    """
+    Correct an enrolled student's record.
+
+    Mirrors the identity and school-record half of ``StudentCreateForm`` and
+    drops the rest: no password pair (an override belongs to the add form), no
+    guardian block (those are ``StudentGuardian`` rows), and no
+    sponsor/payment-plan fields, because Finance owns that editor.
+
+    ``admission_number`` is editable because it is the field most often mistyped
+    during enrolment — see ``services.update_student`` for what changing it does
+    to the login account.
+    """
+
+    first_name = forms.CharField(
+        max_length=150, widget=forms.TextInput(attrs={"class": "form-control"})
+    )
+    last_name = forms.CharField(
+        max_length=150, widget=forms.TextInput(attrs={"class": "form-control"})
+    )
+    email = forms.EmailField(widget=forms.EmailInput(attrs={"class": "form-control"}))
+    admission_number = forms.CharField(
+        max_length=40,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+        help_text="Stored upper-cased. Renames the pupil's login account to match.",
+    )
+    date_of_birth = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+    )
+    gender = forms.ChoiceField(
+        choices=[("", "—"), ("M", "Male"), ("F", "Female"), ("O", "Other")],
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    enrollment_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+    )
+    status = forms.ChoiceField(
+        choices=Student.Status.choices,
+        widget=forms.Select(attrs={"class": "form-select"}),
+        help_text="Drives class lists, dashboards and who the promotion run picks up.",
+    )
+    current_class = forms.ModelChoiceField(
+        queryset=SchoolClass.objects.select_related("academic_year").all(),
+        required=False,
+        empty_label="— No class —",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    current_stream = forms.ModelChoiceField(
+        queryset=Stream.objects.select_related("school_class").all(),
+        required=False,
+        empty_label="— No stream —",
+        widget=forms.Select(attrs={"class": "form-select"}),
+        help_text="Must belong to the class above; checked when you save.",
+    )
+    address = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+    )
 
 
 class BulkImportForm(forms.Form):

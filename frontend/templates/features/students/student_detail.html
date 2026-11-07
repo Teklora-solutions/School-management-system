@@ -12,8 +12,30 @@
     <p class="page-subtitle">{{ student.admission_number }} · {{ student.current_class.name|default:"No class" }}{% if student.current_stream %} / {{ student.current_stream.name }}{% endif %}</p>
   </div>
   <div class="d-flex gap-2">
+    <a href="{% url 'students:edit' student.pk %}" class="btn btn-primary" id="btn-edit-student-{{ student.pk }}">
+      <i class="bi bi-pencil me-1"></i>Edit
+    </a>
     <a href="{% url 'students:pdf' student.pk %}" class="btn btn-outline-primary" target="_blank" rel="noopener noreferrer">
       <i class="bi bi-file-earmark-pdf me-1"></i>Admission Form (PDF)
+    </a>
+    {% if student.user.is_active %}
+    <form method="post" action="{% url 'students:disable_login' student.pk %}"
+          onsubmit="return confirm('Disable the portal login for {{ student.user.full_name }}? Their record, marks and fees stay as they are.');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger" id="btn-disable-login-{{ student.pk }}">
+        <i class="bi bi-person-slash me-1"></i>Disable Login
+      </button>
+    </form>
+    {% else %}
+    <form method="post" action="{% url 'students:enable_login' student.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-success" id="btn-enable-login-{{ student.pk }}">
+        <i class="bi bi-person-check me-1"></i>Enable Login
+      </button>
+    </form>
+    {% endif %}
+    <a href="{% url 'students:delete' student.pk %}" class="btn btn-outline-danger" id="btn-delete-student-{{ student.pk }}">
+      <i class="bi bi-trash me-1"></i>Delete
     </a>
     <a href="{% url 'students:list' %}" class="btn btn-outline-secondary">
       <i class="bi bi-arrow-left me-1"></i>Back
@@ -47,6 +69,16 @@
 
           <dt class="col-sm-4">Status</dt>
           <dd class="col-sm-8">{{ student.get_status_display }}</dd>
+
+          <dt class="col-sm-4">Portal login</dt>
+          <dd class="col-sm-8">
+            {% if student.user.is_active %}
+              <span class="badge" style="background:var(--color-success);color:#fff;">Can sign in</span>
+            {% else %}
+              <span class="badge" style="background:var(--color-danger);color:#fff;">Login disabled</span>
+            {% endif %}
+            <span class="text-muted-sm d-block">Status above decides lists and dashboards; this decides whether the account works.</span>
+          </dd>
 
           <dt class="col-sm-4">Address</dt>
           <dd class="col-sm-8">{{ student.address|default:"—" }}</dd>

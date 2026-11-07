@@ -300,6 +300,120 @@ def create_subject(
 
 
 @transaction.atomic
+def update_subject(
+    *,
+    subject: Subject,
+    name: str,
+    code: str,
+    is_active: bool,
+    actor: User | None = None,
+    request: HttpRequest | None = None,
+) -> Subject:
+    before = (subject.name, subject.code, subject.is_active)
+    subject.name = name.strip()
+    subject.code = code.strip().upper()
+    subject.is_active = is_active
+    subject.full_clean()
+    subject.save()
+    log_action(
+        actor=actor,
+        action="academics.subject_updated",
+        content_type="academics.Subject",
+        object_id=subject.pk,
+        change_summary={
+            "before": {"name": before[0], "code": before[1], "is_active": before[2]},
+            "after": {
+                "name": subject.name,
+                "code": subject.code,
+                "is_active": subject.is_active,
+            },
+        },
+        request=request,
+    )
+    return subject
+
+
+@transaction.atomic
+def set_subject_active(
+    *,
+    subject: Subject,
+    is_active: bool,
+    actor: User | None = None,
+    request: HttpRequest | None = None,
+) -> Subject:
+    subject.is_active = is_active
+    subject.save(update_fields=["is_active", "updated_at"])
+    log_action(
+        actor=actor,
+        action="academics.subject_activated" if is_active else "academics.subject_deactivated",
+        content_type="academics.Subject",
+        object_id=subject.pk,
+        change_summary={"code": subject.code, "is_active": is_active},
+        request=request,
+    )
+    return subject
+
+
+# related_name -> the verb used in the refusal message. New models that point at
+# Subject with CASCADE are picked up automatically by the delete guard below.
+SUBJECT_LINKED_DATA = {
+    "teacher_assignments": "teaching assignments",
+    "result_sheets": "result sheets and entered marks",
+    "homework_assignments": "homework and submissions",
+    "class_subjects": "class mappings",
+}
+
+
+def subject_impact(subject: Subject) -> dict[str, int]:
+    """How much history a delete would take with it."""
+    return {
+        label: getattr(subject, related).count()
+        for related, label in SUBJECT_LINKED_DATA.items()
+        if getattr(subject, related).exists()
+    }
+
+
+@transaction.atomic
+def delete_subject(
+    *,
+    subject: Subject,
+    actor: User | None = None,
+    request: HttpRequest | None = None,
+) -> None:
+    """Delete a subject, or refuse and point at deactivation.
+
+    Teacher assignments, result sheets and homework all CASCADE from Subject, so
+    a delete would quietly destroy entered marks and submissions with it. The
+    subject is only removable while nothing is attached; otherwise deactivate it.
+    """
+    impact = subject_impact(subject)
+    if impact:
+        attached = ", ".join(f"{count} {label}" for label, count in impact.items())
+        raise ValidationError(
+            f"'{subject.code}' still has {attached} attached, so it cannot be "
+            "deleted — removing it would also remove that history. Deactivate "
+            "the subject instead; it stays in old results but stops appearing in "
+            "new pickers."
+        )
+    label = subject.code
+    try:
+        subject.delete()
+    except ProtectedError as exc:
+        raise ValidationError(
+            f"'{label}' is still referenced elsewhere, so it cannot be deleted. "
+            "Deactivate it instead."
+        ) from exc
+    log_action(
+        actor=actor,
+        action="academics.subject_deleted",
+        content_type="academics.Subject",
+        object_id=None,
+        change_summary={"code": label},
+        request=request,
+    )
+
+
+@transaction.atomic
 def map_class_subject(
     *,
     school_class: SchoolClass,
@@ -323,6 +437,62 @@ def map_class_subject(
             "class": school_class.name,
             "subject": subject.code,
             "stream": stream.name if stream else None,
+        },
+        request=request,
+    )
+    return mapping
+
+
+@transaction.atomic
+def update_class_subject(
+    *,
+    mapping: ClassSubject,
+    school_class: SchoolClass,
+    subject: Subject,
+    stream: Stream | None = None,
+    actor: User | None = None,
+    request: HttpRequest | None = None,
+) -> ClassSubject:
+    """Re-point a mapping at a different class/stream/subject.
+
+    A mapping is the shape teacher assignments are built from, so it can only be
+    edited while no assignment is attached to it. When one is, the admin removes
+    the assignment first (teachers:assignment_delete), then edits the mapping —
+    editing underneath a live assignment would leave the teacher pointed at a
+    class they are no longer mapped to.
+    """
+    from apps.teachers.models import TeacherAssignment
+
+    before = {
+        "class": mapping.school_class.name,
+        "subject": mapping.subject.code,
+        "stream": mapping.stream.name if mapping.stream_id else None,
+    }
+    attached = TeacherAssignment.objects.filter(
+        school_class=mapping.school_class, subject=mapping.subject
+    ).count()
+    if attached:
+        raise ValidationError(
+            f"{mapping.subject.code} in {mapping.school_class.name} has "
+            f"{attached} teacher assignment(s) attached. Remove those first, "
+            "then change the mapping."
+        )
+    mapping.school_class = school_class
+    mapping.subject = subject
+    mapping.stream = stream
+    mapping.save()
+    log_action(
+        actor=actor,
+        action="academics.class_subject_updated",
+        content_type="academics.ClassSubject",
+        object_id=mapping.pk,
+        change_summary={
+            "before": before,
+            "after": {
+                "class": mapping.school_class.name,
+                "subject": mapping.subject.code,
+                "stream": mapping.stream.name if mapping.stream_id else None,
+            },
         },
         request=request,
     )

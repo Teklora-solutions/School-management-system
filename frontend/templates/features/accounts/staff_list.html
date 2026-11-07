@@ -83,7 +83,10 @@
             </td>
             <td class="text-muted-sm">{{ u.date_joined|date:"d M Y" }}</td>
             <td class="text-end">
-              <a href="{% url 'accounts:staff_detail' u.pk %}" class="btn btn-sm btn-outline-primary" id="btn-view-staff-{{ u.pk }}">
+              <a href="{% url 'accounts:staff_update' u.pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm btn-outline-secondary" id="btn-edit-staff-{{ u.pk }}" title="Edit {{ u.get_full_name|default:u.username }}" aria-label="Edit {{ u.get_full_name|default:u.username }}">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+              <a href="{% url 'accounts:staff_detail' u.pk %}" class="btn btn-sm btn-outline-primary ms-1" id="btn-view-staff-{{ u.pk }}">
                 <i class="bi bi-eye"></i>
               </a>
             </td>

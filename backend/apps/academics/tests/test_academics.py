@@ -12,6 +12,8 @@ Covers:
   - a year cannot be deleted while it is current or still pointed at
   - classes with optional streams
   - class–subject mapping uniqueness
+  - subject edit, deactivate, and the guarded delete
+  - re-pointing a class–subject mapping
 """
 
 from __future__ import annotations
@@ -24,10 +26,13 @@ from django.urls import reverse
 
 from apps.dashboards.tests.fixtures import make_user
 from apps.finance.models import FeeStructure
+from apps.homework.models import Homework
+from apps.results.models import ResultSheet
+from apps.teachers.models import TeacherAssignment, TeacherProfile
 
-from .. import calendar
-from ..forms import AcademicYearCreateForm, TermForm
-from ..models import AcademicYear, ClassSubject, SchoolClass, Stream, Term
+from .. import calendar, selectors
+from ..forms import AcademicYearCreateForm, ClassSubjectForm, TermForm
+from ..models import AcademicYear, ClassSubject, SchoolClass, Stream, Subject, Term
 from ..services import (
     create_academic_year,
     create_academic_year_with_terms,
@@ -35,7 +40,11 @@ from ..services import (
     create_subject,
     create_term,
     delete_academic_year,
+    delete_subject,
     map_class_subject,
+    set_subject_active,
+    update_class_subject,
+    update_subject,
 )
 
 
@@ -409,3 +418,284 @@ class YearPickerViewTests(TestCase):
         )
         page = self.client.get(reverse("academics:year_list"))
         self.assertContains(page, "Legacy")
+
+
+class SubjectAndMappingMutationTests(TestCase):
+    """The admin's edit/delete privileges over subjects and their mappings."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = make_user("admin", username="mut_admin")
+        cls.teacher = make_user("teacher", username="mut_teacher")
+        cls.year = create_academic_year_with_terms(
+            start_year=2029, today=datetime.date(2026, 10, 21)
+        )
+        cls.class_5 = create_class(
+            academic_year=cls.year, name="Grade 5", level_order=5
+        )
+        cls.class_6 = create_class(
+            academic_year=cls.year, name="Grade 6", level_order=6
+        )
+        cls.term = cls.year.terms.get(name="term_1")
+
+    def make_subject(self, code="MATH"):
+        return create_subject(name="Mathematics", code=code)
+
+    def attach_homework(self, subject):
+        return Homework.objects.create(
+            title="Exercise 1",
+            subject=subject,
+            school_class=self.class_5,
+            term=self.term,
+            due_date=datetime.date(2029, 10, 5),
+        )
+
+    # --- subjects -------------------------------------------------------
+
+    def test_update_subject_normalises_code_and_keeps_history(self):
+        subject = create_subject(name="Maths", code="math")
+        updated = update_subject(
+            subject=subject, name="Mathematics", code=" mat ", is_active=True
+        )
+        self.assertEqual(updated.code, "MAT")
+        self.assertEqual(updated.name, "Mathematics")
+
+    def test_update_subject_rejects_a_duplicate_code(self):
+        create_subject(name="Mathematics", code="MATH")
+        subject = create_subject(name="Physics", code="PHY")
+        with self.assertRaises(ValidationError):
+            update_subject(
+                subject=subject, name="Physics", code="MATH", is_active=True
+            )
+
+    def test_a_blank_code_is_rejected_rather_than_deleted(self):
+        subject = self.make_subject()
+        with self.assertRaises(ValidationError):
+            update_subject(subject=subject, name="Mathematics", code="", is_active=True)
+        self.assertTrue(Subject.objects.filter(pk=subject.pk).exists())
+
+    def test_deactivate_hides_the_subject_from_active_lists(self):
+        subject = self.make_subject()
+        set_subject_active(subject=subject, is_active=False)
+        self.assertFalse(selectors.subject_list(active_only=True).filter(pk=subject.pk).exists())
+        set_subject_active(subject=subject, is_active=True)
+        self.assertTrue(selectors.subject_list(active_only=True).filter(pk=subject.pk).exists())
+
+    def test_delete_removes_an_unused_subject(self):
+        subject = self.make_subject(code="CS")
+        delete_subject(subject=subject)
+        self.assertFalse(Subject.objects.filter(pk=subject.pk).exists())
+
+    def test_delete_refuses_while_homework_is_attached(self):
+        subject = self.make_subject()
+        homework = self.attach_homework(subject)
+        with self.assertRaises(ValidationError) as caught:
+            delete_subject(subject=subject)
+        self.assertIn("Deactivate", " ".join(caught.exception.messages))
+        homework.delete()
+        delete_subject(subject=subject)
+        self.assertFalse(Subject.objects.filter(pk=subject.pk).exists())
+
+    def test_delete_refuses_while_marks_or_assignments_are_attached(self):
+        subject = self.make_subject(code="SCI")
+        ResultSheet.objects.create(
+            school_class=self.class_5, subject=subject, term=self.term
+        )
+        with self.assertRaises(ValidationError):
+            delete_subject(subject=subject)
+
+        profile = TeacherProfile.objects.create(
+            user=self.teacher, staff_id="SCI-T1"
+        )
+        TeacherAssignment.objects.create(
+            teacher=profile,
+            school_class=self.class_5,
+            subject=subject,
+            academic_year=self.year,
+        )
+        with self.assertRaises(ValidationError) as caught:
+            delete_subject(subject=subject)
+        message = " ".join(caught.exception.messages)
+        self.assertIn("teaching assignments", message)
+        self.assertIn("result sheets", message)
+
+    # --- subject views ---------------------------------------------------
+
+    def test_admin_edits_a_subject_from_the_list(self):
+        self.client.force_login(self.admin)
+        subject = self.make_subject()
+        page = self.client.get(reverse("academics:subject_list"))
+        edit_url = reverse("academics:subject_update", args=[subject.pk])
+        self.assertContains(page, f'href="{edit_url}"')
+        edit_page = self.client.get(edit_url)
+        self.assertContains(edit_page, "Edit MATH")
+        self.assertContains(edit_page, 'value="Mathematics"')
+        response = self.client.post(
+            edit_url,
+            {"name": "Mathematics", "code": "MTH", "is_active": "on"},
+        )
+        self.assertRedirects(response, reverse("academics:subject_list"))
+        subject.refresh_from_db()
+        self.assertEqual(subject.code, "MTH")
+
+    def test_a_taken_code_is_shown_on_the_edit_form(self):
+        self.client.force_login(self.admin)
+        create_subject(name="Mathematics", code="MATH")
+        subject = create_subject(name="Physics", code="PHY")
+        response = self.client.post(
+            reverse("academics:subject_update", args=[subject.pk]),
+            {"name": "Physics", "code": "MATH", "is_active": "on"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already exists")
+        subject.refresh_from_db()
+        self.assertEqual(subject.code, "PHY")
+
+    def test_toggle_and_delete_run_from_the_list(self):
+        self.client.force_login(self.admin)
+        subject = self.make_subject(code="HIS")
+        self.client.post(reverse("academics:subject_toggle_active", args=[subject.pk]))
+        subject.refresh_from_db()
+        self.assertFalse(subject.is_active)
+        response = self.client.post(reverse("academics:subject_delete", args=[subject.pk]))
+        self.assertRedirects(response, reverse("academics:subject_list"))
+        self.assertFalse(Subject.objects.filter(pk=subject.pk).exists())
+
+    def test_a_subject_with_history_survives_a_delete_attempt(self):
+        self.client.force_login(self.admin)
+        subject = self.make_subject(code="GEO")
+        self.attach_homework(subject)
+        response = self.client.post(
+            reverse("academics:subject_delete", args=[subject.pk]), follow=True
+        )
+        self.assertTrue(Subject.objects.filter(pk=subject.pk).exists())
+        self.assertTrue(Homework.objects.filter(subject=subject).exists())
+        self.assertContains(response, "cannot be deleted")
+
+    def test_a_non_admin_cannot_edit_or_delete_a_subject(self):
+        self.client.force_login(self.teacher)
+        subject = self.make_subject()
+        for url, payload in [
+            (reverse("academics:subject_update", args=[subject.pk]), {"name": "X", "code": "X1", "is_active": "on"}),
+            (reverse("academics:subject_toggle_active", args=[subject.pk]), {}),
+            (reverse("academics:subject_delete", args=[subject.pk]), {}),
+        ]:
+            response = self.client.post(url, payload)
+            self.assertEqual(response.status_code, 403, url)
+        self.assertTrue(Subject.objects.filter(pk=subject.pk).exists())
+
+    # --- class–subject mappings -----------------------------------------
+
+    def test_repointing_a_mapping_moves_it_to_another_class(self):
+        subject = self.make_subject()
+        mapping = map_class_subject(school_class=self.class_5, subject=subject)
+        update_class_subject(
+            mapping=mapping, school_class=self.class_6, subject=subject, stream=None
+        )
+        mapping.refresh_from_db()
+        self.assertEqual(mapping.school_class, self.class_6)
+        self.assertFalse(
+            ClassSubject.objects.filter(school_class=self.class_5, pk=mapping.pk).exists()
+        )
+
+    def test_editing_a_mapping_cannot_collide_with_an_existing_one(self):
+        subject = self.make_subject()
+        map_class_subject(school_class=self.class_6, subject=subject)
+        mapping = map_class_subject(school_class=self.class_5, subject=subject)
+        form = ClassSubjectForm(
+            {"school_class": self.class_6.pk, "subject": subject.pk},
+            instance=mapping,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("already exists", form.errors["subject"][0])
+
+    def test_renaming_without_changing_targets_is_valid(self):
+        subject = self.make_subject()
+        mapping = map_class_subject(school_class=self.class_5, subject=subject)
+        form = ClassSubjectForm(
+            {"school_class": self.class_5.pk, "subject": subject.pk},
+            instance=mapping,
+        )
+        self.assertTrue(form.is_valid())
+
+    def test_a_mapping_with_a_teacher_assignment_cannot_be_repointed(self):
+        subject = self.make_subject(code="BIO")
+        mapping = map_class_subject(school_class=self.class_5, subject=subject)
+        profile = TeacherProfile.objects.create(user=self.teacher, staff_id="BIO-T1")
+        TeacherAssignment.objects.create(
+            teacher=profile,
+            school_class=self.class_5,
+            subject=subject,
+            academic_year=self.year,
+        )
+        with self.assertRaises(ValidationError) as caught:
+            update_class_subject(
+                mapping=mapping, school_class=self.class_6, subject=subject, stream=None
+            )
+        self.assertIn("teacher assignment", " ".join(caught.exception.messages))
+        mapping.refresh_from_db()
+        self.assertEqual(mapping.school_class, self.class_5)
+
+    def test_admin_edits_a_mapping_from_the_class_page(self):
+        self.client.force_login(self.admin)
+        subject = self.make_subject(code="CRC")
+        mapping = map_class_subject(school_class=self.class_5, subject=subject)
+        class_page = self.client.get(reverse("academics:class_detail", args=[self.class_5.pk]))
+        self.assertContains(class_page, f"/academics/class-subjects/{mapping.pk}/edit/")
+        response = self.client.post(
+            reverse("academics:class_subject_update", args=[mapping.pk]),
+            {
+                "school_class": self.class_6.pk,
+                "subject": subject.pk,
+                "next": reverse("academics:class_detail", args=[self.class_5.pk]),
+            },
+            follow=True,
+        )
+        self.assertRedirects(
+            response, reverse("academics:class_detail", args=[self.class_5.pk])
+        )
+        mapping.refresh_from_db()
+        self.assertEqual(mapping.school_class, self.class_6)
+
+    def test_edit_mapping_page_carries_the_current_row_and_return_path(self):
+        self.client.force_login(self.admin)
+        subject = self.make_subject(code="BUS")
+        mapping = map_class_subject(school_class=self.class_5, subject=subject)
+        class_url = reverse("academics:class_detail", args=[self.class_5.pk])
+        edit_url = reverse("academics:class_subject_update", args=[mapping.pk])
+        list_page = self.client.get(class_url)
+        self.assertContains(list_page, f'href="{edit_url}?next={class_url}"')
+        page = self.client.get(f"{edit_url}?next={class_url}")
+        self.assertContains(page, f'href="{class_url}"', count=2)  # Back + Cancel
+        self.assertContains(page, "Save Changes")
+        self.assertContains(
+            page, f'<option value="{self.class_5.pk}" selected>'
+        )
+        self.assertContains(page, f'<option value="{subject.pk}" selected>')
+
+    def test_a_mapping_edit_that_collides_redraws_the_form(self):
+        self.client.force_login(self.admin)
+        subject = self.make_subject(code="GEO")
+        map_class_subject(school_class=self.class_6, subject=subject)
+        mapping = map_class_subject(school_class=self.class_5, subject=subject)
+        response = self.client.post(
+            reverse("academics:class_subject_update", args=[mapping.pk]),
+            {"school_class": self.class_6.pk, "subject": subject.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        mapping.refresh_from_db()
+        self.assertEqual(mapping.school_class, self.class_5)
+
+    def test_a_bad_next_target_is_ignored_after_an_edit(self):
+        self.client.force_login(self.admin)
+        subject = self.make_subject(code="AGR")
+        mapping = map_class_subject(school_class=self.class_5, subject=subject)
+        response = self.client.post(
+            reverse("academics:class_subject_update", args=[mapping.pk]),
+            {
+                "school_class": self.class_6.pk,
+                "subject": subject.pk,
+                "next": "https://not-this-site.example.com/",
+            },
+        )
+        self.assertRedirects(response, reverse("academics:class_subject_list"))

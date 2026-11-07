@@ -13,7 +13,7 @@ from .models import (
     ResultSheet,
     ScoreEntry,
 )
-from .services import grade_bands_for_class
+from .services import grade_bands_for_class, resolve_grade_for_school_class
 
 
 def grading_for_year(year_id: int) -> dict:
@@ -530,3 +530,68 @@ def class_teacher_remark(*, student_id: int, term_id: int):
         .select_related("class_teacher")
         .first()
     )
+
+
+def report_card_context(
+    *,
+    student,
+    term,
+    identity: dict,
+    entries: list | None = None,
+    positions: dict[int, dict] | None = None,
+) -> dict | None:
+    """
+    Every field one report card page needs, assembled in one place.
+
+    ``entries`` and ``positions`` may be handed in by a caller that already
+    fetched them for a whole class or school; left out, the published rows are
+    looked up here. ``None`` comes back when the pupil has no published results
+    for the term — that is what lets a bulk download skip the pupil and a
+    single request answer 404.
+
+    The arithmetic is done on the rows rather than with SQL aggregates so a
+    pre-fetched list produces exactly the same card as a fresh query.
+    """
+    if entries is None:
+        entries = list(
+            student_published_results(student_id=student.pk, term_id=term.pk)
+        )
+    if not entries:
+        return None
+    if positions is None:
+        positions = student_class_positions(student_id=student.pk, term_id=term.pk)
+
+    scored = [entry.total for entry in entries if entry.total is not None]
+    grand_total = sum(scored) if scored else 0
+    average = round(float(sum(scored) / len(scored)), 1) if scored else 0.0
+
+    overall_grade = ""
+    class_teacher_name = ""
+    if student.current_class_id:
+        overall_grade, _, _ = resolve_grade_for_school_class(
+            student.current_class, average, term.academic_year_id
+        )
+        class_teacher = student.current_class.class_teacher
+        if class_teacher:
+            class_teacher_name = (
+                class_teacher.get_full_name()
+                or class_teacher.email
+                or class_teacher.username
+            )
+
+    return {
+        "student": student,
+        "term": term,
+        "entries": entries,
+        "positions": positions,
+        "average": average,
+        "grand_total": grand_total,
+        "overall_grade": overall_grade,
+        "class_teacher_name": class_teacher_name,
+        "term_position": (
+            student_term_position(student_id=student.pk, term_id=term.pk)
+            if identity["show_positions"]
+            else None
+        ),
+        "ct_remark": class_teacher_remark(student_id=student.pk, term_id=term.pk),
+    }

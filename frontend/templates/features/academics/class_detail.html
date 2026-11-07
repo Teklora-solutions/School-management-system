@@ -86,7 +86,7 @@
         {% if class_subjects %}
         <table class="table table-hover align-middle mb-0">
           <thead>
-            <tr><th>Subject</th><th>Stream</th><th class="text-end">Remove</th></tr>
+            <tr><th>Subject</th><th>Stream</th><th class="text-end">Actions</th></tr>
           </thead>
           <tbody>
             {% for cs in class_subjects %}
@@ -94,14 +94,21 @@
               <td class="fw-600">{{ cs.subject.name }} <span class="text-muted-sm">({{ cs.subject.code }})</span></td>
               <td class="text-muted-sm">{{ cs.stream.name|default:"All streams" }}</td>
               <td class="text-end">
-                <form method="post" action="{% url 'academics:class_subject_remove' cs.pk %}"
-                      onsubmit="return confirm('Remove {{ cs.subject.code }} from this class?')">
-                  {% csrf_token %}
-                  <input type="hidden" name="next" value="{% url 'academics:class_detail' school_class.pk %}">
-                  <button type="submit" class="btn btn-sm btn-outline-danger" id="btn-remove-cs-{{ cs.pk }}">
-                    <i class="bi bi-x-lg"></i>
-                  </button>
-                </form>
+                <div class="d-inline-flex gap-1">
+                  <a href="{% url 'academics:class_subject_update' cs.pk %}?next={{ request.get_full_path }}"
+                     class="btn btn-sm btn-outline-secondary" id="btn-edit-cs-{{ cs.pk }}"
+                     title="Edit mapping" aria-label="Edit {{ cs.subject.code }} in {{ school_class.name }}">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <form method="post" action="{% url 'academics:class_subject_remove' cs.pk %}"
+                        onsubmit="return confirm('Remove {{ cs.subject.code }} from this class?')">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'academics:class_detail' school_class.pk %}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" id="btn-remove-cs-{{ cs.pk }}">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </form>
+                </div>
               </td>
             </tr>
             {% endfor %}

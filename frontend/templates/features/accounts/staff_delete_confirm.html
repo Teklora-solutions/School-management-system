@@ -1,0 +1,94 @@
+{% extends base_template %}
+
+{% block title %}Delete Staff Account | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-person-x me-2" style="color:var(--color-danger);" aria-hidden="true"></i>
+    Delete {{ staff_user.full_name }}?
+  </h1>
+  <p class="page-subtitle">
+    {{ staff_user.get_role_display }} · {{ staff_user.email }}
+    · login:
+    {% if staff_user.is_active %}<span class="badge" style="background:var(--color-success);color:#fff;">active</span>
+    {% else %}<span class="badge" style="background:var(--color-danger);color:#fff;">deactivated</span>{% endif %}
+  </p>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">What this deletes</h2>
+      </div>
+      <div class="card-body">
+        {% if refusals %}
+          <div class="alert alert-danger" role="alert" id="delete-blocked">
+            <div class="fw-600 mb-1">This account cannot be deleted yet.</div>
+            <ul class="mb-0">
+              {% for reason in refusals %}<li>{{ reason }}</li>{% endfor %}
+            </ul>
+            <div class="mt-2">
+              Deactivating keeps the account and its history, and is reversible —
+              use it if the person has simply left.
+            </div>
+          </div>
+        {% else %}
+          <div class="alert alert-warning" role="alert" id="delete-warning">
+            <div class="fw-600 mb-1">This is permanent.</div>
+            Deleting removes the account, the sign-in and the staff record for
+            <strong>{{ staff_user.full_name }}</strong>. There is no undo.
+          </div>
+        {% endif %}
+
+        <dl class="row">
+          <dt class="col-sm-4">Gone with the account</dt>
+          <dd class="col-sm-8">
+            {% if forecast.destroyed %}
+              <ul class="list-unstyled mb-0">
+                {% for label, count in forecast.destroyed.items %}
+                  <li>{{ count }} {{ label }}{{ count|pluralize }}</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <span class="text-muted-sm">Nothing else is attached.</span>
+            {% endif %}
+          </dd>
+
+          <dt class="col-sm-4">Kept, but unsigned</dt>
+          <dd class="col-sm-8">
+            {% if forecast.blanked %}
+              <div class="text-muted-sm mb-1">
+                These records stay in the books and in the results, but the name on
+                them is cleared and cannot be put back:
+              </div>
+              <ul class="list-unstyled mb-0">
+                {% for label, count in forecast.blanked.items %}
+                  <li>{{ count }} {{ label }}{{ count|pluralize }}</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <span class="text-muted-sm">Nothing they posted is still on record.</span>
+            {% endif %}
+          </dd>
+        </dl>
+      </div>
+      <div class="card-footer d-flex gap-2 justify-content-end">
+        <a href="{% url 'accounts:staff_detail' staff_user.pk %}" class="btn btn-outline-secondary" id="btn-cancel-staff-delete">
+          <i class="bi bi-arrow-left me-1"></i>Cancel
+        </a>
+        {% if not refusals %}
+        <form method="post" id="staff-delete-form"
+              onsubmit="return confirm('Delete {{ staff_user.full_name }} and their login? This cannot be undone.');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger" id="btn-confirm-staff-delete">
+            <i class="bi bi-person-x me-1"></i>Delete account and login
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

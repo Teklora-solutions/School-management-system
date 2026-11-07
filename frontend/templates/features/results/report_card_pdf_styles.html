@@ -1,0 +1,60 @@
+{# Report card stylesheet — shared by the single card and multi-card packs. #}
+  <style>
+    @page { size: A4; margin: 14mm 14mm 16mm 14mm; }
+    * { box-sizing: border-box; }
+    body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; color: #1a1a1a; margin: 0; }
+    .page { max-width: 100%; }
+    /* A pack places one card per page; a lone card has no next sibling to break before. */
+    .page + .page { break-before: page; }
+
+    /* ── Identity header ─────────────────────────────────────────────── */
+    .identity { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #1f3a5f; padding-bottom: 10px; }
+    .identity .crest { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; }
+    .identity .crest-placeholder { width: 76px; height: 76px; flex: 0 0 auto; border: 2px solid #1f3a5f; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-weight: 700; color: #1f3a5f; font-size: 20pt; }
+    .identity .who { flex: 1 1 auto; text-align: center; }
+    .identity .school-name { font-size: 21pt; font-weight: 700; letter-spacing: 0.02em; color: #1f3a5f; }
+    .identity .school-motto { font-size: 10pt; font-style: italic; color: #555; margin-top: 2px; }
+    .identity .contacts { font-size: 8.5pt; color: #666; margin-top: 5px; }
+
+    .doc-title { background: #1f3a5f; color: #fff; text-align: center; font-size: 12.5pt; font-weight: 600;
+      letter-spacing: 0.14em; text-transform: uppercase; padding: 7px 0; margin: 14px 0; }
+
+    /* ── Meta + summary ──────────────────────────────────────────────── */
+    .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 10pt; }
+    .meta-table td { padding: 3px 8px; vertical-align: top; }
+    .meta-table td.k { font-weight: 600; color: #444; width: 130px; }
+    .meta-table td.v { width: 37%; }
+
+    .summary-band { display: flex; gap: 10px; margin-bottom: 16px; }
+    .stat { flex: 1 1 0; border: 1px solid #ccd4de; border-radius: 6px; padding: 9px 6px 7px; text-align: center; }
+    .stat .label { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7686; }
+    .stat .value { font-size: 16pt; font-weight: 700; color: #1f3a5f; margin-top: 2px; }
+
+    /* ── Results table ───────────────────────────────────────────────── */
+    .results-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    .results-table th { background: #1f3a5f; color: #fff; padding: 7px 10px; font-size: 9.5pt; text-align: left; }
+    .results-table th.center, .results-table td.center { text-align: center; }
+    .results-table td { padding: 6px 10px; border-bottom: 1px solid #dde3ea; font-size: 10pt; }
+    .results-table tbody tr:nth-child(even) td { background: #f4f6f9; }
+    .results-table tfoot td { border-top: 2px solid #1f3a5f; font-weight: 700; background: #eef1f6; }
+    .grade-a { color: #1a7f37; font-weight: 700; }
+    .grade-b { color: #0550ae; font-weight: 700; }
+    .grade-c { color: #7d4e00; font-weight: 700; }
+    .grade-f { color: #cf222e; font-weight: 700; }
+
+    .remark-box { border: 1px solid #ccd4de; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; }
+    .remark-box .label { font-size: 8.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+      color: #6b7686; margin-bottom: 4px; }
+    .remark-box .text { font-size: 10.5pt; font-style: italic; }
+
+    .note { font-size: 8.5pt; color: #666; margin: 0 0 18px; }
+
+    /* ── Signatures ──────────────────────────────────────────────────── */
+    .signatures { display: flex; gap: 48px; margin-top: 42px; page-break-inside: avoid; }
+    .sig { flex: 1 1 0; text-align: center; }
+    .sig .line { border-top: 1px solid #333; margin-bottom: 5px; padding-top: 5px; font-weight: 600; font-size: 9.5pt; }
+    .sig .sub { font-size: 8.5pt; color: #666; }
+
+    .footer { margin-top: 26px; border-top: 1px solid #ccc; padding-top: 8px; font-size: 8pt; color: #888; text-align: center; }
+  </style>

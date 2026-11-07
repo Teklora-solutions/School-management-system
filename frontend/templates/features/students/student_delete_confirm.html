@@ -1,0 +1,96 @@
+{% extends base_template %}
+
+{% block title %}Delete Student | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-person-x me-2" style="color:var(--color-danger);" aria-hidden="true"></i>
+    Delete {{ student.user.full_name }}?
+  </h1>
+  <p class="page-subtitle">
+    {{ student.admission_number }} ·
+    {{ student.current_class.name|default:"No class" }}{% if student.current_stream %} / {{ student.current_stream.name }}{% endif %}
+    · {{ student.get_status_display }}
+  </p>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">What this deletes</h2>
+      </div>
+      <div class="card-body">
+        {% if not can_delete %}
+          <div class="alert alert-danger" role="alert" id="delete-blocked">
+            <div class="fw-600 mb-1">This account cannot be deleted.</div>
+            Fee, payment or attendance rows protect this pupil, and the database
+            refuses the delete to keep the money trail intact. To remove the pupil
+            you would first have to delete those records — do that only if they
+            were entered in error.
+            <ul class="mb-0 mt-2">
+              {% for label, count in forecast.blockers.items %}
+                <li>{{ count }} {{ label }}{{ count|pluralize }}</li>
+              {% endfor %}
+            </ul>
+            <div class="mt-2">
+              To stop this pupil signing in without deleting anything, use
+              <strong>Disable Login</strong> on
+              <a href="{% url 'students:detail' student.pk %}">their page</a> —
+              it is reversible.
+            </div>
+          </div>
+        {% else %}
+          <div class="alert alert-warning" role="alert" id="delete-warning">
+            <div class="fw-600 mb-1">This is permanent.</div>
+            Deleting removes the pupil record <strong>and the portal login</strong>
+            for <strong>{{ student.user.full_name }}</strong>
+            ({{ student.user.email }}). There is no undo, and no history keeps a
+            copy of the account.
+          </div>
+          <dl class="row">
+            <dt class="col-sm-4">Gone with the record</dt>
+            <dd class="col-sm-8">
+              {% if forecast.destroyed %}
+                <ul class="list-unstyled mb-0">
+                  {% for label, count in forecast.destroyed.items %}
+                    <li>{{ count }} {{ label }}{{ count|pluralize }}</li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                <span class="text-muted-sm">Nothing else is attached.</span>
+              {% endif %}
+            </dd>
+
+            {% if forecast.links %}
+            <dt class="col-sm-4">Rules they appear in</dt>
+            <dd class="col-sm-8">
+              <ul class="list-unstyled mb-0">
+                {% for label, count in forecast.links.items %}
+                  <li>{{ count }} {{ label }}{{ count|pluralize }} — the rule stays, the pupil drops out of it</li>
+                {% endfor %}
+              </ul>
+            </dd>
+            {% endif %}
+          </dl>
+        {% endif %}
+      </div>
+      <div class="card-footer d-flex gap-2 justify-content-end">
+        <a href="{% url 'students:detail' student.pk %}" class="btn btn-outline-secondary" id="btn-cancel-student-delete">
+          <i class="bi bi-arrow-left me-1"></i>Cancel
+        </a>
+        {% if can_delete %}
+        <form method="post" id="student-delete-form"
+              onsubmit="return confirm('Delete {{ student.user.full_name }} ({{ student.admission_number }}) and their login? This cannot be undone.');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger" id="btn-confirm-student-delete">
+            <i class="bi bi-person-x me-1"></i>Delete pupil and login
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

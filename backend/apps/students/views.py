@@ -9,6 +9,8 @@ from __future__ import annotations
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import DetailView, ListView
 
@@ -22,8 +24,41 @@ from .forms import (
     PromotionCommitForm,
     PromotionPreviewForm,
     StudentCreateForm,
+    StudentUpdateForm,
 )
 from .models import BulkImportJob, Student
+
+
+def _safe_next(request, include_post: bool = False) -> str:
+    """
+    A ``next`` value, but only if it points back at this site.
+
+    The staff list hands the edit page its filtered URL so that saving returns
+    the admin to the same slice of pupils they were correcting.
+    """
+    raw = ""
+    if include_post:
+        raw = request.POST.get("next") or ""
+    raw = raw or request.GET.get("next") or ""
+    if not raw:
+        return ""
+    if url_has_allowed_host_and_scheme(
+        url=raw,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return raw
+    return ""
+
+
+def _add_service_errors(form, exc: ValidationError) -> None:
+    """Put a service-layer ``ValidationError`` onto the matching form fields."""
+    if hasattr(exc, "message_dict"):
+        for field, errs in exc.message_dict.items():
+            for err in errs:
+                form.add_error(field if field in form.fields else None, err)
+    else:
+        form.add_error(None, exc)
 
 
 class StudentListView(SchoolReadMixin, ListView):
@@ -98,12 +133,7 @@ class StudentCreateView(AdminRequiredMixin, View):
                     request=request,
                 )
             except ValidationError as exc:
-                if hasattr(exc, "message_dict"):
-                    for field, errs in exc.message_dict.items():
-                        for err in errs:
-                            form.add_error(field if field in form.fields else None, err)
-                else:
-                    form.add_error(None, exc)
+                _add_service_errors(form, exc)
             else:
                 initial_password = (
                     form.cleaned_data.get("password") or student.admission_number
@@ -121,6 +151,166 @@ class StudentCreateView(AdminRequiredMixin, View):
                 )
                 return redirect("students:detail", pk=student.pk)
         return render(request, self.template_name, self._ctx(form))
+
+
+class StudentUpdateView(AdminRequiredMixin, View):
+    """
+    ``/students/<pk>/edit/`` — correct an enrolled pupil's record.
+
+    Field scope and the admission-number/username coupling are the service's
+    decision; see ``services.update_student``.
+    """
+
+    template_name = "features/students/student_edit.html"
+
+    def _get_student(self, pk):
+        # ``selectors.get_student`` raises the model's DoesNotExist, which a plain
+        # View would turn into a 500; the 404 belongs here.
+        return get_object_or_404(selectors.student_list(), pk=pk)
+
+    def _initial(self, student) -> dict:
+        return {
+            "first_name": student.user.first_name,
+            "last_name": student.user.last_name,
+            "email": student.user.email,
+            "admission_number": student.admission_number,
+            "date_of_birth": student.date_of_birth,
+            "gender": student.gender,
+            "enrollment_date": student.enrollment_date,
+            "status": student.status,
+            "current_class": student.current_class,
+            "current_stream": student.current_stream,
+            "address": student.address,
+        }
+
+    def _render(self, request, student, form):
+        return render(
+            request,
+            self.template_name,
+            {
+                "student": student,
+                "form": form,
+                "back_url": _safe_next(request) or reverse_lazy(
+                    "students:detail", args=[student.pk]
+                ),
+            },
+        )
+
+    def get(self, request, pk):
+        student = self._get_student(pk)
+        return self._render(request, student, StudentUpdateForm(initial=self._initial(student)))
+
+    def post(self, request, pk):
+        student = self._get_student(pk)
+        form = StudentUpdateForm(request.POST)
+        if form.is_valid():
+            previous_admission = student.admission_number
+            try:
+                student = services.update_student(
+                    student=student,
+                    first_name=form.cleaned_data["first_name"],
+                    last_name=form.cleaned_data["last_name"],
+                    email=form.cleaned_data["email"],
+                    admission_number=form.cleaned_data["admission_number"],
+                    gender=form.cleaned_data.get("gender", ""),
+                    date_of_birth=form.cleaned_data.get("date_of_birth"),
+                    enrollment_date=form.cleaned_data.get("enrollment_date"),
+                    current_class=form.cleaned_data.get("current_class"),
+                    current_stream=form.cleaned_data.get("current_stream"),
+                    address=form.cleaned_data.get("address", ""),
+                    status=form.cleaned_data["status"],
+                    actor=request.user,
+                    request=request,
+                )
+            except ValidationError as exc:
+                _add_service_errors(form, exc)
+            else:
+                messages.success(
+                    request, f"Student record updated for {student.user.full_name}."
+                )
+                if student.admission_number != previous_admission:
+                    messages.warning(
+                        request,
+                        f"Admission number moved from {previous_admission} to "
+                        f"{student.admission_number}, and the login account is now "
+                        f"'{student.user.username}'. The password was not changed — if "
+                        "it was the old number, have the pupil use Forgot password.",
+                    )
+                next_url = _safe_next(request, include_post=True)
+                if next_url:
+                    return redirect(next_url)
+                return redirect("students:detail", pk=student.pk)
+        return self._render(request, student, form)
+
+
+class StudentLoginDisableView(AdminRequiredMixin, View):
+    """Cut a pupil's portal sign-in without touching their record."""
+
+    def post(self, request, pk):
+        student = get_object_or_404(selectors.student_list(), pk=pk)
+        services.set_student_login_active(
+            student=student, active=False, actor=request.user, request=request
+        )
+        messages.success(
+            request,
+            f"{student.user.full_name} cannot sign in to the student portal any "
+            "more — an open session on another device stops working at its next "
+            "request. Marks, fees, attendance and guardian links are unchanged.",
+        )
+        return redirect("students:detail", pk=pk)
+
+
+class StudentLoginEnableView(AdminRequiredMixin, View):
+    """Restore a disabled pupil login."""
+
+    def post(self, request, pk):
+        student = get_object_or_404(selectors.student_list(), pk=pk)
+        services.set_student_login_active(
+            student=student, active=True, actor=request.user, request=request
+        )
+        messages.success(
+            request, f"{student.user.full_name} can sign in to the portal again."
+        )
+        return redirect("students:detail", pk=pk)
+
+
+class StudentDeleteView(AdminRequiredMixin, View):
+    """Show what a pupil delete would cost, then perform it or refuse."""
+
+    def _student_or_404(self, pk):
+        return get_object_or_404(selectors.student_list(), pk=pk)
+
+    def _render(self, request, student, forecast):
+        return render(
+            request,
+            "features/students/student_delete_confirm.html",
+            {
+                "student": student,
+                "forecast": forecast,
+                "can_delete": not forecast["blockers"],
+            },
+        )
+
+    def get(self, request, pk):
+        student = self._student_or_404(pk)
+        return self._render(
+            request, student, services.student_delete_forecast(student)
+        )
+
+    def post(self, request, pk):
+        student = self._student_or_404(pk)
+        try:
+            label = services.delete_student(
+                student=student, actor=request.user, request=request
+            )
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+            # Nothing was removed, so the same record is still on screen.
+            return self._render(
+                request, student, services.student_delete_forecast(student)
+            )
+        messages.success(request, f"{label} and their portal login were deleted.")
+        return redirect("students:list")
 
 
 class StudentPDFView(AdminRequiredMixin, View):

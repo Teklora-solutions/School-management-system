@@ -96,9 +96,17 @@
               {% else %}
                 <span class="badge" style="background:var(--color-danger);color:#fff;">Withdrawn</span>
               {% endif %}
+              {% if not s.user.is_active %}
+                <span class="badge" style="background:#6c757d;color:#fff;" title="This pupil cannot sign in to the student portal.">Login disabled</span>
+              {% endif %}
             </td>
             <td class="text-end">
-              <a href="{% url 'students:detail' s.pk %}" class="btn btn-sm btn-outline-primary">
+              {% if request.user.role == "admin" %}
+              <a href="{% url 'students:edit' s.pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm btn-outline-secondary" id="btn-edit-student-{{ s.pk }}" title="Edit {{ s.user.full_name }}" aria-label="Edit {{ s.user.full_name }}">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+              {% endif %}
+              <a href="{% url 'students:detail' s.pk %}" class="btn btn-sm btn-outline-primary ms-1">
                 <i class="bi bi-eye"></i>
               </a>
             </td>

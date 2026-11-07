@@ -153,6 +153,43 @@ class StaffUserCreateForm(forms.Form):
         return cleaned
 
 
+class StaffUserUpdateForm(forms.Form):
+    """
+    Edit an existing staff account's identity details.
+
+    No ``role`` field and no password field, on purpose: a role change means
+    moving the profile row that holds ``staff_id`` and re-deriving what the
+    account can see, and a password change belongs to
+    ``reset_user_password`` — the only path that audits it and emails the new
+    credentials. The view passes ``initial={"staff_id": …}`` because that value
+    lives on the role's profile row, not on the user.
+    """
+
+    first_name = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    last_name = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={"class": "form-control"}),
+        help_text="Staff sign in with this address, so the old one stops working once you save.",
+    )
+    phone = forms.CharField(
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    staff_id = forms.CharField(
+        max_length=30,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+        help_text="Saved on the role's profile row. Blank keeps the current ID.",
+    )
+
+
 class StaffUserFilterForm(forms.Form):
     search = forms.CharField(
         required=False,
