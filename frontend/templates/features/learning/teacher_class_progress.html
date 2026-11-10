@@ -1,0 +1,165 @@
+{% extends base_template %}
+
+{% block title %}Class Progress · {{ overview.school_class.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-graph-up me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Class Progress
+  </h1>
+  <p class="page-subtitle">
+    {{ overview.school_class.name }} · {{ overview.subject_name }}
+    {% if term %} · {{ term.get_name_display }}{% endif %}
+  </p>
+</div>
+
+{# ── Summary cards ── #}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ overview.rows|length }}</div>
+        <div class="stat-label">Students</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-check2-square" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ overview.started_count }}</div>
+        <div class="stat-label">Started</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-exclamation-circle" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ overview.not_started_count }}</div>
+        <div class="stat-label">Not started</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-bar-chart" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ overview.avg_pct }}%</div>
+        <div class="stat-label">Class average</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Behind alert ── #}
+{% if overview.behind_count %}
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
+  <i class="bi bi-person-exclamation fs-5" aria-hidden="true"></i>
+  <span>
+    <strong>{{ overview.behind_count }} student{{ overview.behind_count|pluralize }}</strong>
+    {% if overview.behind_count == 1 %}is{% else %}are{% endif %}
+    less than 25% through the course — consider reaching out to encourage them.
+  </span>
+</div>
+{% endif %}
+
+{# ── Student table ── #}
+{% if overview.rows %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-person-lines-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Student progress — {{ overview.total_lessons }} lesson{{ overview.total_lessons|pluralize }}
+    </h2>
+    <a href="{% url 'learning:class_engagement_settings' assignment.school_class.pk assignment.subject_id %}"
+       class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-gear me-1" aria-hidden="true"></i>Settings
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Student</th>
+            <th scope="col">Progress</th>
+            <th scope="col" class="text-center">Streak</th>
+            <th scope="col" class="text-center">Last active</th>
+            <th scope="col" class="text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in overview.rows %}
+          <tr {% if row.is_behind %}style="background:rgba(245,158,11,0.05);"{% endif %}>
+            <td>
+              <div class="fw-600">{{ row.student.user.full_name }}</div>
+              <div class="text-muted-sm">{{ row.student.admission_number }}</div>
+            </td>
+            <td style="min-width:140px;">
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:8px;border-radius:4px;background:var(--color-surface-2);"
+                     role="progressbar"
+                     aria-valuenow="{{ row.pct }}"
+                     aria-valuemin="0"
+                     aria-valuemax="100"
+                     aria-label="{{ row.student.user.full_name }} {{ row.pct }}%">
+                  <div class="progress-bar {% if row.pct == 100 %}bg-success{% elif row.is_behind %}bg-warning{% else %}bg-primary{% endif %}"
+                       style="width:{{ row.pct }}%;border-radius:4px;"></div>
+                </div>
+                <span class="text-muted-sm" style="white-space:nowrap;">{{ row.pct }}%</span>
+              </div>
+              <div class="text-muted-sm mt-1">{{ row.completed }} / {{ row.total }}</div>
+            </td>
+            <td class="text-center">
+              {% if row.current_streak > 0 %}
+              <span style="color:var(--color-warning);">
+                <i class="bi bi-fire" aria-hidden="true"></i> {{ row.current_streak }}
+              </span>
+              {% else %}
+              <span class="text-muted-sm">—</span>
+              {% endif %}
+            </td>
+            <td class="text-center text-muted-sm">
+              {% if row.last_active_date %}{{ row.last_active_date|date:"d M" }}{% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              {% if row.not_started %}
+              <span class="badge" style="background:var(--color-surface-2);color:var(--color-muted);">Not started</span>
+              {% elif row.is_behind %}
+              <span class="badge" style="background:rgba(245,158,11,0.15);color:var(--color-warning);">Encourage</span>
+              {% elif row.pct == 100 %}
+              <span class="badge" style="background:rgba(16,185,129,0.15);color:var(--color-success);">Complete</span>
+              {% else %}
+              <span class="badge" style="background:rgba(99,102,241,0.15);color:var(--accent-light);">In progress</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-people fs-1 d-block mb-2" aria-hidden="true"></i>
+    No active students found in this class.
+  </div>
+</div>
+{% endif %}
+
+<div class="mt-3 d-flex gap-2 flex-wrap">
+  <a href="{% url 'learning:teacher_classroom' assignment.school_class.pk assignment.subject_id %}"
+     class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Classroom
+  </a>
+  <a href="{% url 'learning:class_engagement_settings' assignment.school_class.pk assignment.subject_id %}"
+     class="btn btn-outline-secondary">
+    <i class="bi bi-gear me-1" aria-hidden="true"></i>Engagement Settings
+  </a>
+</div>
+{% endblock content %}

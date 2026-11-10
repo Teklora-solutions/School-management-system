@@ -58,6 +58,8 @@ backend/
 │   ├── attendance/    # AttendanceRegister/Entry (+ services, selectors) — UI still a stub
 │   ├── communications/# Announcement(+Read), MessageThread, ThreadMessage
 │   ├── dashboards/    # six role homes + the Director analytics suite
+│   ├── learning/      # Virtual School: course builder, lessons, quizzes, class feed, points/levels,
+│   │                  #   streaks, student notes, Markdown rendering — see §5a below
 │   ├── public/        # the school's open website at / and its editing screens at /website/
 │   └── public_site/   # DORMANT — not in INSTALLED_APPS, not routed. Dead code.
 ├── tests/             # cross-app integration, e2e role matrix, static-asset contract
@@ -305,8 +307,28 @@ inquiry / satisfaction; `open → in_progress → resolved`; `sender` + optional
 (replies, `is_opening`, attachments). Routes: announcements list/mark-read/mark-all-read, staff create,
 `messages/new/`, `messages/`, `messages/<pk>/`, and Admin/Director `inbox/` + `inbox/<pk>/`.
 
-### `dashboards` — `/dashboards/<role>/`
-Six role homes. `models.py` is an intentional stub. The Director suite (`views_director.py`) carries
+### `learning` — `/learning/` (Virtual School) — §5a
+
+The LMS is built on top of existing school data — classrooms are computed from `TeacherAssignment` + `ClassSubject` + `Term`, so a teacher's online classroom appears automatically with no extra setup.
+
+**Models (8 migrations, 0001–0008):**
+`CourseModule`, `Lesson` (notes with `notes_format` plain/markdown, `video_url`, up to 5 `LessonAttachment` rows), `LessonProgress`, `LessonAttachment`, `ClassEngagementSettings`, `LearningStreak`, `ClassPost`+`ClassPostReaction` (class feed), `PointConfig`+`PointLedger`+`StudentLevel` (points and levels), `StudentLessonNote` (private per-student), `Quiz`+`QuizQuestion`+`QuizChoice`+`QuizAttempt`+`QuizAttemptAnswer` (quizzes).
+
+**Services and selectors:**
+`course_services.py` (module/lesson CRUD, reorder, duplicate, copy course), `engagement_services.py` (lesson completion → streak refresh), `feed_services.py` (create/remove/pin posts, reactions), `points_services.py` (award_points, reverse_award, teacher_bonus, check_level_up), `quiz_services.py` (create/publish quiz, add questions/choices, edit-lock after submissions, start_or_resume_attempt, save_answer, submit_attempt with server-side marking, auto_submit_timed_out), `lesson_notes_services.py`, `markdown_utils.py` (safe Markdown→HTML via `markdown`+`bleach`), `video_utils.py` (parse_video_url: all YouTube formats + Vimeo + Drive; uses `youtube-nocookie.com`).
+
+**Feature flags** (all `SchoolSettings` Booleans, all default OFF):
+`learning_enabled` → gates all LMS pages · `engagement_enabled` → gates progress/streaks/points (also requires per-class `ClassEngagementSettings.is_active`) · `quizzes_enabled` → gates quiz builder and student quiz flow.
+
+**Security rules:**
+- Students can only access classrooms for their own class.
+- Quiz correct answers (`is_correct`) are **never sent to the browser before submission**.
+- Quiz questions are locked after the first submitted attempt (edit-lock with Duplicate-quiz escape hatch).
+- Student lesson notes are private: visible only to that student.
+- Class feed posts and reactions are class-scoped and teacher-moderated.
+- All LMS files served through permission-checked streaming views, never via MEDIA_URL.
+
+### `dashboards` — `/dashboards/<role>/` `models.py` is an intentional stub. The Director suite (`views_director.py`) carries
 class performance and per-class drilldown, class fee overview and debtors, staff directory, "Books of
 Account" (overview/ledger/trial balance), Excel exports via `core.exports` and a books PDF via
 `core.pdf`. `cache.py::invalidate_school_kpis` and `selectors.py` hold the KPI aggregation.
@@ -459,6 +481,7 @@ then calls `create_announcement(audience="by_role", target_roles=["student", "pa
 | `/finance/` | `finance` | FinanceRead / FinanceWrite | `overview`, `accounts/`, `fee-structures/` (+ upload/preview/commit/template), `invoices/` (+ generate), `payments/` (+ record/receipt/reverse), `adjustments/create/`, `ledger/`, `reports/{trial-balance,summary,classes,outstanding(+export)}`, student statements (HTML+PDF), class/school summaries, `expenses/`, `reminders/`, `my-statement/` |
 | `/homework/` | `homework` | Student/Parent + Teacher | List, detail, submit; teacher CRUD + publish + preview + submissions |
 | `/attendance/` | `attendance` | LoginRequired | **Stub** — `ComingSoonView` only |
+| `/learning/` | `learning` | mixed | Virtual School: classrooms, course builder, lessons, quizzes, class feed, progress, badges, points — 35+ named routes. Gated by `learning_enabled` / `engagement_enabled` / `quizzes_enabled` flags. |
 | `/communications/` | `communications` | mixed | Announcements, message threads, admin inbox |
 | `/dashboards/<role>/` | `dashboards` | per role | Six role homes + Director analytics |
 | `/audit/log/`, `/school/`, `/activity/` | `core*` | Admin | Audit viewer, School Settings, activity feed + daily report |
@@ -513,8 +536,7 @@ Per [ADR-004](../docs/decisions/observability.md):
   may aggregate); `business_events.log_event` = machine-greppable finance line events. Only invoice
   posting, payment recording/reversal and `results.published` reach the activity feed; adjustments,
   expenses, fee structures and enrolment are audit-only.
-- Database timestamps are UTC (`USE_TZ = True`) while display `TIME_ZONE = "Africa/Accra"`.
-- Sentry: only when `SENTRY_DSN` is set; `DjangoIntegration` + `LoggingIntegration` (INFO breadcrumbs,
+- Database timestamps are UTC (`USE_TZ = True`) while `TIME_ZONE = "Africa/Nairobi"` (EAT, UTC+3) governs display — Kenyan time. Changed from `Africa/Accra` during the LMS build; streak day-boundary calculations depend on this. `DjangoIntegration` + `LoggingIntegration` (INFO breadcrumbs,
   ERROR events), 10% tracing, `send_default_pii=False`.
 
 ---
@@ -523,7 +545,7 @@ Per [ADR-004](../docs/decisions/observability.md):
 
 ```bash
 cd backend
-python -m pytest -q                       # ~1,130 tests, 72 files — see backend/pytest.ini
+python -m pytest -q                       # ~1,566 tests, 80+ files — see backend/pytest.ini
 python -m pytest apps/finance -q          # one app
 python -m pytest tests/e2e -q             # role matrix across the whole URLconf
 python -m pytest --cov=apps --cov-report=term-missing
@@ -603,8 +625,7 @@ connections before `DROP/CREATE DATABASE`, prints a post-restore checklist.
    Do not run them.
 8. `apps/public_site/` is not installed; editing it changes nothing user-visible.
 9. `docs/SYSTEM_GUIDE.md` is the reference but has drifted in three places — the finance UI (30
-   templates exist, the doc says absent), results entry (the doc says no teacher UI), and the test count
-   (doc says 459; the suite collects 1,130). Trust the tree.
+9. `docs/SYSTEM_GUIDE.md` is the reference but has drifted — the finance UI, results entry and test count are all stale. Trust the tree and these READMEs.
 10. There is no CI and no pre-commit config; `black`/`pre-commit` are declared dependencies that nothing
-    runs. `manage.py check` + `ruff` + `pytest` + `makemigrations --check` by hand, before every
-    checkpoint.
+    runs. `manage.py check` + `ruff` + `pytest` + `makemigrations --check` by hand, before every checkpoint.
+11. The `learning` app has 8 migrations (0001–0008). Three later checkpoints add field migrations to existing models — always run `migrate` after pulling.

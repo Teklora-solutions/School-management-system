@@ -393,5 +393,39 @@ def submit_homework(
         },
         request=request,
     )
+
+    # ── Piece 3: award points for homework submission ────────────────────
+    # Only the FIRST submission earns points (existing is None).
+    # Resubmissions before the due date never earn a second award.
+    if not existing:
+        try:
+            from apps.learning.points_config import (
+                REASON_HW_LATE,
+                REASON_HW_ONTIME,
+                get_point_config,
+            )
+            from apps.learning.points_services import award_points
+
+            cfg = get_point_config()
+            reason   = REASON_HW_LATE if is_late else REASON_HW_ONTIME
+            pts      = cfg.pts_homework_late if is_late else cfg.pts_homework_ontime
+            label    = "late" if is_late else "on time"
+            idem_key = f"hw_{reason}:{homework.pk}:{student.pk}"
+
+            award_points(
+                student=student,
+                reason=reason,
+                points=pts,
+                description=f"Homework submitted {label}: {homework.title}",
+                idempotency_key=idem_key,
+            )
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning(
+                "Points award failed for homework %s student %s",
+                homework.pk,
+                student.pk,
+            )
+
     return submission
 

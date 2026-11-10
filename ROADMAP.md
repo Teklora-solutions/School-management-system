@@ -42,23 +42,26 @@ entries are dated rather than semver'd.
 |---|---|
 | Public website | Live at `/` (home, about, programmes, gallery, contact) with admin editing at `/website/` |
 | Login and portals | Portal chooser at `/login/`, per-role portals, forced first-login password change, staff self-reset blocked, Axes throttling keyed on credential+IP |
-| Admin portal | Staff directory, School Settings, audit log, activity feed + daily report, six role dashboards |
+| Admin portal | Staff directory, School Settings (now includes learning/engagement/quizzes switches), audit log, activity feed + daily report, six role dashboards |
 | Academics | Years, terms, classes, streams, subjects, class-subjects — years/terms have lifecycle actions, classes/streams/subjects are create-only |
 | Students | Roster, profile, admission PDFs, Excel bulk import with preview, promotion batches with idempotency |
 | Teachers | Profiles, per-year assignments with one-teacher-per-subject enforced, matrix, distribution, workload, my-classes, marks entry |
 | Results | Exam-only marks, `GradeScale` per year, `Draft → Submitted → Confirmed → Published` governance, report-card PDF with school identity + class position + CT remark + signature block, class broadsheet **PDF** with top-of-class callout |
 | Finance | Double-entry append-only ledger, fee structures/elections/discounts/plans, invoicing, receipts, reversals, adjustments, expenses, budgets, vendors, periods, approval queue, gap-free numbering, reports + Excel, statements + receipt PDFs, fee reminders |
-| Homework | Teacher authoring with publish/unpublish, 5-file caps, student/parent views, submissions with late flagging |
+| Homework | Teacher authoring with publish/unpublish, 5-file caps, student/parent views, submissions with late flagging. Points awarded on first submission through the engagement ledger. |
 | Communications | Announcements with scheduling and read tracking, complaint/inquiry threads with status workflow and admin inbox |
-| Attendance | **Models, services, selectors complete — no screens** (single `ComingSoonView` route) |
+| Attendance | **Models, services, selectors complete — no screens** (single `ComingSoonView` route). Checkpoint E will add the UI. |
+| **Virtual School — course builder** | Full teacher course builder: modules, lessons (Markdown notes sanitised via bleach, YouTube/Vimeo/Google Drive embeds, up to 5 attachments per lesson), publish/unpublish/reorder/duplicate, copy course to another term, preview-as-student, formatting toolbar. Student course outline with completion ticks, Continue button, progress bars, private per-lesson notes with autosave, course search. |
+| **Virtual School — engagement** | Streaks (school-days only, weekends/holidays transparent, configurable grace allowance), per-class on/off switch, teacher class-progress view (completion %, streak, who needs encouragement), student progress page, parent view. |
+| **Virtual School — class feed** | Teacher posts (announcement/tip/celebration/question), student questions, 5 safe emoji reactions (child-safe), teacher pin and soft-remove, no private 1:1 chat. Points awarded for student questions with daily cap and removal reversal. |
+| **Virtual School — points and levels** | 7 levels (Seedling → Legend), immutable point ledger with idempotency keys (no double-award), teacher manual bonus with required reason, reversal rows (never deletes), daily feed cap anti-farming, level-up in-app notification. Points from lessons, homework (on-time and late), feed questions, streak milestones, teacher bonus. Never from marks. |
+| **Virtual School — quizzes** | Teacher quiz builder (MC + True/False, up to 20 questions, explanations, shuffle, pass mark, attempt limits, optional time limit, show/hide correct answers, gradebook flag stored). Edit-lock after first submitted attempt + Duplicate quiz. Student take-quiz with AJAX answer autosave, resume after disconnect, server-side auto-submit on timeout. Results: score, pass/fail, question-by-question review (gated by teacher setting). Teacher results screen: per-student scores, class average, pass rate, difficulty ranking. Points: `pts_quiz_attempt` (first attempt, once) + `pts_quiz_pass` (first pass, once). Correct answers never sent to browser before submission. |
 | Public REST API | **None.** DRF installed and configured; zero serializers, viewsets or API views |
-| Test suite | **1,108 passed, 22 failed** on 2026-10-31 (~1,130 tests across 72 files). The 22 are pre-existing and are broken down in Q-1 |
+| Test suite | **1,566 passed, 22 failed** as of Checkpoint C (November 2026). The 22 are the same pre-existing failures from 2026-10-31: 17 `apps/public/tests/test_public_site.py`, 4 `apps/accounts`, 1 `tests/test_static_assets.py`. Zero new failures introduced across all LMS checkpoints. |
 | CI / CD | None. No `.github/`, no pipeline, no pre-commit config |
 | Deployment | Documented for one Linux box (gunicorn + nginx + Postgres); no containers |
 
-**Not part of this product:** `school-website/` is an unreferenced static mockup. `apps/public_site/` is a
-dormant app — not in `INSTALLED_APPS`, not routed, superseded by `apps/public`. (`nova-cash/`, an
-unrelated Next.js demo that briefly shared the repository, was removed on 2026-10-31.)
+**Not part of this product:** `school-website/` is an unreferenced static mockup. `apps/public_site/` is a dormant app — not in `INSTALLED_APPS`, not routed, superseded by `apps/public`.
 
 ---
 
@@ -71,12 +74,27 @@ Sizing is deliberately rough: **S** ≈ under an hour of agent work, **M** ≈ o
 
 | ID | Item | Why it is first | Size |
 |---|---|---|---|
-| **A-0** | **Restore the public-website content contract** (the Module 5 · P5 redesign area) | The school's front door is the only area with a large red block: **17 failing tests** in `apps/public/tests/test_public_site.py` pin rules the current templates do not meet — a shared public shell (`app-wrapper--public`, no role sidebar leaking to a signed-in parent), "not written yet" placeholders instead of invented copy, counters that match the tables, gallery publish-order, footer portal links, and the logo appearing only once a file is attached. Whether the contract or the redesign is right is the first question to settle; then a one-line fix in the same pass: `fonts.gstatic.com` preconnect is not in the offline allow-list, so `tests/test_static_assets.py` fails too. Nothing else in the queue is red | M |
-| **A-1** | **Attendance screens** (Module 3 · S0c) — register-per-class-per-day UI, teacher daily capture, class rate view, per-student history, and the rate card the student/parent/result screens already assume | The data layer is done and tested; only the templates/views/URLs are missing, so this is the cheapest large gap and it unblocks attendance on report cards (an option already offered and declined once, so confirm before adding it to the PDF) | L |
-| **A-2** | **Student lifecycle screens** — edit, withdraw, restore, graduate/delete-with-audit for a `Student` | Today a typo in an admission number or a pupil leaving is a `/django-admin/` job or a re-import. Statuses exist in the model; the screens do not | M |
-| **A-3** | **Academics edit screens** — class, stream and subject update views (and their delete guardrails) | Create-only today; corrections currently go through Django admin, which bypasses the service-layer audit trail | M |
-| **A-4** | **Class-teacher remark entry UI** (RC4 part) | The `ClassTeacherRemark` model, migration and report-card *display* are live; there is still no way for a class teacher to type the remark. A displayed field with no input path is a half-delivered feature | S |
-| **A-5** | **Teacher results analytics** (RC3 + RC4) — grade distribution per subject, per-student remark list, subject averages per class, previous-exam comparison incl. most-improved, class-teacher transcript | Approved rulings exist (comparison unit = previous exam of any name; published-only gate; all three meanings of "distribution remarks"). Nothing verified as built | L |
+| **A-0** | **Restore the public-website content contract** | 17 failing tests pin rules the current templates do not meet. Nothing else in the queue is red. | M |
+| **A-1** | **Attendance screens** — register-per-class-per-day UI, teacher daily capture, class rate view, per-student history | Data layer is done and tested; only templates/views/URLs are missing. This is Checkpoint E on the LMS roadmap. | L |
+| **A-2** | **Student lifecycle screens** — edit, withdraw, restore, graduate/delete-with-audit | Statuses exist; screens do not. Corrections go through `/django-admin/`. | M |
+| **A-3** | **Academics edit screens** — class, stream and subject update views | Create-only today; corrections bypass the service-layer audit trail. | M |
+| **A-4** | **Class-teacher remark entry UI** | Model, migration and report-card display are live; no input path. | S |
+| **A-5** | **Teacher results analytics** | Grade distribution, subject averages, most-improved, class-teacher transcript. | L |
+
+### Virtual School — LMS checkpoints (in progress)
+
+| ID | Item | Status |
+|---|---|---|
+| **LMS-A** | Course builder | ✅ **Done** — modules, lessons, attachments, publish/reorder/duplicate/copy |
+| **LMS-B** | Student lesson experience | ✅ **Done** — rendered Markdown, click-to-play video, next/prev nav, private notes, search |
+| **LMS-C** | Quizzes | ✅ **Done** — MC/TF, server-side marking, attempt limits, timer, points integration |
+| **LMS-D** | Live classes and shared calendar | 🔲 Next — teacher schedules a session, students see Join button, shared calendar per class |
+| **LMS-E** | Attendance screens | 🔲 Next — replaces the ComingSoonView stub using existing models |
+| **LMS-F** | Gradebook link | 🔲 Later — quiz scores/homework feed into gradebook; teacher controls what counts |
+| **LMS-G** | Virtual labs | 🔲 Later — PhET and other free simulations embedded in lessons, worksheet + lab report |
+| **LMS-H** | Leaderboard | 🔲 Later — participation-only, opt-in, class-scoped, never mark-based |
+| **LMS-I** | EduShare Africa | 🔲 Later — owner to provide EduShare stack details |
+| **LMS-J** | Quality pass | 🔲 Later — notifications, parent weekly summary, director view, teacher onboarding, PWA |
 
 ### Next — close the finance and access gaps that affect daily use
 
@@ -135,8 +153,8 @@ oversights — and so nobody "fixes" them silently inside an unrelated checkpoin
 
 | ID | Item | Status detail |
 |---|---|---|
-| **Q-1** | **Clear the pre-existing red tests** | Ran the full suite on 2026-10-31: **1,108 passed, 22 failed in 3m49s** (Django 5.1.15, pytest 8.4.2) — byte-for-byte the same 22 recorded on 2026-10-29, so nothing has regressed since. Three distinct causes, all identified: **17** in `apps/public/tests/test_public_site.py` (which tests the **live** `apps/public` website, despite the filename — the current templates do not meet the content contract those tests pin, e.g. the `app-wrapper--public` shell class, blank-field placeholders, gallery counters and footer portal links); **4** in `apps/accounts` (`test_staff_management.py`: forced-password-change middleware ×2, staff-create password-required; `test_role_login.py`: pending-change landing); **1** in `tests/test_static_assets.py` — `public/base.html` preconnects to `https://fonts.gstatic.com`, which is not in the shrink-only allow-list (only `fonts.googleapis.com` is). See **A-0** in §3 |
-| **Q-2** | **Tag releases and adopt semver** | History is four commits (`9ad7f9c` baseline 2026-10-29 → `85bdbf6`, `c7b8700` 2026-10-30 → `29d953b` 2026-10-31) with no tags. Until releases are tagged, the CHANGELOG is date-keyed |
+| **Q-1** | **Clear the pre-existing red tests** | The 22 pre-existing failures are unchanged as of Checkpoint C (November 2026): **17** in `apps/public/tests/test_public_site.py`, **4** in `apps/accounts`, **1** in `tests/test_static_assets.py`. Zero new failures were introduced across all LMS checkpoints (A through C). The suite now passes 1,566 tests. |
+| **Q-2** | **Tag releases and adopt semver** | History is four initial commits with no tags. Until releases are tagged, the CHANGELOG is date-keyed. |
 | **Q-3** | **Delete `apps/public_site/`** | Not installed, not routed, no models, no migrations, no tests — referenced only by its own files. The similar-named `apps/public/tests/test_public_site.py` belongs to the **live** app and must not be touched by this cleanup |
 | **Q-4** | **Delete or formally archive `school-website/`** | 8 static files of a "Springfield Academy" mockup referenced by nothing in `backend/`, `frontend/` or `docs/`. Decide: design reference (then say so in its own README) or delete |
 | **Q-5** | **Bring `docs/SYSTEM_GUIDE.md` back in line with the tree** | Verified stale in several ways: it still says the finance UI is absent (there are 30 templates), that results entry has no teacher UI, that `fees_enabled` is inert, that there are no academics edit/delete screens, and 459 tests against an actual 1,130 collected. The three READMEs now hold the corrected version; the guide needs the same pass |

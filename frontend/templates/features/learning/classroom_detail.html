@@ -1,0 +1,286 @@
+{% extends base_template %}
+{% block title %}{{ classroom.subject.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+
+{# ── Page header ── #}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-book-half me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {{ classroom.subject.name }}
+      </h1>
+      <p class="page-subtitle">
+        {{ classroom.school_class.name }}
+        {% if classroom.term %} · {{ classroom.term.academic_year.name }} · {{ classroom.term.get_name_display }}{% endif %}
+        {% if classroom.teacher_name %} · <i class="bi bi-person-fill" aria-hidden="true"></i> {{ classroom.teacher_name }}{% endif %}
+      </p>
+    </div>
+    <a href="{% url 'learning:classrooms' %}" class="btn btn-outline-secondary btn-sm mt-1">
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All Subjects
+    </a>
+  </div>
+</div>
+
+{# Parent read-only notice #}
+{% if is_parent %}
+<div class="alert alert-info d-flex gap-2 align-items-center mb-3" role="alert" style="font-size:0.875rem;">
+  <i class="bi bi-eye-fill flex-shrink-0" aria-hidden="true"></i>
+  You are viewing <strong>{{ student.user.full_name }}</strong>'s classroom in read-only mode.
+</div>
+{% endif %}
+
+{# ── Progress summary card ── #}
+{% if total_lessons > 0 %}
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="row g-3 align-items-center">
+
+      {# Progress ring / number #}
+      <div class="col-auto text-center">
+        <div style="width:72px;height:72px;border-radius:50%;
+                    background:conic-gradient(var(--accent) {{ overall_pct }}%, var(--color-surface-2) 0);
+                    display:flex;align-items:center;justify-content:center;position:relative;">
+          <div style="width:54px;height:54px;border-radius:50%;background:var(--color-surface);
+                      display:flex;align-items:center;justify-content:center;flex-direction:column;">
+            <span style="font-size:1rem;font-weight:800;color:#fff;line-height:1;">{{ overall_pct }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="fw-600 mb-1" style="color:#fff;">Course progress</div>
+        <div class="text-muted-sm mb-2">{{ total_completed }} of {{ total_lessons }} lessons completed</div>
+        <div class="progress" style="height:8px;border-radius:4px;background:var(--color-surface-2);"
+             role="progressbar"
+             aria-valuenow="{{ overall_pct }}" aria-valuemin="0" aria-valuemax="100"
+             aria-label="Course progress {{ overall_pct }}%">
+          <div class="progress-bar {% if overall_pct == 100 %}bg-success{% else %}bg-primary{% endif %}"
+               style="width:{{ overall_pct }}%;border-radius:4px;"></div>
+        </div>
+      </div>
+
+      {# Continue button #}
+      {% if next_lesson and not is_parent %}
+      <div class="col-12 col-sm-auto">
+        <a href="{% url 'learning:lesson_view' classroom.school_class.pk classroom.subject.pk next_lesson.lesson.pk %}"
+           class="btn btn-primary w-100">
+          <i class="bi bi-play-circle me-1" aria-hidden="true"></i>
+          {% if overall_pct == 0 %}Start course{% else %}Continue{% endif %}
+        </a>
+      </div>
+      {% elif overall_pct == 100 %}
+      <div class="col-12 col-sm-auto">
+        <div class="d-flex align-items-center gap-2" style="color:var(--color-success);">
+          <i class="bi bi-patch-check-fill fs-4" aria-hidden="true"></i>
+          <span class="fw-600">Completed!</span>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Quick actions ── #}
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <a href="{% url 'learning:student_live_sessions' classroom.school_class.pk classroom.subject.pk %}"
+     class="btn btn-outline-danger btn-sm">
+    <i class="bi bi-broadcast me-1" aria-hidden="true"></i>Live Classes
+  </a>
+  <a href="{% url 'learning:class_calendar' classroom.school_class.pk %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Class Calendar
+  </a>
+  <a href="{% url 'learning:class_feed' classroom.school_class.pk %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-megaphone me-1" aria-hidden="true"></i>Class Feed
+  </a>
+  {% if not is_parent %}
+  <a href="{% url 'learning:student_progress' %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>My Progress
+  </a>
+  <a href="{% url 'learning:student_badges' %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-award me-1" aria-hidden="true"></i>My Badges
+  </a>
+  <a href="{% url 'learning:course_search' classroom.school_class.pk classroom.subject.pk %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-search me-1" aria-hidden="true"></i>Search lessons
+  </a>
+  {% endif %}
+</div>
+
+{# ══════════════════════════════════════════════════════════════
+   COURSE OUTLINE
+══════════════════════════════════════════════════════════════ #}
+
+{% if not modules %}
+<div class="card" style="border:2px dashed var(--color-border);background:transparent;">
+  <div class="card-body text-center py-5 px-3">
+    <i class="bi bi-hourglass-split fs-1 d-block mb-3" style="color:var(--color-muted);" aria-hidden="true"></i>
+    <h3 style="color:#fff;font-size:1rem;margin-bottom:0.5rem;">No lessons published yet</h3>
+    <p class="text-muted-sm mb-0" style="max-width:340px;margin:auto;">
+      Your teacher is still building this course.
+      Check back soon — lessons will appear here once they are ready.
+    </p>
+  </div>
+</div>
+
+{% else %}
+
+<div class="course-outline" role="list" aria-label="Course outline">
+{% for mwl in modules %}
+{% with mod=mwl.module %}
+<div class="co-module mb-3" role="listitem">
+
+  {# Module header #}
+  <div class="co-module__header">
+    <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+      <div>
+        <h2 class="co-module__title">{{ mod.title }}</h2>
+        <div class="text-muted-sm" style="font-size:0.78rem;">
+          {{ mwl.completed_lessons }} / {{ mwl.published_lessons }} lesson{{ mwl.published_lessons|pluralize }} completed
+        </div>
+      </div>
+      {# Per-module mini progress #}
+      {% if mwl.published_lessons > 0 %}
+      <div class="d-flex align-items-center gap-2" style="min-width:100px;max-width:160px;flex:1;">
+        <div class="progress flex-grow-1" style="height:6px;border-radius:3px;background:var(--color-surface-2);"
+             role="progressbar"
+             aria-valuenow="{{ mwl.pct_complete }}"
+             aria-valuemin="0" aria-valuemax="100"
+             aria-label="{{ mod.title }} {{ mwl.pct_complete }}% complete">
+          <div class="progress-bar {% if mwl.pct_complete == 100 %}bg-success{% else %}bg-primary{% endif %}"
+               style="width:{{ mwl.pct_complete }}%;border-radius:3px;"></div>
+        </div>
+        <span style="font-size:0.75rem;color:var(--color-muted);white-space:nowrap;">{{ mwl.pct_complete }}%</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Lessons #}
+  {% if mwl.lessons %}
+  <div class="co-module__lessons" role="list">
+    {% for lp in mwl.lessons %}
+    {% with l=lp.lesson %}
+    <div class="co-lesson {% if lp.completed %}co-lesson--done{% endif %}
+                {% if not forloop.last %}co-lesson--bordered{% endif %}"
+         role="listitem">
+
+      {# Completion indicator #}
+      <div class="co-lesson__check flex-shrink-0" aria-hidden="true">
+        {% if lp.completed %}
+        <i class="bi bi-check-circle-fill" style="color:var(--color-success);font-size:1.15rem;"></i>
+        {% else %}
+        <i class="bi bi-circle" style="color:var(--color-border);font-size:1.15rem;"></i>
+        {% endif %}
+      </div>
+
+      {# Lesson info #}
+      <div class="flex-grow-1 min-w-0">
+        <div class="co-lesson__title {% if lp.completed %}co-lesson__title--done{% endif %}">
+          {{ l.title }}
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-1" style="font-size:0.73rem;color:var(--color-muted);">
+          {% if l.video_url %}<span><i class="bi bi-play-circle" aria-hidden="true"></i> Video</span>{% endif %}
+          {% if l.notes %}<span><i class="bi bi-file-text" aria-hidden="true"></i> Notes</span>{% endif %}
+          {% with cnt=lp.attachments|length %}
+          {% if cnt %}<span><i class="bi bi-paperclip" aria-hidden="true"></i> {{ cnt }} file{{ cnt|pluralize }}</span>{% endif %}
+          {% endwith %}
+        </div>
+      </div>
+
+      {# Open / Review button #}
+      {% if not is_parent %}
+      <a href="{% url 'learning:lesson_view' classroom.school_class.pk classroom.subject.pk l.pk %}"
+         class="btn btn-sm flex-shrink-0 {% if lp.completed %}co-btn-review{% else %}btn-primary{% endif %}"
+         aria-label="{% if lp.completed %}Review {{ l.title }}{% else %}Open {{ l.title }}{% endif %}">
+        {% if lp.completed %}
+        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Review
+        {% else %}
+        <i class="bi bi-play-fill me-1" aria-hidden="true"></i>Open
+        {% endif %}
+      </a>
+      {% endif %}
+
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="p-3 text-muted-sm" style="font-size:0.85rem;">No lessons in this module yet.</div>
+  {% endif %}
+</div>
+{% endwith %}
+{% endfor %}
+</div>
+
+{% endif %}
+
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+/* ── Course outline (student) ────────────────────────── */
+.co-module {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.co-module__header {
+  padding: 0.875rem 1rem;
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.co-module__title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 0.1rem;
+}
+
+.co-lesson {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.8rem 1rem;
+  transition: background 0.15s;
+}
+.co-lesson:hover { background: rgba(255,255,255,0.03); }
+.co-lesson--bordered { border-bottom: 1px solid var(--color-border); }
+.co-lesson--done { }
+
+.co-lesson__check { line-height: 1; }
+
+.co-lesson__title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #fff;
+  line-height: 1.4;
+}
+.co-lesson__title--done { color: var(--color-muted); }
+
+.co-btn-review {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  padding: 0.3rem 0.65rem;
+}
+.co-btn-review:hover { border-color: var(--accent); color: var(--accent-light); }
+
+/* Mobile tap targets */
+@media (max-width: 576px) {
+  .co-lesson { padding: 0.9rem 0.875rem; gap: 0.75rem; }
+  .co-lesson .btn { min-height: 36px; }
+}
+</style>
+{% endblock %}

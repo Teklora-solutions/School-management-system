@@ -70,6 +70,7 @@ LOCAL_APPS = [
     "apps.results",
     "apps.finance",
     "apps.homework",
+    "apps.learning",
     "apps.attendance",
     "apps.communications",
     "apps.dashboards",
@@ -165,7 +166,7 @@ else:
 
 # ─── Internationalisation ─────────────────────────────────────────────────────
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "Africa/Accra"  # adjust to your school's timezone
+TIME_ZONE = "Africa/Nairobi"  # EAT (UTC+3) — Kenya. Day boundaries for streaks depend on this.
 USE_I18N = True
 USE_TZ = True
 

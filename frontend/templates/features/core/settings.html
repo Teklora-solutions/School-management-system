@@ -1,5 +1,4 @@
 {% extends base_template %}
-{% load core_extras %}
 
 {% block title %}School Settings | {{ SCHOOL_NAME }}{% endblock %}
 
@@ -10,67 +9,430 @@
     School Settings
   </h1>
   <p class="page-subtitle">
-    Identity used across every dashboard, receipt, report and the school's public pages.
+    Identity, website content, appearance, social links and contact details.
+    <a href="{% url 'public_admin:overview' %}">Manage individual content sections &rarr;</a>
   </p>
 </div>
 
 <div class="row justify-content-center">
-  <div class="col-lg-7">
-    <div class="card">
-      <div class="card-body">
-        <form method="post" enctype="multipart/form-data" novalidate>
-          {% csrf_token %}
+  <div class="col-lg-8">
 
-          {% if form.non_field_errors %}
-          <div class="alert alert-danger" role="alert">
-            {% for e in form.non_field_errors %}{{ e }}{% endfor %}
-          </div>
-          {% endif %}
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
 
-          {% for field in form %}
-          <div class="mb-3">
-            {% if field.field.widget.input_type == "checkbox" %}
-            <div class="d-flex align-items-start gap-2">
-              {{ field }}
-              <div>
-                <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
-                {% if field.help_text %}
-                <div class="text-muted-sm">{{ field.help_text }}</div>
-                {% endif %}
-              </div>
-            </div>
-            {% else %}
-            <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
-            {{ field }}
-            {% if field.help_text %}
-            <div class="text-muted-sm mt-1">{{ field.help_text }}</div>
-            {% endif %}
-            {% if not field.value and field.name in effective %}
-            <div class="text-muted-sm">
-              Blank — currently shown as
-              <span class="fw-600">“{{ effective|dict_get:field.name|default:"—" }}”</span>
-              from the server configuration.
-            </div>
-            {% endif %}
-            {% endif %}
-            {% for error in field.errors %}
-            <div class="text-danger small mt-1">{{ error }}</div>
-            {% endfor %}
-          </div>
-          {% endfor %}
-
-          <div class="d-flex justify-content-end mt-4">
-            <button type="submit" class="btn btn-primary">Save Settings</button>
-          </div>
-        </form>
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for e in form.non_field_errors %}{{ e }}{% endfor %}
       </div>
-    </div>
+      {% endif %}
+
+      <!-- Tab navigation -->
+      <ul class="nav nav-tabs mb-3" id="settingsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="tab-identity" data-bs-toggle="tab" data-bs-target="#pane-identity"
+                  type="button" role="tab">Identity</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-hero" data-bs-toggle="tab" data-bs-target="#pane-hero"
+                  type="button" role="tab">Home Hero</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-about" data-bs-toggle="tab" data-bs-target="#pane-about"
+                  type="button" role="tab">About Page</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-appearance" data-bs-toggle="tab" data-bs-target="#pane-appearance"
+                  type="button" role="tab">Appearance</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-social" data-bs-toggle="tab" data-bs-target="#pane-social"
+                  type="button" role="tab">Social &amp; Contact</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-modules" data-bs-toggle="tab" data-bs-target="#pane-modules"
+                  type="button" role="tab">Modules</button>
+        </li>
+      </ul>
+
+      <div class="tab-content" id="settingsTabContent">
+
+        <!-- ══ IDENTITY ══════════════════════════════════════════════════ -->
+        <div class="tab-pane fade show active" id="pane-identity" role="tabpanel">
+          <div class="card">
+            <div class="card-body">
+
+              {% with field=form.name %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.motto %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.phone %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.email %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.currency %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.logo %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.address %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.established_on %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ HOME HERO ═════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="pane-hero" role="tabpanel">
+          <div class="card">
+            <div class="card-body">
+              <p class="text-muted-sm mb-3">
+                Controls the text in the homepage hero section. Leave blank to use the built-in default text.
+                Use <a href="{% url 'public_admin:hero_list' %}">Hero Slides</a> to manage the carousel images.
+              </p>
+
+              {% with field=form.hero_eyebrow %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.hero_title %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.hero_title_highlight %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.hero_text %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              <hr class="my-4">
+              <h6 class="fw-600 mb-3">Call-to-Action Band</h6>
+
+              {% with field=form.cta_title %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.cta_text %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ ABOUT PAGE ════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="pane-about" role="tabpanel">
+          <div class="card">
+            <div class="card-body">
+              <p class="text-muted-sm mb-3">
+                Long-form text for the About page. Use
+                <a href="{% url 'public_admin:team_list' %}">Team Members</a> and
+                <a href="{% url 'public_admin:timeline_list' %}">Timeline</a> to manage cards and milestones.
+              </p>
+
+              {% with field=form.about %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.mission %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.vision %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.values %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ APPEARANCE ════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="pane-appearance" role="tabpanel">
+          <div class="card">
+            <div class="card-body">
+
+              {% with field=form.theme %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.footer_about %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ SOCIAL & CONTACT ══════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="pane-social" role="tabpanel">
+          <div class="card">
+            <div class="card-body">
+
+              <h6 class="fw-600 mb-3">Social Media Links</h6>
+
+              {% with field=form.facebook_url %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">Facebook</label>
+                {{ field }}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.instagram_url %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">Instagram</label>
+                {{ field }}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.youtube_url %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">YouTube</label>
+                {{ field }}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.linkedin_url %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">LinkedIn</label>
+                {{ field }}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              <hr class="my-4">
+              <h6 class="fw-600 mb-3">Contact &amp; Admissions Page</h6>
+
+              {% with field=form.admissions_email %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.office_hours %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+              {% with field=form.map_embed_url %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-600">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+                {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+              </div>
+              {% endwith %}
+
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ MODULES ═══════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="pane-modules" role="tabpanel">
+          <div class="card">
+            <div class="card-body">
+
+              {% with field=form.show_positions %}
+              <div class="mb-3 d-flex align-items-start gap-2">
+                {{ field }}
+                <div>
+                  <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                </div>
+              </div>
+              {% endwith %}
+
+              {% with field=form.fees_enabled %}
+              <div class="mb-3 d-flex align-items-start gap-2">
+                {{ field }}
+                <div>
+                  <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                </div>
+              </div>
+              {% endwith %}
+
+              {% with field=form.learning_enabled %}
+              <div class="mb-3 d-flex align-items-start gap-2">
+                {{ field }}
+                <div>
+                  <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                </div>
+              </div>
+              {% endwith %}
+
+              {% with field=form.engagement_enabled %}
+              <div class="mb-3 d-flex align-items-start gap-2">
+                {{ field }}
+                <div>
+                  <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                </div>
+              </div>
+              {% endwith %}
+
+              {% with field=form.quizzes_enabled %}
+              <div class="mb-3 d-flex align-items-start gap-2">
+                {{ field }}
+                <div>
+                  <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                </div>
+              </div>
+              {% endwith %}
+
+              {% with field=form.live_classes_enabled %}
+              <div class="mb-3 d-flex align-items-start gap-2">
+                {{ field }}
+                <div>
+                  <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                </div>
+              </div>
+              {% endwith %}
+
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /tab-content -->
+
+      <div class="d-flex justify-content-end mt-4">
+        <button type="submit" class="btn btn-primary px-4">Save Settings</button>
+      </div>
+    </form>
 
     <p class="text-muted-sm mt-3 mb-0">
       <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-      Saved changes are recorded in the
-      <a href="{% url 'core:audit_log' %}" class="alert-link">audit log</a>
-      with the previous and new value for each field.
+      All changes are recorded in the
+      <a href="{% url 'core:audit_log' %}" class="alert-link">audit log</a>.
     </p>
   </div>
 </div>

@@ -1,0 +1,73 @@
+{% extends base_template %}
+
+{% block title %}Points Overview | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-bar-chart me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Points Overview
+  </h1>
+  <p class="page-subtitle">
+    {% if year %}{{ year.name }} — which classes are earning points{% else %}No current academic year.{% endif %}
+  </p>
+</div>
+
+{% if not rows %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-journal-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    No classes found for this academic year.
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Class</th>
+            <th class="text-center">Engagement</th>
+            <th class="text-center">Students</th>
+            <th class="text-center">Avg points</th>
+            <th>Top earner</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="fw-600">{{ row.school_class.name }}</td>
+            <td class="text-center">
+              {% if row.engagement_on %}
+              <span class="badge" style="background:rgba(16,185,129,0.15);color:var(--color-success);">On</span>
+              {% else %}
+              <span class="badge" style="background:var(--color-surface-2);color:var(--color-muted);">Off</span>
+              {% endif %}
+            </td>
+            <td class="text-center">{{ row.student_count }}</td>
+            <td class="text-center fw-600">
+              {% if row.engagement_on %}{{ row.avg_points }}{% else %}<span class="text-muted-sm">—</span>{% endif %}
+            </td>
+            <td>
+              {% if row.engagement_on and row.top_earner_name != "—" %}
+              <div style="font-size:0.875rem;">{{ row.top_earner_name }}</div>
+              <div class="text-muted-sm" style="font-size:0.75rem;">{{ row.top_earner_points }} pts</div>
+              {% else %}
+              <span class="text-muted-sm">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<p class="text-muted-sm mt-3 mb-0">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  Points reflect all automated awards (lessons, homework, feed questions, streaks) plus any teacher bonuses.
+  Rankings are never based on exam marks.
+</p>
+{% endif %}
+{% endblock content %}

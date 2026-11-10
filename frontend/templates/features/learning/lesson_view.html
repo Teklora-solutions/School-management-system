@@ -1,0 +1,588 @@
+{% extends base_template %}
+{% block title %}{{ lesson.title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+
+{# ── Preview banner ── #}
+{% if is_preview %}
+<div class="lv-preview-banner" role="note">
+  <i class="bi bi-eye-fill" aria-hidden="true"></i>
+  <span><strong>Preview mode.</strong> This is exactly what students see.</span>
+  <a href="{% url 'learning:lesson_edit' school_class.pk subject.pk module.pk lesson.pk %}">
+    ← Back to edit
+  </a>
+</div>
+{% endif %}
+
+{# ── Breadcrumb ── #}
+<nav aria-label="Breadcrumb" class="lv-breadcrumb">
+  {% if is_preview %}
+  <a href="{% url 'learning:teacher_classroom' school_class.pk subject.pk %}">{{ subject.name }}</a>
+  {% else %}
+  <a href="{% url 'learning:classroom' school_class.pk subject.pk %}">{{ subject.name }}</a>
+  {% endif %}
+  <span aria-hidden="true">›</span>
+  <span>{{ module.title }}</span>
+  <span aria-hidden="true">›</span>
+  <span aria-current="page">{{ lesson.title }}</span>
+</nav>
+
+{# ── Lesson header ── #}
+<div class="lv-header">
+  <div class="lv-header__title">
+    <h1>{{ lesson.title }}</h1>
+    <div class="lv-header__meta">
+      {{ module.title }}
+      {% if completed %}
+      <span class="lv-done-chip">
+        <i class="bi bi-check-circle-fill" aria-hidden="true"></i> Completed
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if not is_preview %}
+  <div class="lv-header__actions">
+    {% if not completed %}
+    <form method="post" action="{% url 'learning:mark_lesson_complete' lesson.pk %}" id="complete-form-top">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary lv-complete-btn">
+        <i class="bi bi-check-lg me-1" aria-hidden="true"></i>Mark complete
+      </button>
+    </form>
+    {% else %}
+    <span class="lv-done-chip lv-done-chip--lg">
+      <i class="bi bi-check-circle-fill" aria-hidden="true"></i> Done
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{# ══════════════════════════════════════════════════════════════════
+   VIDEO — click-to-load. No video data downloads until student taps.
+   Uses youtube-nocookie.com for privacy. Thumbnail from img.youtube.com
+   (static image CDN, no cookies). That is the only external request.
+═══════════════════════════════════════════════════════════════════ #}
+{% if lesson.video_url %}
+<div class="card lv-video-card mb-4" id="video-section">
+
+  {% if video_info.is_youtube %}
+  {# Thumbnail click-to-play — works for every YouTube URL format #}
+  <div class="lv-video-thumb"
+       data-embed="{{ video_info.embed_url|escapejs }}"
+       role="button" tabindex="0"
+       aria-label="Play video: {{ lesson.title }}">
+    <img src="{{ video_info.thumb_url }}"
+         alt="Video thumbnail for {{ lesson.title }}"
+         class="lv-video-thumb__img"
+         loading="lazy"
+         width="480" height="270">
+    <div class="lv-play-overlay" aria-hidden="true">
+      <i class="bi bi-play-circle-fill lv-play-icon"></i>
+      <span>Tap to play</span>
+    </div>
+  </div>
+
+  {% elif video_info.is_vimeo %}
+  <div class="lv-video-thumb"
+       data-embed="{{ video_info.embed_url|escapejs }}"
+       role="button" tabindex="0"
+       aria-label="Play video: {{ lesson.title }}">
+    <div class="lv-video-fallback d-flex align-items-center gap-3 p-4">
+      <i class="bi bi-play-circle-fill fs-2" style="color:#1ab7ea;" aria-hidden="true"></i>
+      <div>
+        <div class="fw-600">Vimeo video</div>
+        <div class="text-muted-sm mb-2">Tap to play inline, or open on Vimeo</div>
+        <a href="{{ video_info.original_url }}" target="_blank" rel="noopener noreferrer"
+           class="btn btn-sm btn-outline-secondary">
+          Open on Vimeo <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% elif video_info.is_drive %}
+  <div class="lv-video-fallback d-flex align-items-center gap-3 p-4">
+    <i class="bi bi-google fs-2" style="color:#4285f4;" aria-hidden="true"></i>
+    <div>
+      <div class="fw-600">Google Drive video</div>
+      <div class="text-muted-sm mb-2">Opens in Google Drive</div>
+      <a href="{{ video_info.original_url }}" target="_blank" rel="noopener noreferrer"
+         class="btn btn-sm btn-primary">
+        Open video <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
+      </a>
+    </div>
+  </div>
+
+  {% else %}
+  {# Any other URL — plain link, never embedded #}
+  <div class="lv-video-fallback d-flex align-items-center gap-3 p-4">
+    <i class="bi bi-play-circle-fill fs-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    <div>
+      <div class="fw-600">Video resource</div>
+      <a href="{{ video_info.original_url }}" target="_blank" rel="noopener noreferrer"
+         class="btn btn-sm btn-primary mt-1">
+        Open video <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
+{# ══════════════════════════════════════════════════════════════════
+   NOTES — safe HTML from markdown_utils.render_notes()
+═══════════════════════════════════════════════════════════════════ #}
+{% if rendered_notes %}
+<div class="card mb-4">
+  <div class="card-header">
+    <h2 class="card-title mb-0" style="font-size:0.9375rem;">
+      <i class="bi bi-file-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Lesson Notes
+    </h2>
+  </div>
+  <div class="card-body lesson-notes" tabindex="0" aria-label="Lesson notes">
+    {{ rendered_notes }}
+  </div>
+</div>
+{% endif %}
+
+{# ══════════════════════════════════════════════════════════════════
+   ATTACHMENTS
+═══════════════════════════════════════════════════════════════════ #}
+{% if attachments %}
+<div class="card mb-4">
+  <div class="card-header">
+    <h2 class="card-title mb-0" style="font-size:0.9375rem;">
+      <i class="bi bi-paperclip me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Downloads ({{ attachments|length }})
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    {% for att in attachments %}
+    <div class="lv-attachment {% if not forloop.last %}lv-attachment--bordered{% endif %}">
+      <i class="bi {{ att.icon }} lv-att-icon" aria-hidden="true"></i>
+      <div class="flex-grow-1 min-w-0">
+        <div class="fw-600 lv-att-name">{{ att.original_name }}</div>
+        <div class="text-muted-sm" style="font-size:0.73rem;">{{ att.size_kb }} KB</div>
+      </div>
+      <a href="{% url 'learning:lesson_attachment_file' lesson.pk att.pk %}?download=1"
+         class="btn btn-sm btn-outline-secondary flex-shrink-0"
+         download="{{ att.original_name }}"
+         aria-label="Download {{ att.original_name }}">
+        <i class="bi bi-download me-1" aria-hidden="true"></i>Download
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ══════════════════════════════════════════════════════════════════
+   MARK COMPLETE + NEXT/PREV
+═══════════════════════════════════════════════════════════════════ #}
+{% if not is_preview %}
+<div class="lv-nav-block">
+
+  {# Prev #}
+  {% if prev_lp %}
+  <a href="{% url 'learning:lesson_view' school_class.pk subject.pk prev_lp.lesson.pk %}"
+     class="btn btn-outline-secondary lv-nav-btn">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>
+    <span class="lv-nav-label">{{ prev_lp.lesson.title|truncatechars:30 }}</span>
+  </a>
+  {% else %}
+  <div></div>
+  {% endif %}
+
+  {# Mark complete / done indicator #}
+  {% if not completed %}
+  <form method="post" action="{% url 'learning:mark_lesson_complete' lesson.pk %}" class="text-center">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary btn-lg lv-complete-btn-main">
+      <i class="bi bi-check-circle me-1" aria-hidden="true"></i>Mark complete
+    </button>
+  </form>
+  {% else %}
+  <div class="text-center">
+    <div class="lv-done-chip lv-done-chip--lg">
+      <i class="bi bi-check-circle-fill" aria-hidden="true"></i> Completed!
+    </div>
+  </div>
+  {% endif %}
+
+  {# Next #}
+  {% if next_lp %}
+  <a href="{% url 'learning:lesson_view' school_class.pk subject.pk next_lp.lesson.pk %}"
+     class="btn btn-primary lv-nav-btn lv-nav-btn--next">
+    <span class="lv-nav-label">{{ next_lp.lesson.title|truncatechars:30 }}</span>
+    <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
+  </a>
+  {% else %}
+  <a href="{% url 'learning:classroom' school_class.pk subject.pk %}"
+     class="btn btn-outline-secondary lv-nav-btn lv-nav-btn--next">
+    <i class="bi bi-list-ul me-1" aria-hidden="true"></i>Back to course
+  </a>
+  {% endif %}
+
+</div>
+{% else %}
+{# Preview mode — just a back link #}
+<div class="mt-3">
+  <a href="{% url 'learning:lesson_edit' school_class.pk subject.pk module.pk lesson.pk %}"
+     class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to edit
+  </a>
+</div>
+{% endif %}
+
+{# ══════════════════════════════════════════════════════════════════
+   STUDENT PRIVATE NOTES
+   Parents see the section header but can't write. Students get a
+   textarea with autosave (saves on blur, XHR). No teacher ever sees
+   these notes.
+═══════════════════════════════════════════════════════════════════ #}
+{% if not is_preview %}
+<div class="card mt-4" id="my-notes-section">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h2 class="card-title mb-0" style="font-size:0.9rem;">
+      <i class="bi bi-pencil-square me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      My notes
+      <span class="text-muted-sm ms-2" style="font-size:0.75rem;font-weight:400;">
+        (only you can see these)
+      </span>
+    </h2>
+    <span class="lv-autosave-status text-muted-sm" id="autosave-status" aria-live="polite"
+          style="font-size:0.75rem;"></span>
+  </div>
+  <div class="card-body">
+    {% if is_parent %}
+    <p class="text-muted-sm mb-0">Your child's private notes are not visible to parents.</p>
+    {% else %}
+    <form method="post" action="{% url 'learning:save_lesson_note' school_class.pk subject.pk lesson.pk %}"
+          id="notes-form">
+      {% csrf_token %}
+      <textarea
+        class="form-control"
+        name="content"
+        id="my-notes-textarea"
+        rows="5"
+        maxlength="5000"
+        placeholder="Jot down anything you want to remember about this lesson — only you can see this…"
+        style="font-size:0.9rem;line-height:1.6;resize:vertical;"
+        aria-label="My private lesson notes"
+      >{% if student_note %}{{ student_note.content }}{% endif %}</textarea>
+      <div class="d-flex align-items-center justify-content-between mt-2">
+        <div class="text-muted-sm" style="font-size:0.73rem;">
+          <span id="char-count">{% if student_note %}{{ student_note.content|length }}{% else %}0{% endif %}</span> / 5 000 characters
+        </div>
+        <button type="submit" class="btn btn-sm btn-outline-secondary" id="notes-save-btn">
+          <i class="bi bi-floppy me-1" aria-hidden="true"></i>Save notes
+        </button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Lesson view (Checkpoint B) ──────────────────────────── */
+
+.lv-preview-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: var(--radius-sm);
+  background: rgba(14,165,233,0.12);
+  border: 1px solid #0ea5e9;
+  color: #38bdf8;
+  font-size: 0.875rem;
+}
+.lv-preview-banner a { color: #38bdf8; text-decoration: underline; }
+
+.lv-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-bottom: 1rem;
+}
+.lv-breadcrumb a { color: var(--accent-light); }
+.lv-breadcrumb a:hover { color: #fff; }
+
+.lv-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.lv-header__title h1 {
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.25;
+  margin: 0 0 0.25rem;
+}
+.lv-header__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+.lv-header__actions { flex-shrink: 0; }
+
+.lv-done-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 99px;
+  background: rgba(16,185,129,0.15);
+  color: var(--color-success);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.lv-done-chip--lg { font-size: 0.95rem; padding: 0.4rem 1rem; }
+
+/* ── Video ── */
+.lv-video-card { overflow: hidden; border-radius: var(--radius); }
+.lv-video-thumb {
+  position: relative;
+  cursor: pointer;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.lv-video-thumb__img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+.lv-video-thumb:hover .lv-video-thumb__img { opacity: 0.65; }
+.lv-play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
+.lv-play-icon { font-size: 4rem; opacity: 0.95; }
+.lv-video-thumb:hover .lv-play-icon { opacity: 1; transform: scale(1.08); transition: transform 0.15s; }
+.lv-video-embed-frame {
+  aspect-ratio: 16/9;
+  width: 100%;
+  border: 0;
+}
+.lv-video-fallback { background: var(--color-surface-2); }
+
+/* ── Lesson notes (rendered HTML) ── */
+.lesson-notes {
+  font-size: 1rem;
+  line-height: 1.85;
+  color: var(--color-text);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.lesson-notes h1, .lesson-notes h2, .lesson-notes h3, .lesson-notes h4 {
+  color: #fff;
+  font-family: var(--font-heading);
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+.lesson-notes h1 { font-size: 1.35rem; }
+.lesson-notes h2 { font-size: 1.15rem; }
+.lesson-notes h3 { font-size: 1rem; }
+.lesson-notes p { margin-bottom: 0.875rem; }
+.lesson-notes ul, .lesson-notes ol { padding-left: 1.5rem; margin-bottom: 0.875rem; }
+.lesson-notes li { margin-bottom: 0.3rem; }
+.lesson-notes a { color: var(--accent-light); word-break: break-all; }
+.lesson-notes a:hover { color: #fff; }
+.lesson-notes strong { color: #fff; font-weight: 700; }
+.lesson-notes em { color: var(--color-text); }
+.lesson-notes del { color: var(--color-muted); }
+.lesson-notes code {
+  background: var(--color-surface-2);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.875em;
+  color: #f472b6;
+  font-family: monospace;
+}
+.lesson-notes pre {
+  background: var(--color-surface-2);
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+.lesson-notes pre code { background: none; padding: 0; color: #a5f3fc; }
+.lesson-notes blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 0.5rem 1rem;
+  margin: 0 0 1rem;
+  color: var(--color-muted);
+  font-style: italic;
+}
+.lesson-notes img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  margin: 0.5rem 0;
+}
+.lesson-notes table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  overflow-x: auto;
+  display: block;
+}
+.lesson-notes th, .lesson-notes td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+.lesson-notes th { background: var(--color-surface-2); color: #fff; font-weight: 600; }
+.lesson-notes hr { border: none; border-top: 1px solid var(--color-border); margin: 1.5rem 0; }
+
+/* ── Attachments ── */
+.lv-attachment {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  transition: background 0.15s;
+}
+.lv-attachment:hover { background: rgba(255,255,255,0.03); }
+.lv-attachment--bordered { border-bottom: 1px solid var(--color-border); }
+.lv-att-icon { font-size: 1.25rem; color: var(--accent-light); flex-shrink: 0; }
+.lv-att-name { font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Navigation block ── */
+.lv-nav-block {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem 0 1rem;
+}
+.lv-nav-btn {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.lv-nav-btn--next { justify-self: end; }
+.lv-complete-btn-main { min-width: 180px; min-height: 48px; font-size: 1rem; }
+.lv-complete-btn { min-height: 40px; }
+
+@media (max-width: 576px) {
+  .lv-nav-block {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    text-align: center;
+  }
+  .lv-nav-btn { max-width: 100%; justify-self: stretch; }
+  .lv-nav-btn--next { justify-self: stretch; }
+  .lv-complete-btn-main { width: 100%; }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  /* ── Click-to-play video ──────────────────────────────── */
+  document.querySelectorAll('.lv-video-thumb[data-embed]').forEach(function (thumb) {
+    function play() {
+      var embedUrl = thumb.getAttribute('data-embed');
+      var iframe = document.createElement('iframe');
+      iframe.src = embedUrl;
+      iframe.className = 'lv-video-embed-frame';
+      iframe.allowFullscreen = true;
+      iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+      iframe.title = '{{ lesson.title|escapejs }} video';
+      thumb.parentNode.replaceChild(iframe, thumb);
+    }
+    thumb.addEventListener('click', play);
+    thumb.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); }
+    });
+  });
+
+  /* ── Lesson notes autosave ───────────────────────────── */
+  var textarea = document.getElementById('my-notes-textarea');
+  var form     = document.getElementById('notes-form');
+  var status   = document.getElementById('autosave-status');
+  var counter  = document.getElementById('char-count');
+  if (!textarea || !form) return;
+
+  function updateCount() {
+    if (counter) counter.textContent = textarea.value.length;
+  }
+  textarea.addEventListener('input', updateCount);
+
+  var saveTimer = null;
+  function scheduleAutosave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 1500); // 1.5 s after last keystroke
+  }
+  textarea.addEventListener('input', scheduleAutosave);
+  textarea.addEventListener('blur', function () { clearTimeout(saveTimer); doSave(); });
+
+  function doSave() {
+    var data = new FormData(form);
+    if (status) { status.textContent = 'Saving…'; }
+    fetch(form.action, {
+      method: 'POST',
+      body: data,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (json) {
+      if (json.ok && status) {
+        status.textContent = 'Saved ✓';
+        setTimeout(function () { status.textContent = ''; }, 3000);
+      }
+    })
+    .catch(function () {
+      if (status) status.textContent = 'Not saved';
+    });
+  }
+
+  /* Manual save button still works */
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    clearTimeout(saveTimer);
+    doSave();
+  });
+})();
+</script>
+{% endblock %}

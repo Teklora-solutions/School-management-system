@@ -1,0 +1,206 @@
+{% extends base_template %}
+{% block title %}{{ quiz.title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+{# ── Timer strip (only when time limit exists) ── #}
+{% if time_remaining is not None %}
+<div class="quiz-timer-bar" id="timer-bar" role="timer" aria-live="polite"
+     data-seconds="{{ time_remaining }}"
+     data-submit-url="{% url 'learning:quiz_take' school_class.pk subject.pk lesson.pk %}">
+  <i class="bi bi-clock me-1" aria-hidden="true"></i>
+  Time remaining: <strong id="timer-display">--:--</strong>
+</div>
+{% endif %}
+
+<div class="page-header">
+  <h1 class="page-title" style="font-size:1.25rem;">{{ quiz.title }}</h1>
+  <p class="page-subtitle">{{ lesson.title }} · {{ questions|length }} question{{ questions|length|pluralize }}</p>
+</div>
+
+<form method="post" id="quiz-form"
+      action="{% url 'learning:quiz_take' school_class.pk subject.pk lesson.pk %}">
+{% csrf_token %}
+
+<div class="d-flex flex-column gap-4">
+{% for qwc in questions %}
+{% with q=qwc.question %}
+<div class="card quiz-question" id="q-{{ q.pk }}" data-question-id="{{ q.pk }}">
+  <div class="card-header">
+    <span class="text-muted-sm" style="font-size:0.78rem;">Question {{ forloop.counter }} of {{ questions|length }}</span>
+    <h2 style="font-size:1rem;font-weight:600;color:#fff;margin:0.35rem 0 0;">
+      {{ q.body }}
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    {% for c in qwc.choices %}
+    <label class="quiz-choice {% if qwc.student_answer_pk == c.pk %}quiz-choice--selected{% endif %}"
+           for="choice-{{ q.pk }}-{{ c.pk }}">
+      <input type="radio"
+             class="quiz-radio"
+             id="choice-{{ q.pk }}-{{ c.pk }}"
+             name="answer_{{ q.pk }}"
+             value="{{ c.pk }}"
+             data-question="{{ q.pk }}"
+             data-save-url="{{ save_answer_url }}"
+             {% if qwc.student_answer_pk == c.pk %}checked{% endif %}>
+      <span class="quiz-choice__text">{{ c.text }}</span>
+    </label>
+    {% endfor %}
+  </div>
+</div>
+{% endwith %}
+{% endfor %}
+</div>
+
+{# ── Submit bar ── #}
+<div class="quiz-submit-bar mt-4">
+  <div class="text-muted-sm" id="answer-status" aria-live="polite"></div>
+  <button type="submit" class="btn btn-primary btn-lg"
+          onclick="return confirm('Submit this quiz? You cannot change your answers after submitting.');">
+    <i class="bi bi-check-circle me-1" aria-hidden="true"></i>Submit quiz
+  </button>
+</div>
+</form>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.quiz-timer-bar {
+  position: sticky;
+  top: var(--navbar-h);
+  z-index: 100;
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.5rem 1.5rem;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.quiz-timer-bar.warning { background: rgba(245,158,11,0.12); color: var(--color-warning); }
+.quiz-timer-bar.critical { background: rgba(239,68,68,0.12); color: var(--color-danger); }
+
+.quiz-question .card-header { padding: 1rem; }
+
+.quiz-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.9rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.15s;
+  width: 100%;
+}
+.quiz-choice:last-child { border-bottom: none; }
+.quiz-choice:hover { background: rgba(255,255,255,0.04); }
+.quiz-choice--selected { background: var(--accent-glow); }
+.quiz-choice--selected .quiz-choice__text { color: var(--accent-light); }
+.quiz-radio { flex-shrink: 0; margin-top: 0.15rem; accent-color: var(--accent); cursor: pointer; }
+.quiz-choice__text { font-size: 0.9rem; line-height: 1.55; color: var(--color-text); }
+
+.quiz-submit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  position: sticky;
+  bottom: 0;
+  z-index: 50;
+}
+
+@media (max-width: 576px) {
+  .quiz-choice { padding: 0.85rem 0.875rem; }
+  .quiz-submit-bar .btn { width: 100%; }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+  /* ── AJAX answer save ────────────────────────────────── */
+  document.querySelectorAll('.quiz-radio').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      var questionId = this.getAttribute('data-question');
+      var choiceId   = this.value;
+      var saveUrl    = this.getAttribute('data-save-url');
+      var label = document.getElementById('answer-status');
+
+      // Visual highlight
+      var card = document.getElementById('q-' + questionId);
+      if (card) card.querySelectorAll('.quiz-choice').forEach(function(c) {
+        c.classList.remove('quiz-choice--selected');
+      });
+      this.closest('.quiz-choice').classList.add('quiz-choice--selected');
+
+      var form = new FormData();
+      form.append('csrfmiddlewaretoken', csrfToken);
+      form.append('question_id', questionId);
+      form.append('choice_id', choiceId);
+
+      if (label) label.textContent = 'Saving…';
+      fetch(saveUrl, {
+        method: 'POST', body: form,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(j) {
+        if (label) {
+          label.textContent = j.ok ? 'Answer saved' : 'Save failed';
+          setTimeout(function(){ label.textContent = ''; }, 2000);
+        }
+      })
+      .catch(function() {
+        if (label) label.textContent = 'Answer not saved — check connection';
+      });
+    });
+  });
+
+  /* ── Countdown timer ─────────────────────────────────── */
+  var bar = document.getElementById('timer-bar');
+  if (!bar) return;
+
+  var remaining = parseInt(bar.getAttribute('data-seconds'), 10);
+  var submitUrl = bar.getAttribute('data-submit-url');
+  var display   = document.getElementById('timer-display');
+
+  function fmt(sec) {
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  var interval = setInterval(function () {
+    remaining -= 1;
+    if (display) display.textContent = fmt(Math.max(0, remaining));
+    if (remaining <= 60) bar.classList.add('warning');
+    if (remaining <= 10) bar.classList.add('critical');
+    if (remaining <= 0) {
+      clearInterval(interval);
+      if (display) display.textContent = '00:00';
+      // Auto-submit: POST to the quiz submit URL
+      var f = document.createElement('form');
+      f.method = 'POST';
+      f.action = submitUrl;
+      var csrf = document.createElement('input');
+      csrf.type = 'hidden';
+      csrf.name = 'csrfmiddlewaretoken';
+      csrf.value = csrfToken;
+      f.appendChild(csrf);
+      document.body.appendChild(f);
+      f.submit();
+    }
+  }, 1000);
+
+  // Initial display
+  if (display) display.textContent = fmt(remaining);
+})();
+</script>
+{% endblock %}

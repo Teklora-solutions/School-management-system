@@ -9,6 +9,92 @@ repository on that day. Anything labelled *verified* was checked against the cod
 
 ---
 
+## [Unreleased] — November 2026 (LMS Checkpoints A–C + Step 1 fixes)
+
+### Added — Virtual School LMS
+
+#### Foundational setup
+- **Timezone changed** from `Africa/Accra` (GMT+0) to `Africa/Nairobi` (EAT, UTC+3). All streak day-boundary calculations depend on this. No stored data altered (all timestamps are UTC in the DB; only display/`localdate()` changes).
+- **`learning_enabled`** flag already existed in `SchoolSettings`; added **`engagement_enabled`** (`core.0009`) and **`quizzes_enabled`** (`core.0010`) Boolean fields (both default OFF). Added corresponding entries to the features registry and `school_settings_values`.
+
+#### Checkpoint A — Teacher course builder (`learning.0001`–`0005`)
+- New `learning` app with initial migrations for `CourseModule`, `Lesson`, `LessonProgress`.
+- Added `is_published` to `CourseModule`, `notes_format` (plain/markdown) to `Lesson`, and new `LessonAttachment` model (UUID storage, 5 max, 20 MB max, PDF/Word/PPT/Excel/image/MP3 allowed).
+- Full teacher course builder: create/edit/reorder/delete modules and lessons, up to 5 file attachments per lesson served through authenticated streaming views, publish/unpublish per lesson or whole module, preview-as-student, duplicate lesson or module, copy whole course to another term.
+- Student course outline with per-module progress bars, completion ticks, Continue button pointing to the next uncompleted lesson.
+- Module/lesson create forms include a year+term selector so the teacher can build for any term.
+- Responsive builder UI with move-up/down buttons (no drag; works on any phone), draft badges, empty state guidance.
+
+#### Checkpoint B — Student lesson experience (`learning.0006`)
+- Added `StudentLessonNote` model (private per-student per-lesson, `learning.0006`).
+- **Markdown rendering**: `learning/markdown_utils.py` using `markdown>=3.5` + `bleach>=6.1`. Allowed HTML tags: headings, bold, italic, lists, code blocks, tables, blockquotes, links, images. All other tags stripped. `<a>` links get `target="_blank" rel="noopener noreferrer"` automatically. Scripts, iframes, `on*` attributes and style attributes removed unconditionally.
+- Added `markdown>=3.5,<4.0` and `bleach>=6.1,<7.0` to `requirements/base.txt`.
+- **Video embeds**: `learning/video_utils.py` handles all YouTube URL formats (`watch?v=`, `youtu.be/`, `/shorts/`, `/embed/`, `/live/`), Vimeo, Google Drive, and any other link (shown as plain external link). All YouTube embeds use `youtube-nocookie.com` (privacy-enhanced — no cookies until play). Thumbnail from `img.youtube.com` (static CDN, no cookies — the only external image request on the lesson page).
+- **Click-to-play**: video loads only when the student taps the thumbnail, saving data on weak connections.
+- **Next/previous lesson navigation** at the bottom of every lesson page — arrows cross module boundaries automatically.
+- **Student private notes**: autosaved 1.5 s after last keystroke via XHR, falls back to normal POST. Character counter. "Saved ✓" confirmation. Parents see the section but cannot write notes.
+- **Course search**: searches lesson titles and notes text within a subject/term, runs in Python over the already-fetched course data (no extra DB query).
+- Markdown **formatting toolbar** in the lesson editor (Bold, Italic, H2, Sub-heading, Bullet list, Numbered list, Link, Code, Table) — vanilla JS ~80 lines, no CDN, no library. Visible only when Markdown format is selected. Keyboard shortcuts Ctrl+B, Ctrl+I. Collapsible "How to format" hint.
+
+#### Engagement layer (`learning.0002`)
+- `ClassEngagementSettings` (per-class on/off, `streak_grace_days` default 1, show/hide bars and streak).
+- `LearningStreak` (per-student: `current_streak`, `longest_streak`, `last_active_date`, `streak_broken_at`).
+- Fair streak algorithm (`learning/streak_utils.py`): school days only (Mon–Fri inside a term), weekends and term breaks are transparent, configurable grace-day allowance. Points never go down.
+- Student progress page (overall bar, per-module bars, streak, next-lesson button, welcome-back banner on reset).
+- Teacher class progress view (completion %, streak, who hasn't started, who is behind <25%).
+- Director engagement overview (which classes are active, average completion per class).
+
+#### Class community feed (`learning.0003`)
+- `ClassPost` (announcement/question/tip/celebration, `is_pinned`, `is_removed` soft-delete, `removed_by`/`removed_at`).
+- `ClassPostReaction` (5 child-safe emoji: 👍 ✅ ❓ ❤️ 🔥; unique per user per post).
+- Teachers can post all types; students can only post questions; parents read and react only.
+- Teacher moderation: pin/unpin, soft-remove (invisible to students, greyed-out to teachers), restore.
+- Rules banner shown once per session (sessionStorage), dismissible.
+- Reactions update live via XHR; fall back to full-page POST if JS is off.
+- Class Feed sidebar link added for teacher, student and parent roles.
+
+#### Points, levels and badges (`learning.0004`)
+- `PointConfig` singleton (all point values + `daily_feed_cap`, `pts_quiz_pass`, `pts_quiz_attempt` — editable by admin without code changes).
+- `PointLedger` (immutable: every award or reversal is a row; `idempotency_key` unique constraint prevents double-award; `reversal_of` self-FK links reversals to originals).
+- `StudentLevel` cache (recalculated from ledger after every award).
+- 7 levels: Seedling (0) → Sprout (50) → Explorer (150) → Achiever (350) → Scholar (700) → Champion (1,200) → Legend (2,000).
+- Points awarded for: lesson completion (10, once per lesson), homework on-time (20), homework late (8), feed question (5, daily cap 15), streak milestone 5/10/20/30/50 days (15 each), teacher bonus (1–20 with required reason).
+- Removing a feed post reverses the student's feed_post points.
+- Level-up in-app notification fires once per level (guarded by `notified_level`).
+- Teacher: view class points table, full audit ledger per student, give bonus, reverse award (creates negative row, never deletes).
+- Student: My Badges page (level card, all-levels display, recent history). Parent: same read-only.
+- Director: Points Overview (per-class avg, top earner, engagement on/off).
+
+#### Quizzes (`learning.0007`–`0008`)
+- `Quiz` (OneToOne on Lesson, `pass_mark`, `attempts_allowed` 1/2/3/unlimited, `time_limit_minutes`, shuffle flags, `show_correct_after`, `is_published`, `counts_for_gradebook` stored but not connected to report cards yet).
+- `QuizQuestion` (MC or True/False, up to 20 per quiz, `body` Markdown, `explanation`, `position`).
+- `QuizChoice` (`is_correct` **never sent to browser before submission**).
+- `QuizAttempt` (started_at, submitted_at, score_pct, passed, `answers_auto_submitted`, `question_order` JSON shuffle-seed for resume consistency).
+- `QuizAttemptAnswer` (selected_choice FK, `selected_choices` M2M empty — reserved for future "select all that apply", `answer_text` blank — reserved for future short answer, `is_correct` server-only).
+- **Edit-lock**: questions and choices locked after first submitted attempt. Teacher sees gold warning banner + "Duplicate quiz" button. Duplicate creates a fresh editable copy on a new lesson.
+- **Server-side marking**: `submit_attempt()` reads `is_correct` and sets `QuizAttemptAnswer.is_correct` entirely server-side. Correct answers never reach the browser in any pre-submission response.
+- **Timer**: server-clock-based (`time_remaining_seconds` property on attempt). JS countdown auto-submits via form POST when time reaches zero. `auto_submit_timed_out()` handles server-side forced submission.
+- **Resume**: AJAX `save_answer` endpoint saves each answer as the student clicks. A student who closes the browser resumes with all saved answers and the timer still running.
+- **Points**: `quiz_attempt:<quiz_pk>:<student_pk>` (first completed attempt, once) and `quiz_pass:<quiz_pk>:<student_pk>` (first pass, once) — idempotency keys prevent any double-award.
+- Teacher results screen: per-student scores (sorted by best), class average, pass rate, who hasn't attempted, question difficulty ranking (sorted by wrong_pct descending).
+- Parent view: child's quiz landing (attempt history, best score) and results page — read-only, no Take Quiz button.
+
+### Changed
+- `SchoolSettings` form (`core/forms.py`) updated: `engagement_enabled` and `quizzes_enabled` added to `Meta.fields` and the `required=False` checkbox list. Settings template (`features/core/settings.html`) shows both new switches in the Modules tab.
+- `TeacherClassroomDetailView` and `StudentClassroomDetailView` rebuilt to load and display the full course outline from `course_selectors`.
+- `teacher_classroom_detail.html` and `classroom_detail.html` rebuilt with responsive course outlines replacing the "coming soon" placeholder.
+- `classrooms.html` and `teacher_classrooms.html` updated to show Class Feed buttons on each classroom card.
+
+### Fixed
+- Two `test_school_settings.py` tests updated to include `theme`, `engagement_enabled`, and `quizzes_enabled` in their POST payloads (pre-existing fragility exposed by new fields — the tests now correctly represent a "no change" save).
+- `quiz_selectors.quiz_questions_for_student`: iterated `.values()` dicts now accessed with `a["key"]` not `a.key`.
+
+### Verified — test suite
+- **1,566 passed, 22 failed** as of Checkpoint C. The 22 are the identical pre-existing failures from 2026-10-31 (17 public site, 4 accounts, 1 static assets). Zero new failures introduced across all LMS checkpoints (A, B, C, Step 1 fixes).
+- New test files: `apps/learning/tests/test_engagement.py` (57 tests), `apps/learning/tests/test_feed.py` (64 tests), `apps/learning/tests/test_points.py` (57 tests), `apps/learning/tests/test_course_builder.py` (45 tests), `apps/learning/tests/test_checkpoint_b.py` (49 tests), `apps/learning/tests/test_quizzes.py` (38 tests). Total new: 310 learning tests.
+
+---
+
 ## [Unreleased] — 2026-10-31
 
 ### Added
@@ -226,7 +312,7 @@ The modules below were already present at the baseline. Their dates are reconstr
 
 | App | Migrations | Newest |
 |---|---|---|
-| `core` | 6 | `0006_schoolsettings_public_site_content` |
+| `core` | 10 | `0010_schoolsettings_quizzes_enabled` |
 | `accounts` | 3 | `0003_remove_user_accounts_user_role_active_idx_and_more` |
 | `academics` | 2 | `0002_schoolclass_grade_scale` |
 | `students` | 3 | `0003_remove_student_students_student_class_status_idx_and_more` |
@@ -234,6 +320,7 @@ The modules below were already present at the baseline. Their dates are reconstr
 | `results` | 7 | `0007_classteacherremark` |
 | `finance` | 10 | `0010_expense_claims_budgets_and_approvals` |
 | `homework` | 3 | `0003_homeworksubmission_homeworksubmissionattachment` |
+| `learning` | 8 | `0008_quiz_models` |
 | `public` | 2 | `0002_contactmessage_handled_contactmessage_handled_at` |
 | `attendance`, `communications` | 1–2 each | initial |
 

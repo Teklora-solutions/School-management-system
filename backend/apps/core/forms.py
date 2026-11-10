@@ -114,6 +114,10 @@ class SchoolSettingsForm(forms.ModelForm):
     """
     Admin edit of the SchoolSettings singleton.
 
+    Split into tab-groups in the template: Identity, Website Content, Appearance,
+    Social & Contact. Each group surfaces the relevant subset of fields so the
+    form doesn't become an intimidating wall of inputs.
+
     Identity fields are optional: a blank value means "use the SCHOOL_* setting
     from the environment", which the context processor resolves for templates.
     """
@@ -121,6 +125,7 @@ class SchoolSettingsForm(forms.ModelForm):
     class Meta:
         model = SchoolSettings
         fields = [
+            # ── Identity ──────────────────────────────────────────────────
             "name",
             "motto",
             "phone",
@@ -128,18 +133,46 @@ class SchoolSettingsForm(forms.ModelForm):
             "currency",
             "show_positions",
             "fees_enabled",
+            "learning_enabled",
+            "engagement_enabled",
+            "quizzes_enabled",
+            "live_classes_enabled",
             "logo",
             "address",
             "established_on",
+            # ── About page content ────────────────────────────────────────
             "about",
             "mission",
             "vision",
+            "values",
+            # ── Home hero ─────────────────────────────────────────────────
+            "hero_eyebrow",
+            "hero_title",
+            "hero_title_highlight",
+            "hero_text",
+            # ── Home CTA band ─────────────────────────────────────────────
+            "cta_title",
+            "cta_text",
+            # ── Appearance ────────────────────────────────────────────────
+            "theme",
+            # ── Footer ────────────────────────────────────────────────────
+            "footer_about",
+            # ── Social links ──────────────────────────────────────────────
+            "facebook_url",
+            "instagram_url",
+            "youtube_url",
+            "linkedin_url",
+            # ── Contact / Admissions extras ───────────────────────────────
+            "admissions_email",
+            "office_hours",
+            "map_embed_url",
         ]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "motto": forms.TextInput(attrs={"class": "form-control"}),
             "phone": forms.TextInput(attrs={"class": "form-control"}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "admissions_email": forms.EmailInput(attrs={"class": "form-control"}),
             "currency": forms.TextInput(
                 attrs={"class": "form-control", "maxlength": "8", "placeholder": "GHS"}
             ),
@@ -152,18 +185,31 @@ class SchoolSettingsForm(forms.ModelForm):
             "about": forms.Textarea(attrs={"class": "form-control", "rows": 5}),
             "mission": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "vision": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-            # ClearableFileInput is Django's default for an ImageField and it is
-            # what makes "submit the form again without touching the logo box"
-            # keep the current file instead of wiping it.
+            "values": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "hero_eyebrow": forms.TextInput(attrs={"class": "form-control"}),
+            "hero_title": forms.TextInput(attrs={"class": "form-control"}),
+            "hero_title_highlight": forms.TextInput(attrs={"class": "form-control"}),
+            "hero_text": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "cta_title": forms.TextInput(attrs={"class": "form-control"}),
+            "cta_text": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "theme": forms.Select(
+                choices=[("dark", "Dark"), ("light", "Light")],
+                attrs={"class": "form-select"},
+            ),
+            "footer_about": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "facebook_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://facebook.com/yourschool"}),
+            "instagram_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://instagram.com/yourschool"}),
+            "youtube_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://youtube.com/@yourschool"}),
+            "linkedin_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://linkedin.com/school/yourschool"}),
+            "office_hours": forms.TextInput(attrs={"class": "form-control", "placeholder": "Monday – Friday, 8:00 AM – 4:00 PM"}),
+            "map_embed_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://maps.google.com/..."}),
+            # ClearableFileInput keeps the current file when no new file is chosen.
             "logo": forms.ClearableFileInput(attrs={"class": "form-control"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # A ModelForm marks these required because the model fields have no
-        # blank=True, which would make an unchecked box a validation error
-        # instead of the value False.
-        for checkbox in ("show_positions", "fees_enabled"):
+        for checkbox in ("show_positions", "fees_enabled", "learning_enabled", "engagement_enabled", "quizzes_enabled", "live_classes_enabled"):
             self.fields[checkbox].required = False
 
     def clean_currency(self) -> str:

@@ -57,38 +57,210 @@ h1,h2,h3,h4,h5{font-family:var(--pub-font-h);color:var(--pub-heading);line-heigh
 @media(max-width:639px){.pub-btn--hide-sm{display:none}}
 
 /* ── Navbar — FIXED at top, not just sticky ── */
-.pub-nav{position:fixed;top:0;left:0;right:0;z-index:100;background:color-mix(in srgb,var(--pub-bg) 92%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--pub-border);transition:background .3s,border-color .3s}
-.pub-nav.scrolled{background:var(--pub-bg);box-shadow:0 4px 20px rgba(0,0,0,.18)}
-[data-theme="light"] .pub-nav.scrolled{background:var(--pub-bg);box-shadow:0 4px 20px rgba(15,23,42,.08)}
-/* Offset main content so it starts below the fixed navbar */
+/* ═══════════════════════════════════════════════════════════════════════════
+   NAVBAR  — fully responsive, animated mobile drawer
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pub-nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  background:color-mix(in srgb,var(--pub-bg) 92%,transparent);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--pub-border);
+  transition:background .3s,border-color .3s,box-shadow .3s;
+}
+.pub-nav.scrolled{
+  background:var(--pub-bg);
+  box-shadow:0 4px 24px rgba(0,0,0,.18);
+}
+[data-theme="light"] .pub-nav.scrolled{box-shadow:0 4px 20px rgba(15,23,42,.09)}
+
+/* Content sits below the 68 px bar */
 main{padding-top:68px}
-.pub-nav__inner{display:flex;align-items:center;gap:.75rem;height:68px;min-width:0}
-.pub-nav__brand{display:flex;align-items:center;gap:.6rem;font-family:var(--pub-font-h);font-weight:800;font-size:1.05rem;color:var(--pub-heading);white-space:nowrap;flex-shrink:0}
-.pub-nav__dot{width:34px;height:34px;flex-shrink:0;background:linear-gradient(135deg,var(--pub-accent),var(--pub-teal));border-radius:10px;display:grid;place-items:center;color:#0f172a;font-size:1.1rem}
-.pub-nav__links{display:none;gap:.2rem;margin-left:auto;flex-shrink:0}
-.pub-nav__link{padding:.45rem .85rem;border-radius:var(--pub-radius-sm);font-size:.875rem;font-weight:600;color:var(--pub-text-muted);transition:color .2s,background .2s;white-space:nowrap}
+
+/* ── Inner row ── */
+.pub-nav__inner{
+  display:flex;align-items:center;gap:.5rem;
+  height:68px;min-width:0;
+}
+
+/* ── Brand ── */
+.pub-nav__brand{
+  display:flex;align-items:center;gap:.55rem;
+  font-family:var(--pub-font-h);font-weight:800;font-size:1.05rem;
+  color:var(--pub-heading);flex-shrink:0;
+  /* truncate on tiny screens */
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  max-width:calc(100vw - 180px); /* leave room for actions + toggle */
+}
+.pub-nav__dot{
+  width:34px;height:34px;min-width:34px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--pub-accent),var(--pub-teal));
+  border-radius:10px;display:grid;place-items:center;
+  color:#0f172a;font-size:1.1rem;
+}
+
+/* ── Desktop links (hidden on mobile) ── */
+.pub-nav__links{
+  display:none;gap:.15rem;margin-left:auto;flex-shrink:0;
+}
+.pub-nav__link{
+  padding:.45rem .85rem;border-radius:var(--pub-radius-sm);
+  font-size:.875rem;font-weight:600;
+  color:var(--pub-text-muted);
+  transition:color .2s,background .2s;white-space:nowrap;
+}
 .pub-nav__link:hover{color:var(--pub-heading);background:var(--pub-surface)}
 .pub-nav__link.is-active{color:var(--pub-accent)}
-/* Actions: keep together, never overflow */
-.pub-nav__actions{display:flex;align-items:center;gap:.5rem;margin-left:auto;flex-shrink:0}
-/* Hide the outline btn on very small screens to give toggle room */
-@media(max-width:480px){.pub-btn--hide-sm{display:none!important}}
-/* Hamburger toggle — always visible on mobile, explicit size */
-.pub-nav__toggle{width:44px;height:44px;min-width:44px;border-radius:var(--pub-radius-sm);display:grid;place-items:center;color:var(--pub-heading);background:var(--pub-surface-2);border:1px solid var(--pub-border);flex-shrink:0}
-.pub-nav__toggle span{display:block;width:20px;height:2px;background:currentColor;border-radius:2px;position:relative;transition:background .25s}
-.pub-nav__toggle span::before,.pub-nav__toggle span::after{content:'';position:absolute;left:0;width:20px;height:2px;background:currentColor;border-radius:2px;transition:transform .25s,top .25s}
-.pub-nav__toggle span::before{top:-6px}
-.pub-nav__toggle span::after{top:6px}
+
+/* ── Action buttons row ── */
+.pub-nav__actions{
+  display:flex;align-items:center;gap:.4rem;margin-left:auto;flex-shrink:0;
+}
+
+/* Hide "Apply Now" outline btn below 640 px so the bar doesn't overflow */
+@media(max-width:639px){.pub-btn--hide-sm{display:none!important}}
+
+/* ── Hamburger button ── */
+.pub-nav__toggle{
+  width:44px;height:44px;min-width:44px;
+  border-radius:var(--pub-radius-sm);
+  display:grid;place-items:center;
+  color:var(--pub-heading);
+  background:var(--pub-surface-2);
+  border:1px solid var(--pub-border);
+  flex-shrink:0;cursor:pointer;
+  transition:background .2s,border-color .2s;
+}
+.pub-nav__toggle:hover{background:var(--pub-surface);border-color:var(--pub-accent)}
+
+/* Three-bar icon → X animation */
+.pub-nav__toggle span{
+  display:block;width:20px;height:2px;
+  background:currentColor;border-radius:2px;
+  position:relative;transition:background .25s;
+}
+.pub-nav__toggle span::before,
+.pub-nav__toggle span::after{
+  content:'';position:absolute;left:0;
+  width:20px;height:2px;
+  background:currentColor;border-radius:2px;
+  transition:transform .3s cubic-bezier(.4,0,.2,1),
+             top .3s cubic-bezier(.4,0,.2,1),
+             opacity .2s;
+}
+.pub-nav__toggle span::before{top:-7px}
+.pub-nav__toggle span::after{top:7px}
+
+/* Open state → X */
 .pub-nav.is-open .pub-nav__toggle span{background:transparent}
 .pub-nav.is-open .pub-nav__toggle span::before{top:0;transform:rotate(45deg)}
 .pub-nav.is-open .pub-nav__toggle span::after{top:0;transform:rotate(-45deg)}
-.pub-nav__mobile{display:none;flex-direction:column;gap:.25rem;padding:1rem var(--pub-gutter) 1.5rem;background:var(--pub-bg);border-bottom:1px solid var(--pub-border);position:absolute;top:100%;left:0;right:0;z-index:99;box-shadow:0 8px 24px rgba(0,0,0,.2)}
-.pub-nav.is-open .pub-nav__mobile{display:flex}
-.pub-nav__mobile .pub-nav__link{padding:.75rem 1rem;font-size:1rem;border-radius:var(--pub-radius-sm)}
-.pub-nav__mobile .pub-nav__link:hover{background:var(--pub-surface-2)}
-.pub-theme-toggle{width:40px;height:40px;min-width:40px;border-radius:var(--pub-radius-sm);display:grid;place-items:center;font-size:1.1rem;color:var(--pub-text-muted);transition:color .2s,background .2s;flex-shrink:0}
+
+/* ── Mobile drawer ── */
+/*
+   The drawer uses max-height + opacity for a smooth slide-down.
+   We can't animate height:auto directly, so we cap at a generous
+   max-height (it will never actually be that tall).
+*/
+.pub-nav__mobile{
+  position:absolute;top:100%;left:0;right:0;z-index:199;
+  display:flex;flex-direction:column;gap:.25rem;
+  padding:0 var(--pub-gutter);           /* start with 0 vertical padding */
+  background:var(--pub-bg);
+  border-bottom:1px solid transparent;
+  box-shadow:none;
+
+  /* closed state */
+  max-height:0;
+  overflow:hidden;
+  opacity:0;
+  pointer-events:none;
+  transition:
+    max-height .35s cubic-bezier(.4,0,.2,1),
+    opacity    .25s ease,
+    padding    .35s cubic-bezier(.4,0,.2,1),
+    box-shadow .25s ease,
+    border-color .25s ease;
+}
+
+/* open state */
+.pub-nav.is-open .pub-nav__mobile{
+  max-height:100dvh;   /* tall enough for any number of links */
+  opacity:1;
+  pointer-events:auto;
+  padding:1rem var(--pub-gutter) 1.5rem;
+  border-bottom-color:var(--pub-border);
+  box-shadow:0 12px 32px rgba(0,0,0,.22);
+}
+[data-theme="light"] .pub-nav.is-open .pub-nav__mobile{
+  box-shadow:0 8px 24px rgba(15,23,42,.12);
+}
+
+/* Individual links inside drawer */
+.pub-nav__mobile .pub-nav__link{
+  padding:.8rem 1rem;
+  font-size:1rem;font-weight:600;
+  border-radius:var(--pub-radius-sm);
+  border-left:3px solid transparent;
+  transition:background .15s,color .15s,border-color .15s;
+}
+.pub-nav__mobile .pub-nav__link:hover{
+  background:var(--pub-surface-2);color:var(--pub-heading);
+}
+.pub-nav__mobile .pub-nav__link.is-active{
+  color:var(--pub-accent);
+  background:color-mix(in srgb,var(--pub-accent) 10%,transparent);
+  border-left-color:var(--pub-accent);
+}
+
+/* Divider between links and buttons */
+.pub-nav__mobile-divider{
+  height:1px;background:var(--pub-border);margin:.75rem 0;
+}
+
+/* CTA buttons inside drawer */
+.pub-nav__mobile-actions{
+  display:flex;flex-direction:column;gap:.5rem;
+}
+.pub-nav__mobile-actions .pub-btn{
+  width:100%;text-align:center;justify-content:center;
+}
+
+/* Backdrop overlay — dims page behind the open drawer */
+.pub-nav__backdrop{
+  position:fixed;inset:0;z-index:198;
+  background:rgba(0,0,0,.45);
+  opacity:0;pointer-events:none;
+  transition:opacity .3s ease;
+}
+.pub-nav.is-open ~ .pub-nav__backdrop,
+.pub-nav__backdrop.is-visible{
+  opacity:1;pointer-events:auto;
+}
+
+/* ── Theme toggle button ── */
+.pub-theme-toggle{
+  width:40px;height:40px;min-width:40px;
+  border-radius:var(--pub-radius-sm);
+  display:grid;place-items:center;font-size:1.1rem;
+  color:var(--pub-text-muted);
+  transition:color .2s,background .2s;flex-shrink:0;
+}
 .pub-theme-toggle:hover{color:var(--pub-accent);background:var(--pub-surface)}
-@media(min-width:1024px){.pub-nav__links{display:flex}.pub-nav__toggle{display:none}.pub-nav__mobile{display:none!important;position:static;box-shadow:none}.pub-nav__actions{margin-left:0}.pub-nav__links{margin-left:auto}}
+
+/* ── Desktop breakpoint (≥ 1024 px) ── */
+@media(min-width:1024px){
+  .pub-nav__links{display:flex}
+  .pub-nav__toggle{display:none}
+  /* The mobile drawer must never appear on desktop even if JS fires */
+  .pub-nav__mobile{
+    display:none!important;
+  }
+  .pub-nav__backdrop{display:none!important}
+  .pub-nav__actions{margin-left:0}
+  .pub-nav__links{margin-left:auto}
+  .pub-nav__brand{max-width:none}
+}
 
 /* ── Hero ── */
 .pub-hero{position:relative;overflow:hidden;padding:clamp(3rem,8vw,5.5rem) 0 clamp(2.5rem,6vw,4.5rem)}

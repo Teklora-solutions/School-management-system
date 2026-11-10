@@ -23,13 +23,13 @@ See the [root README](../README.md) for the running instructions and
 
 ```
 frontend/
-├── templates/                       153 .html files
+├── templates/                       190+ .html files
 │   ├── base.html                    the app shell (130 lines)
 │   ├── partials/                    5 shared snippets
 │   ├── auth/                        5 standalone screens (login, portal chooser, lockout, …)
 │   ├── registration/                4 standalone password-reset flow screens
 │   ├── dashboards/<role>/           6 roles × exactly 5 files = 30 (the role shells + homes)
-│   ├── features/<module>/           102 screens, 11 modules
+│   ├── features/<module>/           130+ screens, 12 modules
 │   └── public/                      6 pages of the school's open website
 └── static/
     ├── css/    base.css (654) · public_new.css (448) · public.css (621, orphaned)
@@ -37,8 +37,7 @@ frontend/
     └── vendor/ bootstrap 5.3.3 · bootstrap-icons 1.11.3 · chart.js 4.4.4
 ```
 
-`features/` per module: finance 30 · academics 12 · teachers 10 · results 9 · students 8 ·
-communications 6 · accounts 5 · homework 5 · core 4 · public 4 · director 9.
+`features/` per module: finance 30 · academics 12 · teachers 10 · results 9 · students 8 · communications 6 · accounts 5 · homework 5 · core 5 · public 4 · director 9 · **learning 25+** (course builder, lesson view, quiz builder/take/results, class feed, progress, badges, search, copy-course).
 
 ---
 
@@ -53,12 +52,10 @@ communications 6 · accounts 5 · homework 5 · core 4 · public 4 · director 9
 | Public website theme | ~450 dense lines, own `--pub-*` tokens, dark **and** light | `static/css/public_new.css` |
 | Behaviour | 84 lines of dependency-free vanilla JS | `static/js/base.js` |
 | Typography | Inter (body) + Plus Jakarta Sans (headings) via Google Fonts `@import` | `base.css:8`, `public_new.css:2` |
+| Markdown rendering | `markdown>=3.5` + `bleach>=6.1` — lesson notes sanitised server-side before HTML is sent to templates. All `is_correct` values and quiz answers are withheld from the browser until the student submits. |
 | Template tags | `{% load static %}` (30×), `{% load humanize %}` (40×), `{% load core_extras %}` (2×) | only custom module: `backend/apps/core/templatetags/core_extras.py` |
 
-There is **no** jQuery, no Alpine, no HTMX, no framework, no transpilation. There are **zero**
-`fetch()` / `XMLHttpRequest` / `axios` calls in the entire template tree — every interaction is a
-full-page form GET/POST with a CSRF token. (`djangorestframework` is configured in the backend but no
-endpoint uses it, so there is nothing for a JS client to call.)
+There is **no** jQuery, no Alpine, no HTMX, no framework, no transpilation. The lesson form has a lightweight formatting toolbar (~80 lines of vanilla JS, no CDN). Three pages use small inline `fetch()` calls: the lesson note autosave, the quiz answer autosave, and the class feed reaction — all with graceful fallback to full-page POST if JS is off.
 
 ### Offline-first, enforced by tests
 The school network may have no internet, so every vendor file is committed.
@@ -68,8 +65,9 @@ The school network may have no internet, so every vendor file is committed.
 - a vendored CSS references a font file that was not shipped;
 - a vendored file declares a `sourceMappingURL` whose `.map` is not present.
 
-The allow-list is exactly one entry, `fonts.googleapis.com` — cosmetic, since text falls back to system
-fonts offline — and it is **shrink-only** (a test asserts every listed entry is still actually used).
+The allow-list is exactly one entry, `fonts.googleapis.com` — cosmetic, since text falls back to system fonts offline — and it is **shrink-only** (a test asserts every listed entry is still actually used).
+
+One deliberate additional external resource exists: **YouTube video thumbnails** loaded from `img.youtube.com` on the student lesson page. This is a static image CDN — no cookies, no scripts. It is intentional and documented in the backend README. The video itself only loads when the student taps the thumbnail (click-to-play).
 
 > The trailing `//# sourceMappingURL=` comments were deliberately stripped from `bootstrap.min.css`,
 > `bootstrap.bundle.min.js` and `chart.umd.min.js` because the `.map` files (~1.5 MB) are intentionally
@@ -280,14 +278,10 @@ needed locally**. Run `python manage.py collectstatic` only for deployment — i
 ## 9. Known rough edges
 
 - `public.css` is dead weight (621 lines, referenced nowhere).
-- `teachers/assignment_matrix.html` carries a leftover inline `<script>` whose only content is a comment
-  about a `dict_get` shim; the filter it refers to lives in the core templatetags.
-- Teacher and Finance `home.html` still render hard-coded "–" stat cards and leftover "Phase 5" copy.
-- `_navbar.html` in every role shell is a no-op file kept only so the generated five-file layout stays
-  symmetrical.
-- `auth/password_reset.html` and `registration/password_reset.html` are both 44 lines and **not
-  identical**; only the `auth/` one is reached by the custom `StaffBlockedPasswordResetView`.
-- `attendance` renders `partials/_coming_soon.html` — the models exist, the screens do not.
-- `../school-website/` is an unreferenced static mockup of a different school ("Springfield Academy")
-  kept for design reference. It is not served and nothing imports it; the live public site is
-  `templates/public/` + `public_new.css`.
+- `teachers/assignment_matrix.html` carries a leftover inline `<script>` whose only content is a comment about a `dict_get` shim.
+- Teacher and Finance `home.html` still render hard-coded "–" stat cards.
+- `_navbar.html` in every role shell is a no-op file kept only so the generated five-file layout stays symmetrical.
+- `auth/password_reset.html` and `registration/password_reset.html` are both 44 lines and **not identical**; only the `auth/` one is reached by `StaffBlockedPasswordResetView`.
+- `attendance` renders `partials/_coming_soon.html` — the models exist, the screens do not (Checkpoint E).
+- `../school-website/` is an unreferenced static mockup of a different school ("Springfield Academy") kept for design reference.
+- Learning lesson templates include a small amount of inline `fetch()` JS (note autosave, quiz answer autosave, feed reactions) — all with full-page POST fallbacks for JS-off environments.

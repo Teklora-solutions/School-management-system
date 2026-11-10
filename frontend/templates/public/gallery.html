@@ -80,23 +80,25 @@
       <h2>Mark Your Calendar</h2>
     </div>
     <div class="pub-grid pub-grid--2" style="max-width:800px;margin:0 auto">
-      {% for ev in upcoming_events %}
-      <div class="pub-key-date" data-reveal>
-        <div style="text-align:center;min-width:60px">
-          <div class="pub-key-date__day">{{ ev.date|date:"j" }}</div>
-          <div class="pub-key-date__month">{{ ev.date|date:"M" }}</div>
+      {% if event_items %}
+        {% for ev in event_items %}
+        <div class="pub-key-date" data-reveal>
+          <div style="text-align:center;min-width:60px">
+            <div class="pub-key-date__day">{{ ev.day }}</div>
+            <div class="pub-key-date__month">{{ ev.month }}</div>
+          </div>
+          <div class="pub-key-date__info">
+            <div class="pub-key-date__title">{{ ev.title }}</div>
+            {% if ev.description %}<div class="pub-key-date__text">{{ ev.description }}</div>{% endif %}
+          </div>
         </div>
-        <div class="pub-key-date__info">
-          <div class="pub-key-date__title">{{ ev.title }}</div>
-          {% if ev.description %}<div class="pub-key-date__text">{{ ev.description }}</div>{% endif %}
-        </div>
-      </div>
-      {% empty %}
-      <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Nov</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Annual Science Fair</div><div class="pub-key-date__text">9:00 AM — Main Hall. Open to all parents.</div></div></div>
-      <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">22</div><div class="pub-key-date__month">Nov</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Inter-House Sports Day</div><div class="pub-key-date__text">8:00 AM — Sports Field.</div></div></div>
-      <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">05</div><div class="pub-key-date__month">Dec</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Winter Art Exhibition</div><div class="pub-key-date__text">5:00 PM — Art Studios.</div></div></div>
-      <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">12</div><div class="pub-key-date__month">Dec</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Carol Service &amp; Concert</div><div class="pub-key-date__text">6:00 PM — Main Hall.</div></div></div>
-      {% endfor %}
+        {% endfor %}
+      {% else %}
+        <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Nov</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Annual Science Fair</div><div class="pub-key-date__text">9:00 AM — Main Hall. Open to all parents.</div></div></div>
+        <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">22</div><div class="pub-key-date__month">Nov</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Inter-House Sports Day</div><div class="pub-key-date__text">8:00 AM — Sports Field.</div></div></div>
+        <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">05</div><div class="pub-key-date__month">Dec</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Winter Art Exhibition</div><div class="pub-key-date__text">5:00 PM — Art Studios.</div></div></div>
+        <div class="pub-key-date" data-reveal><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">12</div><div class="pub-key-date__month">Dec</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Carol Service &amp; Concert</div><div class="pub-key-date__text">6:00 PM — Main Hall.</div></div></div>
+      {% endif %}
     </div>
   </div>
 </section>

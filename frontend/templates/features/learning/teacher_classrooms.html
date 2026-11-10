@@ -1,0 +1,81 @@
+{% extends base_template %}
+
+{% block title %}My Classrooms | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-easel2 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    My Classrooms
+  </h1>
+  <p class="page-subtitle">
+    {% if term %}{{ term.academic_year.name }} · {{ term.get_name_display }}{% else %}No current term has been set.{% endif %}
+    · Your online classes, built automatically from your teaching assignments
+  </p>
+</div>
+
+{% if not term %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-calendar-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    Classrooms appear here once an academic year and current term are configured.
+  </div>
+</div>
+{% elif not classrooms %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-easel fs-1 d-block mb-2" aria-hidden="true"></i>
+    You have no subject assignments this year, so there is no classroom to teach online yet.
+    Ask an administrator to assign you a class and subject.
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-collection-play me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ classrooms|length }} classroom{{ classrooms|length|pluralize }}
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Class</th>
+            <th scope="col">Subject</th>
+            <th scope="col">Stream</th>
+            <th scope="col">Pupils</th>
+            <th scope="col" class="text-end">Open</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for classroom in classrooms %}
+          <tr>
+            <td class="fw-600">{{ classroom.school_class.name }}</td>
+            <td>{{ classroom.subject.name }}</td>
+            <td>{{ classroom.stream_name|default:"Whole class" }}</td>
+            <td>{{ classroom.student_count }}</td>
+            <td class="text-end">
+              <a href="{% url 'learning:teacher_classroom' classroom.school_class.pk classroom.subject.pk %}"
+                 class="btn btn-sm btn-primary me-1">
+                Open<i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
+              </a>
+              <a href="{% url 'learning:class_feed' classroom.school_class.pk %}"
+                 class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-megaphone" aria-hidden="true" title="Class Feed"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<p class="text-muted-sm mt-3 mb-0">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  Pupils are enrolled automatically from the class register — no class lists to upload.
+</p>
+{% endif %}
+{% endblock content %}

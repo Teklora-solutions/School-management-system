@@ -1,0 +1,132 @@
+{% extends base_template %}
+{% block title %}{{ quiz.title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-patch-question me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    {{ quiz.title }}
+  </h1>
+  <p class="page-subtitle">{{ lesson.title }} · {{ school_class.name }}</p>
+</div>
+
+{% if is_parent %}
+<div class="alert alert-info d-flex gap-2 align-items-center mb-3" role="alert">
+  <i class="bi bi-eye-fill" aria-hidden="true"></i>
+  You are viewing {{ student.user.full_name }}'s quiz history read-only.
+</div>
+{% endif %}
+
+{# ── Quiz info card ── #}
+<div class="card mb-4" style="max-width:560px;">
+  <div class="card-body">
+    {% if quiz.instructions %}
+    <p style="font-size:0.9rem;line-height:1.7;margin-bottom:1rem;">{{ quiz.instructions }}</p>
+    <hr style="border-color:var(--color-border);">
+    {% endif %}
+    <div class="row g-2 text-center mb-3">
+      <div class="col-4">
+        <div class="fw-600" style="font-size:1.25rem;color:#fff;">{{ quiz.question_count }}</div>
+        <div class="text-muted-sm">Question{{ quiz.question_count|pluralize }}</div>
+      </div>
+      <div class="col-4">
+        <div class="fw-600" style="font-size:1.25rem;color:#fff;">{{ quiz.pass_mark }}%</div>
+        <div class="text-muted-sm">To pass</div>
+      </div>
+      <div class="col-4">
+        {% if quiz.time_limit_minutes %}
+        <div class="fw-600" style="font-size:1.25rem;color:#fff;">{{ quiz.time_limit_minutes }} min</div>
+        <div class="text-muted-sm">Time limit</div>
+        {% else %}
+        <div class="fw-600" style="font-size:1.25rem;color:#fff;">—</div>
+        <div class="text-muted-sm">No time limit</div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ── Attempt count ── #}
+    {% if summary.attempts_allowed == 0 %}
+    <div class="text-muted-sm mb-3">Unlimited attempts allowed</div>
+    {% else %}
+    <div class="text-muted-sm mb-3">
+      {{ summary.attempts_used }} of {{ summary.attempts_allowed }} attempt{{ summary.attempts_allowed|pluralize }} used
+    </div>
+    {% endif %}
+
+    {# ── Best score ── #}
+    {% if summary.best_attempt %}
+    <div class="d-flex align-items-center gap-2 mb-3 p-2 rounded"
+         style="background:{% if summary.best_attempt.passed %}rgba(16,185,129,0.1){% else %}rgba(239,68,68,0.1){% endif %};
+                border:1px solid {% if summary.best_attempt.passed %}var(--color-success){% else %}var(--color-danger){% endif %};">
+      <i class="bi {% if summary.best_attempt.passed %}bi-check-circle-fill{% else %}bi-x-circle{% endif %}"
+         style="color:{% if summary.best_attempt.passed %}var(--color-success){% else %}var(--color-danger){% endif %};"
+         aria-hidden="true"></i>
+      <div>
+        <div class="fw-600" style="font-size:0.9rem;">
+          Best score: {{ summary.best_attempt.score_pct }}%
+          — {% if summary.best_attempt.passed %}Passed{% else %}Not yet passed{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Action button ── #}
+    {% if not is_parent %}
+    {% if summary.can_retry %}
+    <a href="{% url 'learning:quiz_take' school_class.pk subject.pk lesson.pk %}"
+       class="btn btn-primary w-100">
+      {% if summary.attempt and not summary.attempt.is_submitted %}
+      <i class="bi bi-play-circle me-1" aria-hidden="true"></i>Continue attempt
+      {% elif summary.attempts_used == 0 %}
+      <i class="bi bi-play-circle me-1" aria-hidden="true"></i>Start quiz
+      {% else %}
+      <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Try again
+      {% endif %}
+    </a>
+    {% else %}
+    <div class="text-muted-sm text-center mt-2">
+      You have used all your attempts for this quiz.
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{# ── Previous attempts ── #}
+{% if summary.all_attempts %}
+<h2 style="font-size:0.9rem;font-weight:700;color:#fff;margin-bottom:0.75rem;">Your attempts</h2>
+<div class="d-flex flex-column gap-2" style="max-width:560px;">
+  {% for att in summary.all_attempts %}
+  {% if att.submitted_at %}
+  <div class="card">
+    <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+      <div class="flex-grow-1">
+        <div class="fw-600" style="font-size:0.875rem;">
+          {{ att.submitted_at|date:"d M Y, g:i a" }}
+          {% if att.answers_auto_submitted %}
+          <span class="badge ms-1" style="background:rgba(245,158,11,0.15);color:var(--color-warning);font-size:0.7rem;">Auto-submitted</span>
+          {% endif %}
+        </div>
+        <div class="text-muted-sm" style="font-size:0.78rem;">
+          Score: {{ att.score_pct }}%
+          — {% if att.passed %}Passed{% else %}Not passed{% endif %}
+        </div>
+      </div>
+      {% if not is_parent %}
+      <a href="{% url 'learning:quiz_results' school_class.pk subject.pk lesson.pk att.pk %}"
+         class="btn btn-sm btn-outline-secondary">View</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="mt-4">
+  <a href="{% url 'learning:classroom' school_class.pk subject.pk %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to course
+  </a>
+</div>
+{% endblock %}

@@ -1,0 +1,167 @@
+{% extends base_template %}
+{% block title %}Quiz Builder · {{ lesson.title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-patch-question me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {% if quiz %}{{ quiz.title }}{% else %}Quiz Builder{% endif %}
+    </h1>
+    <p class="page-subtitle">{{ lesson.title }} · {{ school_class.name }} · {{ subject.name }}</p>
+  </div>
+  <a href="{% url 'learning:lesson_edit' school_class.pk subject.pk module.pk lesson.pk %}"
+     class="btn btn-outline-secondary btn-sm mt-1">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to lesson
+  </a>
+</div>
+
+{% if is_locked %}
+<div class="alert d-flex align-items-start gap-2 mb-4"
+     style="background:rgba(245,158,11,0.1);border-color:var(--color-warning);color:var(--color-warning);"
+     role="alert">
+  <i class="bi bi-lock-fill fs-5 flex-shrink-0 mt-1" aria-hidden="true"></i>
+  <div>
+    <strong>Quiz is locked.</strong>
+    Students have already submitted attempts — questions and answers cannot be changed.
+    <a href="{% url 'learning:teacher_quiz_action' school_class.pk subject.pk module.pk lesson.pk 'duplicate' %}"
+       class="btn btn-sm ms-2"
+       style="background:rgba(245,158,11,0.15);border:1px solid var(--color-warning);color:var(--color-warning);">
+      <i class="bi bi-copy me-1" aria-hidden="true"></i>Duplicate quiz
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% if not quiz %}
+{# ── No quiz yet ── #}
+<div class="card" style="border:2px dashed var(--color-border);background:transparent;max-width:520px;">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-patch-question fs-1 d-block mb-3" style="color:var(--color-muted);" aria-hidden="true"></i>
+    <h3 style="color:#fff;font-size:1rem;margin-bottom:0.5rem;">No quiz on this lesson yet</h3>
+    <p class="text-muted-sm mb-4">Add a quiz to test what students have learned.</p>
+    <a href="{% url 'learning:teacher_quiz_create' school_class.pk subject.pk module.pk lesson.pk %}"
+       class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Create quiz
+    </a>
+  </div>
+</div>
+
+{% else %}
+
+{# ── Quiz header actions ── #}
+<div class="d-flex flex-wrap gap-2 mb-4 align-items-center">
+  <span class="badge {% if quiz.is_published %}bg-success{% else %}bg-secondary{% endif %} px-3 py-2">
+    {% if quiz.is_published %}Published{% else %}Draft{% endif %}
+  </span>
+  <span class="text-muted-sm">{{ quiz.question_count }} question{{ quiz.question_count|pluralize }}</span>
+  {% if quiz.pass_mark %}<span class="text-muted-sm">· Pass: {{ quiz.pass_mark }}%</span>{% endif %}
+  {% if quiz.time_limit_minutes %}<span class="text-muted-sm">· {{ quiz.time_limit_minutes }} min</span>{% endif %}
+
+  <div class="ms-auto d-flex gap-2 flex-wrap">
+    <a href="{% url 'learning:teacher_quiz_settings' school_class.pk subject.pk module.pk lesson.pk %}"
+       class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-gear me-1" aria-hidden="true"></i>Settings
+    </a>
+    <a href="{% url 'learning:teacher_quiz_results' school_class.pk subject.pk module.pk lesson.pk %}"
+       class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-bar-chart me-1" aria-hidden="true"></i>Results
+    </a>
+    {% if quiz.is_published %}
+    <form method="post" action="{% url 'learning:teacher_quiz_action' school_class.pk subject.pk module.pk lesson.pk 'unpublish' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Unpublish
+      </button>
+    </form>
+    {% else %}
+    <form method="post" action="{% url 'learning:teacher_quiz_action' school_class.pk subject.pk module.pk lesson.pk 'publish' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-primary">
+        <i class="bi bi-eye me-1" aria-hidden="true"></i>Publish
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Question list ── #}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h2 style="font-size:1rem;font-weight:700;color:#fff;margin:0;">Questions</h2>
+  {% if not is_locked %}
+  <a href="{% url 'learning:teacher_add_question' school_class.pk subject.pk module.pk lesson.pk %}"
+     class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add question
+  </a>
+  {% endif %}
+</div>
+
+{% if not questions %}
+<div class="card">
+  <div class="card-body text-center py-4 text-muted-sm">
+    <i class="bi bi-chat-square-dots fs-1 d-block mb-2" aria-hidden="true"></i>
+    No questions yet. Click "Add question" to start building the quiz.
+  </div>
+</div>
+{% else %}
+<div class="d-flex flex-column gap-2">
+{% for qwc in questions %}
+{% with q=qwc.question %}
+<div class="card">
+  <div class="card-header d-flex align-items-center gap-2">
+    {# Reorder #}
+    {% if not is_locked %}
+    <div class="d-flex flex-column gap-1 flex-shrink-0">
+      <form method="post" action="{% url 'learning:teacher_move_question' school_class.pk subject.pk module.pk lesson.pk q.pk 'up' %}">
+        {% csrf_token %}
+        <button type="submit" class="cb-reorder__btn" title="Move up"><i class="bi bi-chevron-up" style="font-size:0.65rem;"></i></button>
+      </form>
+      <form method="post" action="{% url 'learning:teacher_move_question' school_class.pk subject.pk module.pk lesson.pk q.pk 'down' %}">
+        {% csrf_token %}
+        <button type="submit" class="cb-reorder__btn" title="Move down"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="flex-grow-1">
+      <div class="fw-600" style="font-size:0.875rem;">Q{{ forloop.counter }}. {{ q.body|truncatechars:100 }}</div>
+      <div class="text-muted-sm" style="font-size:0.75rem;">{{ q.get_question_type_display }}</div>
+    </div>
+
+    {% if not is_locked %}
+    <div class="d-flex gap-1 flex-shrink-0">
+      <a href="{% url 'learning:teacher_edit_question' school_class.pk subject.pk module.pk lesson.pk q.pk %}"
+         class="btn btn-sm cb-btn-icon" title="Edit question"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+      <form method="post" action="{% url 'learning:teacher_delete_question' school_class.pk subject.pk module.pk lesson.pk q.pk %}"
+            onsubmit="return confirm('Delete this question?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm cb-btn-danger" title="Delete"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  <div class="card-body py-2">
+    {% for c in qwc.choices %}
+    <div class="d-flex align-items-center gap-2 py-1">
+      {% if c.is_correct %}
+      <i class="bi bi-check-circle-fill" style="color:var(--color-success);" aria-label="Correct answer"></i>
+      {% else %}
+      <i class="bi bi-circle" style="color:var(--color-muted);" aria-label="Wrong answer"></i>
+      {% endif %}
+      <span style="font-size:0.875rem;">{{ c.text }}</span>
+    </div>
+    {% endfor %}
+    {% if q.explanation %}
+    <div class="text-muted-sm mt-2" style="font-size:0.78rem;">
+      <i class="bi bi-info-circle me-1" aria-hidden="true"></i>{{ q.explanation|truncatechars:80 }}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endwith %}
+{% endfor %}
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

@@ -1,0 +1,148 @@
+{% extends base_template %}
+
+{% block title %}My Progress | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-graph-up-arrow me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    {% if is_parent %}{{ student.user.full_name }}'s Progress{% else %}My Progress{% endif %}
+  </h1>
+  <p class="page-subtitle">
+    {% if term %}{{ term.academic_year.name }} · {{ term.get_name_display }}{% endif %}
+  </p>
+</div>
+
+{# ── Welcome back banner (encouraging, never guilt) ── #}
+{% if progress.is_welcome_back %}
+<div class="alert alert-info d-flex align-items-center gap-2 mb-3" role="alert">
+  <i class="bi bi-hand-wave fs-5" aria-hidden="true"></i>
+  <span>Welcome back! Pick up where you left off — your progress is right here waiting for you.</span>
+</div>
+{% endif %}
+
+{# ── Summary cards ── #}
+<div class="row g-3 mb-4">
+
+  {% if progress.show_progress_bars %}
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-check2-circle" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ progress.overall_pct }}%</div>
+        <div class="stat-label">Course progress</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-journal-check" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ progress.completed_lessons }} / {{ progress.total_lessons }}</div>
+        <div class="stat-label">Lessons completed</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if progress.show_streak %}
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-fire" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ progress.current_streak }}</div>
+        <div class="stat-label">Day streak</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-trophy" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ progress.longest_streak }}</div>
+        <div class="stat-label">Best streak</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+{# ── Course complete celebration ── #}
+{% if progress.is_course_complete %}
+<div class="alert d-flex align-items-center gap-2 mb-4"
+     style="background:rgba(16,185,129,0.12);border-color:var(--color-success);color:var(--color-success);"
+     role="alert">
+  <i class="bi bi-patch-check-fill fs-5" aria-hidden="true"></i>
+  <span><strong>You finished the course!</strong> All lessons are complete for this term.</span>
+</div>
+{% elif progress.next_lesson and not is_parent %}
+{# ── Next up ── #}
+<div class="card mb-4" style="border-color:var(--accent-dark);">
+  <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+    <i class="bi bi-play-circle-fill fs-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    <div class="flex-grow-1">
+      <div class="text-muted-sm mb-1">Next up</div>
+      <div class="fw-600">{{ progress.next_lesson.title }}</div>
+      <div class="text-muted-sm">{{ progress.next_lesson.module.title }}</div>
+    </div>
+    <a href="{% url 'learning:classroom' student.current_class_id progress.next_lesson.module.subject_id %}"
+       class="btn btn-primary">
+      Continue<i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{# ── Per-module progress ── #}
+{% if progress.show_progress_bars and progress.modules %}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-list-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Modules
+    </h2>
+  </div>
+  <div class="card-body">
+    {% for mp in progress.modules %}
+    <div class="mb-4">
+      <div class="d-flex justify-content-between align-items-baseline mb-1">
+        <span class="fw-600" style="font-size:0.9rem;">{{ mp.module.title }}</span>
+        <span class="text-muted-sm">{{ mp.completed_lessons }} / {{ mp.total_lessons }}</span>
+      </div>
+      <div class="progress" style="height:10px;border-radius:6px;background:var(--color-surface-2);"
+           role="progressbar"
+           aria-valuenow="{{ mp.pct }}"
+           aria-valuemin="0"
+           aria-valuemax="100"
+           aria-label="{{ mp.module.title }} progress">
+        <div class="progress-bar {% if mp.is_complete %}bg-success{% else %}bg-primary{% endif %}"
+             style="width:{{ mp.pct }}%;border-radius:6px;"></div>
+      </div>
+      {% if mp.is_complete %}
+      <div class="text-muted-sm mt-1">
+        <i class="bi bi-check-circle-fill" style="color:var(--color-success);" aria-hidden="true"></i>
+        Complete
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% elif not progress.modules %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-hourglass-split fs-1 d-block mb-2" aria-hidden="true"></i>
+    No lessons have been added to this course yet. Check back soon.
+  </div>
+</div>
+{% endif %}
+
+<div class="mt-3">
+  <a href="{% url 'learning:classrooms' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to My Learning
+  </a>
+</div>
+{% endblock content %}

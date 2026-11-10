@@ -143,3 +143,178 @@ class EnquiryFilterForm(forms.Form):
 
     def clean_q(self) -> str:
         return self.cleaned_data["q"].strip()
+
+
+# ── Website content forms ─────────────────────────────────────────────────────
+# One ModelForm per dynamic content model.  All follow the same conventions:
+#   - image fields use FileInput (no "clear" option — delete the row instead)
+#   - boolean fields have required=False so unchecked = False
+#   - text fields strip whitespace in clean_*
+
+from .models import (
+    AdmissionStep,
+    EventItem,
+    FAQ,
+    FeatureCard,
+    HeroSlide,
+    KeyDate,
+    TeamMember,
+    TimelineEvent,
+    Testimonial,
+)
+
+_fc = {"class": "form-control"}
+_fs = {"class": "form-select"}
+
+
+class HeroSlideForm(forms.ModelForm):
+    class Meta:
+        model = HeroSlide
+        fields = ["title", "caption", "image", "alt_text", "display_order", "is_active"]
+        widgets = {
+            "title": forms.TextInput(attrs=_fc),
+            "caption": forms.TextInput(attrs=_fc),
+            "image": forms.FileInput(attrs=_fc),
+            "alt_text": forms.TextInput(attrs=_fc),
+            "display_order": forms.NumberInput(attrs={**_fc, "min": "0"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_active"].required = False
+
+
+class FeatureCardForm(forms.ModelForm):
+    class Meta:
+        model = FeatureCard
+        fields = ["icon", "colour", "number_label", "title", "text", "tag", "display_order", "is_active"]
+        widgets = {
+            "icon": forms.TextInput(attrs={**_fc, "placeholder": "📚"}),
+            "colour": forms.Select(attrs=_fs),
+            "number_label": forms.TextInput(attrs={**_fc, "placeholder": "01"}),
+            "title": forms.TextInput(attrs=_fc),
+            "text": forms.Textarea(attrs={**_fc, "rows": 3}),
+            "tag": forms.TextInput(attrs={**_fc, "placeholder": "✓ Avg. 18 students per class"}),
+            "display_order": forms.NumberInput(attrs={**_fc, "min": "0"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_active"].required = False
+
+
+class TestimonialForm(forms.ModelForm):
+    class Meta:
+        model = Testimonial
+        fields = ["quote", "author_name", "author_role", "avatar", "display_order", "is_active"]
+        widgets = {
+            "quote": forms.Textarea(attrs={**_fc, "rows": 4}),
+            "author_name": forms.TextInput(attrs=_fc),
+            "author_role": forms.TextInput(attrs={**_fc, "placeholder": "Parent, Grade 4"}),
+            "avatar": forms.FileInput(attrs=_fc),
+            "display_order": forms.NumberInput(attrs={**_fc, "min": "0"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_active"].required = False
+        self.fields["avatar"].required = False
+
+
+class TeamMemberForm(forms.ModelForm):
+    class Meta:
+        model = TeamMember
+        fields = ["name", "role", "bio", "photo", "display_order", "is_active"]
+        widgets = {
+            "name": forms.TextInput(attrs=_fc),
+            "role": forms.TextInput(attrs={**_fc, "placeholder": "Principal"}),
+            "bio": forms.Textarea(attrs={**_fc, "rows": 3}),
+            "photo": forms.FileInput(attrs=_fc),
+            "display_order": forms.NumberInput(attrs={**_fc, "min": "0"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_active"].required = False
+        self.fields["photo"].required = False
+
+
+class TimelineEventForm(forms.ModelForm):
+    class Meta:
+        model = TimelineEvent
+        fields = ["year_label", "title", "text", "display_order", "is_active"]
+        widgets = {
+            "year_label": forms.TextInput(attrs={**_fc, "placeholder": "1985"}),
+            "title": forms.TextInput(attrs=_fc),
+            "text": forms.Textarea(attrs={**_fc, "rows": 3}),
+            "display_order": forms.NumberInput(attrs={**_fc, "min": "0"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_active"].required = False
+
+
+class EventItemForm(forms.ModelForm):
+    class Meta:
+        model = EventItem
+        fields = ["day", "month", "title", "description", "display_order", "is_active"]
+        widgets = {
+            "day": forms.TextInput(attrs={**_fc, "placeholder": "15", "maxlength": "4"}),
+            "month": forms.TextInput(attrs={**_fc, "placeholder": "Nov", "maxlength": "10"}),
+            "title": forms.TextInput(attrs=_fc),
+            "description": forms.TextInput(attrs={**_fc, "placeholder": "9:00 AM — Main Hall"}),
+            "display_order": forms.NumberInput(attrs={**_fc, "min": "0"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_active"].required = False
+
+
+class FAQForm(forms.ModelForm):
+    class Meta:
+        model = FAQ
+        fields = ["question", "answer", "display_order", "is_active"]
+        widgets = {
+            "question": forms.TextInput(attrs=_fc),
+            "answer": forms.Textarea(attrs={**_fc, "rows": 4}),
+            "display_order": forms.NumberInput(attrs={**_fc, "min": "0"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_active"].required = False
+
+
+class AdmissionStepForm(forms.ModelForm):
+    class Meta:
+        model = AdmissionStep
+        fields = ["step_number", "title", "text", "display_order", "is_active"]
+        widgets = {
+            "step_number": forms.NumberInput(attrs={**_fc, "min": "1"}),
+            "title": forms.TextInput(attrs=_fc),
+            "text": forms.Textarea(attrs={**_fc, "rows": 3}),
+            "display_order": forms.NumberInput(attrs={**_fc, "min": "0"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_active"].required = False
+
+
+class KeyDateForm(forms.ModelForm):
+    class Meta:
+        model = KeyDate
+        fields = ["day", "month", "title", "description", "display_order", "is_active"]
+        widgets = {
+            "day": forms.TextInput(attrs={**_fc, "placeholder": "15", "maxlength": "4"}),
+            "month": forms.TextInput(attrs={**_fc, "placeholder": "Jan", "maxlength": "10"}),
+            "title": forms.TextInput(attrs=_fc),
+            "description": forms.TextInput(attrs={**_fc, "placeholder": "Applications open for all year groups."}),
+            "display_order": forms.NumberInput(attrs={**_fc, "min": "0"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_active"].required = False

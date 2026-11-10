@@ -160,6 +160,10 @@ def school_settings_values(request=None) -> dict:
         values[field] = stored or str(getattr(settings, env_key, "") or "")
     values["show_positions"] = row.show_positions if row else True
     values["fees_enabled"] = row.fees_enabled if row else True
+    values["learning_enabled"] = row.learning_enabled if row else False
+    values["engagement_enabled"] = row.engagement_enabled if row else False
+    values["quizzes_enabled"] = row.quizzes_enabled if row else False
+    values["live_classes_enabled"] = row.live_classes_enabled if row else False
     if request is not None:
         request._school_settings_values = values
     return values

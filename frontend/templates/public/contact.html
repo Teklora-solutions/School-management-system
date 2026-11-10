@@ -24,14 +24,24 @@
   <div class="pub-container">
     <div class="pub-section-head" data-reveal>
       <p class="pub-eyebrow">How to Apply</p>
-      <h2>Four Simple Steps</h2>
+      <h2>{% if admission_steps %}{{ admission_steps|length }} Simple Step{{ admission_steps|length|pluralize }}{% else %}Four Simple Steps{% endif %}</h2>
       <p>From first inquiry to first day, we'll guide you through every step.</p>
     </div>
     <div class="pub-steps" data-reveal>
-      <div class="pub-step"><div class="pub-step__num">1</div><h3 class="pub-step__title">Submit Inquiry</h3><p class="pub-step__text">Fill in the form below. Our admissions office will respond within 48 hours.</p></div>
-      <div class="pub-step"><div class="pub-step__num">2</div><h3 class="pub-step__title">Campus Visit</h3><p class="pub-step__text">Tour the campus, meet teachers and see a class in session.</p></div>
-      <div class="pub-step"><div class="pub-step__num">3</div><h3 class="pub-step__title">Assessment</h3><p class="pub-step__text">A friendly, age-appropriate assessment helps us place your child in the right class.</p></div>
-      <div class="pub-step"><div class="pub-step__num">4</div><h3 class="pub-step__title">Welcome</h3><p class="pub-step__text">Receive your offer, complete enrolment and join us for your first day.</p></div>
+      {% if admission_steps %}
+        {% for step in admission_steps %}
+        <div class="pub-step">
+          <div class="pub-step__num">{{ step.step_number }}</div>
+          <h3 class="pub-step__title">{{ step.title }}</h3>
+          <p class="pub-step__text">{{ step.text }}</p>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="pub-step"><div class="pub-step__num">1</div><h3 class="pub-step__title">Submit Inquiry</h3><p class="pub-step__text">Fill in the form below. Our admissions office will respond within 48 hours.</p></div>
+        <div class="pub-step"><div class="pub-step__num">2</div><h3 class="pub-step__title">Campus Visit</h3><p class="pub-step__text">Tour the campus, meet teachers and see a class in session.</p></div>
+        <div class="pub-step"><div class="pub-step__num">3</div><h3 class="pub-step__title">Assessment</h3><p class="pub-step__text">A friendly, age-appropriate assessment helps us place your child in the right class.</p></div>
+        <div class="pub-step"><div class="pub-step__num">4</div><h3 class="pub-step__title">Welcome</h3><p class="pub-step__text">Receive your offer, complete enrolment and join us for your first day.</p></div>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -45,11 +55,26 @@
         <p class="pub-eyebrow">Mark Your Calendar</p>
         <h2 style="margin-bottom:1.5rem">Key Admissions Dates</h2>
         <div class="pub-key-dates">
-          <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Jan</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Applications Open</div><div class="pub-key-date__text">Inquiry forms accepted for all year groups.</div></div></div>
-          <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">28</div><div class="pub-key-date__month">Feb</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Open Day</div><div class="pub-key-date__text">10:00 AM — Campus tours and meet-and-greet.</div></div></div>
-          <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">31</div><div class="pub-key-date__month">Mar</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Application Deadline</div><div class="pub-key-date__text">Final day for September intake applications.</div></div></div>
-          <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Apr</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Assessment Day</div><div class="pub-key-date__text">On-campus assessments for all applicants.</div></div></div>
-          <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">01</div><div class="pub-key-date__month">May</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Offers Issued</div><div class="pub-key-date__text">Admission decisions communicated to families.</div></div></div>
+          {% if key_dates %}
+            {% for kd in key_dates %}
+            <div class="pub-key-date">
+              <div style="text-align:center;min-width:60px">
+                <div class="pub-key-date__day">{{ kd.day }}</div>
+                <div class="pub-key-date__month">{{ kd.month }}</div>
+              </div>
+              <div class="pub-key-date__info">
+                <div class="pub-key-date__title">{{ kd.title }}</div>
+                {% if kd.description %}<div class="pub-key-date__text">{{ kd.description }}</div>{% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Jan</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Applications Open</div><div class="pub-key-date__text">Inquiry forms accepted for all year groups.</div></div></div>
+            <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">28</div><div class="pub-key-date__month">Feb</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Open Day</div><div class="pub-key-date__text">10:00 AM — Campus tours and meet-and-greet.</div></div></div>
+            <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">31</div><div class="pub-key-date__month">Mar</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Application Deadline</div><div class="pub-key-date__text">Final day for September intake applications.</div></div></div>
+            <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Apr</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Assessment Day</div><div class="pub-key-date__text">On-campus assessments for all applicants.</div></div></div>
+            <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">01</div><div class="pub-key-date__month">May</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Offers Issued</div><div class="pub-key-date__text">Admission decisions communicated to families.</div></div></div>
+          {% endif %}
         </div>
       </div>
 
@@ -57,26 +82,35 @@
         <p class="pub-eyebrow">Good to Know</p>
         <h2 style="margin-bottom:1.5rem">Frequently Asked Questions</h2>
         <div class="pub-accordion">
-          <div class="pub-accordion__item">
-            <button class="pub-accordion__header">What are the age requirements? <span class="pub-accordion__icon">+</span></button>
-            <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Early Years accepts children from age 3. Primary starts at 6 (Grade 1). Secondary at 11 (Grade 7). We assess each child individually to ensure the right placement.</div></div>
-          </div>
-          <div class="pub-accordion__item">
-            <button class="pub-accordion__header">Is there an entrance exam? <span class="pub-accordion__icon">+</span></button>
-            <div class="pub-accordion__body"><div class="pub-accordion__body-inner">For Early Years, there is no exam — just a play-based observation. For Primary and Secondary, there is a short assessment in English and Maths plus an informal interview.</div></div>
-          </div>
-          <div class="pub-accordion__item">
-            <button class="pub-accordion__header">Do you offer scholarships? <span class="pub-accordion__icon">+</span></button>
-            <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Yes. We offer merit scholarships for Secondary students and need-based financial aid for all year groups. Contact our admissions office for details.</div></div>
-          </div>
-          <div class="pub-accordion__item">
-            <button class="pub-accordion__header">What's included in tuition? <span class="pub-accordion__icon">+</span></button>
-            <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Tuition covers all classes, textbooks and standard extracurricular activities. Transport, individual music lessons and after-school care are billed separately.</div></div>
-          </div>
-          <div class="pub-accordion__item">
-            <button class="pub-accordion__header">Can we visit before applying? <span class="pub-accordion__icon">+</span></button>
-            <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Absolutely — we encourage it! Book a campus visit using the form below or attend one of our Open Days. You'll meet teachers and see classes in session.</div></div>
-          </div>
+          {% if faqs %}
+            {% for faq in faqs %}
+            <div class="pub-accordion__item">
+              <button class="pub-accordion__header">{{ faq.question }} <span class="pub-accordion__icon">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">{{ faq.answer }}</div></div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="pub-accordion__item">
+              <button class="pub-accordion__header">What are the age requirements? <span class="pub-accordion__icon">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Early Years accepts children from age 3. Primary starts at 6 (Grade 1). Secondary at 11 (Grade 7). We assess each child individually to ensure the right placement.</div></div>
+            </div>
+            <div class="pub-accordion__item">
+              <button class="pub-accordion__header">Is there an entrance exam? <span class="pub-accordion__icon">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">For Early Years, there is no exam — just a play-based observation. For Primary and Secondary, there is a short assessment in English and Maths plus an informal interview.</div></div>
+            </div>
+            <div class="pub-accordion__item">
+              <button class="pub-accordion__header">Do you offer scholarships? <span class="pub-accordion__icon">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Yes. We offer merit scholarships for Secondary students and need-based financial aid for all year groups. Contact our admissions office for details.</div></div>
+            </div>
+            <div class="pub-accordion__item">
+              <button class="pub-accordion__header">What's included in tuition? <span class="pub-accordion__icon">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Tuition covers all classes, textbooks and standard extracurricular activities. Transport, individual music lessons and after-school care are billed separately.</div></div>
+            </div>
+            <div class="pub-accordion__item">
+              <button class="pub-accordion__header">Can we visit before applying? <span class="pub-accordion__icon">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Absolutely — we encourage it! Book a campus visit using the form below or attend one of our Open Days.</div></div>
+            </div>
+          {% endif %}
         </div>
       </div>
 
@@ -94,56 +128,39 @@
     </div>
     <div style="max-width:680px;margin:0 auto" data-reveal>
 
-      {% if form_submitted %}
+      {% if messages %}
       <div class="pub-form-success pub-form-success--static" style="display:block;margin-bottom:1.5rem">
-        <h3>&#10003; Inquiry Submitted!</h3>
-        <p>Thank you — your message is with our admissions office. We'll reply within 48 hours.</p>
+        {% for message in messages %}
+        <h3>&#10003; Message Sent!</h3>
+        <p>{{ message }}</p>
+        {% endfor %}
       </div>
       {% endif %}
-
-      <div class="pub-form-success" id="pubFormSuccess">
-        <h3>&#10003; Inquiry Submitted!</h3>
-        <p>Thank you — we'll reply to the email address you provided within 48 hours.</p>
-      </div>
 
       <form method="post" id="pub-inquiry-form" novalidate>
         {% csrf_token %}
         <div class="pub-form-grid-2">
           <div class="pub-form-group">
-            <label class="pub-form-label" for="id_name">Full Name <span>*</span></label>
-            <input class="pub-form-input" type="text" name="name" id="id_name" placeholder="e.g. Ama Mensah" autocomplete="name" required>
-            <span class="pub-form-error" data-error="name"></span>
+            <label class="pub-form-label" for="{{ form.name.id_for_label }}">Full Name <span>*</span></label>
+            {{ form.name }}
+            {% for e in form.name.errors %}<span class="pub-form-error is-visible">{{ e }}</span>{% endfor %}
           </div>
           <div class="pub-form-group">
-            <label class="pub-form-label" for="id_email">Email Address <span>*</span></label>
-            <input class="pub-form-input" type="email" name="email" id="id_email" placeholder="you@example.com" autocomplete="email" required>
-            <span class="pub-form-error" data-error="email"></span>
+            <label class="pub-form-label" for="{{ form.email.id_for_label }}">Email Address <span>*</span></label>
+            {{ form.email }}
+            {% for e in form.email.errors %}<span class="pub-form-error is-visible">{{ e }}</span>{% endfor %}
           </div>
           <div class="pub-form-group">
-            <label class="pub-form-label" for="id_phone">Phone Number</label>
-            <input class="pub-form-input" type="tel" name="phone" id="id_phone" placeholder="+233 12 345 6789" autocomplete="tel">
-            <span class="pub-form-error" data-error="phone"></span>
-          </div>
-          <div class="pub-form-group">
-            <label class="pub-form-label" for="id_subject">Grade of Interest</label>
-            <select class="pub-form-select" name="subject" id="id_subject">
-              <option value="">Select a grade...</option>
-              <option value="Early Years">Early Years (Ages 3–6)</option>
-              <option value="Primary">Primary (Grades 1–6)</option>
-              <option value="Secondary">Secondary (Grades 7–12)</option>
-              <option value="Other">Not sure yet</option>
-            </select>
+            <label class="pub-form-label" for="{{ form.phone.id_for_label }}">Phone Number</label>
+            {{ form.phone }}
           </div>
         </div>
         <div class="pub-form-group">
-          <label class="pub-form-label" for="id_message">Your Message <span>*</span></label>
-          <textarea class="pub-form-textarea" name="message" id="id_message" rows="5" placeholder="Tell us about your child, ask a question, or request a visit..." required></textarea>
-          <span class="pub-form-error" data-error="message"></span>
+          <label class="pub-form-label" for="{{ form.message.id_for_label }}">Your Message <span>*</span></label>
+          {{ form.message }}
+          {% for e in form.message.errors %}<span class="pub-form-error is-visible">{{ e }}</span>{% endfor %}
         </div>
-        <!-- Honeypot -->
-        <div style="display:none" aria-hidden="true">
-          <input type="text" name="website" tabindex="-1" autocomplete="off">
-        </div>
+        {{ form.website }}
         <div style="margin-top:1.5rem;display:flex;flex-wrap:wrap;align-items:center;gap:1rem">
           <button type="submit" class="pub-btn pub-btn--primary pub-btn--lg">&#9999; Submit Inquiry</button>
           <span style="font-size:.85rem;color:var(--pub-text-muted)">We'll reply within 48 hours.</span>
@@ -162,21 +179,37 @@
         <p class="pub-eyebrow">Find Us</p>
         <h2 style="margin-bottom:1.5rem">Contact Details</h2>
         <div style="display:flex;flex-direction:column;gap:1.25rem">
-          {% if identity.address %}<div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128205;</span><div><strong style="color:var(--pub-heading);display:block">Address</strong><span style="color:var(--pub-text-muted)">{{ identity.address }}</span></div></div>{% else %}<div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128205;</span><div><strong style="color:var(--pub-heading);display:block">Address</strong><span style="color:var(--pub-text-muted)">24 Education Road, Cantonments, Accra, Ghana</span></div></div>{% endif %}
-          {% if identity.phone %}<div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128222;</span><div><strong style="color:var(--pub-heading);display:block">Phone</strong><a href="tel:{{ identity.phone }}" style="color:var(--pub-text-muted)">{{ identity.phone }}</a></div></div>{% else %}<div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128222;</span><div><strong style="color:var(--pub-heading);display:block">Phone</strong><a href="tel:+233123456789" style="color:var(--pub-text-muted)">+233 12 345 6789</a></div></div>{% endif %}
-          {% if identity.email %}<div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#9993;</span><div><strong style="color:var(--pub-heading);display:block">Email</strong><a href="mailto:{{ identity.email }}" style="color:var(--pub-text-muted)">{{ identity.email }}</a></div></div>{% else %}<div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#9993;</span><div><strong style="color:var(--pub-heading);display:block">Email</strong><a href="mailto:admissions@springfield.edu" style="color:var(--pub-text-muted)">admissions@springfield.edu</a></div></div>{% endif %}
-          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128337;</span><div><strong style="color:var(--pub-heading);display:block">Office Hours</strong><span style="color:var(--pub-text-muted)">Monday – Friday, 8:00 AM – 4:00 PM</span></div></div>
+          {% if identity.address %}
+          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128205;</span><div><strong style="color:var(--pub-heading);display:block">Address</strong><span style="color:var(--pub-text-muted)">{{ identity.address }}</span></div></div>
+          {% else %}
+          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128205;</span><div><strong style="color:var(--pub-heading);display:block">Address</strong><span style="color:var(--pub-text-muted)">24 Education Road, Cantonments, Accra, Ghana</span></div></div>
+          {% endif %}
+          {% if identity.phone %}
+          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128222;</span><div><strong style="color:var(--pub-heading);display:block">Phone</strong><a href="tel:{{ identity.phone }}" style="color:var(--pub-text-muted)">{{ identity.phone }}</a></div></div>
+          {% endif %}
+          {% if identity.admissions_email %}
+          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#9993;</span><div><strong style="color:var(--pub-heading);display:block">Admissions Email</strong><a href="mailto:{{ identity.admissions_email }}" style="color:var(--pub-text-muted)">{{ identity.admissions_email }}</a></div></div>
+          {% elif identity.email %}
+          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#9993;</span><div><strong style="color:var(--pub-heading);display:block">Email</strong><a href="mailto:{{ identity.email }}" style="color:var(--pub-text-muted)">{{ identity.email }}</a></div></div>
+          {% endif %}
+          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128337;</span><div><strong style="color:var(--pub-heading);display:block">Office Hours</strong><span style="color:var(--pub-text-muted)">{% if identity.office_hours %}{{ identity.office_hours }}{% else %}Monday – Friday, 8:00 AM – 4:00 PM{% endif %}</span></div></div>
         </div>
       </div>
 
       <div data-reveal>
+        {% if identity.map_embed_url %}
+        <iframe src="{{ identity.map_embed_url }}" width="100%" height="350"
+                style="border:0;border-radius:var(--pub-radius-lg);" allowfullscreen="" loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade" title="School location map"></iframe>
+        {% else %}
         <div class="pub-map-placeholder">
           <div>
             <span style="font-size:3rem;display:block;margin-bottom:.5rem">&#128205;</span>
-            <p>Map placeholder — integrate Google Maps here.</p>
+            <p>Set a Google Maps embed URL in School Settings to show the map here.</p>
             <p style="font-size:.75rem;margin-top:.5rem;color:var(--pub-text-muted)">{% if identity.address %}{{ identity.address }}{% else %}24 Education Road, Cantonments, Accra{% endif %}</p>
           </div>
         </div>
+        {% endif %}
       </div>
 
     </div>

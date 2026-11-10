@@ -28,7 +28,19 @@ from apps.core.models import SchoolSettings
 from apps.core.selectors import school_settings_values
 from apps.students.models import Student
 
-from .models import ContactMessage, GalleryPhoto
+from .models import (
+    AdmissionStep,
+    ContactMessage,
+    EventItem,
+    FAQ,
+    FeatureCard,
+    GalleryPhoto,
+    HeroSlide,
+    KeyDate,
+    TeamMember,
+    TimelineEvent,
+    Testimonial,
+)
 
 # The public nav, in the order a visitor should meet it. ``url_name`` resolves
 # inside the ``public`` namespace, so a page can be renamed here and nowhere else.
@@ -62,21 +74,49 @@ def site_identity(request: Any = None) -> dict:
     effective = school_settings_values(request)
     row = SchoolSettings.objects.filter(pk=SchoolSettings.SINGLETON_PK).first()
 
+    def _str(field: str) -> str:
+        return (getattr(row, field, "") or "").strip()
+
     established_on = getattr(row, "established_on", None)
     logo = getattr(row, "logo", None)
     values = {
+        # ── Core identity (env-fallback fields) ──────────────────────────
         "name": effective["name"],
         "motto": effective["motto"],
         "phone": effective["phone"],
         "email": effective["email"],
-        "address": (getattr(row, "address", "") or "").strip(),
+        # ── About / story ─────────────────────────────────────────────────
+        "address": _str("address"),
         "logo_url": logo.url if logo else "",
-        "about": (getattr(row, "about", "") or "").strip(),
-        "mission": (getattr(row, "mission", "") or "").strip(),
-        "vision": (getattr(row, "vision", "") or "").strip(),
+        "about": _str("about"),
+        "mission": _str("mission"),
+        "vision": _str("vision"),
+        "values": _str("values"),
+        # ── Dates ─────────────────────────────────────────────────────────
         "established_on": established_on,
         "established_year": established_on.year if established_on else None,
         "years_running": _whole_years(established_on, timezone.localdate()),
+        # ── Home hero ─────────────────────────────────────────────────────
+        "hero_eyebrow": _str("hero_eyebrow"),
+        "hero_title": _str("hero_title"),
+        "hero_title_highlight": _str("hero_title_highlight"),
+        "hero_text": _str("hero_text"),
+        # ── Home CTA band ─────────────────────────────────────────────────
+        "cta_title": _str("cta_title"),
+        "cta_text": _str("cta_text"),
+        # ── Appearance ────────────────────────────────────────────────────
+        "theme": _str("theme") or "dark",
+        # ── Footer ────────────────────────────────────────────────────────
+        "footer_about": _str("footer_about"),
+        # ── Social links ──────────────────────────────────────────────────
+        "facebook_url": _str("facebook_url"),
+        "instagram_url": _str("instagram_url"),
+        "youtube_url": _str("youtube_url"),
+        "linkedin_url": _str("linkedin_url"),
+        # ── Contact / admissions extras ───────────────────────────────────
+        "admissions_email": _str("admissions_email"),
+        "office_hours": _str("office_hours"),
+        "map_embed_url": _str("map_embed_url"),
     }
     if request is not None:
         request._site_identity = values
@@ -230,3 +270,88 @@ def enquiry_list(*, status: str = "all", q: str = ""):
             Q(name__icontains=q) | Q(email__icontains=q) | Q(message__icontains=q)
         )
     return queryset
+
+
+# ── New dynamic content selectors ─────────────────────────────────────────────
+
+def active_hero_slides() -> list[HeroSlide]:
+    """Hero carousel slides in display order."""
+    return list(HeroSlide.objects.filter(is_active=True))
+
+
+def active_feature_cards() -> list[FeatureCard]:
+    """'Why Choose Us' cards in display order."""
+    return list(FeatureCard.objects.filter(is_active=True))
+
+
+def active_testimonials() -> list[Testimonial]:
+    """Parent testimonials in display order."""
+    return list(Testimonial.objects.filter(is_active=True))
+
+
+def active_team_members() -> list[TeamMember]:
+    """Leadership team cards in display order."""
+    return list(TeamMember.objects.filter(is_active=True))
+
+
+def active_timeline_events() -> list[TimelineEvent]:
+    """History timeline items in display order."""
+    return list(TimelineEvent.objects.filter(is_active=True))
+
+
+def active_event_items() -> list[EventItem]:
+    """Upcoming events shown on the School Life / Gallery page."""
+    return list(EventItem.objects.filter(is_active=True))
+
+
+def active_faqs() -> list[FAQ]:
+    """FAQ accordion items in display order."""
+    return list(FAQ.objects.filter(is_active=True))
+
+
+def active_admission_steps() -> list[AdmissionStep]:
+    """Numbered admissions process steps in display order."""
+    return list(AdmissionStep.objects.filter(is_active=True))
+
+
+def active_key_dates() -> list[KeyDate]:
+    """Key admissions dates in display order."""
+    return list(KeyDate.objects.filter(is_active=True))
+
+
+# ── Management selectors (admin screens) ──────────────────────────────────────
+
+def all_hero_slides() -> list[HeroSlide]:
+    return list(HeroSlide.objects.all())
+
+
+def all_feature_cards() -> list[FeatureCard]:
+    return list(FeatureCard.objects.all())
+
+
+def all_testimonials() -> list[Testimonial]:
+    return list(Testimonial.objects.all())
+
+
+def all_team_members() -> list[TeamMember]:
+    return list(TeamMember.objects.all())
+
+
+def all_timeline_events() -> list[TimelineEvent]:
+    return list(TimelineEvent.objects.all())
+
+
+def all_event_items() -> list[EventItem]:
+    return list(EventItem.objects.all())
+
+
+def all_faqs() -> list[FAQ]:
+    return list(FAQ.objects.all())
+
+
+def all_admission_steps() -> list[AdmissionStep]:
+    return list(AdmissionStep.objects.all())
+
+
+def all_key_dates() -> list[KeyDate]:
+    return list(KeyDate.objects.all())

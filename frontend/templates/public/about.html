@@ -40,7 +40,7 @@
           <div class="pub-card__icon">&#129518;</div>
           <h3>Our Mission</h3>
           <p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">
-            {% if identity.mission %}{{ identity.mission|truncatewords:40 }}
+            {% if identity.mission %}{{ identity.mission }}
             {% else %}To provide a nurturing, inquiry-driven education that empowers every child to think critically, act compassionately and lead with confidence.{% endif %}
           </p>
         </div>
@@ -50,7 +50,7 @@
           <div class="pub-card__icon pub-card__icon--teal">&#128065;</div>
           <h3>Our Vision</h3>
           <p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">
-            {% if identity.vision %}{{ identity.vision|truncatewords:40 }}
+            {% if identity.vision %}{{ identity.vision }}
             {% else %}To be the school our community trusts to prepare young people who are academically strong, emotionally resilient and ready to contribute to society.{% endif %}
           </p>
         </div>
@@ -59,7 +59,10 @@
         <div class="pub-card__body">
           <div class="pub-card__icon pub-card__icon--purple">&#10084;</div>
           <h3>Our Values</h3>
-          <p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">Curiosity, kindness, integrity and excellence — these four words guide every decision we make, from the playground to the boardroom.</p>
+          <p style="color:var(--pub-text-muted);font-size:.875rem;margin-top:.5rem">
+            {% if identity.values %}{{ identity.values }}
+            {% else %}Curiosity, kindness, integrity and excellence — these four words guide every decision we make.{% endif %}
+          </p>
         </div>
       </div>
     </div>
@@ -71,30 +74,41 @@
   <div class="pub-container">
     <div class="pub-section-head" data-reveal>
       <p class="pub-eyebrow">Our Journey</p>
-      <h2>{% if identity.years_running %}{{ identity.years_running }} Decades{% else %}Years{% endif %} of Growth</h2>
+      <h2>{% if identity.years_running %}{{ identity.years_running }} Years{% else %}Decades{% endif %} of Growth</h2>
     </div>
     <div style="max-width:700px;margin:0 auto">
       <div class="pub-timeline" data-reveal>
-        {% if identity.established_year %}
-        <div class="pub-timeline__item">
-          <div class="pub-timeline__dot"></div>
-          <div class="pub-timeline__year">{{ identity.established_year }}</div>
-          <h3 class="pub-timeline__title">The First Classroom</h3>
-          <p class="pub-timeline__text">{{ identity.name|default:"Springfield Academy" }} opens its doors, beginning its commitment to quality education.</p>
-        </div>
+        {% if timeline_events %}
+          {% for event in timeline_events %}
+          <div class="pub-timeline__item">
+            <div class="pub-timeline__dot"></div>
+            <div class="pub-timeline__year">{{ event.year_label }}</div>
+            <h3 class="pub-timeline__title">{{ event.title }}</h3>
+            <p class="pub-timeline__text">{{ event.text }}</p>
+          </div>
+          {% endfor %}
+        {% else %}
+          {% if identity.established_year %}
+          <div class="pub-timeline__item">
+            <div class="pub-timeline__dot"></div>
+            <div class="pub-timeline__year">{{ identity.established_year }}</div>
+            <h3 class="pub-timeline__title">The First Classroom</h3>
+            <p class="pub-timeline__text">{{ identity.name|default:"Springfield Academy" }} opens its doors, beginning its commitment to quality education.</p>
+          </div>
+          {% endif %}
+          <div class="pub-timeline__item">
+            <div class="pub-timeline__dot"></div>
+            <div class="pub-timeline__year">Growth</div>
+            <h3 class="pub-timeline__title">Expanding the Campus</h3>
+            <p class="pub-timeline__text">New buildings, a library and specialist classrooms as the school grows.</p>
+          </div>
+          <div class="pub-timeline__item">
+            <div class="pub-timeline__dot"></div>
+            <div class="pub-timeline__year">Today</div>
+            <h3 class="pub-timeline__title">{{ facts.pupils|default:"Hundreds of" }} Students Strong</h3>
+            <p class="pub-timeline__text">{{ identity.name|default:"Springfield Academy" }} serves students across {{ facts.classes|default:"multiple" }} class{{ facts.classes|pluralize:",es" }} with {{ facts.teachers|default:"dedicated" }} teacher{{ facts.teachers|pluralize }}.</p>
+          </div>
         {% endif %}
-        <div class="pub-timeline__item">
-          <div class="pub-timeline__dot"></div>
-          <div class="pub-timeline__year">Growth</div>
-          <h3 class="pub-timeline__title">Expanding the Campus</h3>
-          <p class="pub-timeline__text">New buildings, a library and specialist classrooms open as the school grows.</p>
-        </div>
-        <div class="pub-timeline__item">
-          <div class="pub-timeline__dot"></div>
-          <div class="pub-timeline__year">Today</div>
-          <h3 class="pub-timeline__title">{{ facts.pupils|default:"Hundreds of" }} Students Strong</h3>
-          <p class="pub-timeline__text">{{ identity.name|default:"Springfield Academy" }} now serves students across {{ facts.classes|default:"multiple" }} class{{ facts.classes|pluralize:",es" }} with {{ facts.teachers|default:"dedicated" }} teacher{{ facts.teachers|pluralize:",s" }}.</p>
-        </div>
       </div>
     </div>
   </div>
@@ -130,10 +144,31 @@
       <h2>Leadership &amp; Key Staff</h2>
       <p>The people who make {{ identity.name|default:"Springfield" }} what it is — experienced, caring and committed to your child's growth.</p>
     </div>
+    {% if team_members %}
+    <div class="pub-grid pub-grid--4">
+      {% for member in team_members %}
+      <div class="pub-card pub-leader-card" data-reveal>
+        <div class="pub-card__body">
+          {% if member.photo %}
+          <img src="{{ member.photo.url }}" alt="{{ member.name }}" loading="lazy"
+               style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent);display:block;">
+          {% else %}
+          <div style="width:100px;height:100px;border-radius:50%;background:var(--pub-accent-glow);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+            <span style="font-size:2.5rem;">&#128100;</span>
+          </div>
+          {% endif %}
+          <h3 style="text-align:center">{{ member.name }}</h3>
+          <p style="color:var(--pub-accent);font-size:.875rem;font-weight:600;text-align:center;margin:.2rem 0 .5rem">{{ member.role }}</p>
+          {% if member.bio %}<p style="color:var(--pub-text-muted);font-size:.8rem;text-align:center">{{ member.bio }}</p>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
     <div class="pub-grid pub-grid--4">
       <div class="pub-card pub-leader-card" data-reveal>
         <div class="pub-card__body">
-          <img src="https://picsum.photos/seed/sfa-leader1/200/200" alt="Principal" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent)">
+          <img src="https://picsum.photos/seed/sfa-leader1/200/200" alt="Principal" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent);display:block;">
           <h3 style="text-align:center">Dr. Abena Owusu</h3>
           <p style="color:var(--pub-accent);font-size:.875rem;font-weight:600;text-align:center;margin:.2rem 0 .5rem">Principal</p>
           <p style="color:var(--pub-text-muted);font-size:.8rem;text-align:center">25 years in education. PhD in Educational Leadership.</p>
@@ -141,7 +176,7 @@
       </div>
       <div class="pub-card pub-leader-card" data-reveal>
         <div class="pub-card__body">
-          <img src="https://picsum.photos/seed/sfa-leader2/200/200" alt="Head of Primary" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent)">
+          <img src="https://picsum.photos/seed/sfa-leader2/200/200" alt="Head of Primary" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent);display:block;">
           <h3 style="text-align:center">Mr. Kwame Asante</h3>
           <p style="color:var(--pub-accent);font-size:.875rem;font-weight:600;text-align:center;margin:.2rem 0 .5rem">Head of Primary</p>
           <p style="color:var(--pub-text-muted);font-size:.8rem;text-align:center">18 years teaching. Specialist in early literacy.</p>
@@ -149,7 +184,7 @@
       </div>
       <div class="pub-card pub-leader-card" data-reveal>
         <div class="pub-card__body">
-          <img src="https://picsum.photos/seed/sfa-leader3/200/200" alt="Head of Secondary" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent)">
+          <img src="https://picsum.photos/seed/sfa-leader3/200/200" alt="Head of Secondary" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent);display:block;">
           <h3 style="text-align:center">Mrs. Efua Boateng</h3>
           <p style="color:var(--pub-accent);font-size:.875rem;font-weight:600;text-align:center;margin:.2rem 0 .5rem">Head of Secondary</p>
           <p style="color:var(--pub-text-muted);font-size:.8rem;text-align:center">MSc in Physics. 15 years in secondary education.</p>
@@ -157,13 +192,14 @@
       </div>
       <div class="pub-card pub-leader-card" data-reveal>
         <div class="pub-card__body">
-          <img src="https://picsum.photos/seed/sfa-leader4/200/200" alt="Director of Sports" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent)">
+          <img src="https://picsum.photos/seed/sfa-leader4/200/200" alt="Director of Sports" loading="lazy" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;border:3px solid var(--pub-accent);display:block;">
           <h3 style="text-align:center">Mr. Daniel Tetteh</h3>
           <p style="color:var(--pub-accent);font-size:.875rem;font-weight:600;text-align:center;margin:.2rem 0 .5rem">Director of Sports</p>
           <p style="color:var(--pub-text-muted);font-size:.8rem;text-align:center">Former national athlete. 12 years coaching.</p>
         </div>
       </div>
     </div>
+    {% endif %}
   </div>
 </section>
 

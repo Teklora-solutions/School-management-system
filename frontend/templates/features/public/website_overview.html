@@ -1,0 +1,204 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Website Management | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-globe me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Website Management
+  </h1>
+  <p class="page-subtitle">
+    Edit every section of the public school website from here.
+    <a href="/" target="_blank" rel="noopener">View the live site <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+  </p>
+</div>
+
+<!-- School Settings shortcut -->
+<div class="card mb-4">
+  <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+      <h5 class="fw-600 mb-1"><i class="bi bi-gear me-2" aria-hidden="true"></i>School Identity &amp; Appearance</h5>
+      <p class="text-muted-sm mb-0">Name, logo, motto, theme, hero text, social links, contact details and more.</p>
+    </div>
+    <a href="{% url 'core_school:settings' %}" class="btn btn-primary">Edit School Settings</a>
+  </div>
+</div>
+
+<!-- Content sections grid -->
+<div class="row g-3">
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-images me-1"></i> Hero Slides</h6>
+        <p class="text-muted-sm flex-grow-1">Homepage carousel images and captions.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">{{ counts.hero_slides }} slide{{ counts.hero_slides|pluralize }}</span>
+          <div class="d-flex gap-2">
+            <a href="{% url 'public_admin:hero_add' %}" class="btn btn-sm btn-outline-primary">Add</a>
+            <a href="{% url 'public_admin:hero_list' %}" class="btn btn-sm btn-primary">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-card-checklist me-1"></i> Feature Cards</h6>
+        <p class="text-muted-sm flex-grow-1">"Why Choose Us" cards on the homepage.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">{{ counts.feature_cards }} card{{ counts.feature_cards|pluralize }}</span>
+          <div class="d-flex gap-2">
+            <a href="{% url 'public_admin:feature_add' %}" class="btn btn-sm btn-outline-primary">Add</a>
+            <a href="{% url 'public_admin:feature_list' %}" class="btn btn-sm btn-primary">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-chat-quote me-1"></i> Testimonials</h6>
+        <p class="text-muted-sm flex-grow-1">Parent / student quotes on the homepage.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">{{ counts.testimonials }} item{{ counts.testimonials|pluralize }}</span>
+          <div class="d-flex gap-2">
+            <a href="{% url 'public_admin:testimonial_add' %}" class="btn btn-sm btn-outline-primary">Add</a>
+            <a href="{% url 'public_admin:testimonial_list' %}" class="btn btn-sm btn-primary">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-people me-1"></i> Team Members</h6>
+        <p class="text-muted-sm flex-grow-1">Leadership cards on the About page.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">{{ counts.team_members }} member{{ counts.team_members|pluralize }}</span>
+          <div class="d-flex gap-2">
+            <a href="{% url 'public_admin:team_add' %}" class="btn btn-sm btn-outline-primary">Add</a>
+            <a href="{% url 'public_admin:team_list' %}" class="btn btn-sm btn-primary">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-clock-history me-1"></i> Timeline</h6>
+        <p class="text-muted-sm flex-grow-1">History milestones on the About page.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">{{ counts.timeline_events }} event{{ counts.timeline_events|pluralize }}</span>
+          <div class="d-flex gap-2">
+            <a href="{% url 'public_admin:timeline_add' %}" class="btn btn-sm btn-outline-primary">Add</a>
+            <a href="{% url 'public_admin:timeline_list' %}" class="btn btn-sm btn-primary">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-calendar-event me-1"></i> Upcoming Events</h6>
+        <p class="text-muted-sm flex-grow-1">Events shown on the Gallery / School Life page.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">{{ counts.event_items }} event{{ counts.event_items|pluralize }}</span>
+          <div class="d-flex gap-2">
+            <a href="{% url 'public_admin:event_add' %}" class="btn btn-sm btn-outline-primary">Add</a>
+            <a href="{% url 'public_admin:event_list' %}" class="btn btn-sm btn-primary">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-question-circle me-1"></i> FAQs</h6>
+        <p class="text-muted-sm flex-grow-1">Accordion questions on the Contact / Admissions page.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">{{ counts.faqs }} FAQ{{ counts.faqs|pluralize }}</span>
+          <div class="d-flex gap-2">
+            <a href="{% url 'public_admin:faq_add' %}" class="btn btn-sm btn-outline-primary">Add</a>
+            <a href="{% url 'public_admin:faq_list' %}" class="btn btn-sm btn-primary">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-list-ol me-1"></i> Admission Steps</h6>
+        <p class="text-muted-sm flex-grow-1">Numbered how-to-apply steps on the Contact page.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">{{ counts.admission_steps }} step{{ counts.admission_steps|pluralize }}</span>
+          <div class="d-flex gap-2">
+            <a href="{% url 'public_admin:admission_add' %}" class="btn btn-sm btn-outline-primary">Add</a>
+            <a href="{% url 'public_admin:admission_list' %}" class="btn btn-sm btn-primary">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-calendar-check me-1"></i> Key Dates</h6>
+        <p class="text-muted-sm flex-grow-1">Admissions key dates on the Contact page.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">{{ counts.key_dates }} date{{ counts.key_dates|pluralize }}</span>
+          <div class="d-flex gap-2">
+            <a href="{% url 'public_admin:keydate_add' %}" class="btn btn-sm btn-outline-primary">Add</a>
+            <a href="{% url 'public_admin:keydate_list' %}" class="btn btn-sm btn-primary">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-images me-1"></i> Gallery Photos</h6>
+        <p class="text-muted-sm flex-grow-1">Photos on the public Gallery page.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">{{ counts.gallery_photos }} photo{{ counts.gallery_photos|pluralize }}</span>
+          <div class="d-flex gap-2">
+            <a href="{% url 'public_admin:gallery_add' %}" class="btn btn-sm btn-outline-primary">Add</a>
+            <a href="{% url 'public_admin:gallery_list' %}" class="btn btn-sm btn-primary">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h6 class="fw-600"><i class="bi bi-envelope me-1"></i> Enquiries</h6>
+        <p class="text-muted-sm flex-grow-1">Contact form submissions from the public site.</p>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <span class="badge bg-secondary">inbox</span>
+          <a href="{% url 'public_admin:enquiry_list' %}" class="btn btn-sm btn-primary">View</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock content %}

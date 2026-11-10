@@ -163,6 +163,37 @@ class SchoolSettings(BaseModel):
             '"Available once the Finance module is activated" instead.'
         ),
     )
+    learning_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Turn on to open the Learning module: online classrooms, lessons "
+            "and quizzes for teachers, students and parents."
+        ),
+    )
+    engagement_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Turn on to show progress bars, lesson streaks and the teacher "
+            "class-progress view inside the Learning module. Requires Learning "
+            "to also be on. Has no effect until you also turn it on per class "
+            "in Class Engagement Settings."
+        ),
+    )
+    quizzes_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Turn on to allow teachers to build quizzes and students to take "
+            "them. Requires Learning to also be on. Each quiz can be published "
+            "or kept as draft independently."
+        ),
+    )
+    live_classes_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Turn on to allow teachers to schedule live classes (Google Meet, Zoom, Teams) "
+            "and show the shared class calendar. Requires Learning to also be on."
+        ),
+    )
 
     # ── Public-site content ───────────────────────────────────────────────
     # These six feed the school's own website (apps/public). They are blankable
@@ -192,6 +223,80 @@ class SchoolSettings(BaseModel):
     )
     mission = models.TextField(blank=True)
     vision = models.TextField(blank=True)
+
+    # ── Website appearance ────────────────────────────────────────────────
+    theme = models.CharField(
+        max_length=20,
+        blank=True,
+        default="dark",
+        help_text='Website colour theme: "dark" or "light".',
+    )
+
+    # ── Home page hero ────────────────────────────────────────────────────
+    hero_eyebrow = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text='Small label above the headline, e.g. "Welcome to Springfield Academy".',
+    )
+    hero_title = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Main headline on the home hero. Leave blank to use the default.",
+    )
+    hero_title_highlight = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="The highlighted word(s) inside the headline (shown in accent colour).",
+    )
+    hero_text = models.TextField(
+        blank=True,
+        help_text="Body text below the hero headline on the home page.",
+    )
+
+    # ── Home CTA band ─────────────────────────────────────────────────────
+    cta_title = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Headline in the home-page call-to-action band.",
+    )
+    cta_text = models.TextField(
+        blank=True,
+        help_text="Body text in the home-page call-to-action band.",
+    )
+
+    # ── Social links ──────────────────────────────────────────────────────
+    facebook_url = models.URLField(blank=True)
+    instagram_url = models.URLField(blank=True)
+    youtube_url = models.URLField(blank=True)
+    linkedin_url = models.URLField(blank=True)
+
+    # ── Footer ────────────────────────────────────────────────────────────
+    footer_about = models.TextField(
+        blank=True,
+        help_text="Short blurb shown in the footer's brand column.",
+    )
+
+    # ── Contact page extras ───────────────────────────────────────────────
+    office_hours = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text='e.g. "Monday – Friday, 8:00 AM – 4:00 PM".',
+    )
+    map_embed_url = models.URLField(
+        blank=True,
+        help_text="Google Maps embed URL shown on the Contact page.",
+    )
+    admissions_email = models.EmailField(
+        max_length=254,
+        blank=True,
+        help_text="Separate admissions email shown on the Contact page.",
+    )
+
+    # ── Values card text ──────────────────────────────────────────────────
+    values = models.TextField(
+        blank=True,
+        help_text="Our Values text shown on the About page.",
+    )
 
     class Meta:
         db_table = "core_school_settings"
