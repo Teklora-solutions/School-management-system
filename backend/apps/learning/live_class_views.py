@@ -2,6 +2,10 @@
 apps/learning/live_class_views.py
 ---------------------------------
 Views for live class session management, student join flow, and shared class calendar.
+
+MRO rule (consistent with every other view in this app):
+  Role mixin FIRST so wrong-role users get 403 before the feature-disabled
+  page runs. This keeps the e2e security matrix clean.
 """
 
 from __future__ import annotations
@@ -35,6 +39,9 @@ class LiveClassesEnabledMixin(LearningEnabledMixin):
         return super().dispatch(request, *args, **kwargs)
 
 
+# ── Teacher views ─────────────────────────────────────────────────────────
+
+
 class TeacherLiveClassListView(TeacherRequiredMixin, LiveClassesEnabledMixin, View):
     template_name = "features/learning/live_sessions_list.html"
 
@@ -61,11 +68,9 @@ class TeacherLiveClassCreateView(TeacherRequiredMixin, LiveClassesEnabledMixin, 
     def get(self, request, class_id: int, subject_id: int):
         school_class = get_object_or_404(SchoolClass, pk=class_id)
         subject = get_object_or_404(Subject, pk=subject_id)
-        # Default start to next hour
         now = timezone.localtime()
         default_start = (now + timezone.timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
         form = LiveClassSessionForm(initial={"scheduled_start": default_start.strftime("%Y-%m-%dT%H:%M")})
-
         return render(
             request,
             self.template_name,
@@ -99,7 +104,7 @@ class TeacherLiveClassCreateView(TeacherRequiredMixin, LiveClassesEnabledMixin, 
                     actor=request.user,
                     request=request,
                 )
-                messages.success(request, f"Live class '{session.title}' scheduled successfully.")
+                messages.success(request, f"Live class '{session.title}' scheduled.")
                 return redirect(
                     "learning:teacher_live_sessions",
                     class_id=class_id,
@@ -120,14 +125,13 @@ class TeacherLiveClassCreateView(TeacherRequiredMixin, LiveClassesEnabledMixin, 
         )
 
 
-class TeacherLiveClassEditView(LiveClassesEnabledMixin, TeacherRequiredMixin, View):
+class TeacherLiveClassEditView(TeacherRequiredMixin, LiveClassesEnabledMixin, View):
     template_name = "features/learning/live_session_form.html"
 
     def get(self, request, class_id: int, subject_id: int, session_id: int):
         session = live_class_selectors.get_live_session(session_id)
         if session.school_class_id != class_id or session.subject_id != subject_id:
             raise PermissionDenied("Session does not belong to this classroom.")
-
         form = LiveClassSessionForm(instance=session)
         return render(
             request,
@@ -145,7 +149,6 @@ class TeacherLiveClassEditView(LiveClassesEnabledMixin, TeacherRequiredMixin, Vi
         session = live_class_selectors.get_live_session(session_id)
         if session.school_class_id != class_id or session.subject_id != subject_id:
             raise PermissionDenied("Session does not belong to this classroom.")
-
         form = LiveClassSessionForm(request.POST, instance=session)
         if form.is_valid():
             try:
@@ -170,7 +173,6 @@ class TeacherLiveClassEditView(LiveClassesEnabledMixin, TeacherRequiredMixin, Vi
                 )
             except ValidationError as exc:
                 form.add_error(None, exc)
-
         return render(
             request,
             self.template_name,
@@ -184,12 +186,11 @@ class TeacherLiveClassEditView(LiveClassesEnabledMixin, TeacherRequiredMixin, Vi
         )
 
 
-class TeacherLiveClassCancelView(LiveClassesEnabledMixin, TeacherRequiredMixin, View):
+class TeacherLiveClassCancelView(TeacherRequiredMixin, LiveClassesEnabledMixin, View):
     def post(self, request, class_id: int, subject_id: int, session_id: int):
         session = live_class_selectors.get_live_session(session_id)
         if session.school_class_id != class_id or session.subject_id != subject_id:
             raise PermissionDenied("Session does not belong to this classroom.")
-
         live_class_services.cancel_live_session(session=session, actor=request.user, request=request)
         messages.info(request, f"Session '{session.title}' was cancelled.")
         return redirect(
@@ -199,12 +200,11 @@ class TeacherLiveClassCancelView(LiveClassesEnabledMixin, TeacherRequiredMixin, 
         )
 
 
-class TeacherLiveClassActionView(LiveClassesEnabledMixin, TeacherRequiredMixin, View):
+class TeacherLiveClassActionView(TeacherRequiredMixin, LiveClassesEnabledMixin, View):
     def post(self, request, class_id: int, subject_id: int, session_id: int, action: str):
         session = live_class_selectors.get_live_session(session_id)
         if session.school_class_id != class_id or session.subject_id != subject_id:
             raise PermissionDenied("Session does not belong to this classroom.")
-
         if action == "start":
             live_class_services.start_live_session(session=session, actor=request.user, request=request)
             messages.success(request, f"Session '{session.title}' is now LIVE.")
@@ -213,15 +213,14 @@ class TeacherLiveClassActionView(LiveClassesEnabledMixin, TeacherRequiredMixin, 
             messages.info(request, f"Session '{session.title}' marked as completed.")
         else:
             raise PermissionDenied("Unknown action.")
-
-        return redirect(
-            "learning:live_session_detail",
-            session_id=session.pk,
-        )
+        return redirect("learning:live_session_detail", session_id=session.pk)
 
 
-class LiveClassDetailView(LiveClassesEnabledMixin, RoleRequiredMixin, View):
-    """View session detail, join link, and attendee list (teacher only sees attendance)."""
+# ── Shared detail view ────────────────────────────────────────────────────
+
+
+class LiveClassDetailView(RoleRequiredMixin, LiveClassesEnabledMixin, View):
+    """Session detail, join link, and attendee list."""
 
     allowed_roles = ["teacher", "admin", "director", "student", "parent"]
     template_name = "features/learning/live_session_detail.html"
@@ -230,14 +229,12 @@ class LiveClassDetailView(LiveClassesEnabledMixin, RoleRequiredMixin, View):
         session = live_class_selectors.get_live_session(session_id)
         is_teacher = request.user.role in ("teacher", "admin", "director")
         attendances = live_class_selectors.get_session_attendances(session_id) if is_teacher else []
-
         has_joined = False
         if request.user.role == "student":
             student = _resolve_student(request)
             if student.current_class_id != session.school_class_id:
                 raise PermissionDenied("You are not enrolled in this class.")
             has_joined = live_class_selectors.has_student_joined(session, student)
-
         return render(
             request,
             self.template_name,
@@ -250,18 +247,21 @@ class LiveClassDetailView(LiveClassesEnabledMixin, RoleRequiredMixin, View):
         )
 
 
-class StudentLiveClassListView(LiveClassesEnabledMixin, StudentOrParentMixin, View):
+# ── Student views ─────────────────────────────────────────────────────────
+
+
+class StudentLiveClassListView(StudentOrParentMixin, LiveClassesEnabledMixin, View):
     template_name = "features/learning/live_sessions_list.html"
 
     def get(self, request, class_id: int, subject_id: int):
         student = _resolve_student(request)
         if student.current_class_id != class_id:
             raise PermissionDenied("You are not enrolled in this class.")
-
         school_class = get_object_or_404(SchoolClass, pk=class_id)
         subject = get_object_or_404(Subject, pk=subject_id)
-        sessions = live_class_selectors.get_live_sessions_for_classroom(class_id, subject_id, include_cancelled=False)
-
+        sessions = live_class_selectors.get_live_sessions_for_classroom(
+            class_id, subject_id, include_cancelled=False
+        )
         return render(
             request,
             self.template_name,
@@ -275,7 +275,7 @@ class StudentLiveClassListView(LiveClassesEnabledMixin, StudentOrParentMixin, Vi
         )
 
 
-class StudentJoinLiveClassView(LiveClassesEnabledMixin, RoleRequiredMixin, View):
+class StudentJoinLiveClassView(RoleRequiredMixin, LiveClassesEnabledMixin, View):
     """Endpoint when student clicks 'Join Live Class'."""
 
     allowed_roles = ["student"]
@@ -283,10 +283,8 @@ class StudentJoinLiveClassView(LiveClassesEnabledMixin, RoleRequiredMixin, View)
     def get(self, request, session_id: int):
         student = _resolve_student(request)
         session = live_class_selectors.get_live_session(session_id)
-
         if student.current_class_id != session.school_class_id:
             raise PermissionDenied("You are not enrolled in this class.")
-
         if not session.join_window_open:
             messages.warning(
                 request,
@@ -294,15 +292,14 @@ class StudentJoinLiveClassView(LiveClassesEnabledMixin, RoleRequiredMixin, View)
                 "You can join starting 15 minutes before scheduled start.",
             )
             return redirect("learning:live_session_detail", session_id=session.pk)
-
-        # Audit student join
         live_class_services.record_student_join(session=session, student=student, request=request)
-
-        # Redirect to safe meeting URL
         return redirect(session.meeting_url)
 
 
-class ClassCalendarView(LiveClassesEnabledMixin, RoleRequiredMixin, View):
+# ── Calendar view ─────────────────────────────────────────────────────────
+
+
+class ClassCalendarView(RoleRequiredMixin, LiveClassesEnabledMixin, View):
     """Shared class calendar aggregating Live sessions, Homework, Quizzes, and Terms."""
 
     allowed_roles = ["teacher", "student", "parent", "admin", "director"]
@@ -311,7 +308,7 @@ class ClassCalendarView(LiveClassesEnabledMixin, RoleRequiredMixin, View):
     def get(self, request, class_id: int):
         school_class = get_object_or_404(SchoolClass, pk=class_id)
 
-        # Access control
+        # Object-level access control
         if request.user.role == "student":
             student = _resolve_student(request)
             if student.current_class_id != class_id:
@@ -340,4 +337,3 @@ class ClassCalendarView(LiveClassesEnabledMixin, RoleRequiredMixin, View):
                 **calendar_data,
             },
         )
-
