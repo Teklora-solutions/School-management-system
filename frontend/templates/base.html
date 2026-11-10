@@ -68,32 +68,29 @@
                   aria-expanded="false"
                   aria-label="User menu">
             {% if request.user.avatar %}
-              <img src="{{ request.user.avatar.url }}" alt="{{ request.user.full_name }}"
-                   style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+              <img class="navbar-avatar__image" src="{{ request.user.avatar.url }}" alt="{{ request.user.full_name }}">
             {% else %}
               {{ request.user.first_name|first|default:request.user.username|first }}{{ request.user.last_name|first }}
             {% endif %}
           </button>
-          <ul class="dropdown-menu dropdown-menu-end"
-              aria-labelledby="user-menu-btn"
-              style="background:var(--color-surface);border-color:var(--color-border);min-width:200px;">
+          <ul class="dropdown-menu dropdown-menu-end user-menu"
+              aria-labelledby="user-menu-btn">
             <li>
-              <div class="px-3 py-2 border-bottom" style="border-color:var(--color-border)!important;">
-                <div class="fw-600" style="color:#fff;font-size:0.875rem;">{{ request.user.full_name }}</div>
+              <div class="px-3 py-2 user-menu__header">
+                <div class="fw-600 user-menu__name">{{ request.user.full_name }}</div>
                 <div class="text-muted-sm">{{ request.user.email }}</div>
               </div>
             </li>
             <li>
-              <a class="dropdown-item" href="{% url 'accounts:profile' %}"
-                 style="color:var(--color-text);">
+              <a class="dropdown-item" href="{% url 'accounts:profile' %}">
                 <i class="bi bi-person me-2"></i>Profile
               </a>
             </li>
-            <li><hr class="dropdown-divider" style="border-color:var(--color-border);"></li>
+            <li><hr class="dropdown-divider"></li>
             <li>
               <form method="post" action="{% url 'accounts:logout' %}">
                 {% csrf_token %}
-                <button type="submit" class="dropdown-item" style="color:var(--color-danger);">
+                <button type="submit" class="dropdown-item user-menu__logout">
                   <i class="bi bi-box-arrow-right me-2"></i>Sign Out
                 </button>
               </form>

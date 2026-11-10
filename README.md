@@ -107,6 +107,21 @@ allow-list is exactly one entry — `fonts.googleapis.com` — and it is shrink-
 
 ## 4. Run it — development
 
+### Docker deployment (PostgreSQL + Cloudflare Tunnel)
+
+For the containerized deployment, see **[deploy/README.md](deploy/README.md)**.
+It uses PostgreSQL, Redis, Gunicorn, a background worker, nginx and a
+cloudflared tunnel with **no published host ports**. All durable state and
+deployment secrets are bind-mounted under the ignored **`data/`** directory.
+
+First run `python3 scripts/init_docker.py` **as your normal user, before Docker**.
+It prepares user-owned `data/` bind-mount directories and the root `.env` using
+`.env.example`, preserving existing configuration and database credentials.
+Configure the hostname in `.env` and the tunnel token as described in the guide,
+then use plain `docker compose up -d --build` (no `--env-file` required).
+Missing bind-mount paths fail rather than being auto-created by Docker.
+The local SQLite database below is not imported or overwritten.
+
 ### 4.1 Windows (PowerShell)
 
 ```powershell

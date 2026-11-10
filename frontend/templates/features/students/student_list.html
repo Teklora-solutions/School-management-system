@@ -84,7 +84,7 @@
               {{ s.current_class.name|default:"—" }}{% if s.current_stream %} <span class="text-muted-sm">/ {{ s.current_stream.name }}</span>{% endif %}
             </td>
             <td class="text-muted-sm">
-              {% for gl in s.guardian_links.all %}{% if forloop.first %}{{ gl.parent.user.full_name }}{% if gl.is_primary %} ★{% endif %}{% endif %}{% endfor %}
+              {% for gl in s.guardian_links.all %}{% if forloop.first %}{{ gl.parent.user.full_name }}{% if gl.is_primary %} <i class="bi bi-star-fill" aria-hidden="true"></i><span class="visually-hidden"> (Primary guardian)</span>{% endif %}{% endif %}{% endfor %}
             </td>
             <td>
               {% if s.status == "active" %}

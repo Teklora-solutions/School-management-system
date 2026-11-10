@@ -12,8 +12,8 @@
       <h1 class="pub-hero__title">More Than <span>a Classroom</span></h1>
       <p class="pub-hero__text">Sports, arts, science fairs, field trips and friendships — {{ identity.name|default:"Springfield" }} is a place where children discover who they are and what they love.</p>
       <div class="pub-hero__actions">
-        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg">&#9999; Apply Now</a>
-        <a href="#gallery" class="pub-btn pub-btn--outline pub-btn--lg">&#128247; View Gallery</a>
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--lg"><i class="bi bi-pencil" aria-hidden="true"></i> Apply Now</a>
+        <a href="#gallery" class="pub-btn pub-btn--outline pub-btn--lg"><i class="bi bi-camera" aria-hidden="true"></i> View Gallery</a>
       </div>
     </div>
   </div>
@@ -65,10 +65,10 @@
 
 <!-- Lightbox -->
 <div id="pubLightbox" class="pub-lightbox" role="dialog" aria-label="Image viewer" aria-modal="true" tabindex="-1">
-  <button id="pubLbClose" class="pub-lightbox__close" aria-label="Close">&#10005;</button>
-  <button id="pubLbPrev"  class="pub-lightbox__nav pub-lightbox__nav--prev" aria-label="Previous">&#8249;</button>
+  <button id="pubLbClose" class="pub-lightbox__close" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+  <button id="pubLbPrev"  class="pub-lightbox__nav pub-lightbox__nav--prev" aria-label="Previous"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
   <img id="pubLbImg" class="pub-lightbox__img" src="" alt="">
-  <button id="pubLbNext"  class="pub-lightbox__nav pub-lightbox__nav--next" aria-label="Next">&#8250;</button>
+  <button id="pubLbNext"  class="pub-lightbox__nav pub-lightbox__nav--next" aria-label="Next"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
   <p id="pubLbCaption" class="pub-lightbox__caption"></p>
 </div>
 

@@ -7,8 +7,8 @@
   <meta name="description" content="{% block meta_description %}{{ identity.motto|default:identity.name }} — {{ identity.name }}{% endblock %}">
   <title>{% block title %}{{ identity.name }}{% endblock %} | {{ identity.name|default:"Springfield Academy" }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">
   <link rel="stylesheet" href="{% static 'css/public_new.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
@@ -21,12 +21,17 @@
 
       <!-- Brand -->
       <a href="{% url 'public:home' %}" class="pub-nav__brand">
+<<<<<<< HEAD
         {% if identity.logo_url %}
         <img src="{{ identity.logo_url }}" alt="{{ identity.name|default:'School logo' }}" style="height:32px;width:auto;object-fit:contain;flex-shrink:0;">
         {% else %}
         <span class="pub-nav__dot" aria-hidden="true">&#127979;</span>
         {% endif %}
         <span>{{ identity.name|default:"Springfield Academy" }}</span>
+=======
+        <span class="pub-nav__dot"><i class="bi bi-building" aria-hidden="true"></i></span>
+        {{ identity.name|default:"Springfield Academy" }}
+>>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
       </a>
 
       <!-- Desktop links -->
@@ -42,15 +47,23 @@
 
       <!-- Action buttons + hamburger -->
       <div class="pub-nav__actions">
+<<<<<<< HEAD
         <button class="pub-theme-toggle" aria-label="Toggle colour theme" id="pubThemeToggle">&#9728;</button>
+=======
+        <button class="pub-theme-toggle" aria-label="Switch to light mode" id="pubThemeToggle"><i class="bi bi-sun" aria-hidden="true"></i></button>
+>>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
         {% if request.user.is_authenticated %}
         <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary pub-btn--sm">
-          &#9889; Dashboard
+          <i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard
         </a>
         {% else %}
         <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--sm pub-btn--hide-sm">Apply Now</a>
         <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary pub-btn--sm">
+<<<<<<< HEAD
           &#128100; Portal
+=======
+          <i class="bi bi-person" aria-hidden="true"></i> Student Portal
+>>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
         </a>
         {% endif %}
         <!-- Hamburger — hidden on desktop via CSS -->
@@ -75,6 +88,7 @@
        href="{{ link.url }}"
        {% if link.is_active %}aria-current="page"{% endif %}>{{ link.label }}</a>
     {% endfor %}
+<<<<<<< HEAD
 
     <div class="pub-nav__mobile-divider"></div>
 
@@ -86,6 +100,11 @@
       <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary">&#128100; Student Portal</a>
       <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline">&#9999; Apply Now</a>
       {% endif %}
+=======
+    <div class="pub-nav__mobile-actions">
+      <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary"><i class="bi bi-person" aria-hidden="true"></i> Student Portal</a>
+      <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline">Apply Now</a>
+>>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
     </div>
   </div>
 </nav>
@@ -96,7 +115,7 @@
 <!-- ═══ PAGE CONTENT ═══════════════════════════════════════════════════════ -->
 <main id="main-content">
   {% if messages %}
-  <div class="pub-container" style="padding-top:1rem">
+  <div class="pub-container pub-messages">
     {% for message in messages %}
     <div class="pub-alert pub-alert--{% if message.tags %}{{ message.tags }}{% else %}info{% endif %}">
       {{ message }}
@@ -115,11 +134,15 @@
       <!-- Brand col -->
       <div class="pub-footer__col">
         <div class="pub-footer__brand">
+<<<<<<< HEAD
           {% if identity.logo_url %}
           <img src="{{ identity.logo_url }}" alt="{{ identity.name|default:'School logo' }}" style="height:34px;width:auto;object-fit:contain;">
           {% else %}
           <span class="pub-nav__dot" style="width:34px;height:34px;font-size:1.1rem">&#127979;</span>
           {% endif %}
+=======
+          <span class="pub-nav__dot pub-nav__dot--footer"><i class="bi bi-building" aria-hidden="true"></i></span>
+>>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
           {{ identity.name|default:"Springfield Academy" }}
         </div>
         <p class="pub-footer__about">
@@ -127,16 +150,23 @@
         </p>
         {% if identity.address or identity.phone or identity.email %}
         <div class="pub-footer__contact">
-          {% if identity.address %}<span>&#128205; {{ identity.address }}</span>{% endif %}
-          {% if identity.phone %}<a href="tel:{{ identity.phone }}">&#128222; {{ identity.phone }}</a>{% endif %}
-          {% if identity.email %}<a href="mailto:{{ identity.email }}">&#9993; {{ identity.email }}</a>{% endif %}
+          {% if identity.address %}<span><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ identity.address }}</span>{% endif %}
+          {% if identity.phone %}<a href="tel:{{ identity.phone }}"><i class="bi bi-telephone" aria-hidden="true"></i> {{ identity.phone }}</a>{% endif %}
+          {% if identity.email %}<a href="mailto:{{ identity.email }}"><i class="bi bi-envelope" aria-hidden="true"></i> {{ identity.email }}</a>{% endif %}
         </div>
         {% endif %}
         <div class="pub-footer__social">
+<<<<<<< HEAD
           {% if identity.facebook_url %}<a href="{{ identity.facebook_url }}" target="_blank" rel="noopener" aria-label="Facebook">f</a>{% else %}<a href="#" aria-label="Facebook">f</a>{% endif %}
           {% if identity.instagram_url %}<a href="{{ identity.instagram_url }}" target="_blank" rel="noopener" aria-label="Instagram">&#128247;</a>{% else %}<a href="#" aria-label="Instagram">&#128247;</a>{% endif %}
           {% if identity.youtube_url %}<a href="{{ identity.youtube_url }}" target="_blank" rel="noopener" aria-label="YouTube">&#9654;</a>{% else %}<a href="#" aria-label="YouTube">&#9654;</a>{% endif %}
           {% if identity.linkedin_url %}<a href="{{ identity.linkedin_url }}" target="_blank" rel="noopener" aria-label="LinkedIn">in</a>{% else %}<a href="#" aria-label="LinkedIn">in</a>{% endif %}
+=======
+          <a href="#" aria-label="Facebook"><i class="bi bi-facebook" aria-hidden="true"></i></a>
+          <a href="#" aria-label="Instagram"><i class="bi bi-instagram" aria-hidden="true"></i></a>
+          <a href="#" aria-label="YouTube"><i class="bi bi-youtube" aria-hidden="true"></i></a>
+          <a href="#" aria-label="LinkedIn"><i class="bi bi-linkedin" aria-hidden="true"></i></a>
+>>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
         </div>
       </div>
 
@@ -153,7 +183,7 @@
         <h4><a href="{% url 'accounts:login' %}" class="pub-footer__title-link">Portal Login</a></h4>
         {% for portal in portal_links %}
         <a href="{{ portal.url }}">
-          <i class="pub-portal-dot" style="color:var(--pub-accent)">&#9679;</i> {{ portal.label }}
+          <i class="bi bi-circle-fill pub-portal-dot" aria-hidden="true"></i> {{ portal.label }}
         </a>
         {% endfor %}
       </div>
@@ -161,10 +191,10 @@
       <!-- CTA col -->
       <div class="pub-footer__col">
         <h4>Join Us</h4>
-        <p style="font-size:0.85rem;color:var(--pub-text-muted);line-height:1.6;margin-bottom:1rem">
+        <p class="pub-footer__inquiry">
           A question about admissions, fees, or a campus visit? Send us a message.
         </p>
-        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary" style="width:100%;text-align:center">Contact Us</a>
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--primary pub-btn--block">Contact Us</a>
       </div>
 
     </div>
@@ -174,7 +204,7 @@
   </div>
 </footer>
 
-<button class="pub-back-top" id="pubBackTop" aria-label="Back to top">&#8593;</button>
+<button class="pub-back-top" id="pubBackTop" aria-label="Back to top"><i class="bi bi-arrow-up" aria-hidden="true"></i></button>
 
 <script>
 (function(){
@@ -257,7 +287,10 @@
     (window.matchMedia('(prefers-color-scheme:light)').matches ? 'light' : 'dark');
   function applyTheme(t){
     document.documentElement.setAttribute('data-theme', t);
-    if(themeBtn) themeBtn.textContent = t === 'light' ? '\u263D' : '\u2600';
+    if(themeBtn) {
+      themeBtn.querySelector('i').className = t === 'light' ? 'bi bi-moon' : 'bi bi-sun';
+      themeBtn.setAttribute('aria-label', t === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
+    }
   }
   applyTheme(saved);
   if(themeBtn){
