@@ -1,0 +1,29 @@
+{% extends base_template %}
+{% block title %}Delete Lesson | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title" style="color:var(--color-danger);">
+    <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Lesson
+  </h1>
+  <p class="page-subtitle">{{ module.title }} · {{ school_class.name }}</p>
+</div>
+
+<div class="card" style="max-width:520px;">
+  <div class="card-body">
+    <p>You are about to delete <strong>{{ lesson.title }}</strong>.</p>
+    <p class="text-muted-sm">
+      All content, notes, video links and uploaded files for this lesson will be permanently removed.
+      This cannot be undone.
+    </p>
+    <form method="post" novalidate class="d-flex gap-2 mt-4">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">
+        <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Yes, delete
+      </button>
+      <a href="{% url 'learning:lesson_edit' school_class.pk subject.pk module.pk lesson.pk %}"
+         class="btn btn-outline-secondary">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

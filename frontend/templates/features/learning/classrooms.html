@@ -1,0 +1,71 @@
+{% extends base_template %}
+
+{% block title %}My Learning | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-bookshelf me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    My Learning
+  </h1>
+  <p class="page-subtitle">
+    {% if term %}{{ term.academic_year.name }} · {{ term.get_name_display }}{% else %}No current term has been set.{% endif %}
+    {% if is_parent and student %} · {{ student.user.full_name }}{% endif %}
+  </p>
+</div>
+
+{% if not term %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-calendar-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    Your classrooms appear here once an academic year and current term are configured.
+  </div>
+</div>
+{% elif not student.current_class_id %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-person-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    {% if is_parent %}{{ student.user.full_name }} is{% else %}You are{% endif %} not enrolled in a class yet.
+  </div>
+</div>
+{% elif not classrooms %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-book fs-1 d-block mb-2" aria-hidden="true"></i>
+    No subjects have been set for this class yet.
+  </div>
+</div>
+{% else %}
+<div class="row g-3">
+  {% for classroom in classrooms %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="card-title">
+          <i class="bi bi-book-half me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          {{ classroom.subject.name }}
+        </h2>
+        <p class="text-muted-sm mb-2">
+          <i class="bi bi-person me-1" aria-hidden="true"></i>
+          {{ classroom.teacher_name|default:"Teacher to be assigned" }}
+        </p>
+        {% if classroom.stream_name %}
+        <span class="badge me-1" style="background:var(--accent);color:#fff;">{{ classroom.stream_name }}</span>
+        {% endif %}
+      </div>
+      <div class="card-body pt-0">
+        <a href="{% url 'learning:classroom' classroom.school_class.pk classroom.subject.pk %}"
+           class="btn btn-sm btn-primary w-100 mb-2">
+          Open classroom<i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
+        </a>
+        <a href="{% url 'learning:class_feed' classroom.school_class.pk %}"
+           class="btn btn-sm btn-outline-secondary w-100">
+          <i class="bi bi-megaphone me-1" aria-hidden="true"></i>Class Feed
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock content %}

@@ -1,0 +1,57 @@
+{% extends base_template %}
+{% block title %}Copy Course | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-files me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Copy Course
+  </h1>
+  <p class="page-subtitle">
+    Copy all modules and lessons from
+    <strong>{{ school_class.name }} · {{ subject.name }} · {{ term.get_name_display }}</strong>
+    to another term or class
+  </p>
+</div>
+
+<div class="card" style="max-width:560px;">
+  <div class="card-body">
+    <div class="alert alert-info d-flex gap-2 mb-4" style="font-size:0.875rem;" role="note">
+      <i class="bi bi-info-circle-fill flex-shrink-0 mt-1" aria-hidden="true"></i>
+      <div>
+        <strong>What is copied:</strong> module titles, lesson titles, notes and video links.
+        <br>
+        <strong>What is NOT copied:</strong> uploaded files (PDFs, images, etc.) — these stay with the original.
+        <br>
+        All copied lessons are set to <strong>draft</strong> so you can review them before students see anything.
+      </div>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {# Target term (same class) #}
+      <div class="mb-4">
+        <label for="id_target_term" class="form-label fw-600">Copy to term</label>
+        <select class="form-select" id="id_target_term" name="target_term_id"
+                style="background:var(--color-surface-2);color:var(--color-text);border-color:var(--color-border);">
+          <option value="">— select a term —</option>
+          {% for t in target_terms %}
+          <option value="{{ t.pk }}">{{ t.academic_year.name }} · {{ t.get_name_display }}</option>
+          {% empty %}
+          <option disabled>No other terms available</option>
+          {% endfor %}
+        </select>
+        <div class="text-muted-sm mt-1">Copies into the same class and subject, different term.</div>
+      </div>
+
+      <button type="submit" class="btn btn-primary"
+              onclick="return confirm('Copy this course? All copied lessons will be in draft.');">
+        <i class="bi bi-files me-1" aria-hidden="true"></i>Copy course
+      </button>
+      <a href="{% url 'learning:teacher_classroom' school_class.pk subject.pk %}"
+         class="btn btn-outline-secondary ms-2">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

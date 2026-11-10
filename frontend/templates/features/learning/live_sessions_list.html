@@ -1,0 +1,153 @@
+{% extends base_template %}
+{% block title %}Live Classes · {{ school_class.name }} {{ subject.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-broadcast me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Live Classes
+    </h1>
+    <p class="page-subtitle">{{ school_class.name }} · {{ subject.name }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'learning:class_calendar' school_class.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Class Calendar
+    </a>
+    {% if is_teacher %}
+    <a href="{% url 'learning:teacher_live_create' school_class.pk subject.pk %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Schedule Live Class
+    </a>
+    <a href="{% url 'learning:teacher_classroom' school_class.pk subject.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Classroom
+    </a>
+    {% else %}
+    <a href="{% url 'learning:classroom' school_class.pk subject.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Classroom
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if not sessions %}
+<div class="card" style="border:2px dashed var(--color-border);background:transparent;">
+  <div class="card-body text-center py-5 px-3">
+    <div style="width:64px;height:64px;background:var(--accent-glow);border-radius:50%;
+                display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;">
+      <i class="bi bi-camera-video" style="font-size:1.75rem;color:var(--accent-light);" aria-hidden="true"></i>
+    </div>
+    <h3 style="color:#fff;font-size:1.1rem;margin-bottom:0.5rem;">No live classes scheduled</h3>
+    <p class="text-muted-sm mb-4" style="max-width:400px;margin:auto;">
+      {% if is_teacher %}
+      Connect with your students online. Schedule a live class on Google Meet, Zoom, or Microsoft Teams.
+      {% else %}
+      There are currently no live sessions scheduled for this class. Check back later or view the class calendar.
+      {% endif %}
+    </p>
+    {% if is_teacher %}
+    <a href="{% url 'learning:teacher_live_create' school_class.pk subject.pk %}" class="btn btn-primary">
+      <i class="bi bi-calendar-plus me-1" aria-hidden="true"></i>Schedule your first session
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+
+<div class="row g-3">
+  {% for s in sessions %}
+  <div class="col-12 col-lg-6">
+    <div class="card h-100 {% if s.is_live %}border-danger shadow-sm{% endif %}" style="position:relative;">
+      {% if s.is_live %}
+      <div style="position:absolute;top:1rem;right:1rem;">
+        <span class="badge bg-danger animate-pulse">
+          <i class="bi bi-record-circle me-1" aria-hidden="true"></i>LIVE NOW
+        </span>
+      </div>
+      {% endif %}
+
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:0.75rem;">
+            {% if s.platform == 'google_meet' %}
+            <i class="bi bi-google me-1" aria-hidden="true"></i>Google Meet
+            {% elif s.platform == 'zoom' %}
+            <i class="bi bi-camera-video-fill me-1" aria-hidden="true"></i>Zoom
+            {% elif s.platform == 'teams' %}
+            <i class="bi bi-microsoft me-1" aria-hidden="true"></i>Teams
+            {% else %}
+            <i class="bi bi-link-45deg me-1" aria-hidden="true"></i>Live Link
+            {% endif %}
+          </span>
+          <span class="text-muted-sm" style="font-size:0.8rem;">
+            {{ s.duration_minutes }} min session
+          </span>
+          {% if s.status == 'cancelled' %}
+          <span class="badge bg-secondary" style="font-size:0.7rem;">Cancelled</span>
+          {% elif s.status == 'completed' %}
+          <span class="badge bg-success-subtle text-success" style="font-size:0.7rem;">Completed</span>
+          {% endif %}
+        </div>
+
+        <h3 class="card-title h5 mb-2" style="color:#fff;">
+          <a href="{% url 'learning:live_session_detail' s.pk %}" class="text-decoration-none text-white">
+            {{ s.title }}
+          </a>
+        </h3>
+
+        {% if s.description %}
+        <p class="text-muted-sm small mb-3" style="line-height:1.5;">
+          {{ s.description|truncatewords:25 }}
+        </p>
+        {% endif %}
+
+        <div class="mt-auto pt-3 border-top border-secondary-subtle d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div style="font-size:0.82rem;">
+            <div class="fw-600 text-light">
+              <i class="bi bi-calendar-event me-1 text-muted" aria-hidden="true"></i>
+              {{ s.scheduled_start|date:"D, j M Y" }}
+            </div>
+            <div class="text-muted-sm">
+              <i class="bi bi-clock me-1" aria-hidden="true"></i>
+              {{ s.scheduled_start|time:"g:i A" }} – {{ s.scheduled_end|time:"g:i A" }}
+            </div>
+          </div>
+
+          <div class="d-flex align-items-center gap-2">
+            {% if is_teacher %}
+            <a href="{% url 'learning:live_session_detail' s.pk %}" class="btn btn-sm btn-outline-secondary">
+              Details
+            </a>
+            {% if s.status != 'cancelled' and s.status != 'completed' %}
+            <a href="{% url 'learning:teacher_live_edit' school_class.pk subject.pk s.pk %}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-pencil" aria-hidden="true"></i>
+            </a>
+            {% endif %}
+            <a href="{{ s.meeting_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">
+              <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Launch
+            </a>
+
+            {% else %}
+            {# Student or Parent view #}
+            {% if s.join_window_open %}
+            <a href="{% url 'learning:student_live_join' s.pk %}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-danger px-3 fw-600">
+              <i class="bi bi-broadcast me-1" aria-hidden="true"></i>Join Class
+            </a>
+            {% else %}
+            <a href="{% url 'learning:live_session_detail' s.pk %}" class="btn btn-sm btn-outline-secondary">
+              Details
+            </a>
+            {% endif %}
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endif %}
+{% endblock %}
+

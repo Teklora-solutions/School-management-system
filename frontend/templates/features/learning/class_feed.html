@@ -1,0 +1,344 @@
+{% extends base_template %}
+
+{% block title %}Class Feed · {{ school_class.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-megaphone me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ school_class.name }} Feed
+    </h1>
+    <p class="page-subtitle">Class notice board — everyone in this class can see posts here</p>
+  </div>
+  <a href="{% url 'learning:classrooms' %}" class="btn btn-outline-secondary btn-sm mt-1">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>My Learning
+  </a>
+</div>
+
+{# ── Posting rules banner (shown once per session via JS hide) ── #}
+<div class="alert alert-info d-flex gap-2 align-items-start mb-3 feed-rules-banner"
+     id="feedRulesBanner" role="note" style="font-size:0.85rem;">
+  <i class="bi bi-info-circle-fill fs-5 flex-shrink-0 mt-1" aria-hidden="true"></i>
+  <div>
+    <strong>Community rules:</strong>
+    Be kind and respectful. Only post things you would say in class.
+    Teachers can see and remove anything that is not appropriate.
+    {% if is_parent %}Parents can read and react but cannot post.{% endif %}
+  </div>
+  <button type="button" class="btn-close btn-close-white ms-auto flex-shrink-0"
+          aria-label="Dismiss" onclick="dismissFeedRules()"></button>
+</div>
+
+{# ── New post form (teachers + students) ── #}
+{% if can_post %}
+<div class="card mb-4">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-pencil-square me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Add a post
+    </h2>
+  </div>
+  <div class="card-body">
+    <form method="post" action="{% url 'learning:class_feed' school_class.pk %}" novalidate>
+      {% csrf_token %}
+
+      {# Post type selector — teachers only; students are locked to QUESTION #}
+      {% if is_teacher %}
+      <div class="mb-3">
+        <label class="form-label" for="id_post_type">Post type</label>
+        <div class="d-flex flex-wrap gap-2" role="group" aria-label="Post type">
+          {% for value, label in post_types %}
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio"
+                   name="post_type" id="pt_{{ value }}" value="{{ value }}"
+                   {% if value == "announcement" %}checked{% endif %}>
+            <label class="form-check-label" for="pt_{{ value }}">
+              {% if value == "announcement" %}<i class="bi bi-megaphone me-1" aria-hidden="true"></i>{% endif %}
+              {% if value == "question" %}<i class="bi bi-question-circle me-1" aria-hidden="true"></i>{% endif %}
+              {% if value == "tip" %}<i class="bi bi-lightbulb me-1" aria-hidden="true"></i>{% endif %}
+              {% if value == "celebration" %}<i class="bi bi-stars me-1" aria-hidden="true"></i>{% endif %}
+              {{ label }}
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <input type="hidden" name="post_type" value="question">
+      {% endif %}
+
+      <div class="mb-3">
+        <label class="form-label" for="id_body">
+          {% if is_teacher %}Your post{% else %}Your question{% endif %}
+        </label>
+        <textarea class="form-control" id="id_body" name="body" rows="3"
+                  maxlength="2000"
+                  placeholder="{% if is_teacher %}Write something for the class…{% else %}Ask a question for the class…{% endif %}"
+                  required></textarea>
+        <div class="text-muted-sm mt-1">
+          Plain text only. Maximum 2&nbsp;000 characters.
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-send me-1" aria-hidden="true"></i>
+        {% if is_teacher %}Post to class{% else %}Ask question{% endif %}
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{# ── Feed ── #}
+{% if not posts %}
+<div class="card">
+  <div class="card-body text-center p-5" style="color:var(--color-muted);">
+    <i class="bi bi-chat-square-dots fs-1 d-block mb-2" aria-hidden="true"></i>
+    <p class="mb-0">No posts yet. Be the first to share something with the class.</p>
+  </div>
+</div>
+{% else %}
+<div class="d-flex flex-column gap-3" role="feed" aria-label="{{ school_class.name }} class feed">
+  {% for item in posts %}
+  {% with post=item.post reactions=item.reactions %}
+  <article class="card feed-post {% if post.is_pinned %}feed-post--pinned{% endif %} {% if post.is_removed %}feed-post--removed{% endif %}"
+           id="post-{{ post.pk }}"
+           aria-label="Post by {% if post.author %}{{ post.author.get_full_name }}{% else %}Unknown{% endif %}">
+
+    {# ── Post header ── #}
+    <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+
+      {# Avatar initial #}
+      <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
+           style="width:32px;height:32px;font-size:0.75rem;">
+        {% if post.author %}{{ post.author.first_name|first|upper }}{{ post.author.last_name|first|upper }}
+        {% else %}??{% endif %}
+      </div>
+
+      <div class="flex-grow-1 min-w-0">
+        <div class="fw-600" style="font-size:0.875rem;">
+          {% if post.author %}{{ post.author.get_full_name }}{% else %}Deleted user{% endif %}
+          {# Role badge #}
+          {% if post.author %}
+          <span class="badge-role badge-role-{{ post.author.role }} ms-1"
+                style="font-size:0.65rem;vertical-align:middle;">
+            {{ post.author.get_role_display }}
+          </span>
+          {% endif %}
+        </div>
+        <div class="text-muted-sm" style="font-size:0.775rem;">
+          {{ post.created_at|date:"d M Y, g:i a" }}
+          {% if post.is_pinned %}
+          · <i class="bi bi-pin-fill" style="color:var(--color-warning);" aria-label="Pinned"></i> Pinned
+          {% endif %}
+          {% if post.is_removed %}
+          · <span style="color:var(--color-danger);">Removed by {{ post.removed_by.get_full_name }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Post type badge #}
+      <span class="badge ms-auto"
+            style="{% if post.post_type == 'announcement' %}background:rgba(14,165,233,0.15);color:#38bdf8;
+                   {% elif post.post_type == 'question' %}background:rgba(245,158,11,0.15);color:#fbbf24;
+                   {% elif post.post_type == 'tip' %}background:rgba(16,185,129,0.15);color:#34d399;
+                   {% else %}background:rgba(236,72,153,0.15);color:#f472b6;{% endif %}">
+        {% if post.post_type == "announcement" %}<i class="bi bi-megaphone me-1" aria-hidden="true"></i>{% endif %}
+        {% if post.post_type == "question" %}<i class="bi bi-question-circle me-1" aria-hidden="true"></i>{% endif %}
+        {% if post.post_type == "tip" %}<i class="bi bi-lightbulb me-1" aria-hidden="true"></i>{% endif %}
+        {% if post.post_type == "celebration" %}<i class="bi bi-stars me-1" aria-hidden="true"></i>{% endif %}
+        {{ post.get_post_type_display }}
+      </span>
+    </div>
+
+    {# ── Body ── #}
+    <div class="card-body {% if post.is_removed %}opacity-50{% endif %}">
+      <p class="mb-0" style="white-space:pre-wrap;font-size:0.9rem;line-height:1.65;">{{ post.body }}</p>
+    </div>
+
+    {# ── Reactions + moderation footer ── #}
+    <div class="card-body pt-0 d-flex align-items-center justify-content-between flex-wrap gap-2"
+         style="border-top:1px solid var(--color-border);">
+
+      {# Reaction buttons #}
+      <div class="d-flex flex-wrap gap-1" role="group" aria-label="Reactions">
+        {% for emoji, label in emoji_choices %}
+        <form method="post"
+              action="{% url 'learning:feed_post_action' school_class.pk post.pk %}"
+              class="d-inline reaction-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="react">
+          <input type="hidden" name="emoji" value="{{ emoji }}">
+          <button type="submit"
+                  class="btn btn-sm reaction-btn {% if reactions.viewer_emoji == emoji %}reaction-btn--active{% endif %}"
+                  style="background:{% if reactions.viewer_emoji == emoji %}var(--accent-glow){% else %}var(--color-surface-2){% endif %};
+                         border:1px solid {% if reactions.viewer_emoji == emoji %}var(--accent){% else %}var(--color-border){% endif %};
+                         border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                  title="{{ label }}"
+                  aria-label="{{ label }}"
+                  {% if is_parent %}disabled{% endif %}>{{ emoji }}</button>
+        </form>
+        {% endfor %}
+        {# Total reaction count alongside buttons #}
+        {% if reactions.total %}
+        <span class="align-self-center text-muted-sm ms-1" style="font-size:0.8rem;">
+          {{ reactions.total }} reaction{{ reactions.total|pluralize }}
+        </span>
+        {% endif %}
+      </div>
+
+      {# Moderation buttons (teachers only) #}
+      {% if is_moderator and not is_parent %}
+      <div class="d-flex gap-1 flex-wrap">
+        {% if not post.is_removed %}
+        <form method="post"
+              action="{% url 'learning:feed_post_action' school_class.pk post.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="pin">
+          <button type="submit"
+                  class="btn btn-sm"
+                  style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.8rem;"
+                  title="{% if post.is_pinned %}Unpin post{% else %}Pin post{% endif %}">
+            <i class="bi bi-{% if post.is_pinned %}pin-angle-fill{% else %}pin{% endif %}"
+               aria-hidden="true"></i>
+            {% if post.is_pinned %}Unpin{% else %}Pin{% endif %}
+          </button>
+        </form>
+        <form method="post"
+              action="{% url 'learning:feed_post_action' school_class.pk post.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="remove">
+          <button type="submit"
+                  class="btn btn-sm"
+                  style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.8rem;"
+                  title="Remove post"
+                  onclick="return confirm('Remove this post? Students will no longer see it.');">
+            <i class="bi bi-trash3" aria-hidden="true"></i> Remove
+          </button>
+        </form>
+        {% else %}
+        <form method="post"
+              action="{% url 'learning:feed_post_action' school_class.pk post.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="restore">
+          <button type="submit"
+                  class="btn btn-sm"
+                  style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10b981;font-size:0.8rem;"
+                  title="Restore post">
+            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Restore
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    </div>
+  </article>
+  {% endwith %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+  .feed-post--pinned {
+    border-color: var(--color-warning) !important;
+    box-shadow: 0 0 0 1px rgba(245,158,11,0.25), var(--shadow-card);
+  }
+  .feed-post--removed {
+    border-color: rgba(239,68,68,0.3) !important;
+    background: rgba(239,68,68,0.04);
+  }
+  .text-muted-sm { color: var(--color-muted); font-size: 0.8rem; }
+  .fw-600 { font-weight: 600; }
+  .reaction-btn { cursor: pointer; transition: all 0.15s ease; }
+  .reaction-btn:hover:not([disabled]) {
+    background: var(--accent-glow) !important;
+    border-color: var(--accent) !important;
+    transform: scale(1.1);
+  }
+  .reaction-btn--active { font-weight: 700; }
+  .feed-rules-banner { display: none; }
+  .feed-rules-banner.visible { display: flex; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Show the rules banner only on first visit per session
+  (function () {
+    var key = 'feedRulesHidden_{{ school_class.pk }}';
+    if (!sessionStorage.getItem(key)) {
+      var banner = document.getElementById('feedRulesBanner');
+      if (banner) banner.classList.add('visible');
+    }
+  })();
+
+  function dismissFeedRules() {
+    var key = 'feedRulesHidden_{{ school_class.pk }}';
+    sessionStorage.setItem(key, '1');
+    var banner = document.getElementById('feedRulesBanner');
+    if (banner) banner.style.display = 'none';
+  }
+
+  // Live reaction update via fetch (graceful degradation: form submits work without JS)
+  document.querySelectorAll('.reaction-form').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn && btn.disabled) return; // parents disabled
+      e.preventDefault();
+      var data = new FormData(form);
+      fetch(form.action, {
+        method: 'POST',
+        body: data,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        if (!json.ok) return;
+        // Refresh the post's reaction area without a full reload
+        var article = form.closest('article');
+        if (!article) return;
+        var allBtns = article.querySelectorAll('.reaction-btn');
+        allBtns.forEach(function (b) {
+          var hiddenEmoji = b.closest('form').querySelector('[name="emoji"]');
+          if (!hiddenEmoji) return;
+          var emoji = hiddenEmoji.value;
+          var count = json.counts[emoji] || 0;
+          // Reset active state
+          b.classList.remove('reaction-btn--active');
+          b.style.background = 'var(--color-surface-2)';
+          b.style.borderColor = 'var(--color-border)';
+          // Update count span
+          var countSpan = b.querySelector('.reaction-count');
+          if (count > 0) {
+            if (!countSpan) {
+              countSpan = document.createElement('span');
+              countSpan.className = 'reaction-count';
+              b.appendChild(document.createTextNode(' '));
+              b.appendChild(countSpan);
+            }
+            countSpan.textContent = count;
+          } else if (countSpan) {
+            countSpan.parentNode.removeChild(countSpan.previousSibling); // space
+            countSpan.parentNode.removeChild(countSpan);
+          }
+          // Mark viewer's chosen emoji
+          if (json.viewer_emoji && json.viewer_emoji === emoji) {
+            b.classList.add('reaction-btn--active');
+            b.style.background = 'var(--accent-glow)';
+            b.style.borderColor = 'var(--accent)';
+          }
+        });
+      })
+      .catch(function () {
+        // Network error — fall back to normal form submit
+        form.submit();
+      });
+    });
+  });
+</script>
+{% endblock %}

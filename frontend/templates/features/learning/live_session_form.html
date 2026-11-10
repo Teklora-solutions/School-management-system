@@ -1,0 +1,112 @@
+{% extends base_template %}
+{% block title %}{% if is_create %}Schedule Live Class{% else %}Edit Live Class{% endif %} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-camera-video me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {% if is_create %}Schedule Live Class{% else %}Edit Live Class{% endif %}
+      </h1>
+      <p class="page-subtitle">{{ school_class.name }} · {{ subject.name }}</p>
+    </div>
+    <a href="{% url 'learning:teacher_live_sessions' school_class.pk subject.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Cancel
+    </a>
+  </div>
+</div>
+
+<div class="card" style="max-width:700px;">
+  <div class="card-body p-4">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for error in form.non_field_errors %}
+        <div><i class="bi bi-exclamation-triangle me-1"></i>{{ error }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# Title #}
+      <div class="mb-3">
+        <label for="{{ form.title.id_for_label }}" class="form-label fw-600">
+          Session Title <span class="text-danger">*</span>
+        </label>
+        {{ form.title }}
+        {% if form.title.errors %}<div class="text-danger small mt-1">{{ form.title.errors.0 }}</div>{% endif %}
+      </div>
+
+      {# Description / Agenda #}
+      <div class="mb-3">
+        <label for="{{ form.description.id_for_label }}" class="form-label fw-600">Agenda / Instructions</label>
+        {{ form.description }}
+        {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors.0 }}</div>{% endif %}
+      </div>
+
+      {# Platform & URL #}
+      <div class="row g-3 mb-3">
+        <div class="col-md-5">
+          <label for="{{ form.platform.id_for_label }}" class="form-label fw-600">Platform</label>
+          {{ form.platform }}
+          {% if form.platform.errors %}<div class="text-danger small mt-1">{{ form.platform.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-7">
+          <label for="{{ form.meeting_url.id_for_label }}" class="form-label fw-600">
+            Meeting Link <span class="text-danger">*</span>
+          </label>
+          {{ form.meeting_url }}
+          {% if form.meeting_url.errors %}<div class="text-danger small mt-1">{{ form.meeting_url.errors.0 }}</div>{% endif %}
+          <div class="form-text text-muted-sm small">
+            Paste Google Meet (<code>meet.google.com</code>), Zoom (<code>zoom.us</code>), or Teams link.
+          </div>
+        </div>
+      </div>
+
+      {# Meeting ID & Passcode #}
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label for="{{ form.meeting_id.id_for_label }}" class="form-label fw-600">Meeting ID (Optional)</label>
+          {{ form.meeting_id }}
+          {% if form.meeting_id.errors %}<div class="text-danger small mt-1">{{ form.meeting_id.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label for="{{ form.passcode.id_for_label }}" class="form-label fw-600">Passcode / Password (Optional)</label>
+          {{ form.passcode }}
+          {% if form.passcode.errors %}<div class="text-danger small mt-1">{{ form.passcode.errors.0 }}</div>{% endif %}
+        </div>
+      </div>
+
+      {# Schedule & Duration #}
+      <div class="row g-3 mb-4">
+        <div class="col-md-7">
+          <label for="{{ form.scheduled_start.id_for_label }}" class="form-label fw-600">
+            Start Date & Time <span class="text-danger">*</span>
+          </label>
+          {{ form.scheduled_start }}
+          {% if form.scheduled_start.errors %}<div class="text-danger small mt-1">{{ form.scheduled_start.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-5">
+          <label for="{{ form.duration_minutes.id_for_label }}" class="form-label fw-600">
+            Duration (Minutes)
+          </label>
+          {{ form.duration_minutes }}
+          {% if form.duration_minutes.errors %}<div class="text-danger small mt-1">{{ form.duration_minutes.errors.0 }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+        <a href="{% url 'learning:teacher_live_sessions' school_class.pk subject.pk %}" class="btn btn-outline-secondary">
+          Cancel
+        </a>
+        <button type="submit" class="btn btn-primary px-4">
+          {% if is_create %}Schedule Session{% else %}Save Changes{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+

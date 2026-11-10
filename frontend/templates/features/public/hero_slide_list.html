@@ -1,0 +1,88 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Hero Slides | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <a href="{% url 'public_admin:overview' %}" class="btn btn-sm btn-outline-secondary mb-2">
+      <i class="bi bi-arrow-left me-1"></i>Website
+    </a>
+    <h1 class="page-title mt-1">
+      <i class="bi bi-images me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Hero Slides
+    </h1>
+    <p class="page-subtitle">Carousel images shown on the homepage hero. Lowest order number appears first.</p>
+  </div>
+  <a href="{% url 'public_admin:hero_add' %}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i>Add slide
+  </a>
+</div>
+
+{% if items %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th style="width:96px;">Image</th>
+          <th>Title</th>
+          <th>Order</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>
+            <img src="{{ item.image.url }}" alt="{{ item.title }}"
+                 style="width:80px;height:54px;object-fit:cover;border-radius:6px;background:var(--color-surface-2);">
+          </td>
+          <td>
+            <span class="fw-600">{{ item.title }}</span>
+            {% if item.caption %}<div class="text-muted-sm">{{ item.caption }}</div>{% endif %}
+          </td>
+          <td><code class="fw-600" style="color:var(--accent-light);">{{ item.display_order }}</code></td>
+          <td>
+            {% if item.is_active %}
+              <span class="badge" style="background:var(--color-success);color:#fff;">Active</span>
+            {% else %}
+              <span class="badge" style="background:var(--color-muted);color:#fff;">Hidden</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+              <a href="{% url 'public_admin:hero_edit' item.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post" action="{% url 'public_admin:hero_toggle' item.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary"
+                        name="action" value="{% if item.is_active %}deactivate{% else %}activate{% endif %}">
+                  {% if item.is_active %}Hide{% else %}Show{% endif %}
+                </button>
+              </form>
+              <form method="post" action="{% url 'public_admin:hero_delete' item.pk %}" class="d-inline"
+                    onsubmit="return confirm('Delete this slide permanently?');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center p-5">
+    <p class="text-muted mb-3">No hero slides yet. Add one to populate the homepage carousel.</p>
+    <a href="{% url 'public_admin:hero_add' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>Add first slide
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

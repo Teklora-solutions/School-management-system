@@ -1,0 +1,82 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}FAQs | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <a href="{% url 'public_admin:overview' %}" class="btn btn-sm btn-outline-secondary mb-2">
+      <i class="bi bi-arrow-left me-1"></i>Website
+    </a>
+    <h1 class="page-title mt-1">
+      <i class="bi bi-question-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      FAQs
+    </h1>
+    <p class="page-subtitle">Frequently asked questions shown as an accordion on the Contact / Admissions page.</p>
+  </div>
+  <a href="{% url 'public_admin:faq_add' %}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i>Add FAQ
+  </a>
+</div>
+
+{% if items %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Question</th>
+          <th>Answer</th>
+          <th>Order</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td><span class="fw-600">{{ item.question|truncatechars:60 }}</span></td>
+          <td><span class="text-muted-sm">{{ item.answer|truncatechars:80 }}</span></td>
+          <td><code class="fw-600" style="color:var(--accent-light);">{{ item.display_order }}</code></td>
+          <td>
+            {% if item.is_active %}
+              <span class="badge" style="background:var(--color-success);color:#fff;">Active</span>
+            {% else %}
+              <span class="badge" style="background:var(--color-muted);color:#fff;">Hidden</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+              <a href="{% url 'public_admin:faq_edit' item.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post" action="{% url 'public_admin:faq_toggle' item.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary"
+                        name="action" value="{% if item.is_active %}deactivate{% else %}activate{% endif %}">
+                  {% if item.is_active %}Hide{% else %}Show{% endif %}
+                </button>
+              </form>
+              <form method="post" action="{% url 'public_admin:faq_delete' item.pk %}" class="d-inline"
+                    onsubmit="return confirm('Delete this FAQ?');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center p-5">
+    <p class="text-muted mb-3">No FAQs yet.</p>
+    <a href="{% url 'public_admin:faq_add' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>Add first FAQ
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

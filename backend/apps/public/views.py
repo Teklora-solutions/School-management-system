@@ -31,10 +31,6 @@ class PublicPageMixin:
     """
     Context shared by all five pages: the nav, the school's identity, and the
     portal doors that make the footer the wide one.
-
-    ``portal_links`` is the flag ``partials/_footer_base.html`` reads. App pages
-    never set it, so they keep the one-line footer they have always had and this
-    is the only place the columns appear — one footer file, two presentations.
     """
 
     def get_context_data(self, **kwargs):
@@ -52,6 +48,10 @@ class HomeView(PublicPageMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         ctx["facts"] = selectors.home_facts()
         ctx["photos"] = selectors.published_photos()[:4]
+        ctx["hero_slides"] = selectors.active_hero_slides()
+        ctx["feature_cards"] = selectors.active_feature_cards()
+        ctx["testimonials"] = selectors.active_testimonials()
+        ctx["event_items"] = selectors.active_event_items()
         return ctx
 
 
@@ -61,6 +61,8 @@ class AboutView(PublicPageMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["facts"] = selectors.home_facts()
+        ctx["team_members"] = selectors.active_team_members()
+        ctx["timeline_events"] = selectors.active_timeline_events()
         return ctx
 
 
@@ -70,6 +72,7 @@ class AcademicsView(PublicPageMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["overview"] = selectors.academics_overview()
+        ctx["facts"] = selectors.home_facts()
         return ctx
 
 
@@ -79,21 +82,25 @@ class GalleryView(PublicPageMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["photos"] = selectors.published_photos()
+        ctx["event_items"] = selectors.active_event_items()
         return ctx
 
 
 class ContactView(PublicPageMixin, FormView):
     """
     Contact details plus an enquiry form.
-
-    The enquiry is saved first and mailed second. A mailbox that is down is not
-    a reason to lose a parent's question, and it is certainly not a reason to
-    show a visitor a 500 on the page that is supposed to invite them in.
     """
 
     template_name = "public/contact.html"
     form_class = ContactUsForm
     success_url = reverse_lazy("public:contact")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["faqs"] = selectors.active_faqs()
+        ctx["admission_steps"] = selectors.active_admission_steps()
+        ctx["key_dates"] = selectors.active_key_dates()
+        return ctx
 
     def form_valid(self, form):
         if form.cleaned_data.get("website"):

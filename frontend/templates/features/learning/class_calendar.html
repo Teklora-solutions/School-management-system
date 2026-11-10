@@ -1,0 +1,135 @@
+{% extends base_template %}
+{% block title %}{{ school_class.name }} Calendar · {{ month_name }} {{ year }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-calendar3 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {{ school_class.name }} Calendar
+      </h1>
+      <p class="page-subtitle">Schedule of live classes, homework deadlines, quizzes, and term milestones</p>
+    </div>
+
+    {# Month Navigation Buttons #}
+    <div class="d-flex align-items-center gap-2">
+      <a href="?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-chevron-left me-1"></i>Prev
+      </a>
+      <span class="fw-bold px-2 text-white" style="font-size:1.05rem;">
+        {{ month_name }} {{ year }}
+      </span>
+      <a href="?year={{ next_year }}&month={{ next_month }}" class="btn btn-outline-secondary btn-sm">
+        Next<i class="bi bi-chevron-right ms-1"></i>
+      </a>
+    </div>
+  </div>
+</div>
+
+{# Event Legend #}
+<div class="d-flex flex-wrap align-items-center gap-3 mb-4 p-2 rounded"
+     style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.8rem;">
+  <span class="text-muted-sm fw-600">Event Key:</span>
+  <span><span class="badge bg-danger me-1">&bull;</span> Live Class</span>
+  <span><span class="badge bg-warning text-dark me-1">&bull;</span> Homework Due</span>
+  <span><span class="badge bg-info text-dark me-1">&bull;</span> Quiz</span>
+  <span><span class="badge bg-success me-1">&bull;</span> Term Milestone</span>
+</div>
+
+<div class="row g-4">
+  {# Calendar Month Grid #}
+  <div class="col-12 col-xl-8">
+    <div class="card overflow-hidden">
+      <div class="table-responsive mb-0">
+        <table class="table table-bordered mb-0 calendar-table" style="table-layout:fixed;border-color:var(--color-border);">
+          <thead>
+            <tr class="text-center text-muted-sm" style="background:var(--color-surface-2);font-size:0.82rem;">
+              <th style="width:14.28%;">Mon</th>
+              <th style="width:14.28%;">Tue</th>
+              <th style="width:14.28%;">Wed</th>
+              <th style="width:14.28%;">Thu</th>
+              <th style="width:14.28%;">Fri</th>
+              <th style="width:14.28%;">Sat</th>
+              <th style="width:14.28%;">Sun</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for week in calendar_weeks %}
+            <tr>
+              {% for day in week %}
+              <td class="calendar-day p-2 {% if not day.is_current_month %}opacity-50{% endif %} {% if day.is_today %}bg-primary-subtle border-primary{% endif %}"
+                  style="height:105px;vertical-align:top;background:var(--color-surface);">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="fw-bold {% if day.is_today %}text-primary{% else %}text-muted{% endif %}"
+                        style="font-size:0.82rem;">
+                    {{ day.day_number }}
+                  </span>
+                  {% if day.is_today %}
+                  <span class="badge bg-primary" style="font-size:0.65rem;">Today</span>
+                  {% endif %}
+                </div>
+
+                <div class="d-flex flex-column gap-1">
+                  {% for ev in day.events %}
+                  <a href="{{ ev.url }}" class="text-decoration-none" title="{{ ev.title }} ({{ ev.time_str }})">
+                    <div class="calendar-event-pill text-truncate px-1 py-0.5 rounded {{ ev.badge_class }}"
+                         style="font-size:0.7rem;line-height:1.2;">
+                      {% if ev.is_live %}🔴 {% endif %}{{ ev.title }}
+                    </div>
+                  </a>
+                  {% endfor %}
+                </div>
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# Agenda & Upcoming Events #}
+  <div class="col-12 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header py-3">
+        <h2 class="h6 mb-0 text-white fw-bold">
+          <i class="bi bi-clock-history me-2"></i>Upcoming Agenda
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        {% if not agenda_events %}
+        <div class="p-4 text-center text-muted-sm">
+          <i class="bi bi-calendar-check fs-2 d-block mb-2 text-muted"></i>
+          No upcoming events scheduled for this class in this period.
+        </div>
+        {% else %}
+        <div class="list-group list-group-flush">
+          {% for ev in agenda_events %}
+          <a href="{{ ev.url }}" class="list-group-item list-group-item-action p-3"
+             style="background:transparent;border-color:var(--color-border);">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <span class="{{ ev.badge_class }}" style="font-size:0.7rem;">
+                {{ ev.category_label }}
+              </span>
+              <span class="text-muted-sm small">{{ ev.date|date:"D, j M" }}</span>
+            </div>
+            <div class="fw-600 text-white" style="font-size:0.88rem;">
+              {% if ev.is_live %}<span class="text-danger">&bull; LIVE </span>{% endif %}
+              {{ ev.title }}
+            </div>
+            <div class="text-muted-sm small mt-1 d-flex justify-content-between">
+              <span>{{ ev.subject_code }}</span>
+              <span>{{ ev.time_str }}</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

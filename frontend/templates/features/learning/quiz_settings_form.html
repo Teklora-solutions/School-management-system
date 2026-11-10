@@ -1,0 +1,104 @@
+{% extends base_template %}
+{% block title %}Quiz Settings · {{ lesson.title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-sliders me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    {% if quiz %}Edit Quiz Settings{% else %}Create Quiz{% endif %}
+  </h1>
+  <p class="page-subtitle">{{ lesson.title }} · {{ school_class.name }}</p>
+</div>
+
+<div class="card" style="max-width:600px;">
+  <div class="card-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="mb-3">
+        <label for="id_title" class="form-label fw-600">Quiz title <span style="color:var(--color-danger);">*</span></label>
+        <input type="text" class="form-control" id="id_title" name="title" maxlength="200" required autofocus
+               value="{{ quiz.title|default:'' }}" placeholder="e.g. Chapter 1 Review Quiz">
+      </div>
+
+      <div class="mb-3">
+        <label for="id_instructions" class="form-label fw-600">Instructions <span class="text-muted-sm">(optional)</span></label>
+        <textarea class="form-control" id="id_instructions" name="instructions" rows="2"
+                  placeholder="e.g. Read each question carefully. You have 10 minutes.">{{ quiz.instructions|default:'' }}</textarea>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+          <label for="id_pass_mark" class="form-label fw-600">Pass mark (%)</label>
+          <input type="number" class="form-control" id="id_pass_mark" name="pass_mark"
+                 min="0" max="100" value="{{ quiz.pass_mark|default:50 }}">
+        </div>
+        <div class="col-sm-6">
+          <label for="id_attempts" class="form-label fw-600">Attempts allowed</label>
+          <select class="form-select" id="id_attempts" name="attempts_allowed"
+                  style="background:var(--color-surface-2);color:var(--color-text);border-color:var(--color-border);">
+            {% for val, label in attempt_choices %}
+            <option value="{{ val }}" {% if quiz and quiz.attempts_allowed == val %}selected{% elif not quiz and val == 1 %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="id_time_limit" class="form-label fw-600">Time limit (minutes) <span class="text-muted-sm">— leave blank for no limit</span></label>
+        <input type="number" class="form-control" id="id_time_limit" name="time_limit_minutes"
+               min="1" max="300" style="max-width:140px;"
+               value="{{ quiz.time_limit_minutes|default:'' }}" placeholder="e.g. 20">
+      </div>
+
+      <div class="mb-3 p-3 rounded" style="background:var(--color-surface-2);border:1px solid var(--color-border);">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 id="id_shuffle_q" name="shuffle_questions" value="1"
+                 {% if quiz and quiz.shuffle_questions %}checked{% endif %}>
+          <label class="form-check-label" for="id_shuffle_q">Shuffle question order</label>
+        </div>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 id="id_shuffle_c" name="shuffle_choices" value="1"
+                 {% if quiz and quiz.shuffle_choices %}checked{% endif %}>
+          <label class="form-check-label" for="id_shuffle_c">Shuffle answer choices</label>
+        </div>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 id="id_show_correct" name="show_correct_after" value="1"
+                 {% if not quiz or quiz.show_correct_after %}checked{% endif %}>
+          <label class="form-check-label" for="id_show_correct">
+            Show correct answers after submission
+          </label>
+        </div>
+        <div class="text-muted-sm" style="font-size:0.78rem;">
+          Turn this off for formal assessments where you don't want students to see answers.
+        </div>
+        {% if quiz %}
+        <div class="form-check form-switch mt-2">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 id="id_gradebook" name="counts_for_gradebook" value="1"
+                 {% if quiz.counts_for_gradebook %}checked{% endif %}>
+          <label class="form-check-label" for="id_gradebook">
+            Count for gradebook
+            <span class="text-muted-sm">(reserved — no effect yet)</span>
+          </label>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1" aria-hidden="true"></i>
+          {% if quiz %}Save settings{% else %}Create quiz{% endif %}
+        </button>
+        <a href="{% url 'learning:teacher_quiz' school_class.pk subject.pk module.pk lesson.pk %}"
+           class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends base_template %}
+{% block title %}Delete Module | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title" style="color:var(--color-danger);">
+    <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Module
+  </h1>
+  <p class="page-subtitle">{{ school_class.name }} · {{ subject.name }}</p>
+</div>
+
+<div class="card" style="max-width:520px;">
+  <div class="card-body">
+    <p>You are about to delete <strong>{{ module.title }}</strong>.</p>
+    <p class="text-muted-sm">
+      This will permanently delete the module and all
+      <strong>{{ module.lessons.count }}</strong> lesson(s) inside it,
+      including any uploaded files. This cannot be undone.
+    </p>
+    <form method="post" novalidate class="d-flex gap-2 mt-4">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">
+        <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Yes, delete
+      </button>
+      <a href="{% url 'learning:teacher_classroom' school_class.pk subject.pk %}"
+         class="btn btn-outline-secondary">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

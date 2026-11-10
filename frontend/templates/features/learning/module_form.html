@@ -1,0 +1,98 @@
+{% extends base_template %}
+{% block title %}{% if module %}Edit Module{% else %}Add Module{% endif %} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-collection me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    {{ action }} Module
+  </h1>
+  <p class="page-subtitle">{{ school_class.name }} · {{ subject.name }}</p>
+</div>
+
+<div class="row g-4" style="max-width:640px;">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          {# ── Year + Term selector (only when adding, not editing) ── #}
+          {% if not module %}
+          <div class="mb-4">
+            <label for="id_term_id" class="form-label fw-600">
+              Academic year &amp; term <span style="color:var(--color-danger);">*</span>
+            </label>
+            <select name="term_id" id="id_term_id" class="form-select" required
+                    style="background:var(--color-surface-2);color:var(--color-text);border-color:var(--color-border);">
+              {% for t in all_terms %}
+              <option value="{{ t.pk }}"
+                      {% if t.pk == term.pk %}selected{% endif %}>
+                {{ t.academic_year.name }} — {{ t.get_name_display }}
+                {% if t.is_current %}✓ Current{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+            <div class="text-muted-sm mt-1">
+              Choose the year and term this module belongs to.
+              The current term is pre-selected.
+            </div>
+          </div>
+          {% else %}
+          {# Editing: show the term but don't allow changing it #}
+          <div class="mb-4">
+            <div class="form-label fw-600 text-muted-sm mb-1">Term</div>
+            <div class="p-2 rounded" style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.875rem;color:#fff;">
+              <i class="bi bi-calendar3 me-1" style="color:var(--accent-light);" aria-hidden="true"></i>
+              {{ term.academic_year.name }} — {{ term.get_name_display }}
+            </div>
+          </div>
+          {% endif %}
+
+          {# ── Module title ── #}
+          <div class="mb-4">
+            <label for="id_title" class="form-label fw-600">
+              Module title <span style="color:var(--color-danger);">*</span>
+            </label>
+            <input type="text" class="form-control" id="id_title" name="title"
+                   maxlength="200" required autofocus
+                   value="{{ module.title|default:'' }}"
+                   placeholder="e.g. Week 1: Introduction to Networks">
+            <div class="text-muted-sm mt-1">
+              This becomes the chapter heading students see in their course outline.
+              Keep it short and clear.
+            </div>
+          </div>
+
+          {# ── Published toggle (edit only) ── #}
+          {% if module %}
+          <div class="mb-4 p-3 rounded" style="background:var(--color-surface-2);border:1px solid var(--color-border);">
+            <div class="form-check form-switch mb-1">
+              <input class="form-check-input" type="checkbox" role="switch"
+                     id="id_is_published" name="is_published" value="1"
+                     {% if module.is_published %}checked{% endif %}>
+              <label class="form-check-label fw-600" for="id_is_published">
+                Published
+              </label>
+            </div>
+            <div class="text-muted-sm" style="font-size:0.8rem;">
+              When <strong>off</strong>, this entire module and all its lessons are hidden
+              from students. You can build ahead in draft and publish when ready.
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg me-1" aria-hidden="true"></i>
+              {% if module %}Save changes{% else %}Add module{% endif %}
+            </button>
+            <a href="{% url 'learning:teacher_classroom' school_class.pk subject.pk %}{% if term %}?term_id={{ term.pk }}{% endif %}"
+               class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

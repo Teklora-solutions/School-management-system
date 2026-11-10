@@ -1,0 +1,89 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Testimonials | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <a href="{% url 'public_admin:overview' %}" class="btn btn-sm btn-outline-secondary mb-2">
+      <i class="bi bi-arrow-left me-1"></i>Website
+    </a>
+    <h1 class="page-title mt-1">
+      <i class="bi bi-chat-quote me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Testimonials
+    </h1>
+    <p class="page-subtitle">Parent and student quotes shown on the homepage.</p>
+  </div>
+  <a href="{% url 'public_admin:testimonial_add' %}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i>Add testimonial
+  </a>
+</div>
+
+{% if items %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Author</th>
+          <th>Quote</th>
+          <th>Order</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>
+            {% if item.avatar %}
+            <img src="{{ item.avatar.url }}" alt="{{ item.author_name }}"
+                 style="width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:.5rem;">
+            {% endif %}
+            <span class="fw-600">{{ item.author_name }}</span>
+            {% if item.author_role %}<div class="text-muted-sm">{{ item.author_role }}</div>{% endif %}
+          </td>
+          <td><span class="text-muted-sm">{{ item.quote|truncatechars:80 }}</span></td>
+          <td><code class="fw-600" style="color:var(--accent-light);">{{ item.display_order }}</code></td>
+          <td>
+            {% if item.is_active %}
+              <span class="badge" style="background:var(--color-success);color:#fff;">Active</span>
+            {% else %}
+              <span class="badge" style="background:var(--color-muted);color:#fff;">Hidden</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+              <a href="{% url 'public_admin:testimonial_edit' item.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post" action="{% url 'public_admin:testimonial_toggle' item.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary"
+                        name="action" value="{% if item.is_active %}deactivate{% else %}activate{% endif %}">
+                  {% if item.is_active %}Hide{% else %}Show{% endif %}
+                </button>
+              </form>
+              <form method="post" action="{% url 'public_admin:testimonial_delete' item.pk %}" class="d-inline"
+                    onsubmit="return confirm('Delete this testimonial?');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center p-5">
+    <p class="text-muted mb-3">No testimonials yet.</p>
+    <a href="{% url 'public_admin:testimonial_add' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>Add first testimonial
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

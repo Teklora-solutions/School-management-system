@@ -1,34 +1,48 @@
 {% load static %}
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="{{ identity.theme|default:'dark' }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="{% block meta_description %}{{ identity.motto|default:identity.name }} — {{ identity.name }}{% endblock %}">
-  <title>{% block title %}{{ identity.name }}{% endblock %} | Springfield Academy</title>
+  <title>{% block title %}{{ identity.name }}{% endblock %} | {{ identity.name|default:"Springfield Academy" }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="{% static 'css/public_new.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
-<body data-theme="dark">
+<body data-theme="{{ identity.theme|default:'dark' }}">
 
 <!-- ═══ NAVBAR ═════════════════════════════════════════════════════════════ -->
-<nav class="pub-nav" id="pub-nav">
+<nav class="pub-nav" id="pub-nav" aria-label="Main navigation">
   <div class="pub-container">
     <div class="pub-nav__inner">
+
+      <!-- Brand -->
       <a href="{% url 'public:home' %}" class="pub-nav__brand">
-        <span class="pub-nav__dot">&#127979;</span>
-        {{ identity.name|default:"Springfield Academy" }}
+        {% if identity.logo_url %}
+        <img src="{{ identity.logo_url }}" alt="{{ identity.name|default:'School logo' }}" style="height:32px;width:auto;object-fit:contain;flex-shrink:0;">
+        {% else %}
+        <span class="pub-nav__dot" aria-hidden="true">&#127979;</span>
+        {% endif %}
+        <span>{{ identity.name|default:"Springfield Academy" }}</span>
       </a>
-      <ul class="pub-nav__links">
+
+      <!-- Desktop links -->
+      <ul class="pub-nav__links" role="list">
         {% for link in nav_links %}
-        <li><a class="pub-nav__link {% if link.is_active %}is-active{% endif %}" href="{{ link.url }}" {% if link.is_active %}aria-current="page"{% endif %}>{{ link.label }}</a></li>
+        <li>
+          <a class="pub-nav__link {% if link.is_active %}is-active{% endif %}"
+             href="{{ link.url }}"
+             {% if link.is_active %}aria-current="page"{% endif %}>{{ link.label }}</a>
+        </li>
         {% endfor %}
       </ul>
+
+      <!-- Action buttons + hamburger -->
       <div class="pub-nav__actions">
-        <button class="pub-theme-toggle" aria-label="Toggle theme" id="pubThemeToggle">&#9728;</button>
+        <button class="pub-theme-toggle" aria-label="Toggle colour theme" id="pubThemeToggle">&#9728;</button>
         {% if request.user.is_authenticated %}
         <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary pub-btn--sm">
           &#9889; Dashboard
@@ -36,25 +50,48 @@
         {% else %}
         <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--sm pub-btn--hide-sm">Apply Now</a>
         <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary pub-btn--sm">
-          &#128100; Student Portal
+          &#128100; Portal
         </a>
         {% endif %}
-        <button class="pub-nav__toggle" id="pubNavToggle" aria-label="Toggle menu" aria-expanded="false">
-          <span></span>
+        <!-- Hamburger — hidden on desktop via CSS -->
+        <button class="pub-nav__toggle"
+                id="pubNavToggle"
+                aria-label="Open navigation menu"
+                aria-expanded="false"
+                aria-controls="pubNavMobile">
+          <span aria-hidden="true"></span>
         </button>
       </div>
+
     </div>
   </div>
-  <div class="pub-nav__mobile" id="pubNavMobile">
+
+  <!-- Mobile drawer -->
+  <div class="pub-nav__mobile" id="pubNavMobile" aria-hidden="true" role="dialog" aria-label="Navigation menu">
+
+    <!-- Nav links -->
     {% for link in nav_links %}
-    <a class="pub-nav__link {% if link.is_active %}is-active{% endif %}" href="{{ link.url }}">{{ link.label }}</a>
+    <a class="pub-nav__link {% if link.is_active %}is-active{% endif %}"
+       href="{{ link.url }}"
+       {% if link.is_active %}aria-current="page"{% endif %}>{{ link.label }}</a>
     {% endfor %}
-    <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem;">
-      <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary" style="text-align:center">&#128100; Student Portal</a>
-      <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline" style="text-align:center">Apply Now</a>
+
+    <div class="pub-nav__mobile-divider"></div>
+
+    <!-- CTA buttons -->
+    <div class="pub-nav__mobile-actions">
+      {% if request.user.is_authenticated %}
+      <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary">&#9889; Dashboard</a>
+      {% else %}
+      <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary">&#128100; Student Portal</a>
+      <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline">&#9999; Apply Now</a>
+      {% endif %}
     </div>
   </div>
 </nav>
+
+<!-- Backdrop — dims the page when mobile menu is open -->
+<div class="pub-nav__backdrop" id="pubNavBackdrop" aria-hidden="true"></div>
 
 <!-- ═══ PAGE CONTENT ═══════════════════════════════════════════════════════ -->
 <main id="main-content">
@@ -78,11 +115,15 @@
       <!-- Brand col -->
       <div class="pub-footer__col">
         <div class="pub-footer__brand">
+          {% if identity.logo_url %}
+          <img src="{{ identity.logo_url }}" alt="{{ identity.name|default:'School logo' }}" style="height:34px;width:auto;object-fit:contain;">
+          {% else %}
           <span class="pub-nav__dot" style="width:34px;height:34px;font-size:1.1rem">&#127979;</span>
+          {% endif %}
           {{ identity.name|default:"Springfield Academy" }}
         </div>
         <p class="pub-footer__about">
-          {% if identity.motto %}{{ identity.motto }}{% else %}Nurturing confident, compassionate learners.{% endif %}
+          {% if identity.footer_about %}{{ identity.footer_about }}{% elif identity.motto %}{{ identity.motto }}{% else %}Nurturing confident, compassionate learners.{% endif %}
         </p>
         {% if identity.address or identity.phone or identity.email %}
         <div class="pub-footer__contact">
@@ -92,10 +133,10 @@
         </div>
         {% endif %}
         <div class="pub-footer__social">
-          <a href="#" aria-label="Facebook">f</a>
-          <a href="#" aria-label="Instagram">&#128247;</a>
-          <a href="#" aria-label="YouTube">&#9654;</a>
-          <a href="#" aria-label="LinkedIn">in</a>
+          {% if identity.facebook_url %}<a href="{{ identity.facebook_url }}" target="_blank" rel="noopener" aria-label="Facebook">f</a>{% else %}<a href="#" aria-label="Facebook">f</a>{% endif %}
+          {% if identity.instagram_url %}<a href="{{ identity.instagram_url }}" target="_blank" rel="noopener" aria-label="Instagram">&#128247;</a>{% else %}<a href="#" aria-label="Instagram">&#128247;</a>{% endif %}
+          {% if identity.youtube_url %}<a href="{{ identity.youtube_url }}" target="_blank" rel="noopener" aria-label="YouTube">&#9654;</a>{% else %}<a href="#" aria-label="YouTube">&#9654;</a>{% endif %}
+          {% if identity.linkedin_url %}<a href="{{ identity.linkedin_url }}" target="_blank" rel="noopener" aria-label="LinkedIn">in</a>{% else %}<a href="#" aria-label="LinkedIn">in</a>{% endif %}
         </div>
       </div>
 
@@ -140,23 +181,74 @@
   'use strict';
 
   /* ── Navbar scroll class ── */
-  var pubNav = document.getElementById('pub-nav');
+  var pubNav  = document.getElementById('pub-nav');
+  var toggle  = document.getElementById('pubNavToggle');
+  var mobile  = document.getElementById('pubNavMobile');
+  var backdrop = document.getElementById('pubNavBackdrop');
+
   if(pubNav){
     window.addEventListener('scroll', function(){
       pubNav.classList.toggle('scrolled', window.scrollY > 10);
     }, {passive:true});
   }
 
-  /* ── Navbar toggle ── */
-  var toggle = document.getElementById('pubNavToggle');
-  var nav    = document.getElementById('pub-nav');
-  var mobile = document.getElementById('pubNavMobile');
+  /* Open / close the mobile drawer */
+  function openMenu(){
+    pubNav.classList.add('is-open');
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.setAttribute('aria-label', 'Close navigation menu');
+    mobile.setAttribute('aria-hidden', 'false');
+    if(backdrop){ backdrop.classList.add('is-visible'); }
+    document.body.style.overflow = 'hidden';
+    /* Move focus to first link for keyboard users */
+    var firstLink = mobile.querySelector('a, button');
+    if(firstLink) setTimeout(function(){ firstLink.focus(); }, 50);
+  }
+
+  function closeMenu(){
+    pubNav.classList.remove('is-open');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-label', 'Open navigation menu');
+    mobile.setAttribute('aria-hidden', 'true');
+    if(backdrop){ backdrop.classList.remove('is-visible'); }
+    document.body.style.overflow = '';
+    toggle.focus();
+  }
+
   if(toggle){
     toggle.addEventListener('click', function(){
-      var open = nav.classList.toggle('is-open');
-      toggle.setAttribute('aria-expanded', open);
+      pubNav.classList.contains('is-open') ? closeMenu() : openMenu();
     });
   }
+
+  /* Close when a nav link inside the drawer is tapped */
+  if(mobile){
+    mobile.querySelectorAll('a').forEach(function(link){
+      link.addEventListener('click', function(){
+        /* small delay so the navigation fires before we collapse */
+        setTimeout(closeMenu, 80);
+      });
+    });
+  }
+
+  /* Close on backdrop click */
+  if(backdrop){
+    backdrop.addEventListener('click', closeMenu);
+  }
+
+  /* Close on Escape key */
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && pubNav && pubNav.classList.contains('is-open')){
+      closeMenu();
+    }
+  });
+
+  /* Close if viewport grows past the mobile breakpoint */
+  window.addEventListener('resize', function(){
+    if(window.innerWidth >= 1024 && pubNav && pubNav.classList.contains('is-open')){
+      closeMenu();
+    }
+  }, {passive:true});
 
   /* ── Dark mode toggle ── */
   var themeBtn = document.getElementById('pubThemeToggle');

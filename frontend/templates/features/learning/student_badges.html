@@ -1,0 +1,165 @@
+{% extends base_template %}
+
+{% block title %}My Badges | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-award me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    {% if is_parent %}{{ student.user.full_name }}'s Badges{% else %}My Badges{% endif %}
+  </h1>
+  <p class="page-subtitle">Points earned through lessons, homework and class participation</p>
+</div>
+
+{# ── Level-up celebration banner ── #}
+{% with sl=student.student_level %}
+{% if sl and sl.notified_level == sl.level_number and sl.level_number > 1 %}
+<div class="alert d-flex align-items-center gap-3 mb-4"
+     style="background:rgba(16,185,129,0.12);border-color:var(--color-success);color:var(--color-success);"
+     role="alert">
+  <i class="bi bi-patch-check-fill fs-3" aria-hidden="true"></i>
+  <div>
+    <strong>Level up!</strong>
+    You reached <strong>{{ sl.level_name }}</strong> — keep going!
+  </div>
+</div>
+{% endif %}
+{% endwith %}
+
+{# ── Level card + progress ── #}
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body text-center py-4">
+        <i class="bi {{ summary.badge_icon }} mb-2"
+           style="font-size:3.5rem;color:var(--accent-light);" aria-hidden="true"></i>
+        <div class="stat-value mb-1">{{ summary.current_level.name }}</div>
+        <div class="text-muted-sm mb-3">Level {{ summary.current_level.number }} of {{ summary.all_levels|length }}</div>
+        <div class="fw-600 mb-1" style="font-size:1.5rem;color:#fff;">
+          {{ summary.total_points }} <span class="text-muted-sm" style="font-size:1rem;">points</span>
+        </div>
+        {% if not summary.at_top_level %}
+        <div class="text-muted-sm mb-2">{{ summary.points_to_next }} more to reach {{ summary.next_level_obj.name }}</div>
+        <div class="progress" style="height:10px;border-radius:6px;background:var(--color-surface-2);"
+             role="progressbar"
+             aria-valuenow="{{ summary.pct_to_next }}"
+             aria-valuemin="0" aria-valuemax="100"
+             aria-label="Progress to {{ summary.next_level_obj.name }}">
+          <div class="progress-bar bg-primary" style="width:{{ summary.pct_to_next }}%;border-radius:6px;"></div>
+        </div>
+        {% else %}
+        <div class="text-muted-sm">
+          <i class="bi bi-stars me-1" style="color:var(--color-warning);" aria-hidden="true"></i>
+          You have reached the top level!
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── All level badges ── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="bi bi-collection me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          All levels
+        </h2>
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          {% for lvl in summary.all_levels %}
+          <div class="text-center p-2" style="min-width:72px;">
+            <i class="bi {{ lvl.badge_icon }} d-block mb-1"
+               style="font-size:1.75rem;
+                      color:{% if summary.current_level.number >= lvl.number %}var(--accent-light){% else %}var(--color-muted){% endif %};"
+               aria-hidden="true"></i>
+            <div style="font-size:0.72rem;
+                        color:{% if summary.current_level.number >= lvl.number %}#fff{% else %}var(--color-muted){% endif %};
+                        font-weight:{% if summary.current_level.number == lvl.number %}700{% else %}400{% endif %};">
+              {{ lvl.name }}
+            </div>
+            <div class="text-muted-sm" style="font-size:0.65rem;">{{ lvl.min_points }} pts</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── How to earn points ── #}
+<div class="card mb-4">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-info-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      How to earn points
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Activity</th><th class="text-end">Points</th></tr></thead>
+      <tbody>
+        <tr><td><i class="bi bi-journal-check me-2 text-success" aria-hidden="true"></i>Complete a lesson</td><td class="text-end">10</td></tr>
+        <tr><td><i class="bi bi-calendar-check me-2 text-success" aria-hidden="true"></i>Submit homework on time</td><td class="text-end">20</td></tr>
+        <tr><td><i class="bi bi-calendar2 me-2" style="color:var(--color-warning);" aria-hidden="true"></i>Submit homework late (still counts!)</td><td class="text-end">8</td></tr>
+        <tr><td><i class="bi bi-question-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>Ask a question on the class feed</td><td class="text-end">5</td></tr>
+        <tr><td><i class="bi bi-fire me-2" style="color:var(--color-warning);" aria-hidden="true"></i>Reach a streak milestone (5, 10, 20… days)</td><td class="text-end">15</td></tr>
+        <tr><td><i class="bi bi-star me-2" style="color:var(--color-warning);" aria-hidden="true"></i>Teacher bonus award</td><td class="text-end">1–20</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── Recent history ── #}
+{% if summary.recent_ledger %}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-clock-history me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Recent points
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Activity</th>
+            <th class="text-center">Points</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in summary.recent_ledger %}
+          <tr {% if row.points < 0 %}style="opacity:0.6;"{% endif %}>
+            <td>
+              <div style="font-size:0.875rem;">{{ row.description|default:row.get_reason_display }}</div>
+              {% if row.awarded_by %}
+              <div class="text-muted-sm" style="font-size:0.75rem;">
+                by {{ row.awarded_by.get_full_name }}
+              </div>
+              {% endif %}
+            </td>
+            <td class="text-center fw-600"
+                style="color:{% if row.points >= 0 %}var(--color-success){% else %}var(--color-danger){% endif %};">
+              {% if row.points >= 0 %}+{% endif %}{{ row.points }}
+            </td>
+            <td class="text-muted-sm" style="font-size:0.8rem;">
+              {{ row.created_at|date:"d M Y" }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="mt-3">
+  <a href="{% url 'learning:classrooms' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>My Learning
+  </a>
+</div>
+{% endblock content %}

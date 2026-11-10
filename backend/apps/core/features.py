@@ -24,6 +24,26 @@ FEATURES: dict[str, dict[str, str]] = {
         "field": "fees_enabled",
         "disabled_message": "Available once the Finance module is activated.",
     },
+    "learning": {
+        "label": "Learning (virtual school)",
+        "field": "learning_enabled",
+        "disabled_message": "Available once the Learning module is activated.",
+    },
+    "engagement": {
+        "label": "Progress and streaks",
+        "field": "engagement_enabled",
+        "disabled_message": "Available once the Engagement module is activated.",
+    },
+    "quizzes": {
+        "label": "Quizzes",
+        "field": "quizzes_enabled",
+        "disabled_message": "Available once the Quizzes module is activated.",
+    },
+    "live_classes": {
+        "label": "Live classes and calendar",
+        "field": "live_classes_enabled",
+        "disabled_message": "Available once the Live Classes module is activated.",
+    },
 }
 
 

@@ -1,0 +1,103 @@
+{% extends base_template %}
+
+{% block title %}Engagement Settings · {{ assignment.school_class.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-toggles me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Engagement Settings
+  </h1>
+  <p class="page-subtitle">
+    {{ assignment.school_class.name }} · {{ assignment.subject.name }}
+  </p>
+</div>
+
+<div class="card" style="max-width:540px;">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-gear me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Class engagement options
+    </h2>
+  </div>
+  <div class="card-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {# ── Master switch ── #}
+      <div class="mb-4">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 id="id_is_active" name="is_active" value="1"
+                 {% if eng.is_active %}checked{% endif %}>
+          <label class="form-check-label fw-600" for="id_is_active">
+            Enable progress and streaks for this class
+          </label>
+        </div>
+        <div class="text-muted-sm mt-1">
+          Students and parents see progress bars and the streak counter.
+          Turn off to hide engagement for this class without affecting others.
+        </div>
+      </div>
+
+      {# ── Progress bars ── #}
+      <div class="mb-4">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 id="id_show_progress_bars" name="show_progress_bars" value="1"
+                 {% if eng.show_progress_bars %}checked{% endif %}>
+          <label class="form-check-label" for="id_show_progress_bars">
+            Show progress bars
+          </label>
+        </div>
+        <div class="text-muted-sm mt-1">
+          Per-module and overall course bars on the student's progress page.
+        </div>
+      </div>
+
+      {# ── Streak ── #}
+      <div class="mb-4">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 id="id_show_streak" name="show_streak" value="1"
+                 {% if eng.show_streak %}checked{% endif %}>
+          <label class="form-check-label" for="id_show_streak">
+            Show lesson streak
+          </label>
+        </div>
+        <div class="text-muted-sm mt-1">
+          Daily lesson-completion counter. Weekends and school holidays
+          are always ignored — they never break a streak.
+        </div>
+      </div>
+
+      {# ── Grace days ── #}
+      <div class="mb-4">
+        <label for="id_grace" class="form-label fw-600">Grace days</label>
+        <select class="form-select" id="id_grace" name="streak_grace_days"
+                style="background:var(--color-surface-2);color:var(--color-text);border-color:var(--color-border);max-width:240px;">
+          {% for val, label in grace_choices %}
+          <option value="{{ val }}" {% if val == eng.streak_grace_days %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="text-muted-sm mt-1">
+          How many consecutive school days without a lesson may be
+          forgiven before the streak resets.
+          <strong>Recommended: 1 day</strong> (covers sick days and power cuts).
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-lg me-1" aria-hidden="true"></i>Save settings
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="mt-3">
+  <a href="{% url 'learning:teacher_class_progress' assignment.school_class.pk assignment.subject_id %}"
+     class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Class Progress
+  </a>
+</div>
+{% endblock content %}

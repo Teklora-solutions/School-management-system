@@ -168,9 +168,14 @@ class SchoolSettingsWriteTests(TestCase):
                 "email": row.email,
                 "currency": row.currency,
                 "show_positions": "on",
-                # Every switch the form owns must be sent in its stored state,
-                # or the "identical" save is a real change to an omitted field.
+                # Every switch and field the form owns must be sent in its stored
+                # state, or the "identical" save is a real change to an omitted field.
                 "fees_enabled": "on" if row.fees_enabled else "",
+                "learning_enabled": "on" if row.learning_enabled else "",
+                "engagement_enabled": "on" if row.engagement_enabled else "",
+                "quizzes_enabled": "on" if row.quizzes_enabled else "",
+                "live_classes_enabled": "on" if row.live_classes_enabled else "",
+                "theme": row.theme or "dark",
             },
         )
 
@@ -202,6 +207,11 @@ class SchoolSettingsWriteTests(TestCase):
                 "currency": row.currency,
                 "show_positions": "on",
                 "fees_enabled": "on" if row.fees_enabled else "",
+                "learning_enabled": "on" if row.learning_enabled else "",
+                "engagement_enabled": "on" if row.engagement_enabled else "",
+                "quizzes_enabled": "on" if row.quizzes_enabled else "",
+                "live_classes_enabled": "on" if row.live_classes_enabled else "",
+                "theme": row.theme or "dark",
             },
         )
 

@@ -30,9 +30,10 @@ No Docker, no JS build step, no managed services required — it runs on one sma
 | **Homework** | Teachers author homework per class/subject/term/stream with up to 5 attachments, save as draft, publish or unpublish, preview. Students and parents see a list with a NEW badge, submit with up to 5 files, resubmit freely until the due date, and are flagged `is_late` permanently after it. Attachments are stored under UUID names and streamed only through permission-checked views — never exposed as media URLs. |
 | **Attendance** | Data model is complete and honest (one register per class per day, present / absent / late / excused, `ATTENDED_STATUSES = (present, late)` so an excused absence counts against the rate, future dates refused, services + selectors written). **The UI is still a "coming soon" stub** — see [Known gaps](#9-known-gaps-and-limitations). |
 | **Communications** | Announcements targeted at everyone, at selected roles, or at specific classes, with optional `publish_at` scheduling and expiry, attachments and capped notification fan-out (500 recipients). Read tracking drives the navbar unread badge. A threaded complaints / inquiries / satisfaction desk with `open → in_progress → resolved`, admin/director assignment, replies and attachments. |
-| **Dashboards** | Six role homes, each behind its own role mixin: Admin (school-wide governance), Director (a full analytics suite — class performance and drilldowns, class fee overview and debtors, staff directory, "Books of Account", Chart.js visuals, Excel and PDF exports), Teacher (my classes, marks entry, homework), Student (results, fees, homework, announcements), Parent (children switcher, same views per child), Finance (the money interface). |
+| **Virtual School (Learning)** | A full Cisco-style online classroom built on top of the existing class and teacher-assignment data — no separate enrollment. Classrooms appear automatically when a teacher assignment exists. Features: **course builder** (modules, lessons with Markdown notes, YouTube/Vimeo/Google Drive video embeds, up to 5 file attachments per lesson, publish/unpublish, reorder, duplicate, copy to another term); **quizzes** (multiple-choice and true/false, up to 20 questions, server-side marking, attempt limits, optional time limit, shuffle, show/hide correct answers, teacher results screen with difficulty ranking); **class community feed** (teacher posts announcements/tips/celebrations, students ask questions, safe reactions, teacher moderation with pin/remove); **points and levels** (7 levels from Seedling to Legend, earned by completing lessons, submitting homework, keeping streaks, posting questions — never by marks, never going down); **fair streaks** (school-days only, weekends and term breaks invisible, grace-day allowance); **progress tracking** (per-module progress bars, overall completion, next-lesson Continue button, student private notes per lesson, course search); **student lesson notes** (private per-student, autosaved via AJAX); **teacher controls** (engagement on/off per class, grace-day setting, manual bonus award with reason, full audit ledger with reversal). All features default OFF and are switched on in School Settings. |
+| **Dashboards** | Six role homes, each behind its own role mixin: Admin (school-wide governance), Director (a full analytics suite — class performance and drilldowns, class fee overview and debtors, staff directory, "Books of Account", Chart.js visuals, Excel and PDF exports, Learning Engagement overview, Points Overview), Teacher (my classes, marks entry, homework, classrooms, class feed, class progress, class points), Student (results, fees, homework, announcements, my learning, my progress, my badges), Parent (children switcher, same views per child including learning and quiz results), Finance (the money interface). |
 | **Public website** | The school's own open site served at `/` — home, about, programmes, gallery, contact/enquiry form — built from data the school already maintains plus two small tables (`GalleryPhoto`, `ContactMessage`). Admins edit it under `/website/`, and enquiries are moderated there. |
-| **Administration** | A staff directory with create / detail / deactivate / reactivate and admin-only password reset; a single School Settings screen (identity, currency, logo, address, positions on/off, fees display switch); an audit log viewer; an activity feed and daily report; and structured logging with request IDs throughout. |
+| **Administration** | A staff directory with create / detail / deactivate / reactivate and admin-only password reset; a School Settings screen (identity, currency, logo, address, positions on/off, fees/learning/engagement/quizzes feature switches); an audit log viewer; an activity feed and daily report; and structured logging with request IDs throughout. |
 
 ---
 
@@ -58,6 +59,7 @@ No Docker, no JS build step, no managed services required — it runs on one sma
 | Lint / format | `ruff`, `black` (both declared; `ruff` is what the guide tells you to run) |
 | Load testing | `locust` |
 | Dependency audit | `pip-audit` |
+| Markdown rendering | `markdown>=3.5` + `bleach>=6.1` — lesson notes sanitised before display |
 
 `djangorestframework` is installed and configured (session auth, `IsAuthenticated`, page-number
 pagination of 25) but **no API endpoints exist yet** — every screen is an HTML view. Treat DRF as a
@@ -242,7 +244,7 @@ All Python tooling runs **from `backend/`** — `pytest.ini` and `DJANGO_SETTING
 
 ```bash
 cd backend
-python -m pytest -q                            # ~1,130 tests across 72 test files
+python -m pytest -q                            # ~1,566 tests across 80+ test files
 python -m pytest --cov=apps --cov-report=term-missing
 python -m ruff check apps config tests
 python manage.py check
@@ -457,34 +459,16 @@ post-restore checklist (`migrate --check`, `curl /readyz/`, admin login spot-che
 
 Stated plainly, because they will bite someone:
 
-- **Attendance has no screens.** Models, services and selectors are complete; `/attendance/` renders a
-  "coming soon" page from a stub URLconf.
+- **Attendance has no screens.** Models, services and selectors are complete; `/attendance/` renders a "coming soon" page from a stub URLconf. Checkpoint E will add the screens.
 - **No REST API.** DRF is configured but unused. Anything that needs JSON must add endpoints.
-- **`apps/public_site/` is dead code** — present on disk, absent from `INSTALLED_APPS` and from the
-  root URLconf, so its routes are unreachable. `apps/public` superseded it.
-- **Screen coverage is partial** — no student edit / withdraw / restore / delete screen; classes,
-  streams and subjects are create-only (years have detail / delete / set-current, terms have edit /
-  set-current); class-subjects can be removed but not edited. Fixes go through `/django-admin/`, which
-  registers only academics and accounts.
-- **Finance edges:** no refunds, no manual-journal UI, and `Invoice.Status.CANCELLED` exists but no
-  flow ever writes it. Expenses do honour `paid_via` — a bank-paid claim credits `1010` Bank, a cash one
-  credits `1000` Cash (`_post_expense_entry` in `backend/apps/finance/services.py:2627`) — but **late fees
-  stop at proposals**: `selectors.late_fee_proposals` computes them from `FinanceSettings` and nothing
-  posts or displays them. Invoice-less adjustments are invisible to fee totals. An invoice's deadline is
-  only as good as the fee items it was billed from: `FeeItem.due_date` is optional, and where the items
-  are blank the invoice and all its lines are `null`, so aging falls back to `issued_date` (0 of 120
-  invoices in the seeded demo DB carry a due date). Overpayment is deliberately left unallocated while
-  the journal credits the full amount. **Re-billing after revising a fee structure doubles `billed`.**
-- **Fee reminders broadcast to every student/parent** regardless of the selection —
-  `apps/finance/tasks.py` ignores `student_ids`.
-- **The `fees` feature switch is partial, by design.** `SchoolSettings.fees_enabled`, read through
-  `apps/core/features.py::feature_enabled("fees")`, replaces figures with a sentence on the Admin,
-  Finance and Director homes and hides any sidebar entry that declares `feature: "fees"`. It does **not**
-  gate the `/finance/` screens or the ledger itself — an off switch there would strand the accounting.
-- Late-fee switches in Finance Settings are flags only — nothing is posted automatically.
-- Teacher and Finance home pages still carry placeholder "–" cards and leftover "Phase 5" text.
+- **`apps/public_site/` is dead code** — present on disk, absent from `INSTALLED_APPS` and from the root URLconf, so its routes are unreachable. `apps/public` superseded it.
+- **Screen coverage is partial** — no student edit / withdraw / restore / delete screen; classes, streams and subjects are create-only. Fixes go through `/django-admin/`.
+- **Finance edges:** no refunds, no manual-journal UI, and `Invoice.Status.CANCELLED` exists but no flow ever writes it. Late fees are computed but go nowhere. Re-billing after revising a fee structure doubles `billed`. Fee reminders broadcast to every student/parent regardless of the selection.
+- **The `fees` feature switch is partial** — it replaces figures with a sentence on dashboards but does not gate the `/finance/` screens or the ledger itself.
+- **Virtual School next steps:** Live classes and shared calendar (Checkpoint D), attendance screens (Checkpoint E), gradebook link (Checkpoint F), virtual labs (Checkpoint G), leaderboard (Checkpoint H) — all planned but not yet built.
+- Teacher and Finance home pages still carry placeholder "–" stat cards.
 - `xhtml2pdf` is in `base.txt` but imported nowhere; WeasyPrint is the only engine.
-- The static-asset suite depends on vendored files that must not be re-downloaded from a CDN (§2).
+- The static-asset suite depends on vendored files that must not be re-downloaded from a CDN (§2). The lesson page loads one external image: YouTube thumbnails from `img.youtube.com` (a static CDN, no cookies, no scripts — this is intentional and documented).
 
 ---
 
@@ -498,9 +482,9 @@ school-management-system/
 │   │   ├── settings/         # base.py / dev.py / prod.py / test.py
 │   │   ├── urls.py           # root URLconf
 │   │   └── wsgi.py, asgi.py
-│   ├── apps/                 # 12 installed apps (core, accounts, academics, students,
+│   ├── apps/                 # 13 installed apps (core, accounts, academics, students,
 │   │   │                     #  teachers, results, finance, homework, attendance,
-│   │   │                     #  communications, dashboards, public)
+│   │   │                     #  communications, dashboards, public, **learning**)
 │   │   └── public_site/      # dormant, not installed, not routed
 │   ├── tests/                # cross-app integration + architecture tests
 │   ├── requirements/         # base.txt / dev.txt / prod.txt
@@ -570,7 +554,7 @@ it never contributed code, data or routes to the school system.
 **Where the logs are:** there is no log file. In development, watch the `runserver` / `qcluster`
 terminal — the verbose formatter prints `rid=` and `uid=` on every line. In production, stdout is
 JSON. `AuditLog`, `SystemEvent` and Axes lockouts are rows in the database (timestamps are UTC,
-while `TIME_ZONE = "Africa/Accra"` governs display).
+while `TIME_ZONE = "Africa/Nairobi"` (EAT, UTC+3) governs display — Kenyan time).
 
 ---
 

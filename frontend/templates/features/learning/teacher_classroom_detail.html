@@ -1,0 +1,479 @@
+{% extends base_template %}
+{% block title %}{{ classroom.school_class.name }} · {{ classroom.subject.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+
+{# ── Page header ── #}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-easel2 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {{ classroom.school_class.name }} · {{ classroom.subject.name }}
+      </h1>
+      <p class="page-subtitle">
+        {{ classroom.teacher_name }}
+        {% if classroom.stream_name %} · {{ classroom.stream_name }} stream{% endif %}
+      </p>
+    </div>
+    <a href="{% url 'learning:teacher_classrooms' %}" class="btn btn-outline-secondary btn-sm mt-1">
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All Classrooms
+    </a>
+  </div>
+</div>
+
+{# ── Term selector (year + term) ── #}
+<div class="card mb-4">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+      <i class="bi bi-calendar3 text-muted-sm" aria-hidden="true"></i>
+      <label class="text-muted-sm mb-0 fw-600" for="id_term_switcher">Term:</label>
+      <select name="term_id" id="id_term_switcher"
+              onchange="this.form.submit()"
+              class="form-select form-select-sm"
+              style="width:auto;min-width:200px;background:var(--color-surface-2);
+                     color:var(--color-text);border-color:var(--color-border);">
+        {% for t in all_terms %}
+        <option value="{{ t.pk }}"
+                {% if t.pk == selected_term.pk %}selected{% endif %}>
+          {{ t.academic_year.name }} — {{ t.get_name_display }}
+          {% if t.is_current %}(Current){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <noscript>
+        <button type="submit" class="btn btn-sm btn-outline-secondary">Go</button>
+      </noscript>
+    </form>
+  </div>
+</div>
+
+{# ── Stats row ── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ classroom.student_count }}</div>
+        <div class="stat-label">Pupils</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-collection" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ modules|length }}</div>
+        <div class="stat-label">Module{{ modules|length|pluralize }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-journal-check" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ published_lessons }}</div>
+        <div class="stat-label">Published</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ total_lessons }}</div>
+        <div class="stat-label">Total lessons</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Quick actions ── #}
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <a href="{% url 'learning:teacher_live_sessions' classroom.school_class.pk classroom.subject.pk %}"
+     class="btn btn-outline-danger btn-sm">
+    <i class="bi bi-broadcast me-1" aria-hidden="true"></i>Live Classes
+  </a>
+  <a href="{% url 'learning:class_calendar' classroom.school_class.pk %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Class Calendar
+  </a>
+  <a href="{% url 'learning:class_feed' classroom.school_class.pk %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-megaphone me-1" aria-hidden="true"></i>Class Feed
+  </a>
+  <a href="{% url 'learning:teacher_class_progress' classroom.school_class.pk classroom.subject.pk %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-graph-up me-1" aria-hidden="true"></i>Class Progress
+  </a>
+  <a href="{% url 'learning:teacher_class_points' classroom.school_class.pk %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-award me-1" aria-hidden="true"></i>Class Points
+  </a>
+  <a href="{% url 'learning:copy_course' classroom.school_class.pk classroom.subject.pk %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-files me-1" aria-hidden="true"></i>Copy course
+  </a>
+  <a href="{% url 'learning:class_engagement_settings' classroom.school_class.pk classroom.subject.pk %}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-gear me-1" aria-hidden="true"></i>Settings
+  </a>
+</div>
+
+{# ══════════════════════════════════════════════════════════════
+   COURSE OUTLINE
+══════════════════════════════════════════════════════════════ #}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h2 style="font-size:1.05rem;font-weight:700;color:#fff;margin:0;">
+    <i class="bi bi-collection me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Course outline
+    <span class="text-muted-sm" style="font-size:0.8rem;font-weight:400;">
+      — {{ selected_term.academic_year.name }} · {{ selected_term.get_name_display }}
+    </span>
+  </h2>
+  <a href="{% url 'learning:module_create' classroom.school_class.pk classroom.subject.pk %}?term_id={{ selected_term.pk }}"
+     class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add module
+  </a>
+</div>
+
+{# ── Empty state ── #}
+{% if not modules %}
+<div class="card" style="border:2px dashed var(--color-border);background:transparent;">
+  <div class="card-body text-center py-5 px-3">
+    <div style="width:64px;height:64px;background:var(--accent-glow);border-radius:50%;
+                display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;">
+      <i class="bi bi-collection-plus" style="font-size:1.75rem;color:var(--accent-light);" aria-hidden="true"></i>
+    </div>
+    <h3 style="color:#fff;font-size:1rem;margin-bottom:0.5rem;">No modules yet</h3>
+    <p class="text-muted-sm mb-4" style="max-width:380px;margin-left:auto;margin-right:auto;">
+      A module is like a chapter. Create your first module, then add lessons inside it.
+      Lessons can have notes, a video, and downloadable files.
+    </p>
+    <a href="{% url 'learning:module_create' classroom.school_class.pk classroom.subject.pk %}?term_id={{ selected_term.pk }}"
+       class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add your first module
+    </a>
+  </div>
+</div>
+
+{% else %}
+
+{% for mwl in modules %}
+{% with mod=mwl.module %}
+<div class="cb-module {% if not mod.is_published %}cb-module--draft{% endif %} mb-3">
+
+  {# Module header #}
+  <div class="cb-module__header d-flex align-items-start gap-2">
+
+    {# Reorder arrows (stacked vertically, no JS) #}
+    <div class="cb-reorder d-flex flex-column gap-1 flex-shrink-0 pt-1">
+      <form method="post"
+            action="{% url 'learning:module_move' classroom.school_class.pk classroom.subject.pk mod.pk 'up' %}">
+        {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+        <button type="submit" class="cb-reorder__btn" title="Move up" aria-label="Move '{{ mod.title }}' up">
+          <i class="bi bi-chevron-up" aria-hidden="true"></i>
+        </button>
+      </form>
+      <form method="post"
+            action="{% url 'learning:module_move' classroom.school_class.pk classroom.subject.pk mod.pk 'down' %}">
+        {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+        <button type="submit" class="cb-reorder__btn" title="Move down" aria-label="Move '{{ mod.title }}' down">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i>
+        </button>
+      </form>
+    </div>
+
+    {# Module title + meta #}
+    <div class="flex-grow-1 min-w-0">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="fw-600" style="font-size:0.9375rem;color:#fff;">{{ mod.title }}</span>
+        {% if not mod.is_published %}
+        <span class="cb-badge cb-badge--draft">Draft — hidden from students</span>
+        {% endif %}
+      </div>
+      <div class="text-muted-sm mt-1" style="font-size:0.78rem;">
+        {{ mwl.published_lessons }} published · {{ mwl.total_lessons }} total lesson{{ mwl.total_lessons|pluralize }}
+      </div>
+    </div>
+
+    {# Module action buttons #}
+    <div class="d-flex gap-1 flex-shrink-0 flex-wrap">
+      <a href="{% url 'learning:lesson_create' classroom.school_class.pk classroom.subject.pk mod.pk %}"
+         class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
+        <span class="d-none d-sm-inline">Add lesson</span>
+      </a>
+      <a href="{% url 'learning:module_edit' classroom.school_class.pk classroom.subject.pk mod.pk %}"
+         class="btn btn-sm cb-btn-icon" title="Edit module" aria-label="Edit module">
+        <i class="bi bi-pencil" aria-hidden="true"></i>
+      </a>
+      <form method="post"
+            action="{% url 'learning:module_duplicate' classroom.school_class.pk classroom.subject.pk mod.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm cb-btn-icon" title="Duplicate module">
+          <i class="bi bi-copy" aria-hidden="true"></i>
+        </button>
+      </form>
+      <a href="{% url 'learning:module_delete' classroom.school_class.pk classroom.subject.pk mod.pk %}"
+         class="btn btn-sm cb-btn-danger" title="Delete module" aria-label="Delete module">
+        <i class="bi bi-trash3" aria-hidden="true"></i>
+      </a>
+    </div>
+  </div>
+
+  {# Lesson list #}
+  <div class="cb-module__body">
+    {% if mwl.lessons %}
+    {% for lp in mwl.lessons %}
+    {% with l=lp.lesson %}
+    <div class="cb-lesson {% if not l.is_published %}cb-lesson--draft{% endif %}
+                {% if not forloop.last %}cb-lesson--bordered{% endif %}">
+
+      {# Lesson reorder #}
+      <div class="cb-reorder cb-reorder--sm d-flex flex-column gap-1 flex-shrink-0">
+        <form method="post"
+              action="{% url 'learning:lesson_move' classroom.school_class.pk classroom.subject.pk mod.pk l.pk 'up' %}">
+          {% csrf_token %}
+          <button type="submit" class="cb-reorder__btn cb-reorder__btn--sm"
+                  title="Move lesson up" aria-label="Move '{{ l.title }}' up">
+            <i class="bi bi-chevron-up" style="font-size:0.6rem;" aria-hidden="true"></i>
+          </button>
+        </form>
+        <form method="post"
+              action="{% url 'learning:lesson_move' classroom.school_class.pk classroom.subject.pk mod.pk l.pk 'down' %}">
+          {% csrf_token %}
+          <button type="submit" class="cb-reorder__btn cb-reorder__btn--sm"
+                  title="Move lesson down" aria-label="Move '{{ l.title }}' down">
+            <i class="bi bi-chevron-down" style="font-size:0.6rem;" aria-hidden="true"></i>
+          </button>
+        </form>
+      </div>
+
+      {# Lesson icon #}
+      <i class="bi bi-journal-text flex-shrink-0 cb-lesson__icon {% if not l.is_published %}cb-lesson__icon--draft{% endif %}"
+         aria-hidden="true"></i>
+
+      {# Title + meta #}
+      <div class="flex-grow-1 min-w-0">
+        <div class="fw-600" style="font-size:0.875rem;color:{% if l.is_published %}#fff{% else %}var(--color-muted){% endif %};">
+          {{ l.title }}
+          {% if not l.is_published %}
+          <span class="cb-badge cb-badge--draft ms-1">Draft</span>
+          {% endif %}
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-1" style="font-size:0.75rem;color:var(--color-muted);">
+          {% if l.video_url %}<span><i class="bi bi-play-circle" aria-hidden="true"></i> Video</span>{% endif %}
+          {% if l.notes %}<span><i class="bi bi-file-text" aria-hidden="true"></i> Notes</span>{% endif %}
+          {% with cnt=lp.attachments|length %}
+          {% if cnt %}<span><i class="bi bi-paperclip" aria-hidden="true"></i> {{ cnt }} file{{ cnt|pluralize }}</span>{% endif %}
+          {% endwith %}
+        </div>
+      </div>
+
+      {# Lesson actions #}
+      <div class="d-flex gap-1 flex-shrink-0">
+        <a href="{% url 'learning:lesson_preview' classroom.school_class.pk classroom.subject.pk mod.pk l.pk %}"
+           class="btn btn-sm cb-btn-icon" title="Preview as student"
+           target="_blank" rel="noopener" aria-label="Preview lesson">
+          <i class="bi bi-eye" aria-hidden="true"></i>
+        </a>
+        <a href="{% url 'learning:lesson_edit' classroom.school_class.pk classroom.subject.pk mod.pk l.pk %}"
+           class="btn btn-sm cb-btn-icon" title="Edit lesson" aria-label="Edit lesson">
+          <i class="bi bi-pencil" aria-hidden="true"></i>
+        </a>
+        <form method="post"
+              action="{% url 'learning:lesson_duplicate' classroom.school_class.pk classroom.subject.pk mod.pk l.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm cb-btn-icon" title="Duplicate lesson">
+            <i class="bi bi-copy" aria-hidden="true"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+    {% else %}
+    <div class="cb-lesson-empty">
+      <i class="bi bi-journal-x" aria-hidden="true"></i>
+      No lessons yet.
+      <a href="{% url 'learning:lesson_create' classroom.school_class.pk classroom.subject.pk mod.pk %}"
+         style="color:var(--accent-light);">Add the first lesson →</a>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endwith %}
+{% endfor %}
+
+{% endif %}
+
+{# ── Enrolled pupils (collapsed) ── #}
+<details class="mt-4">
+  <summary class="cb-summary">
+    <i class="bi bi-people me-1" aria-hidden="true"></i>
+    Enrolled pupils ({{ classroom.student_count }})
+    <i class="bi bi-chevron-down ms-auto cb-summary__chevron" aria-hidden="true"></i>
+  </summary>
+  <div class="card mt-2">
+    <div class="card-body {% if roster %}p-0{% endif %}">
+      {% if roster %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Adm. no.</th>
+              <th scope="col">Name</th>
+              <th scope="col" class="d-none d-sm-table-cell">Stream</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pupil in roster %}
+            <tr>
+              <td class="text-muted-sm">{{ pupil.admission_number }}</td>
+              <td class="fw-600">{{ pupil.user.full_name }}</td>
+              <td class="d-none d-sm-table-cell text-muted-sm">{{ pupil.current_stream.name|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted-sm mb-0">No pupils are enrolled yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</details>
+
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+/* ── Course builder styles ──────────────────────────────── */
+.cb-module {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--color-surface);
+  transition: box-shadow 0.2s;
+}
+.cb-module:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.25); }
+.cb-module--draft { border-color: rgba(245,158,11,0.3); }
+
+.cb-module__header {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+}
+.cb-module--draft .cb-module__header { background: rgba(245,158,11,0.04); }
+
+.cb-module__body { }
+
+.cb-lesson {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  transition: background 0.15s;
+}
+.cb-lesson:hover { background: rgba(255,255,255,0.03); }
+.cb-lesson--bordered { border-bottom: 1px solid var(--color-border); }
+.cb-lesson--draft { opacity: 0.7; }
+
+.cb-lesson__icon {
+  font-size: 1rem;
+  color: var(--accent-light);
+  flex-shrink: 0;
+}
+.cb-lesson__icon--draft { color: var(--color-muted); }
+
+.cb-lesson-empty {
+  padding: 1.25rem 1rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.cb-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 99px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.cb-badge--draft {
+  background: rgba(245,158,11,0.15);
+  color: var(--color-warning);
+}
+
+.cb-reorder { gap: 2px; }
+.cb-reorder__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0;
+  transition: all 0.15s;
+}
+.cb-reorder__btn:hover {
+  border-color: var(--accent);
+  color: var(--accent-light);
+  background: var(--accent-glow);
+}
+
+.cb-btn-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  border-radius: var(--radius-sm);
+}
+.cb-btn-icon:hover { border-color: var(--accent); color: var(--accent-light); }
+
+.cb-btn-danger {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.25);
+  color: #ef4444;
+  border-radius: var(--radius-sm);
+}
+.cb-btn-danger:hover { background: rgba(239,68,68,0.15); border-color: #ef4444; color: #ef4444; }
+
+.cb-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.875rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.cb-summary:hover { color: #fff; }
+.cb-summary::-webkit-details-marker { display: none; }
+details[open] .cb-summary__chevron { transform: rotate(180deg); }
+.cb-summary__chevron { transition: transform 0.2s; }
+</style>
+{% endblock %}

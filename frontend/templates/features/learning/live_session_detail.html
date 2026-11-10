@@ -1,0 +1,225 @@
+{% extends base_template %}
+{% block title %}{{ session.title }} | Live Class | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <div class="d-flex align-items-center gap-2 mb-2">
+        {% if session.is_live %}
+        <span class="badge bg-danger"><i class="bi bi-record-circle me-1"></i>LIVE NOW</span>
+        {% elif session.status == 'cancelled' %}
+        <span class="badge bg-secondary">Cancelled</span>
+        {% elif session.status == 'completed' %}
+        <span class="badge bg-success">Completed</span>
+        {% else %}
+        <span class="badge bg-primary">Scheduled</span>
+        {% endif %}
+        <span class="text-muted-sm">{{ session.school_class.name }} · {{ session.subject.name }}</span>
+      </div>
+      <h1 class="page-title">{{ session.title }}</h1>
+      <p class="page-subtitle">Hosted by {{ session.teacher.get_full_name|default:session.teacher.username }}</p>
+    </div>
+
+    <div class="d-flex gap-2">
+      {% if is_teacher %}
+      <a href="{% url 'learning:teacher_live_sessions' session.school_class.pk session.subject.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>All Live Classes
+      </a>
+      {% else %}
+      <a href="{% url 'learning:student_live_sessions' session.school_class.pk session.subject.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  {# Main Details Card #}
+  <div class="col-12 col-lg-7">
+    <div class="card mb-4">
+      <div class="card-body p-4">
+        {# Launch / Join Banner #}
+        <div class="p-3 mb-4 rounded d-flex align-items-center justify-content-between flex-wrap gap-3"
+             style="background:var(--color-surface-2);border:1px solid var(--color-border);">
+          <div>
+            <div class="text-muted-sm small">Platform</div>
+            <div class="fw-bold fs-6 text-white">
+              {% if session.platform == 'google_meet' %}Google Meet
+              {% elif session.platform == 'zoom' %}Zoom
+              {% elif session.platform == 'teams' %}Microsoft Teams
+              {% else %}Live Meeting Link
+              {% endif %}
+            </div>
+          </div>
+
+          <div>
+            {% if is_teacher %}
+            <a href="{{ session.meeting_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary px-4">
+              <i class="bi bi-box-arrow-up-right me-1"></i>Launch Meeting Room
+            </a>
+            {% else %}
+            {% if session.join_window_open %}
+            <a href="{% url 'learning:student_live_join' session.pk %}" target="_blank" rel="noopener noreferrer" class="btn btn-danger px-4 fw-600">
+              <i class="bi bi-broadcast me-1"></i>Join Class Now
+            </a>
+            {% else %}
+            <button class="btn btn-secondary px-4" disabled>
+              <i class="bi bi-lock me-1"></i>Link Inactive
+            </button>
+            <div class="text-muted-sm small mt-1 text-center">Opens 15 min before start</div>
+            {% endif %}
+            {% endif %}
+          </div>
+        </div>
+
+        {# Schedule info #}
+        <div class="row g-3 mb-4">
+          <div class="col-6 col-sm-4">
+            <div class="text-muted-sm small">Date</div>
+            <div class="fw-600 text-white">{{ session.scheduled_start|date:"D, j M Y" }}</div>
+          </div>
+          <div class="col-6 col-sm-4">
+            <div class="text-muted-sm small">Time</div>
+            <div class="fw-600 text-white">{{ session.scheduled_start|time:"g:i A" }} – {{ session.scheduled_end|time:"g:i A" }}</div>
+          </div>
+          <div class="col-6 col-sm-4">
+            <div class="text-muted-sm small">Duration</div>
+            <div class="fw-600 text-white">{{ session.duration_minutes }} minutes</div>
+          </div>
+        </div>
+
+        {% if session.meeting_id or session.passcode %}
+        <div class="p-3 mb-4 rounded bg-dark border border-secondary-subtle">
+          <div class="row g-2">
+            {% if session.meeting_id %}
+            <div class="col-sm-6">
+              <span class="text-muted small">Meeting ID:</span>
+              <code class="ms-1 fs-6 text-warning">{{ session.meeting_id }}</code>
+            </div>
+            {% endif %}
+            {% if session.passcode %}
+            <div class="col-sm-6">
+              <span class="text-muted small">Passcode:</span>
+              <code class="ms-1 fs-6 text-warning">{{ session.passcode }}</code>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if session.description %}
+        <div class="mb-4">
+          <h2 class="h6 fw-bold text-white mb-2">Agenda & Instructions</h2>
+          <div class="text-muted-sm" style="line-height:1.7;white-space:pre-wrap;">{{ session.description }}</div>
+        </div>
+        {% endif %}
+
+        {# Teacher controls #}
+        {% if is_teacher and session.status != 'cancelled' and session.status != 'completed' %}
+        <hr class="border-secondary-subtle my-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="d-flex gap-2">
+            {% if session.status != 'in_progress' %}
+            <form method="post" action="{% url 'learning:teacher_live_action' session.school_class.pk session.subject.pk session.pk 'start' %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-success">
+                <i class="bi bi-play-circle me-1"></i>Start Session Now
+              </button>
+            </form>
+            {% else %}
+            <form method="post" action="{% url 'learning:teacher_live_action' session.school_class.pk session.subject.pk session.pk 'end' %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-warning">
+                <i class="bi bi-stop-circle me-1"></i>End Session
+              </button>
+            </form>
+            {% endif %}
+            <a href="{% url 'learning:teacher_live_edit' session.school_class.pk session.subject.pk session.pk %}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-pencil me-1"></i>Edit
+            </a>
+          </div>
+
+          <form method="post" action="{% url 'learning:teacher_live_cancel' session.school_class.pk session.subject.pk session.pk %}"
+                onsubmit="return confirm('Are you sure you want to cancel this live session?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+              <i class="bi bi-x-circle me-1"></i>Cancel Session
+            </button>
+          </form>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+  {# Attendee List (Teacher View) or Class Status #}
+  <div class="col-12 col-lg-5">
+    {% if is_teacher %}
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center py-3">
+        <h2 class="h6 mb-0 text-white fw-bold">
+          <i class="bi bi-people me-2"></i>Pupil Attendance ({{ attendances|length }})
+        </h2>
+        <span class="badge bg-secondary">{{ attendances|length }} joined</span>
+      </div>
+      <div class="card-body p-0">
+        {% if not attendances %}
+        <div class="p-4 text-center text-muted-sm">
+          <i class="bi bi-person-check fs-2 d-block mb-2 text-muted"></i>
+          No pupils have clicked to join this session yet.
+        </div>
+        {% else %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0" style="font-size:0.85rem;">
+            <thead>
+              <tr>
+                <th>Pupil</th>
+                <th>Admission No</th>
+                <th>Joined At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for att in attendances %}
+              <tr>
+                <td class="fw-600 text-white">
+                  {{ att.student.user.get_full_name|default:att.student.user.username }}
+                </td>
+                <td class="text-muted-sm">{{ att.student.admission_number }}</td>
+                <td class="text-muted-sm">{{ att.joined_at|time:"g:i A" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% else %}
+    {# Student Info Card #}
+    <div class="card">
+      <div class="card-body p-4">
+        <h2 class="h6 fw-bold text-white mb-3">Online Class Checklist</h2>
+        <ul class="text-muted-sm small mb-4 ps-3" style="line-height:1.8;">
+          <li>Ensure your microphone and camera are working.</li>
+          <li>Find a quiet place with stable internet.</li>
+          <li>Join 5 minutes before the scheduled start time.</li>
+          <li>Have your notebook and pen ready.</li>
+        </ul>
+
+        {% if has_joined %}
+        <div class="alert alert-success d-flex align-items-center gap-2 mb-0" role="alert">
+          <i class="bi bi-check-circle-fill fs-5"></i>
+          <div>You have already joined this session.</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+

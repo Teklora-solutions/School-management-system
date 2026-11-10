@@ -1,0 +1,86 @@
+{% extends base_template %}
+
+{% block title %}Class Points · {{ school_class.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-award me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Class Points
+  </h1>
+  <p class="page-subtitle">{{ school_class.name }} — points earned by each student this term</p>
+</div>
+
+{% if not rows %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-people fs-1 d-block mb-2" aria-hidden="true"></i>
+    No active students found.
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-person-lines-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ rows|length }} student{{ rows|length|pluralize }}
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th class="text-center">Level</th>
+            <th class="text-center">Points</th>
+            <th>Last activity</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>
+              <div class="fw-600">{{ row.student.user.get_full_name }}</div>
+              <div class="text-muted-sm">{{ row.student.admission_number }}</div>
+            </td>
+            <td class="text-center">
+              <i class="bi {{ row.level.badge_icon }}"
+                 style="color:var(--accent-light);font-size:1.1rem;"
+                 title="{{ row.level.name }}"
+                 aria-label="{{ row.level.name }}"></i>
+              <div class="text-muted-sm" style="font-size:0.75rem;">{{ row.level.name }}</div>
+            </td>
+            <td class="text-center fw-600" style="font-size:1.05rem;color:#fff;">
+              {{ row.total_points }}
+            </td>
+            <td class="text-muted-sm" style="font-size:0.8rem;">
+              {{ row.last_reason }}
+              {% if row.last_awarded %}· {{ row.last_awarded|date:"d M" }}{% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{% url 'learning:teacher_student_ledger' school_class.pk row.student.pk %}"
+                 class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-list-ul me-1" aria-hidden="true"></i>Ledger
+              </a>
+              <a href="{% url 'learning:teacher_bonus_award' school_class.pk row.student.pk %}"
+                 class="btn btn-sm btn-primary ms-1">
+                <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Bonus
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="mt-3">
+  <a href="{% url 'learning:teacher_classrooms' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>My Classrooms
+  </a>
+</div>
+{% endblock content %}

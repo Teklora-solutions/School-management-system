@@ -164,3 +164,88 @@ def delete_enquiry(
         change_summary={"name": name, "email": email},
         request=request,
     )
+
+
+# ── Generic ordered-content service ──────────────────────────────────────────
+# All eight new content models follow the same create/update/delete pattern.
+# One generic function handles them all, with the audit action derived from
+# the model's app_label and class name so the log stays searchable.
+
+from .models import (
+    AdmissionStep,
+    EventItem,
+    FAQ,
+    FeatureCard,
+    HeroSlide,
+    KeyDate,
+    TeamMember,
+    TimelineEvent,
+    Testimonial,
+)
+
+
+def _model_label(instance) -> str:
+    opts = instance._meta
+    return f"{opts.app_label}.{opts.model_name}"
+
+
+@transaction.atomic
+def save_content_item(
+    *,
+    instance,
+    cleaned_data: dict,
+    actor=None,
+    request=None,
+):
+    """
+    Create or update any of the eight website content models.
+
+    The same audit pattern as ``save_gallery_photo``: a create logs all initial
+    values; an update logs only what moved.
+    """
+    creating = instance.pk is None
+    model_cls = type(instance)
+    stored = None if creating else model_cls.objects.filter(pk=instance.pk).first()
+    changes = apply_cleaned_data(
+        instance=instance, stored=stored, cleaned_data=cleaned_data
+    )
+    instance.full_clean()
+    instance.save()
+
+    label = _model_label(instance)
+    if creating:
+        log_action(
+            actor=actor,
+            action=f"public.{instance._meta.model_name}_created",
+            content_type=label,
+            object_id=instance.pk,
+            change_summary={k: str(v) for k, v in cleaned_data.items()},
+            request=request,
+        )
+    elif changes:
+        log_action(
+            actor=actor,
+            action=f"public.{instance._meta.model_name}_updated",
+            content_type=label,
+            object_id=instance.pk,
+            change_summary=changes,
+            request=request,
+        )
+    return instance
+
+
+@transaction.atomic
+def delete_content_item(*, instance, actor=None, request=None) -> None:
+    """Delete any website content item and write an audit row."""
+    pk = instance.pk
+    label = _model_label(instance)
+    name = str(instance)
+    instance.delete()
+    log_action(
+        actor=actor,
+        action=f"public.{instance._meta.model_name}_deleted",
+        content_type=label,
+        object_id=pk,
+        change_summary={"item": name},
+        request=request,
+    )

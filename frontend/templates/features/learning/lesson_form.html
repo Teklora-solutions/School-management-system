@@ -1,0 +1,412 @@
+{% extends base_template %}
+{% block title %}{% if lesson %}Edit Lesson{% else %}Add Lesson{% endif %} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-journal-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ action }} Lesson
+    </h1>
+    <p class="page-subtitle">{{ module.title }} · {{ school_class.name }} · {{ subject.name }}</p>
+  </div>
+  {% if lesson %}
+  <a href="{% url 'learning:lesson_preview' school_class.pk subject.pk module.pk lesson.pk %}"
+     class="btn btn-outline-secondary btn-sm mt-1" target="_blank" rel="noopener">
+    <i class="bi bi-eye me-1" aria-hidden="true"></i>Preview as student
+  </a>
+  {% endif %}
+</div>
+
+<form method="post" enctype="multipart/form-data" novalidate id="lesson-form">
+{% csrf_token %}
+
+<div class="row g-4">
+
+  {# ── Left column: title, notes, video ── #}
+  <div class="col-lg-8">
+
+    {# Title #}
+    <div class="card mb-3">
+      <div class="card-body">
+        <label for="id_title" class="form-label fw-600">Lesson title <span style="color:var(--color-danger);">*</span></label>
+        <input type="text" class="form-control" id="id_title" name="title"
+               maxlength="200" required autofocus
+               value="{{ lesson.title|default:'' }}"
+               placeholder="e.g. What is the OSI Model?">
+      </div>
+    </div>
+
+    {# Notes #}
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-file-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Notes
+        </h2>
+        <div class="d-flex align-items-center gap-2">
+          <label class="text-muted-sm mb-0" for="id_notes_format">Format:</label>
+          <select class="form-select form-select-sm" id="id_notes_format" name="notes_format"
+                  style="width:auto;background:var(--color-surface-2);color:var(--color-text);border-color:var(--color-border);">
+            <option value="plain" {% if not lesson or lesson.notes_format == 'plain' %}selected{% endif %}>Plain text</option>
+            <option value="markdown" {% if lesson and lesson.notes_format == 'markdown' %}selected{% endif %}>Markdown</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body">
+
+        {# ── Formatting toolbar (shown only when Markdown is selected) ── #}
+        <div id="md-toolbar" class="md-toolbar mb-2" role="toolbar" aria-label="Formatting tools"
+             style="display:none;">
+          <button type="button" class="md-tb-btn" data-action="bold"
+                  title="Bold (Ctrl+B)" aria-label="Bold">
+            <strong>B</strong>
+          </button>
+          <button type="button" class="md-tb-btn" data-action="italic"
+                  title="Italic (Ctrl+I)" aria-label="Italic">
+            <em>I</em>
+          </button>
+          <span class="md-tb-sep" aria-hidden="true"></span>
+          <button type="button" class="md-tb-btn" data-action="h2"
+                  title="Heading" aria-label="Heading">
+            H
+          </button>
+          <button type="button" class="md-tb-btn" data-action="h3"
+                  title="Sub-heading" aria-label="Sub-heading">
+            H<sub>2</sub>
+          </button>
+          <span class="md-tb-sep" aria-hidden="true"></span>
+          <button type="button" class="md-tb-btn" data-action="ul"
+                  title="Bullet list" aria-label="Bullet list">
+            <i class="bi bi-list-ul" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="md-tb-btn" data-action="ol"
+                  title="Numbered list" aria-label="Numbered list">
+            <i class="bi bi-list-ol" aria-hidden="true"></i>
+          </button>
+          <span class="md-tb-sep" aria-hidden="true"></span>
+          <button type="button" class="md-tb-btn" data-action="link"
+                  title="Insert link" aria-label="Insert link">
+            <i class="bi bi-link-45deg" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="md-tb-btn" data-action="code"
+                  title="Code block" aria-label="Code block">
+            <i class="bi bi-code" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="md-tb-btn" data-action="table"
+                  title="Insert table" aria-label="Insert table">
+            <i class="bi bi-table" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <textarea class="form-control" id="id_notes" name="notes"
+                  rows="16" style="font-family:monospace;font-size:0.875rem;line-height:1.7;"
+                  placeholder="Write your lesson notes here.
+
+Switch the Format to Markdown to use headings, bold, lists and more.
+Use the toolbar buttons above — no need to memorise any codes.
+
+Plain text works well too — line breaks are preserved exactly as you type them.">{{ lesson.notes|default:'' }}</textarea>
+
+        {# ── How to format hint (shown when Markdown selected) ── #}
+        <div id="md-hint" class="mt-2" style="display:none;">
+          <details>
+            <summary class="text-muted-sm" style="cursor:pointer;font-size:0.8rem;user-select:none;">
+              <i class="bi bi-question-circle me-1" aria-hidden="true"></i>
+              How to format (click to expand)
+            </summary>
+            <div class="mt-2 p-3 rounded" style="background:var(--color-surface-2);font-size:0.8rem;line-height:1.8;">
+              <div class="row g-2">
+                <div class="col-sm-6">
+                  <code>## Heading</code> → big heading<br>
+                  <code>### Sub-heading</code> → smaller heading<br>
+                  <code>**bold text**</code> → <strong>bold</strong><br>
+                  <code>*italic text*</code> → <em>italic</em>
+                </div>
+                <div class="col-sm-6">
+                  <code>- item</code> → bullet list<br>
+                  <code>1. item</code> → numbered list<br>
+                  <code>[text](url)</code> → link<br>
+                  Leave a blank line between sections.
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    {# Video #}
+    <div class="card mb-3">
+      <div class="card-header">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-play-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Video (optional)
+        </h2>
+      </div>
+      <div class="card-body">
+        <input type="url" class="form-control" id="id_video_url" name="video_url"
+               value="{{ lesson.video_url|default:'' }}"
+               placeholder="https://www.youtube.com/watch?v=...   or Vimeo, Google Drive">
+        <div class="text-muted-sm mt-2">
+          Supported: YouTube, Vimeo, Google Drive. Any other URL is shown as a plain link.
+          Students do not need to leave the page to watch.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  {# ── Right column: publish + attachments ── #}
+  <div class="col-lg-4">
+
+    {# Publish toggle #}
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 id="id_is_published" name="is_published" value="1"
+                 {% if not lesson or lesson.is_published %}checked{% endif %}>
+          <label class="form-check-label fw-600" for="id_is_published">Published</label>
+        </div>
+        <div class="text-muted-sm">
+          Unpublished lessons are visible only to you. Publish when you are ready for students to see this.
+        </div>
+        <hr style="border-color:var(--color-border);">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-check-lg me-1" aria-hidden="true"></i>
+          {% if lesson %}Save changes{% else %}Add lesson{% endif %}
+        </button>
+        <a href="{% url 'learning:teacher_classroom' school_class.pk subject.pk %}"
+           class="btn btn-outline-secondary w-100 mt-2">Discard</a>
+      </div>
+    </div>
+
+    {# Existing attachments #}
+    {% if attachments %}
+    <div class="card mb-3">
+      <div class="card-header">
+        <h2 class="card-title mb-0" style="font-size:0.875rem;">
+          <i class="bi bi-paperclip me-1" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Files ({{ attachments|length }}/5)
+        </h2>
+      </div>
+      <div class="card-body p-0">
+        {% for att in attachments %}
+        <div class="d-flex align-items-center gap-2 px-3 py-2"
+             style="border-bottom:1px solid var(--color-border);">
+          <i class="bi {{ att.icon }}" style="color:var(--accent-light);font-size:1.1rem;" aria-hidden="true"></i>
+          <div class="flex-grow-1 min-w-0">
+            <div style="font-size:0.825rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              {{ att.original_name }}
+            </div>
+            <div class="text-muted-sm" style="font-size:0.75rem;">{{ att.size_kb }} KB</div>
+          </div>
+          <form method="post"
+                action="{% url 'learning:attachment_delete' school_class.pk subject.pk module.pk lesson.pk att.pk %}"
+                style="flex-shrink:0;">
+            {% csrf_token %}
+            <button type="submit"
+                    class="btn btn-sm"
+                    style="background:transparent;border:none;color:var(--color-danger);padding:2px 6px;"
+                    title="Remove this file"
+                    onclick="return confirm('Remove {{ att.original_name }}?');"
+                    aria-label="Remove {{ att.original_name }}">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Upload new attachments #}
+    {% if not attachments or attachments|length < 5 %}
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title mb-0" style="font-size:0.875rem;">
+          <i class="bi bi-upload me-1" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Upload files
+        </h2>
+      </div>
+      <div class="card-body">
+        <input type="file" class="form-control" name="attachments"
+               id="id_attachments" multiple
+               accept="{{ allowed_ext }}"
+               style="background:var(--color-surface-2);border-color:var(--color-border);color:var(--color-text);">
+        <div class="text-muted-sm mt-2" style="font-size:0.78rem;">
+          PDF, Word, PowerPoint, Excel, images, MP3 · Max 20 MB per file · Up to 5 total
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+</form>
+
+{% if lesson %}
+<div class="mt-3 d-flex gap-2 flex-wrap">
+  <form method="post"
+        action="{% url 'learning:lesson_duplicate' school_class.pk subject.pk module.pk lesson.pk %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-copy me-1" aria-hidden="true"></i>Duplicate lesson
+    </button>
+  </form>
+  <a href="{% url 'learning:lesson_delete' school_class.pk subject.pk module.pk lesson.pk %}"
+     class="btn btn-sm"
+     style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;">
+    <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete lesson
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.md-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-bottom: none;
+}
+.md-tb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.md-tb-btn:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent-light);
+}
+.md-tb-sep {
+  width: 1px;
+  background: var(--color-border);
+  margin: 3px 2px;
+}
+/* When toolbar is visible, attach it to the textarea visually */
+#md-toolbar + textarea,
+#md-toolbar ~ .card-body textarea {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var fmt    = document.getElementById('id_notes_format');
+  var toolbar = document.getElementById('md-toolbar');
+  var hint   = document.getElementById('md-hint');
+  var ta     = document.getElementById('id_notes');
+
+  // ── Show/hide toolbar based on format selection ──
+  function updateToolbar() {
+    var isMd = fmt && fmt.value === 'markdown';
+    if (toolbar) toolbar.style.display = isMd ? 'flex' : 'none';
+    if (hint)    hint.style.display    = isMd ? 'block' : 'none';
+  }
+  if (fmt) fmt.addEventListener('change', updateToolbar);
+  updateToolbar();
+
+  // ── Insert formatting at cursor ──
+  function wrapSelection(before, after, placeholder) {
+    if (!ta) return;
+    ta.focus();
+    var start = ta.selectionStart;
+    var end   = ta.selectionEnd;
+    var sel   = ta.value.substring(start, end) || placeholder;
+    var replacement = before + sel + (after || '');
+    ta.setRangeText(replacement, start, end, 'select');
+    // Move cursor to just before the closing marker
+    if (!ta.value.substring(start, end)) {
+      ta.selectionStart = start + before.length;
+      ta.selectionEnd   = start + before.length + placeholder.length;
+    }
+    ta.dispatchEvent(new Event('input', {bubbles: true}));
+  }
+
+  function insertLine(prefix, placeholder) {
+    if (!ta) return;
+    ta.focus();
+    var start = ta.selectionStart;
+    var val   = ta.value;
+    // Go to start of the current line
+    var lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    var existing  = val.substring(lineStart, start);
+    // If there's already a blank line before, insert cleanly
+    var needNewline = lineStart > 0 && val[lineStart - 1] !== '\n' ? '\n' : '';
+    var insert = needNewline + prefix + placeholder + '\n';
+    ta.setRangeText(insert, lineStart, lineStart, 'end');
+    ta.dispatchEvent(new Event('input', {bubbles: true}));
+  }
+
+  var ACTIONS = {
+    bold:   function() { wrapSelection('**', '**', 'bold text'); },
+    italic: function() { wrapSelection('*', '*', 'italic text'); },
+    h2:     function() { insertLine('## ', 'Heading'); },
+    h3:     function() { insertLine('### ', 'Sub-heading'); },
+    ul:     function() { insertLine('- ', 'List item'); },
+    ol:     function() { insertLine('1. ', 'List item'); },
+    link:   function() {
+      var url = prompt('Enter the URL:', 'https://');
+      if (url) wrapSelection('[', '](' + url + ')', 'link text');
+    },
+    code:   function() { wrapSelection('```\n', '\n```', 'code here'); },
+    table:  function() {
+      var tbl = '\n| Column 1 | Column 2 |\n|---|---|\n| Cell | Cell |\n';
+      if (ta) { ta.setRangeText(tbl, ta.selectionStart, ta.selectionEnd, 'end'); }
+    },
+  };
+
+  if (toolbar) {
+    toolbar.querySelectorAll('[data-action]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var fn = ACTIONS[btn.getAttribute('data-action')];
+        if (fn) fn();
+      });
+    });
+  }
+
+  // ── Keyboard shortcuts (Ctrl+B, Ctrl+I) ──
+  if (ta) {
+    ta.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); ACTIONS.bold(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'i') { e.preventDefault(); ACTIONS.italic(); }
+    });
+  }
+
+  // ── Unsaved-changes warning (unchanged) ──
+  var form = document.getElementById('lesson-form');
+  var dirty = false;
+  if (form) {
+    form.addEventListener('input', function () { dirty = true; });
+    form.addEventListener('change', function () { dirty = true; });
+    form.addEventListener('submit', function () { dirty = false; });
+    window.addEventListener('beforeunload', function (e) {
+      if (dirty) { e.preventDefault(); e.returnValue = ''; }
+    });
+  }
+})();
+</script>
+{% endblock %}

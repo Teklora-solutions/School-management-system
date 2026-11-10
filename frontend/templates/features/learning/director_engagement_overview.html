@@ -1,0 +1,125 @@
+{% extends base_template %}
+
+{% block title %}Learning Engagement | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-activity me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Learning Engagement
+  </h1>
+  <p class="page-subtitle">
+    {% if year %}{{ year.name }} — which classes are actively using their courses{% else %}No current academic year.{% endif %}
+  </p>
+</div>
+
+{% if not rows %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-journal-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    No classes found for this academic year.
+  </div>
+</div>
+{% else %}
+
+{# ── Quick counts ── #}
+{% with active_count=0 %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-toggles" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">
+          {% for r in rows %}{% if r.engagement_on %}{% with x=1 %}{% endwith %}{% endif %}{% endfor %}
+          {{ rows|length }}
+        </div>
+        <div class="stat-label">Classes tracked</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">
+          {% for r in rows %}{% if r.engagement_on %}{{ r.active_student_count }}{% endif %}{% endfor %}
+        </div>
+        <div class="stat-label">Active learners</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endwith %}
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-bar-chart-steps me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      All classes
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Class</th>
+            <th scope="col" class="text-center">Engagement</th>
+            <th scope="col" class="text-center">Students</th>
+            <th scope="col" class="text-center">Active learners</th>
+            <th scope="col">Avg completion</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="fw-600">{{ row.school_class.name }}</td>
+            <td class="text-center">
+              {% if row.engagement_on %}
+              <span class="badge" style="background:rgba(16,185,129,0.15);color:var(--color-success);">On</span>
+              {% else %}
+              <span class="badge" style="background:var(--color-surface-2);color:var(--color-muted);">Off</span>
+              {% endif %}
+            </td>
+            <td class="text-center">{{ row.student_count }}</td>
+            <td class="text-center">
+              {% if row.engagement_on %}{{ row.active_student_count }}
+              {% else %}<span class="text-muted-sm">—</span>{% endif %}
+            </td>
+            <td style="min-width:160px;">
+              {% if row.engagement_on and row.total_lessons > 0 %}
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1"
+                     style="height:8px;border-radius:4px;background:var(--color-surface-2);"
+                     role="progressbar"
+                     aria-valuenow="{{ row.avg_completion_pct }}"
+                     aria-valuemin="0"
+                     aria-valuemax="100"
+                     aria-label="{{ row.school_class.name }} average {{ row.avg_completion_pct }}%">
+                  <div class="progress-bar bg-primary"
+                       style="width:{{ row.avg_completion_pct }}%;border-radius:4px;"></div>
+                </div>
+                <span class="text-muted-sm" style="white-space:nowrap;">{{ row.avg_completion_pct }}%</span>
+              </div>
+              {% elif row.engagement_on %}
+              <span class="text-muted-sm">No lessons yet</span>
+              {% else %}
+              <span class="text-muted-sm">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<p class="text-muted-sm mt-3 mb-0">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  "Active learners" = students who completed at least one lesson this term.
+  Completion is averaged across all students in the class, including those who have not started.
+  Teachers turn engagement on per classroom via their classroom's settings page.
+</p>
+{% endblock content %}
