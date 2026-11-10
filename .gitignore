@@ -31,6 +31,10 @@ ENV/
 .env
 !.env.example
 
+# Docker persistent state, backups and deployment credentials
+/data/
+.env.docker
+
 # Django
 *.log
 local_settings.py

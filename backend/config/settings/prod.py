@@ -15,6 +15,12 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 
 # ── Database (PostgreSQL required in production) ──────────────────────────────
 DATABASES = {"default": env.db("DATABASE_URL")}
+# Docker supplies the raw password separately so URL-reserved characters work.
+# Read it here (not only in an entrypoint) so `docker compose exec ... manage.py`
+# gets the same connection settings as Gunicorn and the background worker.
+_postgres_password = env("POSTGRES_PASSWORD", default=None)
+if _postgres_password is not None:
+    DATABASES["default"]["PASSWORD"] = _postgres_password
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 DATABASES["default"]["CONN_MAX_AGE"] = 60  # persistent connections
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = True  # discard stale connections
