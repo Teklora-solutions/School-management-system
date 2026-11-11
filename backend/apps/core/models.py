@@ -8,6 +8,7 @@ that need it.
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class BaseModel(models.Model):
@@ -319,3 +320,32 @@ class SchoolSettings(BaseModel):
         """Return the singleton row, creating an empty one if none exists."""
         obj, _ = cls.objects.get_or_create(pk=cls.SINGLETON_PK)
         return obj
+
+
+class WorkerHeartbeat(BaseModel):
+    """
+    One row, written by ``apps.core.tasks.worker_heartbeat`` on a schedule.
+
+    The readiness probe reads it so a stopped background worker is visible
+    without taking the whole site down. A heartbeat means the scheduler and
+    its worker are alive; it does not say anything about individual jobs.
+    """
+
+    SINGLETON_PK = 1
+
+    last_run_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "core_worker_heartbeat"
+        verbose_name = "worker heartbeat"
+        verbose_name_plural = "worker heartbeats"
+
+    def __str__(self) -> str:
+        return f"worker last ran at {self.last_run_at or 'never'}"
+
+    @classmethod
+    def record(cls):
+        heartbeat, _ = cls.objects.get_or_create(pk=cls.SINGLETON_PK)
+        heartbeat.last_run_at = timezone.now()
+        heartbeat.save(update_fields=["last_run_at", "updated_at"])
+        return heartbeat.last_run_at

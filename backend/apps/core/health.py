@@ -15,11 +15,44 @@ Both endpoints are unauthenticated and excluded from axes rate-limiting.
 from __future__ import annotations
 
 import time
+from datetime import timedelta
 
 from django.core.cache import cache
 from django.db import OperationalError, connection
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views import View
+
+#: The heartbeat task is scheduled every five minutes; three missed runs means
+#: the worker has stopped (deploys and restarts can skip one).
+WORKER_STALE_AFTER = timedelta(minutes=15)
+
+
+def _worker_check() -> str:
+    """
+    Report the background worker's last heartbeat.
+
+    This never contributes to ``errors``: a worker that has stopped is a
+    problem to fix, but the site itself still serves every page, so the
+    readiness probe must stay 200 and the load balancer must keep it.
+    """
+    from apps.core.models import WorkerHeartbeat
+
+    try:
+        last_run = WorkerHeartbeat.objects.values_list(
+            "last_run_at", flat=True
+        ).first()
+    except Exception:  # noqa: BLE001 — an unmigrated table must not fail readiness
+        return "unknown (heartbeat table unavailable)"
+
+    if last_run is None:
+        return "never"
+    age = timezone.now() - last_run
+    minutes = int(age.total_seconds() // 60)
+    state = "ok" if age <= WORKER_STALE_AFTER else "stale"
+    if minutes < 1:
+        return f"{state} (last run just now)"
+    return f"{state} (last run {minutes} min ago)"
 
 
 class LivenessView(View):
@@ -39,8 +72,11 @@ class ReadinessView(View):
     Checks:
       - DB: execute a trivial query
       - Cache: set + get a key
+      - Worker: report the background worker's last heartbeat (advisory only)
     Returns 200 {"status": "ok", "checks": {...}} or
             503 {"status": "error", "checks": {...}, "detail": "..."}
+    The worker line never changes the status: a stopped worker must not take
+    the website down with it.
     """
 
     def get(self, request):
@@ -69,6 +105,10 @@ class ReadinessView(View):
         except Exception as exc:  # noqa: BLE001
             checks["cache"] = "error"
             errors.append(f"cache: {exc}")
+
+        # ── Background worker ─────────────────────────────────────────────
+        # Reported, never fatal: see ``_worker_check``.
+        checks["worker"] = _worker_check()
 
         if errors:
             return JsonResponse(
