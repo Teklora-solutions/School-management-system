@@ -552,6 +552,10 @@ main{padding-top:68px}
 .pub-form-success{display:none;padding:1.5rem;border-radius:var(--pub-radius);background:rgba(16,185,129,.1);border:1px solid var(--pub-success);color:var(--pub-success);text-align:center;margin-bottom:1.5rem}
 .pub-form-success.is-visible{display:block}
 .pub-form-success h3{color:var(--pub-success);margin-bottom:.5rem}
+.pub-form-alert{padding:1rem 1.25rem;border-radius:var(--pub-radius-sm);background:rgba(220,53,69,.08);border:1px solid var(--pub-danger);color:var(--pub-danger);font-size:.9rem;margin-bottom:1.5rem}
+.pub-form-alert[hidden]{display:none}
+.pub-form-alert strong{display:block;margin-bottom:.25rem}
+.pub-form-alert p{margin:0}
 
 /* ── Steps ── */
 .pub-steps{display:grid;gap:1.5rem}

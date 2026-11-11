@@ -464,37 +464,94 @@
     if(tslides.length > 1) setInterval(function(){ tGoTo(tidx+1); }, 6000);
   }
 
-  /* ── Inquiry form validation ── */
+  /* ── Inquiry form: validated here, confirmed only after the server saves it ── */
   var form = document.getElementById('pub-inquiry-form');
   if(form){
-    var successMsg = form.querySelector('.pub-form-success');
+    var successMsg = document.getElementById('pubFormSuccess');
+    var errorBox   = document.getElementById('pubFormError');
+    var errorText  = document.getElementById('pubFormErrorText');
+    var submitBtn  = form.querySelector('[type="submit"]');
+    var FIELDS = ['name','email','phone','message'];
+
+    function fieldEl(name){ return form.querySelector('[name="'+name+'"]'); }
+    function errorEl(name){ return form.querySelector('[data-error="'+name+'"]'); }
     function showErr(name, msg){
-      var inp = form.querySelector('[name="'+name+'"]');
-      var err = form.querySelector('[data-error="'+name+'"]');
+      var inp = fieldEl(name), err = errorEl(name);
       if(inp) inp.classList.add('is-invalid');
       if(err){ err.textContent = msg; err.classList.add('is-visible'); }
     }
     function clearErr(name){
-      var inp = form.querySelector('[name="'+name+'"]');
-      var err = form.querySelector('[data-error="'+name+'"]');
+      var inp = fieldEl(name), err = errorEl(name);
       if(inp) inp.classList.remove('is-invalid');
-      if(err) err.classList.remove('is-visible');
+      if(err){ err.textContent = ''; err.classList.remove('is-visible'); }
     }
-    form.addEventListener('submit', function(e){
-      e.preventDefault();
-      ['name','email','phone','message'].forEach(clearErr);
+    function hideAlert(){ if(errorBox) errorBox.hidden = true; }
+    function showAlert(msg){
+      if(errorText && msg) errorText.textContent = msg;
+      if(errorBox){ errorBox.hidden = false; errorBox.scrollIntoView({behavior:'smooth',block:'center'}); }
+    }
+    function validate(){
+      FIELDS.forEach(clearErr);
+      hideAlert();
       var valid = true;
-      var name = form.querySelector('[name="name"]');
-      var email = form.querySelector('[name="email"]');
-      var phone = form.querySelector('[name="phone"]');
-      var msg   = form.querySelector('[name="message"]');
+      var name = fieldEl('name'), email = fieldEl('email');
+      var phone = fieldEl('phone'), msg = fieldEl('message');
       if(name && !name.value.trim()){ showErr('name','Please enter your name.'); valid=false; }
       if(email && !email.value.trim()){ showErr('email','Please enter your email.'); valid=false; }
       else if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)){ showErr('email','Enter a valid email.'); valid=false; }
       if(phone && phone.value.trim() && !/^[\d\s()+\-]{7,20}$/.test(phone.value)){ showErr('phone','Enter a valid phone number.'); valid=false; }
       if(msg && !msg.value.trim()){ showErr('message','Please enter a message.'); valid=false; }
-      if(!valid) return;
-      if(successMsg){ successMsg.classList.add('is-visible'); form.reset(); successMsg.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(function(){ successMsg.classList.remove('is-visible'); }, 7000); }
+      return valid;
+    }
+    function lock(on){
+      if(!submitBtn) return;
+      submitBtn.disabled = on;
+      submitBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+    }
+
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      if(successMsg) successMsg.classList.remove('is-visible','pub-form-success--static');
+      if(!validate()) return;
+      lock(true);
+      fetch(form.getAttribute('action') || window.location.href, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: {'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
+        credentials: 'same-origin'
+      }).then(function(res){
+        return res.json().catch(function(){ return {}; }).then(function(data){
+          return {status: res.status, data: data || {}};
+        });
+      }).then(function(result){
+        var data = result.data;
+        if(data.ok === true){
+          form.reset();
+          FIELDS.forEach(clearErr);
+          if(successMsg){
+            successMsg.classList.add('is-visible');
+            successMsg.scrollIntoView({behavior:'smooth',block:'center'});
+          }
+          return;
+        }
+        var errors = data.errors || {};
+        FIELDS.forEach(function(name){
+          if(errors[name] && errors[name].length) showErr(name, errors[name][0]);
+        });
+        if(errors.__all__ && errors.__all__.length){
+          showAlert(errors.__all__[0]);
+        } else if(errors.name || errors.email || errors.phone || errors.message){
+          showAlert('Please check the highlighted fields and try again.');
+        } else if(result.status === 429){
+          showAlert('You have sent several messages just now. Please wait a few minutes and try again.');
+        } else {
+          showAlert('The school could not take your message just now. Please try again in a moment.');
+        }
+      }).catch(function(){
+        showAlert('We could not reach the school — your message has not been sent. Please check your connection and try again.');
+      }).then(function(){
+        lock(false);
+      });
     });
   }
 

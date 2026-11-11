@@ -29,6 +29,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.core import mail
+from django.core.cache import cache
 from django.core.mail import EmailMessage
 from django.db import connections
 from django.test import TestCase, override_settings
@@ -420,10 +421,18 @@ class GalleryPageTest(TestCase):
 
 
 class ContactPageTest(TestCase):
+    """
+    An enquiry is confirmed only after the row exists. The browser posts the
+    same form either way; with JavaScript it is sent in the background and the
+    page reads a JSON answer, without it the visitor is redirected to a page
+    that says the message was saved.
+    """
+
     def setUp(self):
         self.url = reverse("public:contact")
+        cache.clear()
 
-    def post(self, **overrides):
+    def post(self, headers=None, **overrides):
         payload = {
             "name": "  Ama Mensah ",
             "email": "  Ama@Example.com ",
@@ -432,12 +441,24 @@ class ContactPageTest(TestCase):
             "website": "",
         }
         payload.update(overrides)
-        return self.client.post(self.url, payload)
+        return self.client.post(self.url, payload, **(headers or {}))
+
+    def ajax(self, **overrides):
+        return self.post(
+            headers={"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}, **overrides
+        )
 
     def test_the_honeypot_is_a_hidden_field_the_visitor_is_not_asked_to_fill(self):
         body = self.client.get(self.url).content.decode()
         self.assertIn('type="hidden"', body)
         self.assertIn('name="website"', body)
+
+    def test_the_page_has_a_place_for_every_error_the_browser_may_report(self):
+        body = self.client.get(self.url).content.decode()
+        for name in ("name", "email", "phone", "message"):
+            self.assertIn(f'data-error="{name}"', body)
+        self.assertIn('id="pubFormSuccess"', body)
+        self.assertIn('id="pubFormError"', body)
 
     def test_valid_enquiry_is_saved_trimmed_and_mailed(self):
         set_settings(email="office@greenfield.test")
@@ -457,6 +478,33 @@ class ContactPageTest(TestCase):
         self.assertIn("Ama Mensah", mail.outbox[0].subject)
         self.assertIn("Which class would my daughter join?", mail.outbox[0].body)
         self.assertIn("ama@example.com", mail.outbox[0].body)
+
+    def test_without_javascript_the_saved_page_confirms_once(self):
+        response = self.post()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], self.url)
+
+        confirmation = self.client.get(self.url).content.decode()
+        self.assertIn('class="pub-form-success pub-form-success--static"', confirmation)
+        self.assertIn("Inquiry Submitted!", confirmation)
+
+        refreshed = self.client.get(self.url).content.decode()
+        self.assertNotIn('class="pub-form-success pub-form-success--static"', refreshed)
+
+    def test_ajax_success_is_answered_only_after_the_row_is_stored(self):
+        response = self.ajax()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True})
+        self.assertEqual(ContactMessage.objects.count(), 1)
+
+    def test_ajax_validation_error_is_answered_with_the_field_errors(self):
+        response = self.ajax(email="not-an-email", message="")
+        self.assertEqual(response.status_code, 400)
+        body = response.json()
+        self.assertFalse(body["ok"])
+        self.assertIn("email", body["errors"])
+        self.assertIn("message", body["errors"])
+        self.assertEqual(ContactMessage.objects.count(), 0)
 
     def test_a_dead_mailbox_does_not_lose_the_enquiry_or_500_the_page(self):
         set_settings(email="office@greenfield.test")
@@ -479,18 +527,69 @@ class ContactPageTest(TestCase):
         body = response.content.decode()
         self.assertIn("Enter a valid email address", body)
         self.assertIn("This field is required", body)
+        self.assertNotIn('class="pub-form-success pub-form-success--static"', body)
 
     def test_oversized_message_is_refused(self):
         response = self.post(message="x" * 2001)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(ContactMessage.objects.count(), 0)
 
-    def test_a_spam_bot_is_thanked_and_dropped(self):
+    def test_a_spam_bot_gets_an_error_and_nothing_is_saved(self):
         set_settings(email="office@greenfield.test")
         response = self.post(website="http://spam.example")
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(ContactMessage.objects.count(), 0)
         self.assertEqual(len(mail.outbox), 0)
+        body = response.content.decode()
+        self.assertIn("accept this message", body)
+        self.assertNotIn('class="pub-form-success pub-form-success--static"', body)
+
+    def test_a_visitor_is_stopped_after_five_messages_in_ten_minutes(self):
+        set_settings(email="")
+        for _ in range(5):
+            self.assertEqual(self.post().status_code, 302)
+        self.assertEqual(ContactMessage.objects.count(), 5)
+
+        refused = self.post()
+        self.assertEqual(refused.status_code, 200)
+        self.assertIn("several messages in the last few minutes", refused.content.decode())
+        self.assertEqual(ContactMessage.objects.count(), 5)
+
+    def test_the_rate_limit_answers_json_429_for_the_browser(self):
+        set_settings(email="")
+        for _ in range(5):
+            self.ajax()
+        refused = self.ajax()
+        self.assertEqual(refused.status_code, 429)
+        body = refused.json()
+        self.assertFalse(body["ok"])
+        self.assertTrue(body["retry"])
+        self.assertIn("__all__", body["errors"])
+        self.assertEqual(ContactMessage.objects.count(), 5)
+
+    def test_the_limit_does_not_lock_out_a_neighbour_at_the_same_address(self):
+        """The cookie, not the address, is the bucket: one family's allowance."""
+        set_settings(email="")
+        for _ in range(5):
+            self.post()
+        self.assertEqual(self.post().status_code, 200)
+
+        self.client.cookies.clear()
+        self.assertEqual(self.post().status_code, 302)
+        self.assertEqual(ContactMessage.objects.count(), 6)
+
+    def test_a_broken_cache_cannot_block_a_real_enquiry(self):
+        class BrokenCache:
+            def add(self, *args, **kwargs):
+                raise RuntimeError("cache down")
+
+            def incr(self, *args, **kwargs):
+                raise RuntimeError("cache down")
+
+        with patch("apps.public.views.cache", BrokenCache()):
+            for _ in range(6):
+                self.assertEqual(self.post().status_code, 302)
+        self.assertEqual(ContactMessage.objects.count(), 6)
 
     def test_a_signed_in_user_can_use_the_form_too(self):
         set_settings(email="office@greenfield.test")
