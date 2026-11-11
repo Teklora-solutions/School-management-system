@@ -20,36 +20,44 @@
     <form method="post" enctype="multipart/form-data" novalidate>
       {% csrf_token %}
 
-      {% if form.non_field_errors %}
-      <div class="alert alert-danger" role="alert">
-        {% for e in form.non_field_errors %}{{ e }}{% endfor %}
+      {% if error_summary %}
+      <div class="alert alert-danger" role="alert" id="settings-error-summary">
+        <p class="fw-600 mb-1">Your changes were not saved.</p>
+        {% if error_tab_label %}
+        <p class="mb-2">Fix the fields in the <strong>{{ error_tab_label }}</strong> tab.</p>
+        {% endif %}
+        <ul class="mb-0">
+          {% for label, message in error_summary %}
+          <li><strong>{{ label }}:</strong> {{ message }}</li>
+          {% endfor %}
+        </ul>
       </div>
       {% endif %}
 
       <!-- Tab navigation -->
       <ul class="nav nav-tabs mb-3" id="settingsTabs" role="tablist">
         <li class="nav-item" role="presentation">
-          <button class="nav-link active" id="tab-identity" data-bs-toggle="tab" data-bs-target="#pane-identity"
+          <button class="nav-link {% if active_tab == 'identity' %}active{% endif %}" id="tab-identity" data-bs-toggle="tab" data-bs-target="#pane-identity"
                   type="button" role="tab">Identity</button>
         </li>
         <li class="nav-item" role="presentation">
-          <button class="nav-link" id="tab-hero" data-bs-toggle="tab" data-bs-target="#pane-hero"
+          <button class="nav-link {% if active_tab == 'hero' %}active{% endif %}" id="tab-hero" data-bs-toggle="tab" data-bs-target="#pane-hero"
                   type="button" role="tab">Home Hero</button>
         </li>
         <li class="nav-item" role="presentation">
-          <button class="nav-link" id="tab-about" data-bs-toggle="tab" data-bs-target="#pane-about"
+          <button class="nav-link {% if active_tab == 'about' %}active{% endif %}" id="tab-about" data-bs-toggle="tab" data-bs-target="#pane-about"
                   type="button" role="tab">About Page</button>
         </li>
         <li class="nav-item" role="presentation">
-          <button class="nav-link" id="tab-appearance" data-bs-toggle="tab" data-bs-target="#pane-appearance"
+          <button class="nav-link {% if active_tab == 'appearance' %}active{% endif %}" id="tab-appearance" data-bs-toggle="tab" data-bs-target="#pane-appearance"
                   type="button" role="tab">Appearance</button>
         </li>
         <li class="nav-item" role="presentation">
-          <button class="nav-link" id="tab-social" data-bs-toggle="tab" data-bs-target="#pane-social"
+          <button class="nav-link {% if active_tab == 'social' %}active{% endif %}" id="tab-social" data-bs-toggle="tab" data-bs-target="#pane-social"
                   type="button" role="tab">Social &amp; Contact</button>
         </li>
         <li class="nav-item" role="presentation">
-          <button class="nav-link" id="tab-modules" data-bs-toggle="tab" data-bs-target="#pane-modules"
+          <button class="nav-link {% if active_tab == 'modules' %}active{% endif %}" id="tab-modules" data-bs-toggle="tab" data-bs-target="#pane-modules"
                   type="button" role="tab">Modules</button>
         </li>
       </ul>
@@ -57,7 +65,7 @@
       <div class="tab-content" id="settingsTabContent">
 
         <!-- ══ IDENTITY ══════════════════════════════════════════════════ -->
-        <div class="tab-pane fade show active" id="pane-identity" role="tabpanel">
+        <div class="tab-pane fade{% if active_tab == 'identity' %} show active{% endif %}" id="pane-identity" role="tabpanel">
           <div class="card">
             <div class="card-body">
 
@@ -136,7 +144,7 @@
         </div>
 
         <!-- ══ HOME HERO ═════════════════════════════════════════════════ -->
-        <div class="tab-pane fade" id="pane-hero" role="tabpanel">
+        <div class="tab-pane fade{% if active_tab == 'hero' %} show active{% endif %}" id="pane-hero" role="tabpanel">
           <div class="card">
             <div class="card-body">
               <p class="text-muted-sm mb-3">
@@ -206,7 +214,7 @@
         </div>
 
         <!-- ══ ABOUT PAGE ════════════════════════════════════════════════ -->
-        <div class="tab-pane fade" id="pane-about" role="tabpanel">
+        <div class="tab-pane fade{% if active_tab == 'about' %} show active{% endif %}" id="pane-about" role="tabpanel">
           <div class="card">
             <div class="card-body">
               <p class="text-muted-sm mb-3">
@@ -254,7 +262,7 @@
         </div>
 
         <!-- ══ APPEARANCE ════════════════════════════════════════════════ -->
-        <div class="tab-pane fade" id="pane-appearance" role="tabpanel">
+        <div class="tab-pane fade{% if active_tab == 'appearance' %} show active{% endif %}" id="pane-appearance" role="tabpanel">
           <div class="card">
             <div class="card-body">
 
@@ -281,7 +289,7 @@
         </div>
 
         <!-- ══ SOCIAL & CONTACT ══════════════════════════════════════════ -->
-        <div class="tab-pane fade" id="pane-social" role="tabpanel">
+        <div class="tab-pane fade{% if active_tab == 'social' %} show active{% endif %}" id="pane-social" role="tabpanel">
           <div class="card">
             <div class="card-body">
 
@@ -354,7 +362,7 @@
         </div>
 
         <!-- ══ MODULES ═══════════════════════════════════════════════════ -->
-        <div class="tab-pane fade" id="pane-modules" role="tabpanel">
+        <div class="tab-pane fade{% if active_tab == 'modules' %} show active{% endif %}" id="pane-modules" role="tabpanel">
           <div class="card">
             <div class="card-body">
 

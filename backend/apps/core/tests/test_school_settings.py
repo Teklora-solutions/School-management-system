@@ -94,6 +94,38 @@ class SchoolSettingsWriteTests(TestCase):
         self.assertContains(response, "School Settings")
         self.assertContains(response, "Save Settings")
 
+    def test_invalid_save_reopens_the_tab_with_the_error(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            self.url,
+            {
+                "name": "Bright Future School",
+                "motto": "",
+                "phone": "",
+                "email": "",
+                "currency": "GHS",
+                "quiet_hours_start": "25",
+                "quiet_hours_end": "6",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["active_tab"], "modules")
+        self.assertEqual(response.context["error_tab_label"], "Modules")
+        self.assertContains(
+            response, "Fix the fields in the <strong>Modules</strong> tab.",
+            html=True,
+        )
+        self.assertContains(response, "Hour must be between 0 and 23, got 25.")
+        self.assertContains(
+            response, 'class="tab-pane fade show active" id="pane-modules"'
+        )
+        self.assertNotContains(
+            response, 'class="tab-pane fade show active" id="pane-identity"'
+        )
+        # The page creates the singleton row on GET; nothing from this POST is saved.
+        self.assertEqual(SchoolSettings.load().name, "")
+
     def test_admin_can_save_and_it_stays_a_singleton(self):
         self.client.force_login(self.admin)
         response = self.client.post(

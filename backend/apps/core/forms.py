@@ -110,6 +110,55 @@ class DailyReportForm(forms.Form):
     )
 
 
+#: Which tab of the settings page holds each field. The view uses the first
+#: errored field to reopen the right tab after an invalid save.
+FIELD_TABS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "identity",
+        "Identity",
+        (
+            "name", "motto", "phone", "email", "currency", "logo",
+            "address", "established_on",
+        ),
+    ),
+    (
+        "hero",
+        "Home Hero",
+        (
+            "hero_eyebrow", "hero_title", "hero_title_highlight",
+            "hero_text", "cta_title", "cta_text",
+        ),
+    ),
+    ("about", "About Page", ("about", "mission", "vision", "values")),
+    ("appearance", "Appearance", ("theme", "footer_about")),
+    (
+        "social",
+        "Social & Contact",
+        (
+            "facebook_url", "instagram_url", "youtube_url", "linkedin_url",
+            "admissions_email", "office_hours", "map_embed_url",
+        ),
+    ),
+    (
+        "modules",
+        "Modules",
+        (
+            "show_positions", "fees_enabled", "learning_enabled",
+            "engagement_enabled", "quizzes_enabled", "live_classes_enabled",
+            "feed_community_enabled", "notification_quiet_hours_enabled",
+            "quiet_hours_start", "quiet_hours_end", "feed_teacher_starters",
+            "feed_student_starters",
+        ),
+    ),
+)
+
+FIELD_TAB_BY_NAME: dict[str, tuple[str, str]] = {
+    field: (slug, label)
+    for slug, label, fields in FIELD_TABS
+    for field in fields
+}
+
+
 class SchoolSettingsForm(forms.ModelForm):
     """
     Admin edit of the SchoolSettings singleton.

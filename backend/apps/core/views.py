@@ -18,6 +18,7 @@ from django.views.generic import ListView, TemplateView, UpdateView
 
 from . import selectors
 from .forms import (
+    FIELD_TAB_BY_NAME,
     AuditLogFilterForm,
     DailyReportForm,
     SchoolSettingsForm,
@@ -149,6 +150,28 @@ class SchoolSettingsView(AdminRequiredMixin, UpdateView):
         ctx = super().get_context_data(**kwargs)
         # What each field currently renders as, after the .env fallback.
         ctx["effective"] = selectors.school_settings_values()
+
+        # An invalid save reopens the tab holding the first error, so the
+        # message is never left on a hidden pane.
+        ctx["active_tab"] = "identity"
+        ctx["error_tab_label"] = ""
+        ctx["error_summary"] = []
+        form = ctx.get("form")
+        if form is not None and form.is_bound and form.errors:
+            for field_name in form.errors:
+                if field_name in FIELD_TAB_BY_NAME:
+                    slug, label = FIELD_TAB_BY_NAME[field_name]
+                    ctx["active_tab"] = slug
+                    ctx["error_tab_label"] = label
+                    break
+            ctx["error_summary"] = [
+                (
+                    "General" if name == "__all__" else form.fields[name].label,
+                    " ".join(str(error) for error in errors),
+                )
+                for name, errors in form.errors.items()
+                if name == "__all__" or name in form.fields
+            ]
         return ctx
 
 
