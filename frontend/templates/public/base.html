@@ -21,17 +21,12 @@
 
       <!-- Brand -->
       <a href="{% url 'public:home' %}" class="pub-nav__brand">
-<<<<<<< HEAD
         {% if identity.logo_url %}
-        <img src="{{ identity.logo_url }}" alt="{{ identity.name|default:'School logo' }}" style="height:32px;width:auto;object-fit:contain;flex-shrink:0;">
+        <img class="pub-nav__logo" src="{{ identity.logo_url }}" alt="{{ identity.name|default:'School logo' }}">
         {% else %}
-        <span class="pub-nav__dot" aria-hidden="true">&#127979;</span>
+        <span class="pub-nav__dot" aria-hidden="true"><i class="bi bi-building" aria-hidden="true"></i></span>
         {% endif %}
         <span>{{ identity.name|default:"Springfield Academy" }}</span>
-=======
-        <span class="pub-nav__dot"><i class="bi bi-building" aria-hidden="true"></i></span>
-        {{ identity.name|default:"Springfield Academy" }}
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
       </a>
 
       <!-- Desktop links -->
@@ -47,11 +42,7 @@
 
       <!-- Action buttons + hamburger -->
       <div class="pub-nav__actions">
-<<<<<<< HEAD
-        <button class="pub-theme-toggle" aria-label="Toggle colour theme" id="pubThemeToggle">&#9728;</button>
-=======
         <button class="pub-theme-toggle" aria-label="Switch to light mode" id="pubThemeToggle"><i class="bi bi-sun" aria-hidden="true"></i></button>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
         {% if request.user.is_authenticated %}
         <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary pub-btn--sm">
           <i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard
@@ -59,11 +50,7 @@
         {% else %}
         <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--sm pub-btn--hide-sm">Apply Now</a>
         <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary pub-btn--sm">
-<<<<<<< HEAD
-          &#128100; Portal
-=======
           <i class="bi bi-person" aria-hidden="true"></i> Student Portal
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
         </a>
         {% endif %}
         <!-- Hamburger — hidden on desktop via CSS -->
@@ -88,23 +75,17 @@
        href="{{ link.url }}"
        {% if link.is_active %}aria-current="page"{% endif %}>{{ link.label }}</a>
     {% endfor %}
-<<<<<<< HEAD
 
     <div class="pub-nav__mobile-divider"></div>
 
     <!-- CTA buttons -->
     <div class="pub-nav__mobile-actions">
       {% if request.user.is_authenticated %}
-      <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary">&#9889; Dashboard</a>
+      <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary"><i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard</a>
       {% else %}
-      <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary">&#128100; Student Portal</a>
-      <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline">&#9999; Apply Now</a>
-      {% endif %}
-=======
-    <div class="pub-nav__mobile-actions">
       <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary"><i class="bi bi-person" aria-hidden="true"></i> Student Portal</a>
-      <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline">Apply Now</a>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
+      <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline"><i class="bi bi-pencil" aria-hidden="true"></i> Apply Now</a>
+      {% endif %}
     </div>
   </div>
 </nav>
@@ -134,15 +115,11 @@
       <!-- Brand col -->
       <div class="pub-footer__col">
         <div class="pub-footer__brand">
-<<<<<<< HEAD
           {% if identity.logo_url %}
-          <img src="{{ identity.logo_url }}" alt="{{ identity.name|default:'School logo' }}" style="height:34px;width:auto;object-fit:contain;">
+          <img class="pub-footer__logo" src="{{ identity.logo_url }}" alt="{{ identity.name|default:'School logo' }}">
           {% else %}
-          <span class="pub-nav__dot" style="width:34px;height:34px;font-size:1.1rem">&#127979;</span>
+          <span class="pub-nav__dot pub-nav__dot--footer" aria-hidden="true"><i class="bi bi-building" aria-hidden="true"></i></span>
           {% endif %}
-=======
-          <span class="pub-nav__dot pub-nav__dot--footer"><i class="bi bi-building" aria-hidden="true"></i></span>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
           {{ identity.name|default:"Springfield Academy" }}
         </div>
         <p class="pub-footer__about">
@@ -156,17 +133,10 @@
         </div>
         {% endif %}
         <div class="pub-footer__social">
-<<<<<<< HEAD
-          {% if identity.facebook_url %}<a href="{{ identity.facebook_url }}" target="_blank" rel="noopener" aria-label="Facebook">f</a>{% else %}<a href="#" aria-label="Facebook">f</a>{% endif %}
-          {% if identity.instagram_url %}<a href="{{ identity.instagram_url }}" target="_blank" rel="noopener" aria-label="Instagram">&#128247;</a>{% else %}<a href="#" aria-label="Instagram">&#128247;</a>{% endif %}
-          {% if identity.youtube_url %}<a href="{{ identity.youtube_url }}" target="_blank" rel="noopener" aria-label="YouTube">&#9654;</a>{% else %}<a href="#" aria-label="YouTube">&#9654;</a>{% endif %}
-          {% if identity.linkedin_url %}<a href="{{ identity.linkedin_url }}" target="_blank" rel="noopener" aria-label="LinkedIn">in</a>{% else %}<a href="#" aria-label="LinkedIn">in</a>{% endif %}
-=======
-          <a href="#" aria-label="Facebook"><i class="bi bi-facebook" aria-hidden="true"></i></a>
-          <a href="#" aria-label="Instagram"><i class="bi bi-instagram" aria-hidden="true"></i></a>
-          <a href="#" aria-label="YouTube"><i class="bi bi-youtube" aria-hidden="true"></i></a>
-          <a href="#" aria-label="LinkedIn"><i class="bi bi-linkedin" aria-hidden="true"></i></a>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
+          {% if identity.facebook_url %}<a href="{{ identity.facebook_url }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="bi bi-facebook" aria-hidden="true"></i></a>{% else %}<a href="#" aria-label="Facebook"><i class="bi bi-facebook" aria-hidden="true"></i></a>{% endif %}
+          {% if identity.instagram_url %}<a href="{{ identity.instagram_url }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="bi bi-instagram" aria-hidden="true"></i></a>{% else %}<a href="#" aria-label="Instagram"><i class="bi bi-instagram" aria-hidden="true"></i></a>{% endif %}
+          {% if identity.youtube_url %}<a href="{{ identity.youtube_url }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="bi bi-youtube" aria-hidden="true"></i></a>{% else %}<a href="#" aria-label="YouTube"><i class="bi bi-youtube" aria-hidden="true"></i></a>{% endif %}
+          {% if identity.linkedin_url %}<a href="{{ identity.linkedin_url }}" target="_blank" rel="noopener" aria-label="LinkedIn"><i class="bi bi-linkedin" aria-hidden="true"></i></a>{% else %}<a href="#" aria-label="LinkedIn"><i class="bi bi-linkedin" aria-hidden="true"></i></a>{% endif %}
         </div>
       </div>
 

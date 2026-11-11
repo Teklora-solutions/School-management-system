@@ -118,49 +118,29 @@
         <span class="wcu-card__num" aria-hidden="true">01</span>
         <div class="wcu-card__icon"><i class="bi bi-book" aria-hidden="true"></i></div>
         <h3 class="wcu-card__title">Personalised Learning</h3>
-<<<<<<< HEAD
-        <p class="wcu-card__text">Small class sizes and dedicated mentors mean every child gets the individual attention they need to truly thrive.</p>
-        <span class="wcu-card__tag">&#10003; Avg. 18 students per class</span>
-=======
         <p class="wcu-card__text">Small class sizes and dedicated mentors mean every child gets the individual attention they need to truly thrive — academically and personally.</p>
         <span class="wcu-card__tag"><i class="bi bi-check-lg" aria-hidden="true"></i> Avg. 18 students per class</span>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
       </div>
       <div class="wcu-card wcu-card--teal" data-reveal>
         <span class="wcu-card__num" aria-hidden="true">02</span>
         <div class="wcu-card__icon"><i class="bi bi-heart" aria-hidden="true"></i></div>
         <h3 class="wcu-card__title">Whole-Child Focus</h3>
-<<<<<<< HEAD
-        <p class="wcu-card__text">Academics, character, arts and athletics woven together. We develop confident, compassionate people.</p>
-        <span class="wcu-card__tag">&#10003; Character &amp; wellbeing curriculum</span>
-=======
         <p class="wcu-card__text">Academics, character, arts and athletics woven together. We develop confident, compassionate people — not just high scorers.</p>
         <span class="wcu-card__tag"><i class="bi bi-check-lg" aria-hidden="true"></i> Character &amp; wellbeing curriculum</span>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
       </div>
       <div class="wcu-card wcu-card--indigo" data-reveal>
         <span class="wcu-card__num" aria-hidden="true">03</span>
         <div class="wcu-card__icon"><i class="bi bi-eyedropper" aria-hidden="true"></i></div>
         <h3 class="wcu-card__title">Modern Facilities</h3>
-<<<<<<< HEAD
-        <p class="wcu-card__text">Science labs, a library, art studios, sports fields and tech-enabled classrooms.</p>
-        <span class="wcu-card__tag">&#10003; Renovated 2024</span>
-=======
         <p class="wcu-card__text">Purpose-built science labs, a 12,000-book library, art studios, sports fields and tech-enabled classrooms built for 21st-century learners.</p>
         <span class="wcu-card__tag"><i class="bi bi-check-lg" aria-hidden="true"></i> Renovated 2024</span>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
       </div>
       <div class="wcu-card wcu-card--rose" data-reveal>
         <span class="wcu-card__num" aria-hidden="true">04</span>
         <div class="wcu-card__icon"><i class="bi bi-tree" aria-hidden="true"></i></div>
         <h3 class="wcu-card__title">Green Campus</h3>
-<<<<<<< HEAD
-        <p class="wcu-card__text">Gardens, outdoor spaces and a student-led sustainability programme.</p>
-        <span class="wcu-card__tag">&#10003; Zero-waste initiative</span>
-=======
         <p class="wcu-card__text">Gardens, outdoor learning spaces and a student-led sustainability programme. We teach children to care for the world they will inherit.</p>
         <span class="wcu-card__tag"><i class="bi bi-check-lg" aria-hidden="true"></i> Zero-waste initiative</span>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
       </div>
     </div>
     {% endif %}
@@ -212,16 +192,13 @@
       <h2>What's Happening at {{ identity.name|default:"Springfield" }}</h2>
     </div>
     <div class="pub-grid pub-grid--3">
-<<<<<<< HEAD
       {% if event_items %}
         {% for ev in event_items|slice:":3" %}
         <div class="pub-card" data-reveal>
           <div class="pub-card__body">
-            <p style="color:var(--pub-accent);font-family:var(--pub-font-h);font-size:1.5rem;font-weight:800;line-height:1">
-              {{ ev.day }} <span style="display:block;font-size:.75rem;color:var(--pub-text-muted);text-transform:uppercase;font-weight:600">{{ ev.month }}</span>
-            </p>
-            <h3 style="margin-top:.5rem">{{ ev.title }}</h3>
-            {% if ev.description %}<p style="color:var(--pub-text-muted);font-size:.85rem;margin-top:.35rem">{{ ev.description }}</p>{% endif %}
+            <p class="pub-event-date">{{ ev.day }} <span class="pub-event-date__month">{{ ev.month }}</span></p>
+            <h3 class="pub-event-title">{{ ev.title }}</h3>
+            {% if ev.description %}<p class="pub-card__description">{{ ev.description }}</p>{% endif %}
           </div>
         </div>
         {% endfor %}
@@ -229,43 +206,22 @@
         <div class="pub-card" data-reveal>
           <img class="pub-card__img" src="https://picsum.photos/seed/sfa-event1/600/375" alt="Science fair" loading="lazy">
           <div class="pub-card__body">
-            <p style="color:var(--pub-accent);font-family:var(--pub-font-h);font-size:1.5rem;font-weight:800;line-height:1">15 <span style="display:block;font-size:.75rem;color:var(--pub-text-muted);text-transform:uppercase;font-weight:600">Nov</span></p>
-            <h3 style="margin-top:.5rem">Annual Science Fair</h3>
+            <p class="pub-event-date">15 <span class="pub-event-date__month">Nov</span></p>
+            <h3 class="pub-event-title">Annual Science Fair</h3>
           </div>
         </div>
         <div class="pub-card" data-reveal>
           <img class="pub-card__img" src="https://picsum.photos/seed/sfa-event2/600/375" alt="Sports day" loading="lazy">
           <div class="pub-card__body">
-            <p style="color:var(--pub-accent);font-family:var(--pub-font-h);font-size:1.5rem;font-weight:800;line-height:1">22 <span style="display:block;font-size:.75rem;color:var(--pub-text-muted);text-transform:uppercase;font-weight:600">Nov</span></p>
-            <h3 style="margin-top:.5rem">Inter-House Sports Day</h3>
+            <p class="pub-event-date">22 <span class="pub-event-date__month">Nov</span></p>
+            <h3 class="pub-event-title">Inter-House Sports Day</h3>
           </div>
-=======
-      <div class="pub-card" data-reveal>
-        <img class="pub-card__img" src="https://picsum.photos/seed/sfa-event1/600/375" alt="Science fair" loading="lazy">
-        <div class="pub-card__body">
-          <p class="pub-event-date">15 <span class="pub-event-date__month">Nov</span></p>
-          <h3 class="pub-event-title">Annual Science Fair</h3>
-        </div>
-      </div>
-      <div class="pub-card" data-reveal>
-        <img class="pub-card__img" src="https://picsum.photos/seed/sfa-event2/600/375" alt="Sports day" loading="lazy">
-        <div class="pub-card__body">
-          <p class="pub-event-date">22 <span class="pub-event-date__month">Nov</span></p>
-          <h3 class="pub-event-title">Inter-House Sports Day</h3>
-        </div>
-      </div>
-      <div class="pub-card" data-reveal>
-        <img class="pub-card__img" src="https://picsum.photos/seed/sfa-event3/600/375" alt="Art exhibition" loading="lazy">
-        <div class="pub-card__body">
-          <p class="pub-event-date">05 <span class="pub-event-date__month">Dec</span></p>
-          <h3 class="pub-event-title">Winter Art Exhibition</h3>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
         </div>
         <div class="pub-card" data-reveal>
           <img class="pub-card__img" src="https://picsum.photos/seed/sfa-event3/600/375" alt="Art exhibition" loading="lazy">
           <div class="pub-card__body">
-            <p style="color:var(--pub-accent);font-family:var(--pub-font-h);font-size:1.5rem;font-weight:800;line-height:1">05 <span style="display:block;font-size:.75rem;color:var(--pub-text-muted);text-transform:uppercase;font-weight:600">Dec</span></p>
-            <h3 style="margin-top:.5rem">Winter Art Exhibition</h3>
+            <p class="pub-event-date">05 <span class="pub-event-date__month">Dec</span></p>
+            <h3 class="pub-event-title">Winter Art Exhibition</h3>
           </div>
         </div>
       {% endif %}
