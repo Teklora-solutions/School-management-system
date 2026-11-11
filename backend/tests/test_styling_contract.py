@@ -30,12 +30,12 @@ class StylingContractTests(SimpleTestCase):
     def test_application_templates_do_not_use_emoji_icons(self):
         for path in sorted(TEMPLATES.rglob("*.html")):
             with self.subTest(template=str(path.relative_to(TEMPLATES))):
-                self.assertIsNone(EMOJI.search(html.unescape(path.read_text())))
+                self.assertIsNone(EMOJI.search(html.unescape(path.read_text(encoding="utf-8"))))
 
     def test_public_icons_exist_in_the_local_icon_font(self):
-        stylesheet = (STATIC / "vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css").read_text()
+        stylesheet = (STATIC / "vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css").read_text(encoding="utf-8")
         for path in sorted((TEMPLATES / "public").glob("*.html")):
-            icons = set(ICON_CLASS.findall(path.read_text()))
+            icons = set(ICON_CLASS.findall(path.read_text(encoding="utf-8")))
             for icon in icons:
                 with self.subTest(template=path.name, icon=icon):
                     self.assertIn(f".bi-{icon}::before", stylesheet)
@@ -43,7 +43,7 @@ class StylingContractTests(SimpleTestCase):
     def test_public_decorative_icons_are_hidden_from_screen_readers(self):
         for path in sorted((TEMPLATES / "public").glob("*.html")):
             parser = IconParser()
-            parser.feed(path.read_text())
+            parser.feed(path.read_text(encoding="utf-8"))
             for attrs in parser.icons:
                 with self.subTest(template=path.name, icon=attrs["class"]):
                     self.assertEqual(attrs.get("aria-hidden"), "true")
@@ -58,10 +58,10 @@ class StylingContractTests(SimpleTestCase):
             "public/home.html",
         ):
             with self.subTest(template=name):
-                self.assertNotRegex((TEMPLATES / name).read_text(), r"\bstyle\s*=")
+                self.assertNotRegex((TEMPLATES / name).read_text(encoding="utf-8"), r"\bstyle\s*=")
 
     def test_public_layout_loads_the_local_icon_stylesheet(self):
-        source = (TEMPLATES / "public/base.html").read_text()
+        source = (TEMPLATES / "public/base.html").read_text(encoding="utf-8")
         self.assertIn("{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}", source)
         self.assertIn('aria-label="Switch to light mode"', source)
         self.assertIn("themeBtn.querySelector('i').className", source)

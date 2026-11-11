@@ -128,30 +128,14 @@
     </div>
     <div style="max-width:680px;margin:0 auto" data-reveal>
 
-<<<<<<< HEAD
       {% if messages %}
-      <div class="pub-form-success pub-form-success--static" style="display:block;margin-bottom:1.5rem">
+      <div class="pub-form-success pub-form-success--static">
         {% for message in messages %}
-        <h3>&#10003; Message Sent!</h3>
+        <h3><i class="bi bi-check-lg" aria-hidden="true"></i> Message Sent!</h3>
         <p>{{ message }}</p>
         {% endfor %}
       </div>
       {% endif %}
-
-=======
-      {% if form_submitted %}
-      <div class="pub-form-success pub-form-success--static">
-        <h3><i class="bi bi-check-lg" aria-hidden="true"></i> Inquiry Submitted!</h3>
-        <p>Thank you — your message is with our admissions office. We'll reply within 48 hours.</p>
-      </div>
-      {% endif %}
-
-      <div class="pub-form-success" id="pubFormSuccess">
-        <h3><i class="bi bi-check-lg" aria-hidden="true"></i> Inquiry Submitted!</h3>
-        <p>Thank you — we'll reply to the email address you provided within 48 hours.</p>
-      </div>
-
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
       <form method="post" id="pub-inquiry-form" novalidate>
         {% csrf_token %}
         <div class="pub-form-grid-2">
@@ -194,27 +178,16 @@
         <p class="pub-eyebrow">Find Us</p>
         <h2 style="margin-bottom:1.5rem">Contact Details</h2>
         <div style="display:flex;flex-direction:column;gap:1.25rem">
-<<<<<<< HEAD
-          {% if identity.address %}
-          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128205;</span><div><strong style="color:var(--pub-heading);display:block">Address</strong><span style="color:var(--pub-text-muted)">{{ identity.address }}</span></div></div>
-          {% else %}
-          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128205;</span><div><strong style="color:var(--pub-heading);display:block">Address</strong><span style="color:var(--pub-text-muted)">24 Education Road, Cantonments, Accra, Ghana</span></div></div>
-          {% endif %}
+          <div class="pub-contact-detail"><i class="bi bi-geo-alt pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Address</strong><span class="pub-text-muted">{{ identity.address|default:"24 Education Road, Cantonments, Accra, Ghana" }}</span></div></div>
           {% if identity.phone %}
-          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128222;</span><div><strong style="color:var(--pub-heading);display:block">Phone</strong><a href="tel:{{ identity.phone }}" style="color:var(--pub-text-muted)">{{ identity.phone }}</a></div></div>
+          <div class="pub-contact-detail"><i class="bi bi-telephone pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Phone</strong><a class="pub-text-muted" href="tel:{{ identity.phone }}">{{ identity.phone }}</a></div></div>
           {% endif %}
           {% if identity.admissions_email %}
-          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#9993;</span><div><strong style="color:var(--pub-heading);display:block">Admissions Email</strong><a href="mailto:{{ identity.admissions_email }}" style="color:var(--pub-text-muted)">{{ identity.admissions_email }}</a></div></div>
+          <div class="pub-contact-detail"><i class="bi bi-envelope pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Admissions Email</strong><a class="pub-text-muted" href="mailto:{{ identity.admissions_email }}">{{ identity.admissions_email }}</a></div></div>
           {% elif identity.email %}
-          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#9993;</span><div><strong style="color:var(--pub-heading);display:block">Email</strong><a href="mailto:{{ identity.email }}" style="color:var(--pub-text-muted)">{{ identity.email }}</a></div></div>
+          <div class="pub-contact-detail"><i class="bi bi-envelope pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Email</strong><a class="pub-text-muted" href="mailto:{{ identity.email }}">{{ identity.email }}</a></div></div>
           {% endif %}
-          <div style="display:flex;align-items:flex-start;gap:.75rem"><span style="font-size:1.4rem;color:var(--pub-accent)">&#128337;</span><div><strong style="color:var(--pub-heading);display:block">Office Hours</strong><span style="color:var(--pub-text-muted)">{% if identity.office_hours %}{{ identity.office_hours }}{% else %}Monday – Friday, 8:00 AM – 4:00 PM{% endif %}</span></div></div>
-=======
-          <div class="pub-contact-detail"><i class="bi bi-geo-alt pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Address</strong><span class="pub-text-muted">{{ identity.address|default:"24 Education Road, Cantonments, Accra, Ghana" }}</span></div></div>
-          <div class="pub-contact-detail"><i class="bi bi-telephone pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Phone</strong><a class="pub-text-muted" href="tel:{{ identity.phone|default:'+233123456789' }}">{{ identity.phone|default:"+233 12 345 6789" }}</a></div></div>
-          <div class="pub-contact-detail"><i class="bi bi-envelope pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Email</strong>{% if identity.email %}<a class="pub-text-muted" href="mailto:{{ identity.email }}">{{ identity.email }}</a>{% else %}<a class="pub-text-muted" href="mailto:admissions@springfield.edu">admissions@springfield.edu</a>{% endif %}</div></div>
-          <div class="pub-contact-detail"><i class="bi bi-clock pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Office Hours</strong><span class="pub-text-muted">Monday – Friday, 8:00 AM – 4:00 PM</span></div></div>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
+          <div class="pub-contact-detail"><i class="bi bi-clock pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Office Hours</strong><span class="pub-text-muted">{% if identity.office_hours %}{{ identity.office_hours }}{% else %}Monday – Friday, 8:00 AM – 4:00 PM{% endif %}</span></div></div>
         </div>
       </div>
 
@@ -226,13 +199,8 @@
         {% else %}
         <div class="pub-map-placeholder">
           <div>
-<<<<<<< HEAD
-            <span style="font-size:3rem;display:block;margin-bottom:.5rem">&#128205;</span>
-            <p>Set a Google Maps embed URL in School Settings to show the map here.</p>
-=======
             <i class="bi bi-geo-alt pub-map-icon" aria-hidden="true"></i>
-            <p>Map placeholder — integrate Google Maps here.</p>
->>>>>>> bc69d7a9d909aeda82d20be538153d0db7a0c228
+            <p>Set a Google Maps embed URL in School Settings to show the map here.</p>
             <p style="font-size:.75rem;margin-top:.5rem;color:var(--pub-text-muted)">{% if identity.address %}{{ identity.address }}{% else %}24 Education Road, Cantonments, Accra{% endif %}</p>
           </div>
         </div>
