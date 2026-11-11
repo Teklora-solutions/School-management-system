@@ -24,8 +24,7 @@ from django.utils import timezone
 from apps.academics.models import AcademicYear, SchoolClass, Subject, Term
 from apps.accounts.models import User
 from apps.accounts.portals import PORTALS
-from apps.core.models import SchoolSettings
-from apps.core.selectors import school_settings_values
+from apps.core.selectors import school_settings_row, school_settings_values
 from apps.students.models import Student
 
 from .models import (
@@ -60,7 +59,8 @@ def site_identity(request: Any = None) -> dict:
 
     ``school_settings_values`` already resolves the blank-means-env rule and
     memoises per request, so the shared fields are taken from it rather than
-    read twice. The six website-only fields come off the same singleton row.
+    read twice. The six website-only fields come off the same singleton row,
+    which ``school_settings_row`` has already read for this request.
 
     The result is memoised on the request too: the Contact page asks for the
     school's email address once to render the page and once again to mail an
@@ -72,7 +72,7 @@ def site_identity(request: Any = None) -> dict:
             return memo
 
     effective = school_settings_values(request)
-    row = SchoolSettings.objects.filter(pk=SchoolSettings.SINGLETON_PK).first()
+    row = school_settings_row(request)
 
     def _str(field: str) -> str:
         return (getattr(row, field, "") or "").strip()

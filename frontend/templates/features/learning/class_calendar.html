@@ -75,7 +75,7 @@
                   <a href="{{ ev.url }}" class="text-decoration-none" title="{{ ev.title }} ({{ ev.time_str }})">
                     <div class="calendar-event-pill text-truncate px-1 py-0.5 rounded {{ ev.badge_class }}"
                          style="font-size:0.7rem;line-height:1.2;">
-                      {% if ev.is_live %}🔴 {% endif %}{{ ev.title }}
+                      {% if ev.is_live %}<i class="bi bi-record-circle" aria-hidden="true"></i> {% endif %}{{ ev.title }}
                     </div>
                   </a>
                   {% endfor %}

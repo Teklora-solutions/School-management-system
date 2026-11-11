@@ -10,14 +10,17 @@ Four rules hold this module together, and each has a test:
     visitor and a signed-in parent get the same page. The matrix in
     ``apps/core/tests/test_security_matrix.py`` records the same five paths as
     deliberately public.
-  * **Nothing invented.** A fact the school has not entered renders as "not
-    written yet", never as a plausible sentence. That is the difference between
-    a website and a brochure someone guessed for the school.
+  * **Real numbers, labelled.** Where a page counts something, the count is a
+    row count from the table that owns it, and a count the school has not
+    entered renders as an em dash rather than a confident zero. Prose and
+    imagery the school has not supplied fall back to presentation copy in the
+    template — never to a private value.
   * **No private numbers.** A public page may name a class or a subject; it must
     never carry a pupil, a money figure or a balance. The static test reads the
     template files for the vocabulary that would mean it had crossed that line.
-  * **One shell.** These pages extend ``base.html`` directly — never the
-    ``base_template`` variable, which resolves to the viewer's role sidebar.
+  * **One shell.** These pages extend ``public/base.html``, which renders the
+    public navbar and footer itself — never the ``base_template`` variable,
+    which resolves to the viewer's role sidebar.
 """
 
 from __future__ import annotations
@@ -69,7 +72,7 @@ PRIVATE_TOKENS = (
     "receipt",
     "balance",
     "outstanding",
-    "admission",
+    "admission_number",
     "fee_structure",
     "student.",
     "payment",
@@ -168,14 +171,14 @@ class PublicPagesTest(TestCase):
 
     def test_a_signed_in_parent_sees_no_sidebar(self):
         """
-        The reason these templates extend base.html and not ``base_template``:
-        a parent on the About page must not get the parent dashboard's nav bolted
-        onto a public page. The empty ``.sidebar-overlay`` div stays in the shared
-        shell for every page and public.css hides it.
+        The public shell is its own document, not the app shell with a role
+        sidebar bolted on: a parent reading the About page gets the public
+        navbar and footer, and none of the dashboard's navigation.
         """
         self.client.force_login(self.users["parent"])
         body = self.client.get(reverse("public:about")).content.decode()
-        self.assertIn("app-wrapper--public", body)
+        self.assertIn('class="pub-nav"', body)
+        self.assertIn('class="pub-footer"', body)
         self.assertNotIn('id="app-sidebar"', body)
         self.assertNotIn("sidebar-item", body)
 
@@ -198,20 +201,21 @@ class FooterPortalLinksTest(TestCase):
     def test_every_portal_door_appears_in_the_footer_of_every_page(self):
         for name in PAGE_URL_NAMES:
             body = self.client.get(reverse(f"public:{name}")).content.decode()
-            self.assertIn("app-footer--wide", body, f"{name} lost the wide footer")
-            self.assertIn("Sign in to a portal", body)
+            self.assertIn('class="pub-footer"', body, f"{name} lost the public footer")
+            self.assertIn("Portal Login", body)
             for slug in PORTALS:
                 self.assertIn(f"/login/{slug}/", body, f"{name} footer misses {slug}")
 
-    def test_app_pages_keep_their_one_line_footer(self):
+    def test_app_pages_do_not_get_the_public_footer(self):
         """
-        One footer file, two presentations. An app page hands the shared partial
-        no ``portal_links`` and gets the single line it has always had.
+        One footer per audience: the six portal doors belong to the public
+        website, and the signed-in admin dashboard must not grow a second,
+        public-facing footer underneath its own.
         """
         self.client.force_login(make_user("admin"))
         body = self.client.get(reverse("dashboards:admin_home")).content.decode()
-        self.assertNotIn("app-footer--wide", body)
-        self.assertNotIn("Sign in to a portal", body)
+        self.assertNotIn('class="pub-footer"', body)
+        self.assertNotIn("Portal Login", body)
 
 
 class CalendarFixtureTest(TestCase):
@@ -278,8 +282,9 @@ class HomeFactsTest(CalendarFixtureTest):
         self.assertTrue(facts["has_current_year"])
 
         body = self.client.get(reverse("public:home")).content.decode()
-        self.assertIn("pupils on roll", body)
-        self.assertIn(">2<", body)
+        for label in ("Students Enrolled", "Subjects Offered", "Qualified Teachers"):
+            self.assertIn(label, body)
+        self.assertIn('data-count="2"', body)
         self.assertNotIn("Grade 4 last year", body)
 
     def test_no_current_year_says_so_instead_of_counting_nothing(self):
@@ -290,29 +295,42 @@ class HomeFactsTest(CalendarFixtureTest):
         self.assertFalse(facts["has_current_year"])
 
         body = self.client.get(reverse("public:home")).content.decode()
-        self.assertIn("No academic year is marked current yet", body)
-        self.assertIn("None published yet", body)
+        self.assertIn(
+            "A school community, in the figures the school has entered.", body
+        )
+        self.assertNotIn('data-count="0"', body)
 
-    def test_a_zero_fact_is_left_out_of_the_band(self):
+    def test_a_zero_fact_is_an_em_dash_not_a_zero(self):
+        """
+        An empty roll is not the same as an unknown one, but a public band
+        cannot tell the difference — so the count the school has not filled is
+        an em dash, and no counter animation is handed a zero.
+        """
         body = self.client.get(reverse("public:home")).content.decode()
-        self.assertNotIn("pupils on roll", body)
+        self.assertIn("Students Enrolled", body)
+        self.assertNotIn('data-count="0"', body)
+        self.assertGreaterEqual(body.count(">—<"), 1)
 
-    def test_home_shows_only_the_first_four_published_photos(self):
+    def test_home_sends_visitors_to_the_gallery_instead_of_embedding_photos(self):
+        """The gallery is the one place photographs live; home links to it."""
         with override_settings(MEDIA_ROOT=MEDIA_TMP):
-            for order in range(6):
-                make_photo(title=f"Photo {order}", display_order=order)
+            make_photo(title="Harvest", display_order=1)
             body = self.client.get(reverse("public:home")).content.decode()
-        self.assertEqual(body.count('class="thumb"'), 4)
+        self.assertIn(f'href="{reverse("public:gallery")}"', body)
+        self.assertIn("See Gallery", body)
+        self.assertNotIn("Harvest", body)
 
 
 class AboutPageTest(TestCase):
-    """A story the school has not written stays visibly unwritten."""
+    """The written story wins; where none is written the shell's copy stands in."""
 
-    def test_blank_fields_are_marked_blank(self):
+    def test_an_unwritten_story_uses_the_shell_copy_and_leaves_numbers_blank(self):
         body = self.client.get(reverse("public:about")).content.decode()
-        self.assertIn("This page has no story yet", body)
-        self.assertIn("Nothing on this page has been invented", body)
-        self.assertEqual(body.count("Not written yet"), 2)
+        self.assertIn("A thriving school community guided by the belief", body)
+        self.assertIn("To provide a nurturing, inquiry-driven education", body)
+        self.assertIn("To be the school our community trusts", body)
+        self.assertIn("Curiosity, kindness, integrity and excellence", body)
+        self.assertGreaterEqual(body.count(">—<"), 5)
 
     def test_written_fields_replace_the_placeholders(self):
         set_settings(
@@ -325,9 +343,8 @@ class AboutPageTest(TestCase):
         self.assertIn("We teach eleven to eighteen year olds", body)
         self.assertIn("Every child known by name.", body)
         self.assertIn("A school the town is proud of.", body)
-        self.assertNotIn("This page has no story yet", body)
-        self.assertNotIn("Not written yet", body)
-        self.assertIn("<dt>Founded</dt><dd>2001</dd>", body)
+        self.assertNotIn("A thriving school community guided by the belief", body)
+        self.assertIn(">Founded</span><strong>2001</strong>", body)
 
     def test_years_running_counts_completed_years_only(self):
         today = timezone.localdate()
@@ -347,42 +364,45 @@ class AboutPageTest(TestCase):
 
         home = self.client.get(reverse("public:home")).content.decode()
         self.assertIn("Welcome", home)
-        self.assertNotIn("Since 2", home)
+        self.assertNotIn("Educating young people since", home)
+        self.assertNotIn("Trusted by families since", home)
 
         about = self.client.get(reverse("public:about")).content.decode()
-        self.assertIn("<dt>Founded</dt><dd>—</dd>", about)
-        self.assertNotIn("<dt>Years running</dt>", about)
+        self.assertIn(">Founded</span><strong>—</strong>", about)
+        self.assertIn("Our <span>Story</span>", about)
+        self.assertNotIn("Years of <span>Believing in Children</span>", about)
 
 
 class AcademicsPageTest(CalendarFixtureTest):
     """The real calendar, including when there is nothing real to show."""
 
-    def test_shows_the_current_year_terms_classes_and_subjects(self):
+    def test_shows_the_current_year_terms_and_classes(self):
         body = self.client.get(reverse("public:academics")).content.decode()
         self.assertIn("2025/2026", body)
         self.assertIn("Grade 3", body)
         self.assertIn("Grade 9", body)
-        self.assertIn("Blue", body)
-        self.assertIn("Mathematics", body)
-        self.assertIn("Biology", body)
-        self.assertIn("Running now", body)
         self.assertIn("Term 1", body)
+        self.assertIn("</i> Now</span>", body)
+        self.assertIn("1 Sep 2025", body)
+        self.assertIn("20 Dec 2025", body)
+        self.assertIn("<strong>2</strong><span>Subjects</span>", body)
 
     def test_classes_list_lowest_level_first(self):
         body = self.client.get(reverse("public:academics")).content.decode()
         self.assertLess(body.index("Grade 3"), body.index("Grade 9"))
         self.assertNotIn("Grade 4 last year", body)
 
-    def test_says_so_when_no_year_is_current(self):
+    def test_no_current_year_means_no_calendar_section(self):
         AcademicYear.objects.update(is_current=False)
         body = self.client.get(reverse("public:academics")).content.decode()
-        self.assertIn("published once an academic year is marked current", body)
+        self.assertIn("Admissions Open", body)
+        self.assertNotIn("Academic Calendar", body)
         self.assertNotIn("Grade 3", body)
-        self.assertIn("No terms are published for a current year yet", body)
 
-    def test_lists_other_years_on_record(self):
+    def test_only_the_current_year_is_published_not_the_archive(self):
         body = self.client.get(reverse("public:academics")).content.decode()
-        self.assertIn("2024/2025", body)
+        self.assertIn("2025/2026", body)
+        self.assertNotIn("2024/2025", body)
 
     def test_does_not_name_a_pupil_or_a_staff_id(self):
         make_student(self.junior, "ADM-PUB-9")
@@ -410,14 +430,19 @@ class GalleryPageTest(TestCase):
         self.assertIn("Sports day", body)
         self.assertIn("Harvest", body)
         self.assertNotIn("Not for the web", body)
-        self.assertIn("2 photographs published by the school", body)
-        self.assertIn('rel="noopener"', body)
+        self.assertLess(body.index("Sports day"), body.index("Harvest"))
+        self.assertEqual(body.count('class="pub-gallery__item"'), 2)
+        self.assertNotIn("picsum.photos/seed/sfa-g1/", body)
 
-    def test_empty_gallery_says_empty_instead_of_borrowing_stock_images(self):
+    def test_an_empty_gallery_is_filled_with_the_placeholder_set(self):
+        """
+        With no uploads the template shows its twelve stock pictures rather
+        than an empty grid, and no local media path is invented alongside them.
+        """
         body = self.client.get(reverse("public:gallery")).content.decode()
-        self.assertIn("No photographs yet", body)
-        self.assertIn("stock images", body)
-        self.assertNotIn("gallery-item", body)
+        self.assertEqual(body.count('class="pub-gallery__item"'), 12)
+        self.assertIn("picsum.photos/seed/sfa-g1/", body)
+        self.assertNotIn("/media/gallery/", body)
 
 
 class ContactPageTest(TestCase):
@@ -606,14 +631,23 @@ class QueryBudgetTest(CalendarFixtureTest):
     reason, never because a test went red.
     """
 
-    # Measured against the fixture below: home 11, about 10, academics 10,
-    # gallery 5, contact 4 — each ceiling is that number plus two.
+    # Measured against the fixture below: home 14, about 11, academics 15,
+    # gallery 5, contact 6 — each ceiling is that number plus two. The counts
+    # include the savepoint pair a TestCase-wrapped request emits.
+    #
+    # The public redesign added small published tables the old pages did not
+    # read (hero slides, "why choose us" cards, testimonials, events), which is
+    # why home and about sit above their old budgets. Academics is the outlier:
+    # it runs both ``academics_overview`` and ``home_facts``, so it asks for the
+    # current year and the subject count twice. Folding those two selectors
+    # together is a known follow-up; until then the ceiling records the cost
+    # rather than hiding it.
     CEILINGS = {
-        "home": 13,
-        "about": 12,
-        "academics": 12,
+        "home": 16,
+        "about": 13,
+        "academics": 17,
         "gallery": 7,
-        "contact": 6,
+        "contact": 8,
     }
 
     def test_each_page_stays_inside_its_budget(self):
@@ -637,7 +671,7 @@ class StaticContractTest(TestCase):
     files themselves so a later edit cannot cross one by accident.
     """
 
-    def test_public_pages_extend_the_shared_shell_not_a_role_shell(self):
+    def test_public_pages_extend_the_public_shell_not_a_role_shell(self):
         offenders = [
             path.name
             for path in PUBLIC_TEMPLATES
@@ -649,10 +683,20 @@ class StaticContractTest(TestCase):
             "A public template that extends base_template bolts the viewer's "
             "role sidebar onto a public page",
         )
-        self.assertIn(
-            '{% extends "base.html" %}',
-            _without_comments(TEMPLATES_DIR / "public" / "base.html"),
+        app_shell = [
+            path.name
+            for path in PUBLIC_TEMPLATES
+            if '{% extends "base.html" %}' in _without_comments(path)
+        ]
+        self.assertEqual(
+            app_shell,
+            [],
+            "A public template must extend public/base.html, not the app shell",
         )
+        shell = _without_comments(TEMPLATES_DIR / "public" / "base.html")
+        self.assertNotIn("{% extends", shell)
+        self.assertIn('<nav class="pub-nav"', shell)
+        self.assertIn('<footer class="pub-footer">', shell)
 
     def test_no_public_comment_contains_a_tag_in_disguise(self):
         """
@@ -762,7 +806,8 @@ class IdentityTest(TestCase):
         A page asks for the school's identity more than once — the context
         processor, the shell, and the Contact view mailing an enquiry. Without a
         request there is nothing to memoise on and each call reads; with one, the
-        whole page costs a single pair of primary-key reads on a singleton row.
+        shared values and the website-only fields cost one primary-key read on a
+        singleton row for the whole page.
         """
         set_settings(name="Greenfield Academy")
         with CaptureQueriesContext(connections["default"]) as ctx:
@@ -781,7 +826,7 @@ class IdentityTest(TestCase):
             first = len(ctx.captured_queries)
             selectors.site_identity(request)
             selectors.site_identity(request)
-        self.assertEqual(first, 2, "one read for the shared values, one for the row")
+        self.assertEqual(first, 1, "the values and the row are one read")
         self.assertEqual(
             len(ctx.captured_queries),
             first,
@@ -792,14 +837,16 @@ class IdentityTest(TestCase):
         with override_settings(MEDIA_ROOT=MEDIA_TMP):
             set_settings(name="Greenfield Academy")
             body = self.client.get(reverse("public:home")).content.decode()
-            self.assertNotIn("hero-logo", body)
+            self.assertNotIn("pub-nav__logo", body)
+            self.assertNotIn("pub-footer__logo", body)
 
             row = set_settings()
             row.logo = upload("crest.png")
             row.save()
             body = self.client.get(reverse("public:home")).content.decode()
-            self.assertIn("hero-logo", body)
-            self.assertIn("Greenfield Academy logo", body)
+            self.assertIn("pub-nav__logo", body)
+            self.assertIn("pub-footer__logo", body)
+            self.assertIn(row.logo.url, body)
 
 
 class GalleryModelTest(TestCase):

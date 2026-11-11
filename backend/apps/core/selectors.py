@@ -139,6 +139,28 @@ _ENV_FALLBACKS = {
 }
 
 
+#: Distinct from ``None``, which is the legitimate answer "no row saved yet".
+_UNREAD = object()
+
+
+def school_settings_row(request=None):
+    """
+    The singleton settings row, or ``None`` before the school saves one.
+
+    Memoised on the request so the context processor, a view and the public
+    site's identity selector all share one primary-key read. ``None`` is
+    memoised too, so a fresh install does not repeat an empty read.
+    """
+    if request is not None:
+        memo = getattr(request, "_school_settings_row", _UNREAD)
+        if memo is not _UNREAD:
+            return memo
+    row = SchoolSettings.objects.filter(pk=SchoolSettings.SINGLETON_PK).first()
+    if request is not None:
+        request._school_settings_row = row
+    return row
+
+
 def school_settings_values(request=None) -> dict:
     """
     Effective school identity: the SchoolSettings row, with any blank field
@@ -153,7 +175,7 @@ def school_settings_values(request=None) -> dict:
         memo = getattr(request, "_school_settings_values", None)
         if memo is not None:
             return memo
-    row = SchoolSettings.objects.filter(pk=SchoolSettings.SINGLETON_PK).first()
+    row = school_settings_row(request)
     values = {}
     for field, env_key in _ENV_FALLBACKS.items():
         stored = str(getattr(row, field, "") or "").strip() if row else ""
