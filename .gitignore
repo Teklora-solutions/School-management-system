@@ -83,3 +83,6 @@ db.*-try.sqlite3
 
 # WeasyPrint / xhtml2pdf temp
 tmp/
+
+# Rendered pages saved for inspection — they carry live CSRF tokens
+tmp_page*.html
