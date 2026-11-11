@@ -18,12 +18,16 @@ usually wants a full register — ``--students-per-class 30`` gives four classes
 of thirty, which is enough for class-wide screens, the homework review page and
 the finance ageing lists to show something real.
 
-Demo credentials match ``locustfile.py``.  They are seeded with
+Demo credentials are generated at random on the first run and printed once at
+the end of the output — they are not stored in the repository, and two
+installations do not share them. They are seeded with
 ``must_change_password=False`` so they work immediately, which is why the
-command refuses to run under the ``config.settings.prod`` settings module
-unless ``--force`` is passed.  A username that already exists with the same
-role but a different email (a database's own ``admin``, say) is reused as the
-actor and its password is left exactly as it was.
+command refuses to run without DEBUG unless ``--force`` is passed. Pass
+``--password`` to use a known password instead (tests and repeatable demos).
+Re-running keeps the passwords the accounts already have; a username that
+already exists with the same role but a different email (a database's own
+``admin``, say) is reused as the actor and its password is left exactly as it
+was.
 """
 
 from __future__ import annotations
@@ -31,6 +35,8 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import random
+import secrets
+import string
 from decimal import Decimal
 
 from django.conf import settings
@@ -81,15 +87,12 @@ SEED_RNG = 20260901  # fixed so the generated names/scores repeat per run
 
 DEMO_EMAIL_DOMAIN = "demo.school"
 
-# Kept in sync with the credentials in locustfile.py.
-DEMO_PASSWORDS = {
-    User.Role.ADMIN: "REMOVED-DEMO-PASSWORD",
-    User.Role.DIRECTOR: "REMOVED-DEMO-PASSWORD",
-    User.Role.FINANCE: "REMOVED-DEMO-PASSWORD",
-    User.Role.TEACHER: "REMOVED-DEMO-PASSWORD",
-    User.Role.STUDENT: "REMOVED-DEMO-PASSWORD",
-    User.Role.PARENT: "REMOVED-DEMO-PASSWORD",
-}
+PASSWORD_ALPHABET = string.ascii_letters + string.digits
+
+
+def _generate_password(length: int = 16) -> str:
+    """A random password that is easy to read out of a terminal."""
+    return "".join(secrets.choice(PASSWORD_ALPHABET) for _ in range(length))
 
 SCHOOL_IDENTITY = {
     "name": "Greenfield Academy",
@@ -233,14 +236,13 @@ class _DryRunRollback(Exception):
     """Raised at the end of --dry-run so the atomic block unwinds every write."""
 
 
-def production_settings_module() -> bool:
+def is_production() -> bool:
     """
-    True when the running settings module is the production one.
-
-    ``DEBUG`` cannot be the signal here: the test suite deliberately runs with
-    it forced off, so a DEBUG guard would make this command untestable.
+    True when the command is pointed at something that is not a development
+    database. ``DEBUG`` is the signal: the test suite inherits it from dev,
+    and the production settings module turns it off.
     """
-    return str(getattr(settings, "SETTINGS_MODULE", "")).endswith(".prod")
+    return not settings.DEBUG
 
 
 class Command(BaseCommand):
@@ -266,16 +268,30 @@ class Command(BaseCommand):
         parser.add_argument(
             "--force",
             action="store_true",
-            help="Run even under the production settings module.",
+            help="Run even with DEBUG off (a real database).",
+        )
+        parser.add_argument(
+            "--password",
+            default="",
+            help=(
+                "Use this password for every demo login instead of generating "
+                "one. For tests and repeatable demos."
+            ),
         )
 
     def handle(self, *args, **options):
-        if production_settings_module() and not options["force"]:
+        if is_production() and not options["force"]:
             raise CommandError(
                 "Demo logins are seeded with must_change_password=False. "
-                f"Refusing to run under {settings.SETTINGS_MODULE}; pass "
+                "DEBUG is off, so this looks like a real database; pass "
                 "--force if that is really what you want."
             )
+        self.fixed_password = options["password"]
+        self.passwords = {
+            role: self.fixed_password or _generate_password()
+            for role, _label in User.Role.choices
+        }
+        self.kept_logins: set[str] = set()
         per_class = options["students_per_class"]
         if not MIN_STUDENTS_PER_CLASS <= per_class <= MAX_STUDENTS_PER_CLASS:
             raise CommandError(
@@ -401,7 +417,7 @@ class Command(BaseCommand):
                 # belongs to its owner, so it is never reset to a demo one.
                 self.adopted.add(username)
                 return existing
-            return self.apply_demo_login(existing, role)
+            return self.apply_demo_login(existing, role, created=False)
 
         # create_staff_user derives the username from the email prefix, which
         # is what pins these accounts to the names in locustfile.py.
@@ -415,11 +431,20 @@ class Command(BaseCommand):
             send_credentials=False,
             extra_profile=extra_profile,
         )
-        return self.apply_demo_login(user, role)
+        return self.apply_demo_login(user, role, created=True)
 
-    def apply_demo_login(self, user: User, role: str) -> User:
-        """Give a demo account its known password and skip the forced change."""
-        user.set_password(DEMO_PASSWORDS[role])
+    def apply_demo_login(self, user: User, role: str, *, created: bool) -> User:
+        """
+        Set a demo login and skip the forced password change.
+
+        A newly created account gets this run's generated password; one that
+        already existed keeps the password it has, unless ``--password`` asked
+        for a specific one.
+        """
+        if created or self.fixed_password:
+            user.set_password(self.passwords[role])
+        else:
+            self.kept_logins.add(user.username)
         user.must_change_password = False
         user.save(
             update_fields=["password", "must_change_password", "updated_at"]
@@ -676,7 +701,7 @@ class Command(BaseCommand):
             },
         )
         if created:
-            self.apply_demo_login(user, User.Role.PARENT)
+            self.apply_demo_login(user, User.Role.PARENT, created=True)
         return profile
 
     def ensure_student(
@@ -726,7 +751,7 @@ class Command(BaseCommand):
         # The service names students after their admission number; the demo
         # needs the predictable stu_001… form used by locustfile.py.
         user.username = username
-        user.set_password(DEMO_PASSWORDS[User.Role.STUDENT])
+        user.set_password(self.passwords[User.Role.STUDENT])
         user.must_change_password = False
         user.save(
             update_fields=[
@@ -1189,11 +1214,17 @@ class Command(BaseCommand):
             ("par_001", User.Role.PARENT, "Parent of stu_001"),
         ]
         for username, role, label in rows:
-            password = DEMO_PASSWORDS[role]
+            password = self.passwords[role]
             if username in self.adopted:
                 self.stdout.write(
                     f"  {username:<10} {'(existing)':<16} {label} "
                     "- login kept, password unchanged"
+                )
+                continue
+            if username in self.kept_logins and not self.fixed_password:
+                self.stdout.write(
+                    f"  {username:<10} {'(kept)':<16} {label} "
+                    "- password unchanged from the last run"
                 )
                 continue
             self.stdout.write(f"  {username:<10} {password:<16} {label}")
@@ -1201,4 +1232,8 @@ class Command(BaseCommand):
         self.stdout.write(
             f"  Also seeded: stu_001-stu_{len(self.world['students']):03d} and "
             f"par_001-par_{len(self.world['parents']):03d}."
+        )
+        self.stdout.write(
+            "  New passwords are shown here once. Re-running the seed does not "
+            "reset them."
         )

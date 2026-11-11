@@ -97,7 +97,7 @@ class LiveClassSessionTests(TestCase):
         self.teacher_user = User.objects.create_user(
             username="teacher_mth",
             email="mth@school.edu",
-            password="REMOVED-DEMO-PASSWORD",
+            password="test-only",
             role=User.Role.TEACHER,
             must_change_password=False,
         )
@@ -106,7 +106,7 @@ class LiveClassSessionTests(TestCase):
         self.student_user = User.objects.create_user(
             username="student_ama",
             email="ama@student.edu",
-            password="REMOVED-DEMO-PASSWORD",
+            password="test-only",
             role=User.Role.STUDENT,
             must_change_password=False,
         )
@@ -120,7 +120,7 @@ class LiveClassSessionTests(TestCase):
         self.other_student_user = User.objects.create_user(
             username="student_kofi",
             email="kofi@student.edu",
-            password="REMOVED-DEMO-PASSWORD",
+            password="test-only",
             role=User.Role.STUDENT,
             must_change_password=False,
         )

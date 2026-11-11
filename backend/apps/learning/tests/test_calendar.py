@@ -57,14 +57,14 @@ class ClassCalendarTests(TestCase):
         self.teacher_user = User.objects.create_user(
             username="teacher_sci",
             email="sci@school.edu",
-            password="REMOVED-DEMO-PASSWORD",
+            password="test-only",
             role=User.Role.TEACHER,
             must_change_password=False,
         )
         self.student_user = User.objects.create_user(
             username="student_yaw",
             email="yaw@student.edu",
-            password="REMOVED-DEMO-PASSWORD",
+            password="test-only",
             role=User.Role.STUDENT,
             must_change_password=False,
         )
@@ -150,7 +150,7 @@ class ClassCalendarTests(TestCase):
         other_user = User.objects.create_user(
             username="other_stud",
             email="other@student.edu",
-            password="REMOVED-DEMO-PASSWORD",
+            password="test-only",
             role=User.Role.STUDENT,
             must_change_password=False,
         )

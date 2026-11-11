@@ -29,7 +29,6 @@ import datetime as dt
 import logging
 from decimal import Decimal
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -39,7 +38,7 @@ from django.utils import timezone
 from apps.academics import services as academics_services
 from apps.academics.models import AcademicYear, SchoolClass, Term
 from apps.accounts.models import User
-from apps.core.management.commands.seed_demo_data import production_settings_module
+from apps.core.management.commands.seed_demo_data import is_production
 from apps.finance import selectors as finance_selectors
 from apps.finance import services as finance_services
 from apps.finance.models import (
@@ -177,16 +176,16 @@ class Command(BaseCommand):
             "--force",
             action="store_true",
             help=(
-                "Run even under the production settings module. The scenario "
+                "Run even with DEBUG off (a real database). The scenario "
                 "logins use their admission number as the password."
             ),
         )
 
     def handle(self, *args, **options):
-        if production_settings_module() and not options["force"]:
+        if is_production() and not options["force"]:
             raise CommandError(
                 "Scenario pupils are seeded with a known password and no forced "
-                f"change. Refusing to run under {settings.SETTINGS_MODULE}; pass "
+                "change. DEBUG is off, so this looks like a real database; pass "
                 "--force if that is really what you want."
             )
 

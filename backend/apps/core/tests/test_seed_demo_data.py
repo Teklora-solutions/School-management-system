@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import re
 from decimal import Decimal
 
 from django.core.management import call_command
@@ -41,21 +42,27 @@ from apps.teachers.models import TeacherAssignment, TeacherProfile
 
 from ..management.commands.seed_demo_data import (
     CLASSES,
-    DEMO_PASSWORDS,
     GRADE_BANDS,
     SHEET_TARGETS,
     STUDENTS_PER_CLASS,
     SUBJECTS,
     TEACHERS,
-    production_settings_module,
+    is_production,
 )
 
 EXPECTED_STUDENTS = len(CLASSES) * STUDENTS_PER_CLASS
 SEED_STATES = set(SHEET_TARGETS)
+# Passed with --password so the test can log in afterwards. Deliberately
+# fake: nothing outside the test database ever uses it.
+SEED_TEST_PASSWORD = "seed-test-only-password"
 
 
 def run_seed(**options) -> str:
     """Invoke the seeder, returning everything it wrote to stdout."""
+    options.setdefault("password", SEED_TEST_PASSWORD)
+    # The test runner turns DEBUG off, which is exactly the condition the
+    # command refuses to run under; the tests seed a throwaway database.
+    options.setdefault("force", True)
     out = io.StringIO()
     call_command("seed_demo_data", stdout=out, verbosity=1, **options)
     return out.getvalue()
@@ -280,14 +287,14 @@ class SeedDemoDataTests(TestCase):
                 )
                 self.assertTrue(
                     self.client.login(
-                        username=username, password=DEMO_PASSWORDS[role]
+                        username=username, password=SEED_TEST_PASSWORD
                     )
                 )
                 self.client.logout()
 
     def test_summary_prints_the_login_table(self):
         self.assertIn("Demo data ready.", self.output)
-        self.assertIn("REMOVED-DEMO-PASSWORD", self.output)
+        self.assertIn(SEED_TEST_PASSWORD, self.output)
         self.assertIn("stu_001", self.output)
 
     # ─── Safety ──────────────────────────────────────────────────────────
@@ -448,31 +455,26 @@ class SeedDemoDataExistingGradeScaleTests(TestCase):
 
 class SeedDemoDataGuardTests(TestCase):
     """
-    The seeder hands out known passwords, so it must refuse to run somewhere
+    The seeder hands out working passwords, so it must refuse to run somewhere
     that looks like a real deployment or against an account it does not own.
     """
 
-    def test_local_settings_module_is_not_blocked(self):
-        self.assertFalse(production_settings_module())
+    def test_debug_on_is_not_blocked(self):
+        with self.settings(DEBUG=True):
+            self.assertFalse(is_production())
 
-    def test_refuses_to_run_under_prod_settings(self):
-        with (
-            self.settings(SETTINGS_MODULE="config.settings.prod"),
-            self.assertRaises(CommandError),
-        ):
-            run_seed()
+    def test_refuses_to_run_with_debug_off(self):
+        with self.assertRaises(CommandError):
+            call_command("seed_demo_data", stdout=io.StringIO(), verbosity=0)
 
     def test_blocked_run_writes_nothing(self):
         before = _counts()
-        with (
-            self.settings(SETTINGS_MODULE="config.settings.prod"),
-            self.assertRaises(CommandError),
-        ):
-            run_seed()
+        with self.assertRaises(CommandError):
+            call_command("seed_demo_data", stdout=io.StringIO(), verbosity=0)
         self.assertEqual(_counts(), before)
 
-    def test_force_flag_overrides_the_prod_guard(self):
-        with self.settings(SETTINGS_MODULE="config.settings.prod"):
+    def test_force_flag_overrides_the_debug_guard(self):
+        with self.settings(DEBUG=False):
             output = run_seed(force=True, dry_run=True)
         self.assertIn("Dry run complete", output)
 
@@ -486,3 +488,31 @@ class SeedDemoDataGuardTests(TestCase):
         with self.assertRaises(CommandError):
             run_seed()
 
+
+
+class GeneratedPasswordTests(TestCase):
+    """Without --password the seeder invents one, prints it, and it works."""
+
+    def test_the_printed_password_authenticates(self):
+        out = io.StringIO()
+        call_command(
+            "seed_demo_data", password="", stdout=out, verbosity=1, force=True
+        )
+        output = out.getvalue()
+
+        admin_line = next(
+            line for line in output.splitlines() if line.strip().startswith("admin ")
+        )
+        generated = re.search(r"\b([A-Za-z0-9]{16})\b", admin_line)
+        self.assertIsNotNone(generated, admin_line)
+        self.assertTrue(
+            self.client.login(username="admin", password=generated.group(1))
+        )
+
+    def test_a_second_run_keeps_the_generated_password(self):
+        run_seed(password="")
+        second = run_seed(password="")
+        admin_line = next(
+            line for line in second.splitlines() if line.strip().startswith("admin ")
+        )
+        self.assertIn("(kept)", admin_line)

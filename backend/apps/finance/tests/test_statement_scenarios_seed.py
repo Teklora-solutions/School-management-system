@@ -43,6 +43,9 @@ ZERO = Decimal("0.00")
 
 def run_seed(**options) -> str:
     out = io.StringIO()
+    # The test runner turns DEBUG off, which is the condition the command
+    # refuses to run under; this seeds a throwaway database.
+    options.setdefault("force", True)
     call_command("seed_statement_scenarios", stdout=out, **options)
     return out.getvalue()
 
@@ -94,13 +97,13 @@ class SeedStatementScenariosTests(TestCase):
         User.objects.create_user(
             username="seed_admin",
             email="seed_admin@example.test",
-            password="REMOVED-DEMO-PASSWORD",
+            password="test-only",
             role=User.Role.ADMIN,
         )
         User.objects.create_user(
             username="seed_finance",
             email="seed_finance@example.test",
-            password="REMOVED-DEMO-PASSWORD",
+            password="test-only",
             role=User.Role.FINANCE,
         )
 

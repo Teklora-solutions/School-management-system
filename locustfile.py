@@ -24,21 +24,36 @@ Requirements:
 
 from __future__ import annotations
 
+import os
 import random
 
 from locust import HttpUser, between, task
 from locust.exception import StopUser
 
 # ---------------------------------------------------------------------------
-# Credentials — override via environment variables or edit here.
-# These must match accounts created by scripts/seed_demo_data.py
+# Credentials — read from the environment, never stored here.
+#
+# The demo seeder prints a fresh random password for each role once. Put the
+# values it printed into these variables before running the load test:
+#   LOCUST_ADMIN_PASSWORD, LOCUST_STUDENT_PASSWORD, LOCUST_PARENT_PASSWORD,
+#   LOCUST_DIRECTOR_PASSWORD, LOCUST_FINANCE_PASSWORD
+# The defaults below are deliberately unusable so a forgotten export fails
+# loudly instead of logging in with a password from a document.
 # ---------------------------------------------------------------------------
 
-ADMIN_CREDS = {"username": "admin", "password": "REMOVED-DEMO-PASSWORD"}
-STUDENT_CREDS = {"username": "stu_001", "password": "REMOVED-DEMO-PASSWORD"}
-PARENT_CREDS = {"username": "par_001", "password": "REMOVED-DEMO-PASSWORD"}
-DIRECTOR_CREDS = {"username": "director", "password": "REMOVED-DEMO-PASSWORD"}
-FINANCE_CREDS = {"username": "finance", "password": "REMOVED-DEMO-PASSWORD"}
+
+def _creds(prefix: str, username: str) -> dict:
+    return {
+        "username": username,
+        "password": os.environ.get(f"LOCUST_{prefix}_PASSWORD", "set-LOCUST-env-var"),
+    }
+
+
+ADMIN_CREDS = _creds("ADMIN", "admin")
+STUDENT_CREDS = _creds("STUDENT", "stu_001")
+PARENT_CREDS = _creds("PARENT", "par_001")
+DIRECTOR_CREDS = _creds("DIRECTOR", "director")
+FINANCE_CREDS = _creds("FINANCE", "finance")
 
 
 def _login(client, credentials: dict) -> bool:
