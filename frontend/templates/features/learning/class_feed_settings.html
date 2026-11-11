@@ -42,6 +42,21 @@
           </div>
         </div>
       </div>
+      <hr class="my-3">
+      <div class="d-flex align-items-start gap-2 mb-3">
+        <input class="form-check-input mt-1" type="checkbox" id="id_polls_enabled"
+               name="polls_enabled" value="1" {% if feed_settings.polls_enabled %}checked{% endif %}>
+        <div>
+          <label class="form-label mb-0 fw-600" for="id_polls_enabled">
+            Allow polls in this class
+          </label>
+          <div class="text-muted-sm">
+            Teachers can ask one question with 2–6 options. Pupils vote once,
+            may change their vote until the poll closes, and never see who
+            voted. Off by default; the community feed must also be on.
+          </div>
+        </div>
+      </div>
       <button type="submit" class="btn btn-primary btn-sm">Save</button>
     </form>
   </div>

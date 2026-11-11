@@ -468,7 +468,7 @@ class ClassEngagementSettingsView(
 # module switch — no new feature flag needed).
 # ---------------------------------------------------------------------------
 
-from . import feed_selectors, feed_services
+from . import feed_selectors, feed_services, poll_services
 from .models import (
     ClassFeedSettings,
     ClassPost,
@@ -512,6 +512,27 @@ def _posted_link(request, field: str, kind: str):
     else:
         obj = Quiz.objects.filter(pk=pk).select_related("lesson__module").first()
     return obj if obj is not None else _BAD_LINK
+
+
+def _nairobi_datetime(raw: str):
+    """
+    Parse a ``datetime-local`` value as Nairobi time.
+
+    The device may be set to another zone, so the entered wall-clock time is
+    pinned to Africa/Nairobi rather than to the browser's zone.
+    """
+    from zoneinfo import ZoneInfo
+
+    from django.conf import settings
+    from django.utils import timezone as dj_timezone
+    from django.utils.dateparse import parse_datetime
+
+    value = parse_datetime((raw or "").strip())
+    if value is None:
+        return None
+    if dj_timezone.is_naive(value):
+        value = value.replace(tzinfo=ZoneInfo(settings.TIME_ZONE))
+    return value
 
 
 def _feed_link_lessons(school_class):
@@ -583,7 +604,12 @@ class ClassFeedView(_FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, Te
             school_class, request=self.request
         )
         filter_key = self.request.GET.get("filter", "all")
-        post_types = list(ClassPost.PostType.choices)
+        # Polls are created with their own card, never the post box.
+        post_types = [
+            choice
+            for choice in ClassPost.PostType.choices
+            if choice[0] != ClassPost.PostType.POLL
+        ]
         if not community_on:
             # The original notice board offered four types; the two community
             # types must not appear until the class switch is on.
@@ -610,6 +636,7 @@ class ClassFeedView(_FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, Te
                 "is_parent": self.request.user.role == "parent",
                 "feed_filters": feed_selectors.feed_filters_for(self.request.user),
                 "active_filter": filter_key,
+                "polls_on": poll_services.polls_enabled_for(school_class),
             }
         )
 
@@ -823,6 +850,114 @@ class ClassFeedPollView(
         return JsonResponse({"count": count})
 
 
+class ClassFeedPollCreateView(
+    _FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, TemplateView
+):
+    """POST-only: teacher creates a poll post with 2–6 options."""
+
+    allowed_roles = ["admin", "director", "teacher"]
+
+    def post(self, request, *args, **kwargs):
+        from django.shortcuts import redirect
+
+        from .models import ClassPoll
+
+        school_class = self._resolve_class(request, self.kwargs["class_id"])
+
+        raw_close = (request.POST.get("closes_at") or "").strip()
+        closes_at = None
+        if raw_close:
+            closes_at = _nairobi_datetime(raw_close)
+            if closes_at is None:
+                messages.error(request, "That closing time is not valid.")
+                return redirect("learning:class_feed", class_id=school_class.pk)
+
+        options = [
+            request.POST.get(f"option_{index}", "")
+            for index in range(1, poll_services.MAX_OPTIONS + 1)
+        ]
+        try:
+            poll_services.create_poll(
+                author=request.user,
+                school_class=school_class,
+                question=request.POST.get("question", ""),
+                options=options,
+                results_visibility=request.POST.get(
+                    "results_visibility",
+                    ClassPoll.ResultsVisibility.AFTER_CLOSE,
+                ),
+                closes_at=closes_at,
+            )
+            messages.success(request, "Poll added to the class feed.")
+        except (PermissionDenied, ValueError) as exc:
+            messages.error(request, str(exc))
+
+        return redirect("learning:class_feed", class_id=school_class.pk)
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+class ClassFeedPollVoteView(
+    _FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, TemplateView
+):
+    """POST-only: a student votes, or changes a vote before the poll closes."""
+
+    allowed_roles = ["student"]
+
+    def post(self, request, *args, **kwargs):
+        from django.shortcuts import redirect
+        from django.urls import reverse
+
+        from .models import ClassPoll
+
+        school_class = self._resolve_class(request, self.kwargs["class_id"])
+
+        # The view checks class membership too; cast_vote re-checks it.
+        student = getattr(request.user, "student_profile", None)
+        if student is None or student.current_class_id != school_class.pk:
+            messages.error(
+                request, "You can only vote in polls for your own class."
+            )
+            return redirect("learning:class_feed", class_id=school_class.pk)
+
+        poll = get_object_or_404(
+            ClassPoll,
+            post_id=self.kwargs["post_id"],
+            post__school_class=school_class,
+        )
+        try:
+            option_id = int(request.POST.get("option", ""))
+        except (TypeError, ValueError):
+            option_id = None
+
+        try:
+            if option_id is None:
+                raise ValueError("Choose one of the poll options.")
+            poll_services.cast_vote(
+                poll=poll, voter=request.user, option_id=option_id
+            )
+            messages.success(request, "Your vote was saved.")
+        except (PermissionDenied, ValueError) as exc:
+            messages.error(request, str(exc))
+            return redirect(
+                "learning:class_feed", class_id=school_class.pk
+            )
+
+        if request.POST.get("from") == "feed":
+            return redirect(
+                f"{reverse('learning:class_feed', kwargs={'class_id': school_class.pk})}"
+                f"?voted=1#post-{poll.post_id}"
+            )
+        return redirect(
+            f"{reverse('learning:feed_post', kwargs={'class_id': school_class.pk, 'post_id': poll.post_id})}"
+            f"?voted=1#poll-{poll.post_id}"
+        )
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
 class ClassFeedThreadView(
     _FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, TemplateView
 ):
@@ -1009,8 +1144,9 @@ class ClassFeedSettingsView(RoleRequiredMixin, LearningEnabledMixin, TemplateVie
             school_class=school_class, defaults={"is_active": False}
         )
         row.is_active = request.POST.get("is_active") == "1"
+        row.polls_enabled = request.POST.get("polls_enabled") == "1"
         row.full_clean()
-        row.save(update_fields=["is_active", "updated_at"])
+        row.save(update_fields=["is_active", "polls_enabled", "updated_at"])
         messages.success(
             request,
             f"Class community feed switched {'on' if row.is_active else 'off'} "

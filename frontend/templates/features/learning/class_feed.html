@@ -174,6 +174,73 @@
 </div>
 {% endif %}
 
+{# ── Poll composer (teachers, when polls are on for this class) ── #}
+{% if community_on and polls_on and is_teacher %}
+<div class="card mb-4 feed-poll-composer">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-bar-chart-line me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Create a poll
+    </h2>
+  </div>
+  <div class="card-body">
+    <form method="post" action="{% url 'learning:feed_poll_create' school_class.pk %}" novalidate>
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label" for="id_poll_question">Question</label>
+        <textarea class="form-control" id="id_poll_question" name="question"
+                  rows="2" maxlength="2000" required
+                  placeholder="What should the class decide?"></textarea>
+      </div>
+
+      <fieldset class="mb-3">
+        <legend class="form-label">Options <span class="text-muted-sm">(2 to 6)</span></legend>
+        {% for n in "123456" %}
+        <div class="mb-2">
+          <label class="form-label mb-1" for="id_option_{{ n }}">
+            Option {{ n }}{% if n == "1" or n == "2" %} <span class="text-muted-sm">(required)</span>{% endif %}
+          </label>
+          <input type="text" class="form-control" id="id_option_{{ n }}"
+                 name="option_{{ n }}" maxlength="120">
+        </div>
+        {% endfor %}
+      </fieldset>
+
+      <fieldset class="mb-3">
+        <legend class="form-label">When can pupils see the results?</legend>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="radio" name="results_visibility"
+                 id="results_after_close" value="after_close" checked>
+          <label class="form-check-label" for="results_after_close">
+            Only after the poll closes (needs a closing time)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="results_visibility"
+                 id="results_live" value="live">
+          <label class="form-check-label" for="results_live">
+            While pupils are voting
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="mb-3">
+        <label class="form-label" for="id_closes_at">Closing time (Nairobi time, optional)</label>
+        <input type="datetime-local" class="form-control" id="id_closes_at" name="closes_at">
+        <div class="text-muted-sm mt-1">
+          Required when results are shown only after closing. Leave empty for a
+          poll that stays open until you remove it.
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>Add poll
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 {# ── Feed ── #}
 {% if community_on %}
   {% include "features/learning/_feed_community.html" %}
@@ -209,6 +276,7 @@
     font-size: 0.9rem;
     line-height: 1.65;
     overflow-wrap: anywhere;
+    color: var(--color-text);
   }
   .feed-link-btn {
     background: var(--color-surface-2);
@@ -261,6 +329,52 @@
   .feed-skeleton .skeleton-line--short { width: 55%; margin-bottom: 0; }
   @keyframes feedPulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
   .feed-draft-note { color: var(--color-muted); }
+  .feed-poll {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: .75rem;
+    color: var(--color-text);
+  }
+  .feed-poll__badge { background: rgba(6,182,212,0.15); color: #22d3ee; }
+  .feed-poll__state { background: rgba(148,163,184,0.18); color: var(--color-muted); }
+  .feed-poll__options { border: 0; padding: 0; margin: 0 0 .6rem; }
+  .feed-poll__option {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    min-height: 48px;
+    padding: .65rem .8rem;
+    margin-bottom: .45rem;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    cursor: pointer;
+  }
+  .feed-poll__option input { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; }
+  .feed-poll__option--chosen { border-color: var(--accent); background: var(--accent-glow); }
+  .feed-poll__option-text { font-size: .9rem; }
+  .feed-poll__tick { margin-left: auto; font-size: .75rem; color: var(--accent-light); white-space: nowrap; }
+  .feed-poll__submit { min-height: 46px; font-weight: 600; }
+  .feed-poll__voted { font-size: .85rem; color: var(--accent-light); }
+  .feed-poll__results { list-style: none; padding: 0; margin: 0 0 .4rem; }
+  .feed-poll__result { margin-bottom: .55rem; }
+  .feed-poll__result-label { font-size: .85rem; overflow-wrap: anywhere; }
+  .feed-poll__result-count { font-size: .8rem; color: var(--color-muted); white-space: nowrap; }
+  .feed-poll__bar {
+    height: 10px;
+    margin-top: .2rem;
+    border-radius: 99px;
+    background: var(--color-border);
+    overflow: hidden;
+  }
+  .feed-poll__bar span {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+    border-radius: 99px;
+    background: var(--accent);
+  }
 </style>
 {% endblock %}
 

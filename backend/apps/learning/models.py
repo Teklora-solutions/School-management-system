@@ -279,6 +279,13 @@ class ClassFeedSettings(BaseModel):
         default=False,
         help_text="Turn on the class community feed for this class.",
     )
+    polls_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Allow teachers to create polls in this class. Off by default; "
+            "requires the community feed to be on."
+        ),
+    )
 
     class Meta:
         db_table = "learning_class_feed_settings"
@@ -414,6 +421,7 @@ class ClassPost(BaseModel):
         CELEBRATION      = "celebration",      "Celebration"
         CHALLENGE        = "challenge",        "Challenge"
         DISCUSSION_PROMPT = "discussion_prompt", "Discussion prompt"
+        POLL             = "poll",             "Poll"
 
     # Posts accessible to anyone in these roles that is in the same class.
     # ``tip`` is shown to students as "I figured it out"; ``celebration``
@@ -605,6 +613,131 @@ class ClassPostReaction(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.user_id} {self.emoji} on post {self.post_id}"
+
+
+# ---------------------------------------------------------------------------
+# Class polls
+# ---------------------------------------------------------------------------
+
+
+class ClassPoll(BaseModel):
+    """
+    A poll attached to one poll-type ClassPost.
+
+    The question lives on ``post.body``; this row carries the two settings a
+    teacher chooses. Results are not stored: they are counted from votes on
+    every read, so the tally is always current and survives a missed job.
+
+    ``closes_at`` is stored in UTC like every datetime. The class switch
+    ``ClassFeedSettings.polls_enabled`` and the community feed must both be
+    on before a poll can be created or voted on.
+    """
+
+    class ResultsVisibility(models.TextChoices):
+        LIVE = "live", "Show results while voting"
+        AFTER_CLOSE = "after_close", "Show results only after closing"
+
+    post = models.OneToOneField(
+        ClassPost,
+        on_delete=models.CASCADE,
+        related_name="poll",
+    )
+    results_visibility = models.CharField(
+        max_length=12,
+        choices=ResultsVisibility.choices,
+        default=ResultsVisibility.AFTER_CLOSE,
+        help_text=(
+            "Teachers always see the tally. This setting controls whether "
+            "students and parents see it during voting or only after close."
+        ),
+    )
+    closes_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional closing time (stored UTC, entered in Nairobi time). "
+            "Empty means the poll stays open until a teacher removes it."
+        ),
+    )
+
+    class Meta:
+        db_table = "learning_class_poll"
+
+    def __str__(self) -> str:
+        return f"Poll on post {self.post_id}"
+
+    def is_closed(self, now=None) -> bool:
+        from django.utils import timezone
+
+        if self.closes_at is None:
+            return False
+        return (now or timezone.now()) >= self.closes_at
+
+
+class ClassPollOption(BaseModel):
+    """One ordered answer choice. Text is plain text and autoescaped."""
+
+    poll = models.ForeignKey(
+        ClassPoll,
+        on_delete=models.CASCADE,
+        related_name="options",
+    )
+    text = models.CharField(max_length=120)
+    position = models.PositiveSmallIntegerField()
+
+    class Meta:
+        db_table = "learning_class_poll_option"
+        ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["poll", "position"],
+                name="uniq_poll_option_position",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.position}. {self.text}"
+
+
+class ClassPollVote(BaseModel):
+    """
+    One student's vote on one poll.
+
+    The unique constraint on (poll, voter) is the database-level guarantee
+    that a pupil can never cast two votes. Changing a vote before the poll
+    closes updates this row's ``option`` rather than creating a second one.
+    """
+
+    poll = models.ForeignKey(
+        ClassPoll,
+        on_delete=models.CASCADE,
+        related_name="votes",
+    )
+    option = models.ForeignKey(
+        ClassPollOption,
+        on_delete=models.CASCADE,
+        related_name="votes",
+    )
+    voter = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="poll_votes",
+    )
+
+    class Meta:
+        db_table = "learning_class_poll_vote"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["poll", "voter"],
+                name="uniq_poll_vote_per_student",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["poll", "option"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Vote by user {self.voter_id} on poll {self.poll_id}"
 
 
 # ---------------------------------------------------------------------------

@@ -45,7 +45,13 @@ from typing import Optional
 from django.db.models import Count, Exists, OuterRef, Q
 from django.urls import NoReverseMatch, reverse
 
-from .models import ClassFeedSettings, ClassPost, ClassPostReaction, ClassPostReply
+from .models import (
+    ClassFeedSettings,
+    ClassPoll,
+    ClassPost,
+    ClassPostReaction,
+    ClassPostReply,
+)
 
 # Roles that can see the feed at all (teacher also sees removed posts).
 VIEWER_ROLES = {"admin", "director", "teacher", "student", "parent"}
@@ -115,6 +121,7 @@ class PostWithReactions:
     answered: bool = False
     lesson_link: Optional[dict] = None
     quiz_link: Optional[dict] = None
+    poll: object = None
 
     @property
     def is_removed(self) -> bool:
@@ -123,6 +130,10 @@ class PostWithReactions:
     @property
     def is_question(self) -> bool:
         return self.post.post_type == ClassPost.PostType.QUESTION
+
+    @property
+    def is_poll(self) -> bool:
+        return self.post.post_type == ClassPost.PostType.POLL
 
     @property
     def question_state(self) -> str:
@@ -246,6 +257,19 @@ def can_view_feed(user, school_class) -> bool:
             student__current_class=school_class
         ).exists()
     return False
+
+
+def polls_visible_to(viewer, school_class) -> bool:
+    """
+    Poll posts disappear for students and parents when the class polls
+    switch is off. Teachers keep seeing them, like any other removed or
+    switched-off content, so the history is not lost.
+    """
+    if getattr(viewer, "role", "") in MODERATOR_ROLES:
+        return True
+    from .poll_services import polls_enabled_for
+
+    return polls_enabled_for(school_class)
 
 
 def can_reply(user, post, school_class=None) -> bool:
@@ -413,11 +437,17 @@ def _quiz_link(post, viewer) -> Optional[dict]:
 
 
 def _bundle(posts: list, viewer) -> list[PostWithReactions]:
-    """Attach reaction summaries and reply stats to a list of posts."""
+    """Attach reaction summaries, reply stats and poll data to posts."""
     if not posts:
         return []
 
+    from .poll_selectors import build_poll_summary
+
     post_ids = [p.pk for p in posts]
+    polls = {
+        poll.post_id: poll
+        for poll in ClassPoll.objects.filter(post_id__in=post_ids)
+    }
     reactions = list(
         ClassPostReaction.objects.filter(post_id__in=post_ids).values(
             "post_id", "user_id", "emoji"
@@ -448,6 +478,11 @@ def _bundle(posts: list, viewer) -> list[PostWithReactions]:
                 answered=reply_count > 0,
                 lesson_link=_lesson_link(post, viewer),
                 quiz_link=_quiz_link(post, viewer),
+                poll=(
+                    build_poll_summary(polls[post.pk], viewer)
+                    if post.pk in polls
+                    else None
+                ),
             )
         )
     return result
@@ -471,6 +506,8 @@ def feed_for_classroom(*, school_class, viewer) -> list[PostWithReactions]:
     qs = _base_posts_queryset(school_class).order_by("-is_pinned", "-created_at")
     if role not in MODERATOR_ROLES:
         qs = qs.filter(is_removed=False)
+        if not polls_visible_to(viewer, school_class):
+            qs = qs.exclude(post_type=ClassPost.PostType.POLL)
 
     return _bundle(list(qs), viewer)
 
@@ -526,6 +563,8 @@ def feed_page(
     base = _base_posts_queryset(school_class)
     if role not in MODERATOR_ROLES:
         base = base.filter(is_removed=False)
+        if not polls_visible_to(viewer, school_class):
+            base = base.exclude(post_type=ClassPost.PostType.POLL)
 
     pinned = []
     stream_base = _apply_filter(base, filter_key, viewer)
@@ -569,6 +608,12 @@ def post_detail(*, post_id: int, viewer) -> Optional[PostWithReactions]:
 
     # Visibility: removed posts hidden from non-moderators
     if post.is_removed and role not in MODERATOR_ROLES:
+        return None
+    if (
+        post.post_type == ClassPost.PostType.POLL
+        and role not in MODERATOR_ROLES
+        and not polls_visible_to(viewer, post.school_class)
+    ):
         return None
 
     return _bundle([post], viewer)[0]
@@ -619,6 +664,8 @@ def new_posts_count(
     qs = ClassPost.objects.filter(school_class=school_class, id__gt=after_id)
     if role not in MODERATOR_ROLES:
         qs = qs.filter(is_removed=False)
+        if not polls_visible_to(viewer, school_class):
+            qs = qs.exclude(post_type=ClassPost.PostType.POLL)
     return _apply_filter(qs, filter_key, viewer).count()
 
 
@@ -628,6 +675,8 @@ def latest_visible_post_id(*, school_class, viewer) -> int:
     qs = ClassPost.objects.filter(school_class=school_class)
     if role not in MODERATOR_ROLES:
         qs = qs.filter(is_removed=False)
+        if not polls_visible_to(viewer, school_class):
+            qs = qs.exclude(post_type=ClassPost.PostType.POLL)
     return qs.order_by("-id").values_list("id", flat=True).first() or 0
 
 

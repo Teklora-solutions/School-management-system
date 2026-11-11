@@ -71,6 +71,7 @@ POSTER_ROLES = {"admin", "director", "teacher", "student"}
 COMMUNITY_ONLY_TYPES = {
     ClassPost.PostType.CHALLENGE,
     ClassPost.PostType.DISCUSSION_PROMPT,
+    ClassPost.PostType.POLL,
 }
 
 # Student post types that only exist in the community feed.
@@ -228,6 +229,7 @@ def create_post(
     post_type: str = ClassPost.PostType.ANNOUNCEMENT,
     lesson=None,
     quiz=None,
+    allow_poll: bool = False,
 ) -> ClassPost:
     """
     Create a class feed post.
@@ -248,6 +250,10 @@ def create_post(
     valid_types = {choice[0] for choice in ClassPost.PostType.choices}
     if post_type not in valid_types:
         raise ValueError("Unknown post type.")
+    if post_type == ClassPost.PostType.POLL and not allow_poll:
+        raise PermissionDenied(
+            "Polls are created with the poll form, not the post box."
+        )
 
     community_on = community_enabled_for(school_class)
 

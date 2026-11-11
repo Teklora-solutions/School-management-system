@@ -1,0 +1,102 @@
+{% with summary=poll %}
+<section class="feed-poll mt-3" id="poll-{{ post.pk }}" aria-label="Poll{% if post.is_removed %} (removed){% endif %}">
+  <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+    <span class="badge feed-poll__badge">
+      <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>Poll
+    </span>
+    {% if summary.is_closed %}
+    <span class="badge feed-poll__state">
+      <i class="bi bi-lock me-1" aria-hidden="true"></i>Closed
+    </span>
+    {% elif summary.closes_at %}
+    <span class="text-muted-sm">
+      <i class="bi bi-clock me-1" aria-hidden="true"></i>
+      Closes {{ summary.closes_at|date:"d M Y, g:i a" }}
+    </span>
+    {% else %}
+    <span class="text-muted-sm">No closing time</span>
+    {% endif %}
+  </div>
+
+  {% if summary.can_vote %}
+  <form method="post"
+        action="{% url 'learning:feed_poll_vote' school_class.pk post.pk %}"
+        class="feed-poll__form">
+    {% csrf_token %}
+    <input type="hidden" name="from" value="{{ poll_from_page|default:'thread' }}">
+    {% if summary.has_voted %}
+    <p class="feed-poll__voted mb-2">
+      <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>
+      You voted: <strong>{{ summary.viewer_option_text }}</strong>.
+      You can change it until the poll closes.
+    </p>
+    {% endif %}
+    <fieldset class="feed-poll__options">
+      <legend class="visually-hidden">Choose one option</legend>
+      {% for option in summary.options %}
+      <label class="feed-poll__option{% if option.chosen %} feed-poll__option--chosen{% endif %}">
+        <input type="radio" name="option" value="{{ option.id }}"
+               {% if option.chosen %}checked{% endif %} required>
+        <span class="feed-poll__option-text">{{ option.text }}</span>
+        {% if option.chosen %}
+        <span class="feed-poll__tick"><i class="bi bi-check2" aria-hidden="true"></i> You voted</span>
+        {% endif %}
+      </label>
+      {% endfor %}
+    </fieldset>
+    <button type="submit" class="btn btn-primary w-100 feed-poll__submit">
+      {% if summary.has_voted %}Change my vote{% else %}Vote{% endif %}
+    </button>
+  </form>
+
+  {% elif summary.has_voted %}
+  <p class="feed-poll__voted mb-2">
+    <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>
+    You voted: <strong>{{ summary.viewer_option_text }}</strong>.
+  </p>
+  {% elif summary.is_closed %}
+  <p class="text-muted-sm mb-2">
+    <i class="bi bi-lock me-1" aria-hidden="true"></i>Voting has closed.
+  </p>
+  {% elif summary.viewer_is_parent %}
+  <p class="text-muted-sm mb-2">
+    <i class="bi bi-eye me-1" aria-hidden="true"></i>
+    Parents can see the poll and its results but cannot vote.
+  </p>
+  {% endif %}
+
+  {% if summary.show_results %}
+  <ul class="feed-poll__results" aria-label="Poll results">
+    {% for option in summary.options %}
+    <li class="feed-poll__result">
+      <div class="d-flex justify-content-between align-items-baseline gap-2">
+        <span class="feed-poll__result-label">
+          {{ option.text }}{% if option.chosen %} <span class="text-muted-sm">(your vote)</span>{% endif %}
+        </span>
+        <span class="feed-poll__result-count">{{ option.count }} · {{ option.percent }}%</span>
+      </div>
+      <div class="feed-poll__bar"
+           role="img"
+           aria-label="{{ option.text }}: {{ option.count }} vote{{ option.count|pluralize }}, {{ option.percent }} percent">
+        <span style="width: {{ option.percent }}%;"></span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="text-muted-sm mb-0">
+    {{ summary.total_votes }} {{ summary.vote_label }}
+    {% if summary.viewer_is_teacher %}
+    · {{ summary.turnout }} pupil{{ summary.turnout|pluralize }} in the class
+    {% endif %}
+    {% if summary.viewer_is_teacher and not summary.is_closed and summary.results_visibility == "after_close" %}
+    · Pupils see the tally only after the poll closes
+    {% endif %}
+  </p>
+  {% elif not summary.is_closed %}
+  <p class="text-muted-sm mb-0">
+    <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
+    Results will appear once the poll closes.
+  </p>
+  {% endif %}
+</section>
+{% endwith %}

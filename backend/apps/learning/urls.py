@@ -66,6 +66,11 @@ urlpatterns = [
         name="feed_poll",
     ),
     path(
+        "class/<int:class_id>/feed/polls/new/",
+        views.ClassFeedPollCreateView.as_view(),
+        name="feed_poll_create",
+    ),
+    path(
         "class/<int:class_id>/feed/settings/",
         views.ClassFeedSettingsView.as_view(),
         name="feed_settings",
@@ -79,6 +84,11 @@ urlpatterns = [
         "class/<int:class_id>/feed/post/<int:post_id>/reply/",
         views.ClassFeedReplyCreateView.as_view(),
         name="feed_reply_create",
+    ),
+    path(
+        "class/<int:class_id>/feed/post/<int:post_id>/vote/",
+        views.ClassFeedPollVoteView.as_view(),
+        name="feed_poll_vote",
     ),
     path(
         "class/<int:class_id>/feed/reply/<int:reply_id>/action/",

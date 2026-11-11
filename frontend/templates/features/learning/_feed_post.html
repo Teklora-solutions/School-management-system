@@ -54,6 +54,10 @@
   <div class="card-body {% if post.is_removed %}opacity-50{% endif %}">
     <p class="mb-0 feed-post__body">{{ post.body }}</p>
 
+    {% if item.poll %}
+    {% include "features/learning/_feed_poll.html" with poll=item.poll post=post school_class=school_class poll_from_page=poll_from_page %}
+    {% endif %}
+
     {% if item.lesson_link or item.quiz_link %}
     <div class="d-flex flex-wrap gap-2 mt-3">
       {% if item.lesson_link %}

@@ -30,7 +30,7 @@
     </div>
     <div class="d-flex flex-column gap-3">
       {% for item in pinned_posts %}
-      {% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent %}
+      {% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent poll_from_page="feed" %}
       {% endfor %}
     </div>
   </section>
@@ -64,7 +64,7 @@
     </div>
     {% else %}
     {% for item in posts %}
-    {% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent %}
+    {% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent poll_from_page="feed" %}
     {% endfor %}
     {% endif %}
   </div>
