@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="{% block meta_description %}{{ identity.motto|default:identity.name }} — {{ identity.name }}{% endblock %}">
-  <title>{% block title %}{{ identity.name }}{% endblock %} | {{ identity.name|default:"Springfield Academy" }}</title>
+  <title>{% block title %}{{ identity.name|default:"Springfield Academy" }}{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">
@@ -311,7 +311,7 @@
     requestAnimationFrame(step);
   }
   if('IntersectionObserver' in window){
-    var counters = document.querySelectorAll('.pub-stat__num[data-count]');
+    var counters = document.querySelectorAll('[data-count]');
     var co = new IntersectionObserver(function(entries){
       entries.forEach(function(e){ if(e.isIntersecting){ animateCounter(e.target); co.unobserve(e.target); } });
     }, {threshold:0.5});

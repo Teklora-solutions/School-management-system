@@ -68,30 +68,6 @@
   </div>
 </header>
 
-<!-- STATS -->
-<div class="pub-section--tight pub-section--alt">
-  <div class="pub-container">
-    <div class="pub-stats" data-reveal>
-      <div class="pub-stats__item">
-        <div class="pub-stat__num" {% if facts.pupils %}data-count="{{ facts.pupils }}"{% endif %}>{{ facts.pupils|default:"—" }}</div>
-        <div class="pub-stats__label">Students</div>
-      </div>
-      <div class="pub-stats__item">
-        <div class="pub-stat__num" {% if facts.teachers %}data-count="{{ facts.teachers }}"{% endif %}>{{ facts.teachers|default:"—" }}</div>
-        <div class="pub-stats__label">Teachers</div>
-      </div>
-      <div class="pub-stats__item">
-        <div class="pub-stat__num" {% if identity.years_running %}data-count="{{ identity.years_running }}" data-suffix="+"{% endif %}>{% if identity.years_running %}{{ identity.years_running }}+{% else %}—{% endif %}</div>
-        <div class="pub-stats__label">Years of Excellence</div>
-      </div>
-      <div class="pub-stats__item">
-        <div class="pub-stat__num" {% if facts.classes %}data-count="{{ facts.classes }}"{% endif %}>{{ facts.classes|default:"—" }}</div>
-        <div class="pub-stats__label">Classes This Year</div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- WHY CHOOSE US -->
 <section class="pub-section">
   <div class="pub-container">
@@ -151,32 +127,32 @@
 <section class="ach-section">
   <div class="pub-container pub-achievements__content">
     <div class="pub-section-head pub-achievements__heading" data-reveal>
-      <p class="pub-eyebrow ach-eyebrow">Our Track Record</p>
-      <h2 class="ach-heading">Results That Speak for Themselves</h2>
-      <p class="ach-sub">{% if identity.years_running %}{{ identity.years_running }}{% else %}Forty{% endif %} years of nurturing young people.</p>
+      <p class="pub-eyebrow ach-eyebrow">At a Glance</p>
+      <h2 class="ach-heading">The School in Numbers</h2>
+      <p class="ach-sub">{% if identity.established_year %}Educating young people since {{ identity.established_year }}.{% else %}A school community, in the figures the school has entered.{% endif %}</p>
     </div>
     <div class="ach-grid">
       <div class="ach-card" data-reveal>
         <span class="ach-card__icon"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
-        <div class="ach-card__num" {% if facts.pupils %}data-count="{{ facts.pupils }}"{% endif %}>{{ facts.pupils|default:"1,200" }}</div>
+        <div class="ach-card__num" {% if facts.pupils %}data-count="{{ facts.pupils }}"{% endif %}>{{ facts.pupils|default:"—" }}</div>
         <div class="ach-card__label">Students Enrolled</div>
         <div class="ach-card__desc">Across Early Years, Primary &amp; Secondary</div>
       </div>
       <div class="ach-card" data-reveal>
-        <span class="ach-card__icon"><i class="bi bi-trophy" aria-hidden="true"></i></span>
-        <div class="ach-card__num" data-count="98" data-suffix="%">98%</div>
-        <div class="ach-card__label">Pass Rate</div>
-        <div class="ach-card__desc">Consistent results year after year</div>
+        <span class="ach-card__icon"><i class="bi bi-journal-bookmark" aria-hidden="true"></i></span>
+        <div class="ach-card__num" {% if facts.subjects %}data-count="{{ facts.subjects }}"{% endif %}>{{ facts.subjects|default:"—" }}</div>
+        <div class="ach-card__label">Subjects Offered</div>
+        <div class="ach-card__desc">In the current academic year</div>
       </div>
       <div class="ach-card" data-reveal>
         <span class="ach-card__icon"><i class="bi bi-pencil-square" aria-hidden="true"></i></span>
-        <div class="ach-card__num" {% if facts.teachers %}data-count="{{ facts.teachers }}"{% endif %}>{{ facts.teachers|default:"85" }}</div>
+        <div class="ach-card__num" {% if facts.teachers %}data-count="{{ facts.teachers }}"{% endif %}>{{ facts.teachers|default:"—" }}</div>
         <div class="ach-card__label">Qualified Teachers</div>
-        <div class="ach-card__desc">Average 12 years experience</div>
+        <div class="ach-card__desc">Teaching across every year group</div>
       </div>
       <div class="ach-card" data-reveal>
         <span class="ach-card__icon"><i class="bi bi-star" aria-hidden="true"></i></span>
-        <div class="ach-card__num" {% if identity.years_running %}data-count="{{ identity.years_running }}" data-suffix="+"{% endif %}>{% if identity.years_running %}{{ identity.years_running }}+{% else %}40+{% endif %}</div>
+        <div class="ach-card__num" {% if identity.years_running %}data-count="{{ identity.years_running }}" data-suffix="+"{% endif %}>{% if identity.years_running %}{{ identity.years_running }}+{% else %}—{% endif %}</div>
         <div class="ach-card__label">Years of Excellence</div>
         <div class="ach-card__desc">{% if identity.established_year %}Trusted by families since {{ identity.established_year }}{% else %}A trusted learning community{% endif %}</div>
       </div>
