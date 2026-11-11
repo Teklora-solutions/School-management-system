@@ -469,7 +469,12 @@ class ClassEngagementSettingsView(
 # ---------------------------------------------------------------------------
 
 from . import feed_selectors, feed_services
-from .models import ClassPost, ClassPostReaction
+from .models import (
+    ClassFeedSettings,
+    ClassPost,
+    ClassPostReaction,
+    ClassPostReply,
+)
 
 
 class _FeedClassMixin:
@@ -488,11 +493,84 @@ class _FeedClassMixin:
         return school_class
 
 
+_BAD_LINK = object()
+
+
+def _posted_link(request, field: str, kind: str):
+    """Resolve an optional lesson/quiz id from the composer, or a sentinel."""
+    raw = (request.POST.get(field) or "").strip()
+    if not raw:
+        return None
+    from .models import Lesson, Quiz
+
+    try:
+        pk = int(raw)
+    except (TypeError, ValueError):
+        return _BAD_LINK
+    if kind == "Lesson":
+        obj = Lesson.objects.filter(pk=pk).select_related("module").first()
+    else:
+        obj = Quiz.objects.filter(pk=pk).select_related("lesson__module").first()
+    return obj if obj is not None else _BAD_LINK
+
+
+def _feed_link_lessons(school_class):
+    from .models import Lesson
+
+    return list(
+        Lesson.objects.filter(
+            module__school_class=school_class,
+            module__is_published=True,
+            is_published=True,
+        )
+        .select_related("module__subject")
+        .order_by("title")[:200]
+    )
+
+
+def _feed_link_quizzes(school_class):
+    from .models import Quiz
+
+    return list(
+        Quiz.objects.filter(
+            lesson__module__school_class=school_class,
+            is_published=True,
+        )
+        .select_related("lesson__module__subject")
+        .order_by("title")[:200]
+    )
+
+
+class FeedHomeView(RoleRequiredMixin, LearningEnabledMixin, TemplateView):
+    """
+    "Class Feed" menu entry: go straight to the feed.
+
+    One class whose feed this user may open → straight there. Several → a
+    short chooser. None → an honest empty state, not a dead menu link.
+    """
+
+    allowed_roles = ["admin", "director", "teacher", "student", "parent"]
+    template_name = "features/learning/feed_home.html"
+
+    def get(self, request, *args, **kwargs):
+        from django.shortcuts import redirect
+
+        classes = feed_selectors.classrooms_for_feed(request.user)
+        if len(classes) == 1:
+            return redirect("learning:class_feed", class_id=classes[0].pk)
+        self.classes = classes
+        return self.render_to_response({"classes": classes})
+
+
 class ClassFeedView(_FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, TemplateView):
     """
     Main class feed page.  Shows all posts for a class.
     Teachers see removed posts (greyed-out). Students and parents do not.
     Contains the new-post form inline (POST handled here too).
+
+    When the community feed is switched on for this class the page renders
+    the new experience (filters, replies status, Show more); when it is off
+    the original notice board renders exactly as before.
     """
 
     allowed_roles = ["admin", "director", "teacher", "student", "parent"]
@@ -501,38 +579,80 @@ class ClassFeedView(_FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, Te
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         school_class = self._resolve_class(self.request, self.kwargs["class_id"])
-        posts = feed_selectors.feed_for_classroom(
-            school_class=school_class, viewer=self.request.user
+        community_on = feed_selectors.community_enabled_for(
+            school_class, request=self.request
         )
+        filter_key = self.request.GET.get("filter", "all")
+        post_types = list(ClassPost.PostType.choices)
+        if not community_on:
+            # The original notice board offered four types; the two community
+            # types must not appear until the class switch is on.
+            legacy_types = {
+                ClassPost.PostType.ANNOUNCEMENT,
+                ClassPost.PostType.QUESTION,
+                ClassPost.PostType.TIP,
+                ClassPost.PostType.CELEBRATION,
+            }
+            post_types = [(v, label) for v, label in post_types if v in legacy_types]
+
         ctx.update(
             {
                 "school_class": school_class,
-                "posts": posts,
+                "community_on": community_on,
                 "can_post": feed_selectors.can_post(self.request.user, school_class),
+                "can_manage_feed": self.request.user.role
+                in ("teacher", "admin", "director"),
                 "is_moderator": feed_selectors.is_moderator(self.request.user),
-                "post_types": ClassPost.PostType.choices,
+                "post_types": post_types,
                 "student_allowed_types": list(ClassPost.STUDENT_ALLOWED_TYPES),
                 "emoji_choices": ClassPostReaction.Emoji.choices,
                 "is_teacher": self.request.user.role in ("teacher", "admin", "director"),
                 "is_parent": self.request.user.role == "parent",
+                "feed_filters": feed_selectors.feed_filters_for(self.request.user),
+                "active_filter": filter_key,
             }
         )
+
+        if community_on:
+            page = feed_selectors.feed_page(
+                school_class=school_class,
+                viewer=self.request.user,
+                filter_key=filter_key,
+            )
+            ctx.update(
+                {
+                    "posts": page.posts,
+                    "pinned_posts": page.pinned,
+                    "has_more": page.has_more,
+                    "next_before_id": page.next_before_id,
+                    "latest_visible_id": page.latest_visible_id,
+                    "link_lessons": _feed_link_lessons(school_class),
+                    "link_quizzes": _feed_link_quizzes(school_class),
+                }
+            )
+        else:
+            ctx["posts"] = feed_selectors.feed_for_classroom(
+                school_class=school_class, viewer=self.request.user
+            )
         return ctx
 
     def post(self, request, *args, **kwargs):
         from django.shortcuts import redirect
+        from django.urls import reverse
+
         school_class = self._resolve_class(request, self.kwargs["class_id"])
 
         body = request.POST.get("body", "").strip()
         post_type = request.POST.get("post_type", ClassPost.PostType.ANNOUNCEMENT)
+        lesson = _posted_link(request, "lesson_id", "Lesson")
+        quiz = _posted_link(request, "quiz_id", "Quiz")
+        if lesson is _BAD_LINK or quiz is _BAD_LINK:
+            messages.error(request, "That linked item was not found.")
+            return redirect("learning:class_feed", class_id=school_class.pk)
 
         if not body:
             messages.error(request, "Post body cannot be empty.")
             return redirect("learning:class_feed", class_id=school_class.pk)
-
-        # Coerce student to QUESTION regardless of what was submitted
-        if request.user.role == "student":
-            post_type = ClassPost.PostType.QUESTION
 
         try:
             feed_services.create_post(
@@ -540,8 +660,14 @@ class ClassFeedView(_FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, Te
                 school_class=school_class,
                 body=body,
                 post_type=post_type,
+                lesson=lesson,
+                quiz=quiz,
             )
             messages.success(request, "Your post has been added to the class feed.")
+            return redirect(
+                reverse("learning:class_feed", kwargs={"class_id": school_class.pk})
+                + "?posted=1"
+            )
         except PermissionDenied as exc:
             messages.error(request, str(exc))
         except ValueError as exc:
@@ -580,11 +706,18 @@ class ClassFeedPostActionView(
 
         try:
             if action == "remove":
-                feed_services.remove_post(post=post, removed_by=request.user)
+                feed_services.remove_post(
+                    post=post,
+                    removed_by=request.user,
+                    reason=request.POST.get("reason", "").strip(),
+                    request=request,
+                )
                 messages.success(request, "Post removed.")
 
             elif action == "restore":
-                feed_services.restore_post(post=post, restored_by=request.user)
+                feed_services.restore_post(
+                    post=post, restored_by=request.user, request=request
+                )
                 messages.success(request, "Post restored.")
 
             elif action == "pin":
@@ -619,6 +752,264 @@ class ClassFeedPostActionView(
 
     def get(self, request, *args, **kwargs):
         raise Http404
+
+
+class ClassFeedItemsView(
+    _FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, TemplateView
+):
+    """HTML fragment for "Show more" and for filter switches."""
+
+    allowed_roles = ["admin", "director", "teacher", "student", "parent"]
+    template_name = "features/learning/_feed_items.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        school_class = self._resolve_class(self.request, self.kwargs["class_id"])
+        if not feed_selectors.community_enabled_for(
+            school_class, request=self.request
+        ):
+            raise Http404
+        before_raw = self.request.GET.get("before_id")
+        try:
+            before_id = int(before_raw) if before_raw else None
+        except (TypeError, ValueError):
+            before_id = None
+        page = feed_selectors.feed_page(
+            school_class=school_class,
+            viewer=self.request.user,
+            filter_key=self.request.GET.get("filter", "all"),
+            before_id=before_id,
+        )
+        ctx.update(
+            {
+                "school_class": school_class,
+                "posts": page.posts,
+                "has_more": page.has_more,
+                "next_before_id": page.next_before_id,
+                "emoji_choices": ClassPostReaction.Emoji.choices,
+                "is_moderator": feed_selectors.is_moderator(self.request.user),
+                "is_parent": self.request.user.role == "parent",
+            }
+        )
+        return ctx
+
+    def get(self, request, *args, **kwargs):
+        return self.render_to_response(self.get_context_data())
+
+
+class ClassFeedPollView(
+    _FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, TemplateView
+):
+    """Very cheap JSON poll: how many visible posts are newer than *after*."""
+
+    allowed_roles = ["admin", "director", "teacher", "student", "parent"]
+
+    def get(self, request, *args, **kwargs):
+        school_class = self._resolve_class(request, self.kwargs["class_id"])
+        if not feed_selectors.community_enabled_for(
+            school_class, request=request
+        ):
+            return JsonResponse({"count": 0})
+        try:
+            after_id = int(request.GET.get("after", 0) or 0)
+        except (TypeError, ValueError):
+            after_id = 0
+        count = feed_selectors.new_posts_count(
+            school_class=school_class,
+            viewer=request.user,
+            after_id=after_id,
+            filter_key=request.GET.get("filter", "all"),
+        )
+        return JsonResponse({"count": count})
+
+
+class ClassFeedThreadView(
+    _FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, TemplateView
+):
+    """One post and its replies — the only place a reply can be written."""
+
+    allowed_roles = ["admin", "director", "teacher", "student", "parent"]
+    template_name = "features/learning/class_feed_thread.html"
+
+    def get(self, request, *args, **kwargs):
+        from django.shortcuts import redirect
+
+        school_class = self._resolve_class(request, self.kwargs["class_id"])
+        if not feed_selectors.community_enabled_for(
+            school_class, request=request
+        ):
+            return redirect("learning:class_feed", class_id=school_class.pk)
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        school_class = self._resolve_class(self.request, self.kwargs["class_id"])
+        thread = feed_selectors.post_thread(
+            post_id=self.kwargs["post_id"], viewer=self.request.user
+        )
+        if thread is None:
+            raise Http404
+        ctx.update(
+            {
+                "school_class": school_class,
+                "thread": thread,
+                "community_on": True,
+                "is_moderator": feed_selectors.is_moderator(self.request.user),
+                "is_parent": self.request.user.role == "parent",
+                "emoji_choices": ClassPostReaction.Emoji.choices,
+                "replied": self.request.GET.get("replied") == "1",
+            }
+        )
+        return ctx
+
+
+class ClassFeedReplyCreateView(
+    _FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, TemplateView
+):
+    """POST-only: add a reply under one post."""
+
+    allowed_roles = ["admin", "director", "teacher", "student", "parent"]
+
+    def post(self, request, *args, **kwargs):
+        from django.shortcuts import redirect
+        from django.urls import reverse
+
+        school_class = self._resolve_class(request, self.kwargs["class_id"])
+        post = get_object_or_404(
+            ClassPost, pk=self.kwargs["post_id"], school_class=school_class
+        )
+        try:
+            feed_services.create_reply(
+                post=post,
+                author=request.user,
+                body=request.POST.get("body", ""),
+            )
+            messages.success(request, "Your reply was added.")
+            target = reverse(
+                "learning:feed_post",
+                kwargs={
+                    "class_id": school_class.pk,
+                    "post_id": post.pk,
+                },
+            )
+            return redirect(target + "?replied=1#replies")
+        except (PermissionDenied, ValueError) as exc:
+            messages.error(request, str(exc))
+
+        return redirect(
+            "learning:feed_post",
+            class_id=school_class.pk,
+            post_id=post.pk,
+        )
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+class ClassFeedReplyActionView(
+    _FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, TemplateView
+):
+    """POST-only: best answer or reply removal (teacher)."""
+
+    allowed_roles = ["admin", "director", "teacher", "student", "parent"]
+
+    def post(self, request, *args, **kwargs):
+        from django.shortcuts import redirect
+
+        school_class = self._resolve_class(request, self.kwargs["class_id"])
+        reply = get_object_or_404(
+            ClassPostReply,
+            pk=self.kwargs["reply_id"],
+            post__school_class=school_class,
+        )
+        action = request.POST.get("action", "")
+
+        try:
+            if action == "best":
+                feed_services.mark_best_answer(reply=reply, actor=request.user)
+                messages.success(request, "Best answer saved.")
+            elif action == "remove":
+                feed_services.remove_reply(
+                    reply=reply,
+                    removed_by=request.user,
+                    reason=request.POST.get("reason", "").strip(),
+                    request=request,
+                )
+                messages.success(request, "Reply removed.")
+            else:
+                messages.error(request, "Unknown action.")
+        except (PermissionDenied, ValueError) as exc:
+            messages.error(request, str(exc))
+
+        return redirect(
+            "learning:feed_post",
+            class_id=school_class.pk,
+            post_id=reply.post_id,
+        )
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+class ClassFeedSettingsView(RoleRequiredMixin, LearningEnabledMixin, TemplateView):
+    """
+    Per-class feed switch for teachers and above.
+
+    Off by default. The page also says plainly when points are off for this
+    class, so a teacher is not left wondering why questions earn nothing.
+    """
+
+    allowed_roles = ["admin", "director", "teacher"]
+    template_name = "features/learning/class_feed_settings.html"
+
+    def _get_class(self, request):
+        from apps.academics.models import SchoolClass
+
+        school_class = get_object_or_404(SchoolClass, pk=self.kwargs["class_id"])
+        if not feed_selectors.can_view_feed(request.user, school_class):
+            raise Http404
+        return school_class
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        school_class = self._get_class(self.request)
+        row, _ = ClassFeedSettings.objects.get_or_create(
+            school_class=school_class, defaults={"is_active": False}
+        )
+        school_switch_on = feature_enabled("feed_community", request=self.request)
+        engagement_school_on = feature_enabled(
+            "engagement", request=self.request
+        )
+        try:
+            engagement_class_on = school_class.engagement_settings.is_active
+        except ClassEngagementSettings.DoesNotExist:
+            engagement_class_on = False
+        ctx.update(
+            {
+                "school_class": school_class,
+                "feed_settings": row,
+                "school_switch_on": school_switch_on,
+                "points_on": engagement_school_on and engagement_class_on,
+            }
+        )
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        from django.shortcuts import redirect
+
+        school_class = self._get_class(request)
+        row, _ = ClassFeedSettings.objects.get_or_create(
+            school_class=school_class, defaults={"is_active": False}
+        )
+        row.is_active = request.POST.get("is_active") == "1"
+        row.full_clean()
+        row.save(update_fields=["is_active", "updated_at"])
+        messages.success(
+            request,
+            f"Class community feed switched {'on' if row.is_active else 'off'} "
+            f"for {school_class.name}.",
+        )
+        return redirect("learning:feed_settings", class_id=school_class.pk)
 
 
 # ---------------------------------------------------------------------------

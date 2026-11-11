@@ -44,6 +44,14 @@ FEATURES: dict[str, dict[str, str]] = {
         "field": "live_classes_enabled",
         "disabled_message": "Available once the Live Classes module is activated.",
     },
+    "feed_community": {
+        "label": "Class community feed",
+        "field": "feed_community_enabled",
+        "disabled_message": (
+            "Available once the class community feed is activated for the school. "
+            "Each teacher also switches it on for their own class."
+        ),
+    },
 }
 
 

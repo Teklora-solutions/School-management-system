@@ -1,0 +1,6 @@
+{% for item in posts %}
+{% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent %}
+{% endfor %}
+<div data-feed-page
+     data-has-more="{% if has_more %}1{% else %}0{% endif %}"
+     data-next-before-id="{{ next_before_id|default:'' }}"></div>

@@ -329,7 +329,7 @@ NAVIGATION: dict[str, list[dict]] = {
         {
             "label": "Class Feed",
             "icon": "bi-megaphone",
-            "url_name": "learning:teacher_classrooms",
+            "url_name": "learning:feed_home",
             "feature": "learning",
         },
         {
@@ -381,7 +381,7 @@ NAVIGATION: dict[str, list[dict]] = {
         {
             "label": "Class Feed",
             "icon": "bi-megaphone",
-            "url_name": "learning:classrooms",
+            "url_name": "learning:feed_home",
             "feature": "learning",
         },
         {
@@ -544,7 +544,7 @@ NAVIGATION: dict[str, list[dict]] = {
         {
             "label": "Class Feed",
             "icon": "bi-megaphone",
-            "url_name": "learning:classrooms",
+            "url_name": "learning:feed_home",
             "feature": "learning",
         },
         {

@@ -1,0 +1,178 @@
+{% with post=item.post reactions=item.reactions %}
+<article class="card feed-post {% if post.is_pinned %}feed-post--pinned{% endif %} {% if post.is_removed %}feed-post--removed{% endif %}"
+         id="post-{{ post.pk }}"
+         aria-label="Post by {% if post.author %}{{ post.author.get_full_name }}{% else %}Unknown{% endif %}">
+
+  {# ── Post header ── #}
+  <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+
+    <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
+         style="width:32px;height:32px;font-size:0.75rem;">
+      {% if post.author %}{{ post.author.first_name|first|upper }}{{ post.author.last_name|first|upper }}
+      {% else %}??{% endif %}
+    </div>
+
+    <div class="flex-grow-1 min-w-0">
+      <div class="fw-600" style="font-size:0.875rem;">
+        {% if post.author %}{{ post.author.get_full_name }}{% else %}Deleted user{% endif %}
+        {% if post.author %}
+        <span class="badge-role badge-role-{{ post.author.role }} ms-1"
+              style="font-size:0.65rem;vertical-align:middle;">
+          {{ post.author.get_role_display }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="text-muted-sm" style="font-size:0.775rem;">
+        {{ post.created_at|date:"d M Y, g:i a" }}
+        {% if post.is_pinned %}
+        · <i class="bi bi-pin-fill" style="color:var(--color-warning);" aria-label="Pinned"></i> Pinned
+        {% endif %}
+        {% if post.is_removed %}
+        · <span style="color:var(--color-danger);">Removed by {{ post.removed_by.get_full_name }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <span class="badge ms-auto"
+          style="{% if post.post_type == 'announcement' %}background:rgba(14,165,233,0.15);color:#38bdf8;
+                 {% elif post.post_type == 'question' %}background:rgba(245,158,11,0.15);color:#fbbf24;
+                 {% elif post.post_type == 'tip' %}background:rgba(16,185,129,0.15);color:#34d399;
+                 {% elif post.post_type == 'challenge' %}background:rgba(139,92,246,0.15);color:#a78bfa;
+                 {% elif post.post_type == 'discussion_prompt' %}background:rgba(6,182,212,0.15);color:#22d3ee;
+                 {% else %}background:rgba(236,72,153,0.15);color:#f472b6;{% endif %}">
+      {% if post.post_type == "announcement" %}<i class="bi bi-megaphone me-1" aria-hidden="true"></i>{% endif %}
+      {% if post.post_type == "question" %}<i class="bi bi-question-circle me-1" aria-hidden="true"></i>{% endif %}
+      {% if post.post_type == "tip" %}<i class="bi bi-lightbulb me-1" aria-hidden="true"></i>{% endif %}
+      {% if post.post_type == "celebration" %}<i class="bi bi-stars me-1" aria-hidden="true"></i>{% endif %}
+      {% if post.post_type == "challenge" %}<i class="bi bi-flag me-1" aria-hidden="true"></i>{% endif %}
+      {% if post.post_type == "discussion_prompt" %}<i class="bi bi-chat-dots me-1" aria-hidden="true"></i>{% endif %}
+      {{ post.get_post_type_display }}
+    </span>
+  </div>
+
+  {# ── Body ── #}
+  <div class="card-body {% if post.is_removed %}opacity-50{% endif %}">
+    <p class="mb-0 feed-post__body">{{ post.body }}</p>
+
+    {% if item.lesson_link or item.quiz_link %}
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      {% if item.lesson_link %}
+      <a class="btn btn-sm feed-link-btn" href="{{ item.lesson_link.url }}">
+        <i class="bi bi-journal-text me-1" aria-hidden="true"></i>{{ item.lesson_link.label }}
+      </a>
+      {% endif %}
+      {% if item.quiz_link %}
+      <a class="btn btn-sm feed-link-btn" href="{{ item.quiz_link.url }}">
+        <i class="bi bi-patch-question me-1" aria-hidden="true"></i>{{ item.quiz_link.label }}
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if item.is_question %}
+    <div class="mt-3 d-flex align-items-center gap-2 flex-wrap">
+      {% if item.question_state == "answered" %}
+      <span class="badge feed-status feed-status--answered">
+        <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Answered
+      </span>
+      {% else %}
+      <span class="badge feed-status feed-status--waiting">
+        <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Waiting for an answer
+      </span>
+      {% endif %}
+      {% if item.has_best_answer %}
+      <span class="badge feed-status feed-status--best">
+        <i class="bi bi-star-fill me-1" aria-hidden="true"></i>Best answer chosen
+      </span>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── Reactions + moderation footer ── #}
+  <div class="card-body pt-0 d-flex align-items-center justify-content-between flex-wrap gap-2"
+       style="border-top:1px solid var(--color-border);">
+
+    <div class="d-flex flex-wrap gap-1 align-items-center" role="group" aria-label="Reactions">
+      {% for row in reactions.rows %}
+      <form method="post"
+            action="{% url 'learning:feed_post_action' school_class.pk post.pk %}"
+            class="d-inline reaction-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="{{ row.emoji }}">
+        <button type="submit"
+                class="btn btn-sm reaction-btn {% if row.active %}reaction-btn--active{% endif %}"
+                style="background:{% if row.active %}var(--accent-glow){% else %}var(--color-surface-2){% endif %};
+                       border:1px solid {% if row.active %}var(--accent){% else %}var(--color-border){% endif %};
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="{{ row.label }}"
+                aria-label="{{ row.label }}"
+                data-emoji="{{ row.emoji }}"
+                {% if is_parent %}disabled{% endif %}>{{ row.emoji }}{% if row.count %}<span class="reaction-count" data-count-for="{{ row.emoji }}"> {{ row.count }}</span>{% endif %}</button>
+      </form>
+      {% endfor %}
+      {% if reactions.total %}
+      <span class="align-self-center text-muted-sm ms-1" style="font-size:0.8rem;">
+        {{ reactions.total }} reaction{{ reactions.total|pluralize }}
+      </span>
+      {% endif %}
+    </div>
+
+    <div class="d-flex gap-1 flex-wrap align-items-center">
+      {% if thread_mode %}
+      <span class="text-muted-sm" style="font-size:0.8rem;">
+        <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+        {{ item.reply_count }} repl{{ item.reply_count|pluralize:"y,ies" }}
+      </span>
+      {% else %}
+      <a href="{% url 'learning:feed_post' school_class.pk post.pk %}"
+         class="btn btn-sm"
+         style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.8rem;">
+        <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+        {% if item.is_question %}{% if item.reply_count %}{{ item.reply_count }} answer{{ item.reply_count|pluralize }}{% else %}Answer{% endif %}
+        {% else %}{{ item.reply_count }} repl{{ item.reply_count|pluralize:"y,ies" }}{% endif %}
+      </a>
+      {% endif %}
+
+      {% if is_moderator and not is_parent %}
+      {% if not post.is_removed %}
+      <form method="post" action="{% url 'learning:feed_post_action' school_class.pk post.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="pin">
+        <button type="submit"
+                class="btn btn-sm"
+                style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.8rem;"
+                title="{% if post.is_pinned %}Unpin post{% else %}Pin post{% endif %}">
+          <i class="bi bi-{% if post.is_pinned %}pin-angle-fill{% else %}pin{% endif %}" aria-hidden="true"></i>
+          {% if post.is_pinned %}Unpin{% else %}Pin{% endif %}
+        </button>
+      </form>
+      <form method="post" action="{% url 'learning:feed_post_action' school_class.pk post.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="remove">
+        <button type="submit"
+                class="btn btn-sm"
+                style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.8rem;"
+                title="Remove post"
+                onclick="return confirm('Remove this post? Students will no longer see it or its replies.');">
+          <i class="bi bi-trash3" aria-hidden="true"></i> Remove
+        </button>
+      </form>
+      {% else %}
+      <form method="post" action="{% url 'learning:feed_post_action' school_class.pk post.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="restore">
+        <button type="submit"
+                class="btn btn-sm"
+                style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10b981;font-size:0.8rem;"
+                title="Restore post">
+          <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Restore
+        </button>
+      </form>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</article>
+{% endwith %}

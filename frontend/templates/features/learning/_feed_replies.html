@@ -1,0 +1,101 @@
+<section id="replies" aria-label="Replies">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+    <h2 class="h6 mb-0 fw-600">
+      <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+      {{ thread.replies|length }} repl{{ thread.replies|length|pluralize:"y,ies" }}
+    </h2>
+    {% if thread.question_state == "answered" %}
+    <span class="badge feed-status feed-status--answered">
+      <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Answered
+    </span>
+    {% elif thread.question_state == "waiting" %}
+    <span class="badge feed-status feed-status--waiting">
+      <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Waiting for an answer
+    </span>
+    {% endif %}
+  </div>
+
+  {% if not thread.replies %}
+  <div class="card feed-empty">
+    <div class="card-body text-center p-4" style="color:var(--color-muted);">
+      <p class="mb-0">No replies yet.{% if thread.can_reply %} Be the first to help.{% endif %}</p>
+    </div>
+  </div>
+  {% else %}
+  <div class="d-flex flex-column gap-2">
+    {% for reply in thread.replies %}
+    <article class="card feed-reply {% if reply.is_best_answer %}feed-reply--best{% endif %} {% if reply.is_removed %}feed-reply--removed{% endif %}"
+             id="reply-{{ reply.pk }}"
+             aria-label="Reply by {% if reply.author %}{{ reply.author.get_full_name }}{% else %}Unknown{% endif %}">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+          <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
+               style="width:28px;height:28px;font-size:0.7rem;">
+            {% if reply.author %}{{ reply.author.first_name|first|upper }}{{ reply.author.last_name|first|upper }}
+            {% else %}??{% endif %}
+          </div>
+          <div class="flex-grow-1 min-w-0">
+            <div class="fw-600" style="font-size:0.82rem;">
+              {% if reply.author %}{{ reply.author.get_full_name }}{% else %}Deleted user{% endif %}
+              {% if reply.author %}
+              <span class="badge-role badge-role-{{ reply.author.role }} ms-1"
+                    style="font-size:0.62rem;vertical-align:middle;">
+                {{ reply.author.get_role_display }}
+              </span>
+              {% endif %}
+            </div>
+            <div class="text-muted-sm" style="font-size:0.75rem;">
+              {{ reply.created_at|date:"d M Y, g:i a" }}
+              {% if reply.is_removed %}
+              · <span style="color:var(--color-danger);">Removed by {{ reply.removed_by.get_full_name }}</span>
+              {% endif %}
+            </div>
+          </div>
+          {% if reply.is_best_answer %}
+          <span class="badge feed-status feed-status--best">
+            <i class="bi bi-star-fill me-1" aria-hidden="true"></i>Best answer
+          </span>
+          {% endif %}
+        </div>
+
+        <p class="mb-0 feed-reply__body {% if reply.is_removed %}opacity-50{% endif %}">{{ reply.body }}</p>
+
+        {% if not reply.is_removed %}
+        <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+          {% if thread.can_choose_best and not reply.is_best_answer %}
+          <form method="post"
+                action="{% url 'learning:feed_reply_action' school_class.pk reply.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="best">
+            <button type="submit"
+                    class="btn btn-sm"
+                    style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);color:#a78bfa;font-size:0.78rem;">
+              <i class="bi bi-star me-1" aria-hidden="true"></i>Best answer
+            </button>
+          </form>
+          {% endif %}
+
+          {% if thread.can_moderate %}
+          <form method="post" class="d-flex flex-wrap gap-1 align-items-center"
+                action="{% url 'learning:feed_reply_action' school_class.pk reply.pk %}"
+                onsubmit="return confirm('Remove this reply? Students will no longer see it.');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="remove">
+            <input type="text" name="reason" maxlength="200" class="form-control form-control-sm"
+                   style="max-width:190px;" placeholder="Reason (optional)"
+                   aria-label="Reason for removing this reply">
+            <button type="submit"
+                    class="btn btn-sm"
+                    style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.78rem;">
+              <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Remove
+            </button>
+          </form>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>

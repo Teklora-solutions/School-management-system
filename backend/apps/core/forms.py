@@ -137,6 +137,7 @@ class SchoolSettingsForm(forms.ModelForm):
             "engagement_enabled",
             "quizzes_enabled",
             "live_classes_enabled",
+            "feed_community_enabled",
             "logo",
             "address",
             "established_on",
