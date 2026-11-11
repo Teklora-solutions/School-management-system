@@ -59,7 +59,7 @@
             <a href="{% url 'public_admin:enquiry_detail' enquiry.pk %}" class="fw-600"
                id="btn-view-{{ enquiry.pk }}">{{ enquiry.name }}</a>
             <div class="text-muted-sm">{{ enquiry.email }}</div>
-            {% if enquiry.phone %}<div class="text-muted-sm">{{ enquiry.phone }}</div>{% endif %}
+            {% if enquiry.phone %}<div class="text-muted-sm"><a href="tel:{{ enquiry.phone|cut:' ' }}">{{ enquiry.phone }}</a></div>{% endif %}
           </td>
           <td style="max-width:26rem;">
             <a href="{% url 'public_admin:enquiry_detail' enquiry.pk %}" class="text-muted"

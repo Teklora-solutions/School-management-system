@@ -219,6 +219,17 @@ a:hover { color: #fff; }
   background: var(--accent-glow);
   border-left: 3px solid var(--accent);
 }
+/* Bootstrap's list-group hover/focus paints a light background that makes the
+   dark theme's text unreadable; keep the row in the theme on interaction. */
+.notification-row.list-group-item-action:hover,
+.notification-row.list-group-item-action:focus {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.notification-row--unread.list-group-item-action:hover,
+.notification-row--unread.list-group-item-action:focus {
+  background: var(--accent-glow);
+}
 .notification-row__icon {
   flex-shrink: 0;
   width: 36px;
