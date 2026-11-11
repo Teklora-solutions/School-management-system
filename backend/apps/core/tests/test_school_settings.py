@@ -105,6 +105,8 @@ class SchoolSettingsWriteTests(TestCase):
                 "email": "bureau@bright.school",
                 "currency": "ghs",
                 "show_positions": "on",
+                "quiet_hours_start": "20",
+                "quiet_hours_end": "6",
             },
         )
 
@@ -121,7 +123,8 @@ class SchoolSettingsWriteTests(TestCase):
         self.client.force_login(self.admin)
         self.client.post(
             self.url,
-            {"name": "X", "motto": "", "phone": "", "email": "", "currency": "GHS"},
+            {"name": "X", "motto": "", "phone": "", "email": "", "currency": "GHS",
+             "quiet_hours_start": "20", "quiet_hours_end": "6"},
         )
 
         self.assertFalse(SchoolSettings.objects.get(pk=1).show_positions)
@@ -144,6 +147,8 @@ class SchoolSettingsWriteTests(TestCase):
                 "currency": "GHS",
                 "show_positions": "on",
                 "fees_enabled": "on" if row.fees_enabled else "",
+                "quiet_hours_start": str(row.quiet_hours_start),
+                "quiet_hours_end": str(row.quiet_hours_end),
             },
         )
 
@@ -175,6 +180,10 @@ class SchoolSettingsWriteTests(TestCase):
                 "engagement_enabled": "on" if row.engagement_enabled else "",
                 "quizzes_enabled": "on" if row.quizzes_enabled else "",
                 "live_classes_enabled": "on" if row.live_classes_enabled else "",
+                "feed_community_enabled": "on" if row.feed_community_enabled else "",
+                "notification_quiet_hours_enabled": "on" if row.notification_quiet_hours_enabled else "",
+                "quiet_hours_start": str(row.quiet_hours_start),
+                "quiet_hours_end": str(row.quiet_hours_end),
                 "theme": row.theme or "dark",
             },
         )
@@ -211,6 +220,10 @@ class SchoolSettingsWriteTests(TestCase):
                 "engagement_enabled": "on" if row.engagement_enabled else "",
                 "quizzes_enabled": "on" if row.quizzes_enabled else "",
                 "live_classes_enabled": "on" if row.live_classes_enabled else "",
+                "feed_community_enabled": "on" if row.feed_community_enabled else "",
+                "notification_quiet_hours_enabled": "on" if row.notification_quiet_hours_enabled else "",
+                "quiet_hours_start": str(row.quiet_hours_start),
+                "quiet_hours_end": str(row.quiet_hours_end),
                 "theme": row.theme or "dark",
             },
         )
@@ -258,7 +271,8 @@ class SchoolSettingsWriteTests(TestCase):
         self.client.force_login(self.admin)
         response = self.client.post(
             self.url,
-            {"name": "Y", "motto": "", "phone": "", "email": "not-an-email"},
+            {"name": "Y", "motto": "", "phone": "", "email": "not-an-email",
+             "quiet_hours_start": "20", "quiet_hours_end": "6"},
         )
 
         self.assertEqual(response.status_code, 200)

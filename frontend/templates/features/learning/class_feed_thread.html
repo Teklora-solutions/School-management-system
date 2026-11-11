@@ -37,6 +37,33 @@
       <label class="form-label" for="id_reply_body">
         <i class="bi bi-reply me-1" aria-hidden="true"></i>Write a reply
       </label>
+
+      {% if reply_starters %}
+      <div class="feed-starters">
+        {% if is_moderator %}
+        <details>
+          <summary class="feed-starters__summary">
+            <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Guiding questions
+          </summary>
+          <div class="feed-starters__row">
+            {% for starter in reply_starters %}
+            <button type="button" class="feed-starter" data-feed-starter="{{ starter }}">{{ starter }}</button>
+            {% endfor %}
+          </div>
+        </details>
+        {% else %}
+        <p class="feed-starters__summary mb-1">
+          <i class="bi bi-chat-heart me-1" aria-hidden="true"></i>Need a way to start? Tap one, then add your own words.
+        </p>
+        <div class="feed-starters__row">
+          {% for starter in reply_starters %}
+          <button type="button" class="feed-starter" data-feed-starter="{{ starter }}">{{ starter }}</button>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
       <textarea class="form-control" id="id_reply_body" name="body" rows="3"
                 maxlength="1000" required
                 data-feed-reply-input
@@ -100,6 +127,34 @@
     background: rgba(239,68,68,0.04);
   }
   .feed-draft-note { color: var(--color-muted); }
+  .feed-starters { margin-bottom: .6rem; }
+  .feed-starters__summary {
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    margin-bottom: .35rem;
+  }
+  .feed-starters__row {
+    display: flex;
+    gap: .4rem;
+    overflow-x: auto;
+    padding-bottom: .3rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  .feed-starter {
+    flex: 0 0 auto;
+    max-width: 260px;
+    text-align: left;
+    white-space: normal;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    color: var(--color-text);
+    font-size: 0.78rem;
+    line-height: 1.35;
+    padding: .4rem .7rem;
+  }
+  .feed-starter:active { background: var(--accent-glow); border-color: var(--accent); }
 </style>
 {% endblock %}
 

@@ -109,6 +109,27 @@
     if (replyClassId && replyText) {
       replyText.setAttribute('data-feed-reply-class', replyClassId);
     }
+
+    // Starters: append the plain text and leave the cursor at the end, so the
+    // writer carries on typing rather than replacing the prompt.
+    document.querySelectorAll('[data-feed-starter]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!replyText) return;
+        var starter = btn.getAttribute('data-feed-starter') || '';
+        if (!starter) return;
+        var current = replyText.value;
+        var separator = current && !/\s$/.test(current) ? ' ' : '';
+        replyText.value = current + separator + starter;
+        replyText.focus();
+        var end = replyText.value.length;
+        try {
+          replyText.setSelectionRange(end, end);
+        } catch (err) {
+          /* very old browsers: focus alone is enough */
+        }
+        replyText.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    });
   }
 
   // -----------------------------------------------------------------------

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -161,7 +161,11 @@ class NotificationListView(LoginRequiredMixin, ListView):
     paginate_by = 30
 
     def get_queryset(self):
-        return self.request.user.notifications.order_by("-created_at")
+        from .notifications import delivered_notifications
+
+        return delivered_notifications(
+            self.request.user.notifications.order_by("-created_at")
+        )
 
 
 class NotificationOpenView(LoginRequiredMixin, View):
@@ -173,7 +177,13 @@ class NotificationOpenView(LoginRequiredMixin, View):
     """
 
     def get(self, request, pk):
+        from .notifications import delivered_notifications
+
         notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
+        if not delivered_notifications(
+            Notification.objects.filter(pk=notification.pk)
+        ).exists():
+            raise Http404
         if not notification.is_read:
             Notification.objects.filter(pk=notification.pk).update(is_read=True)
         if notification.link:
@@ -185,7 +195,11 @@ class NotificationMarkAllReadView(LoginRequiredMixin, View):
     """POST: clear the bell badge without opening every notification."""
 
     def post(self, request):
-        updated = request.user.notifications.filter(is_read=False).update(is_read=True)
+        from .notifications import delivered_notifications
+
+        updated = delivered_notifications(
+            request.user.notifications.filter(is_read=False)
+        ).update(is_read=True)
         if updated:
             messages.success(request, "All notifications marked as read.")
         return redirect("core_notifications:list")

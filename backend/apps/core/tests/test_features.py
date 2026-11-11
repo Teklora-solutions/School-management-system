@@ -56,12 +56,15 @@ class FeatureEnabledTests(TestCase):
         from django.urls import reverse
 
         self.client.force_login(self.admin)
+        row = SchoolSettings.load()
         payload = {
             "name": "Feature School",
             "motto": "",
             "phone": "",
             "email": "",
             "currency": "GHS",
+            "quiet_hours_start": str(row.quiet_hours_start),
+            "quiet_hours_end": str(row.quiet_hours_end),
         }
         if fees_enabled:
             payload["fees_enabled"] = "on"

@@ -138,6 +138,11 @@ class SchoolSettingsForm(forms.ModelForm):
             "quizzes_enabled",
             "live_classes_enabled",
             "feed_community_enabled",
+            "notification_quiet_hours_enabled",
+            "quiet_hours_start",
+            "quiet_hours_end",
+            "feed_teacher_starters",
+            "feed_student_starters",
             "logo",
             "address",
             "established_on",
@@ -204,14 +209,71 @@ class SchoolSettingsForm(forms.ModelForm):
             "linkedin_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://linkedin.com/school/yourschool"}),
             "office_hours": forms.TextInput(attrs={"class": "form-control", "placeholder": "Monday – Friday, 8:00 AM – 4:00 PM"}),
             "map_embed_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://maps.google.com/..."}),
+            "quiet_hours_start": forms.NumberInput(
+                attrs={"class": "form-control", "min": 0, "max": 23, "step": 1}
+            ),
+            "quiet_hours_end": forms.NumberInput(
+                attrs={"class": "form-control", "min": 0, "max": 23, "step": 1}
+            ),
+            "feed_teacher_starters": forms.Textarea(
+                attrs={"class": "form-control", "rows": 6}
+            ),
+            "feed_student_starters": forms.Textarea(
+                attrs={"class": "form-control", "rows": 4}
+            ),
             # ClearableFileInput keeps the current file when no new file is chosen.
             "logo": forms.ClearableFileInput(attrs={"class": "form-control"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for checkbox in ("show_positions", "fees_enabled", "learning_enabled", "engagement_enabled", "quizzes_enabled", "live_classes_enabled"):
+        for checkbox in ("show_positions", "fees_enabled", "learning_enabled", "engagement_enabled", "quizzes_enabled", "live_classes_enabled", "feed_community_enabled", "notification_quiet_hours_enabled"):
             self.fields[checkbox].required = False
+        # Integer fields: a POST that omits them (older tests, partial forms)
+        # must keep the model default rather than saving NULL.
+        for int_field in ("quiet_hours_start", "quiet_hours_end"):
+            self.fields[int_field].required = False
+            self.fields[int_field].initial = self._meta.model._meta.get_field(
+                int_field
+            ).default
+
+    def _hour_or_default(self, field_name: str) -> int:
+        value = self.cleaned_data.get(field_name)
+        if value is None:
+            return self._meta.model._meta.get_field(field_name).default
+        return value
+
+    def clean_quiet_hours_start(self) -> int:
+        return self._hour_or_default("quiet_hours_start")
+
+    def clean_quiet_hours_end(self) -> int:
+        return self._hour_or_default("quiet_hours_end")
 
     def clean_currency(self) -> str:
         return self.cleaned_data["currency"].strip().upper()
+
+    @staticmethod
+    def _clean_starters(raw: str, label: str) -> str:
+        """
+        Starters are inserted into a child's reply as plain text, so a
+        bracketed placeholder like ``[topic]`` would be typed into the reply
+        box and sent. Refuse it at the settings page with a clear message.
+        """
+        if "[" in raw or "]" in raw:
+            raise forms.ValidationError(
+                f"Remove the [placeholder] from the {label} starters. "
+                "Starters are typed into a pupil's reply exactly as written."
+            )
+        return raw
+
+    def clean_feed_teacher_starters(self) -> str:
+        return self._clean_starters(
+            self.cleaned_data.get("feed_teacher_starters", ""),
+            "teacher",
+        )
+
+    def clean_feed_student_starters(self) -> str:
+        return self._clean_starters(
+            self.cleaned_data.get("feed_student_starters", ""),
+            "pupil",
+        )

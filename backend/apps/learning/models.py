@@ -481,6 +481,16 @@ class ClassPost(BaseModel):
         related_name="class_posts_removed",
     )
     removed_at = models.DateTimeField(null=True, blank=True)
+    digest_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Set by the morning digest job when this post is included in a "
+            "teacher's digest. Prevents the same unanswered question from "
+            "appearing in consecutive daily digests."
+        ),
+    )
 
     class Meta:
         db_table = "learning_class_post"

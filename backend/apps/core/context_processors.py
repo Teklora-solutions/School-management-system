@@ -199,10 +199,11 @@ def unread_notifications(request: HttpRequest) -> dict:
         return {"unread_notification_count": 0}
     try:
         from .models import Notification
+        from .notifications import delivered_notifications
 
         return {
-            "unread_notification_count": Notification.objects.filter(
-                recipient=request.user, is_read=False
+            "unread_notification_count": delivered_notifications(
+                Notification.objects.filter(recipient=request.user, is_read=False)
             ).count()
         }
     except Exception:  # noqa: BLE001

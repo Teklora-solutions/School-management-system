@@ -81,20 +81,48 @@ def _engagement_active(student) -> bool:
 
 
 def _daily_feed_total(student, today) -> int:
-    """Sum of feed_post points awarded today (calendar day, school timezone)."""
+    """
+    Net feed_post points for *student* on *today*.
+
+    Gross: SUM of all FEED_POST award rows created today.
+    Clawback: SUM of REVERSAL rows whose reversed original was a FEED_POST row
+    created today.  The clawback rows have negative points, so adding them
+    reduces the total — restoring the student's cap credit the same day a post
+    is removed.
+
+    Only FEED_POST awards and their direct reversals are counted; a reversal of
+    any other reason (lesson, homework, etc.) never affects the feed cap.
+    """
     day_start = timezone.datetime(today.year, today.month, today.day,
                                   tzinfo=timezone.get_current_timezone())
     day_end = day_start + timezone.timedelta(days=1)
-    result = (
+
+    # 1. Gross: today's FEED_POST awards
+    today_feed_ids = list(
         PointLedger.objects.filter(
             student=student,
             reason=PointLedger.Reason.FEED_POST,
             created_at__gte=day_start,
             created_at__lt=day_end,
-        ).aggregate(total=Sum("points"))["total"]
+        ).values_list("id", flat=True)
+    )
+    if not today_feed_ids:
+        return 0
+
+    gross = (
+        PointLedger.objects.filter(id__in=today_feed_ids)
+        .aggregate(total=Sum("points"))["total"]
         or 0
     )
-    return result
+
+    # 2. Clawback: reversals whose original was one of today's FEED_POST rows
+    clawback = (
+        PointLedger.objects.filter(reversal_of_id__in=today_feed_ids)
+        .aggregate(total=Sum("points"))["total"]
+        or 0
+    )
+
+    return max(0, gross + clawback)  # clawback rows hold negative values
 
 
 # ---------------------------------------------------------------------------

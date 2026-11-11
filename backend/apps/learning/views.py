@@ -849,6 +849,8 @@ class ClassFeedThreadView(
         )
         if thread is None:
             raise Http404
+        from .reply_starters import starters_for_role
+
         ctx.update(
             {
                 "school_class": school_class,
@@ -857,6 +859,11 @@ class ClassFeedThreadView(
                 "is_moderator": feed_selectors.is_moderator(self.request.user),
                 "is_parent": self.request.user.role == "parent",
                 "emoji_choices": ClassPostReaction.Emoji.choices,
+                "reply_starters": starters_for_role(
+                    self.request.user.role, request=self.request
+                )
+                if thread.can_reply
+                else (),
                 "replied": self.request.GET.get("replied") == "1",
             }
         )

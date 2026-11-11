@@ -504,7 +504,73 @@ def create_reply(*, post: ClassPost, author, body: str) -> ClassPostReply:
     if len(body) > 1000:
         raise ValueError("A reply cannot exceed 1000 characters.")
 
-    return ClassPostReply.objects.create(post=post, author=author, body=body)
+    # Refuse a student's bare starter — it is a prompt, not an answer.
+    # Teachers may send a guiding question on its own: that is the point of
+    # their starter set.
+    from .reply_starters import is_starter_only
+
+    if is_starter_only(body, getattr(author, "role", "")):
+        raise ValueError(
+            "That looks like a prompt, not an answer. "
+            "Add your own thoughts after the starter and try again."
+        )
+
+    reply = ClassPostReply.objects.create(post=post, author=author, body=body)
+
+    # ── Notify the question's author on their FIRST reply ──────────────
+    # Rules: only once (first visible reply), never the author's own reply,
+    # only when the post is a question, reply is not removed.
+    _notify_first_reply(post=post, reply=reply)
+
+    return reply
+
+
+def _notify_first_reply(*, post: ClassPost, reply: ClassPostReply) -> None:
+    """
+    Send one notification to the question's author when the first visible
+    reply arrives.  Never fires for a removed reply, the author's own reply,
+    or if a notification was already sent for an earlier reply on this post.
+    """
+    if post.post_type != ClassPost.PostType.QUESTION:
+        return
+    if post.author is None:
+        return
+    if reply.author_id == post.author_id:
+        return   # never notify about your own reply
+    if reply.is_removed:
+        return
+
+    # Is this the first visible reply? Counted after the save above, so the
+    # new reply itself is excluded.
+    visible_before = (
+        ClassPostReply.objects.filter(post=post, is_removed=False)
+        .exclude(pk=reply.pk)
+        .count()
+    )
+    if visible_before > 0:
+        return
+
+    # Preference rows are created lazily on first use; a missing row means on.
+    # Teachers' operational notices are not governed by this table.
+    if getattr(post.author, "role", "") in ("student", "parent"):
+        from apps.core.models import NotificationPreference
+
+        pref = NotificationPreference.for_user(post.author)
+        if not pref.notify_feed_reply:
+            return
+
+    replier_name = reply.author.first_name if reply.author else "Someone"
+    class_name = post.school_class.name
+    try:
+        notify(
+            recipient=post.author,
+            title=f"{replier_name} replied to your question in {class_name}",
+            message="",   # no reply content in notifications
+            link=f"/learning/class/{post.school_class_id}/feed/post/{post.pk}/",
+            category="feed_reply",
+        )
+    except Exception:   # noqa: BLE001
+        logger.warning("First-reply notification failed for post %s", post.pk)
 
 
 @transaction.atomic
@@ -532,13 +598,87 @@ def mark_best_answer(*, reply: ClassPostReply, actor) -> ClassPostReply:
         )
 
     # Clear any previous choice first — the unique index allows only one.
+    was_already_best = reply.is_best_answer
     ClassPostReply.objects.filter(
         post=post, is_best_answer=True
     ).exclude(pk=reply.pk).update(is_best_answer=False, updated_at=timezone.now())
 
     reply.is_best_answer = True
     reply.save(update_fields=["is_best_answer", "updated_at"])
+
+    # ── Notifications ──────────────────────────────────────────────────
+    # Re-clicking Best answer on the same reply must not notify twice.
+    if not was_already_best:
+        _notify_best_answer(post=post, reply=reply, chosen_by=actor)
+
     return reply
+
+
+def _notify_best_answer(*, post: ClassPost, reply: ClassPostReply, chosen_by) -> None:
+    """
+    Two notifications on Best Answer:
+    1. The reply's author: "Your answer was chosen" (always, unless it's their
+       own reply — but marking your own reply is not allowed anyway).
+    2. The question's author: notified only when a *teacher* (or admin/director)
+       chose the best answer, so the student knows the teacher endorsed it.
+
+    Neither fires if the reply or the post is removed.
+    Quiet hours apply.  Reply content is never included in the text.
+    """
+    if reply.is_removed or post.is_removed:
+        return
+
+    chosen_by_role = getattr(chosen_by, "role", "")
+    class_name = post.school_class.name
+    feed_link = f"/learning/class/{post.school_class_id}/feed/post/{post.pk}/"
+    chosen_by_name = chosen_by.first_name if chosen_by else "Your teacher"
+
+    # 1. Notify the reply's author
+    if reply.author and reply.author_id != chosen_by.pk:
+        if getattr(reply.author, "role", "") in ("student", "parent"):
+            from apps.core.models import NotificationPreference
+
+            pref = NotificationPreference.for_user(reply.author)
+            can_notify = pref.notify_feed_best_answer
+        else:
+            can_notify = True
+        if can_notify:
+            try:
+                notify(
+                    recipient=reply.author,
+                    title=f"Your answer was chosen as Best Answer in {class_name}",
+                    message="",
+                    link=feed_link,
+                    category="feed_best_answer",
+                )
+            except Exception:   # noqa: BLE001
+                logger.warning("Best-answer notify failed for reply author, reply %s", reply.pk)
+
+    # 2. Notify the question's author when a teacher/admin/director chose it
+    if (
+        chosen_by_role in MODERATOR_ROLES
+        and post.author
+        and post.author_id != chosen_by.pk
+        and post.author_id != getattr(reply, "author_id", None)
+    ):
+        if getattr(post.author, "role", "") in ("student", "parent"):
+            from apps.core.models import NotificationPreference
+
+            pref = NotificationPreference.for_user(post.author)
+            can_notify = pref.notify_feed_best_answer
+        else:
+            can_notify = True
+        if can_notify:
+            try:
+                notify(
+                    recipient=post.author,
+                    title=f"{chosen_by_name} marked a Best Answer for your question in {class_name}",
+                    message="",
+                    link=feed_link,
+                    category="feed_best_answer",
+                )
+            except Exception:   # noqa: BLE001
+                logger.warning("Best-answer notify failed for question author, post %s", post.pk)
 
 
 @transaction.atomic

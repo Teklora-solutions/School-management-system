@@ -112,6 +112,11 @@ class SystemEvent(BaseModel):
 class Notification(BaseModel):
     """
     In-app notification. Created via ``apps.core.notifications.notify()``.
+
+    ``deliver_after`` is set when quiet hours are active at the moment of
+    creation. The bell-count query and the notification inbox filter on
+    ``deliver_after <= now()`` so held notifications are invisible until the
+    window ends.  ``deliver_after=None`` means deliver immediately.
     """
 
     recipient = models.ForeignKey(
@@ -124,6 +129,15 @@ class Notification(BaseModel):
     link = models.CharField(max_length=255, blank=True)
     is_read = models.BooleanField(default=False, db_index=True)
     category = models.CharField(max_length=40, blank=True, db_index=True)
+    deliver_after = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "When set, the notification is hidden until this datetime passes. "
+            "Used by quiet-hours deferral. Null means deliver immediately."
+        ),
+    )
 
     class Meta:
         db_table = "core_notification"
@@ -131,6 +145,14 @@ class Notification(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.recipient_id}: {self.title}"
+
+
+def _validate_hour(value: int) -> None:
+    """Reusable validator: 0–23 inclusive."""
+    from django.core.exceptions import ValidationError
+
+    if not (0 <= value <= 23):
+        raise ValidationError(f"Hour must be between 0 and 23, got {value}.")
 
 
 class SchoolSettings(BaseModel):
@@ -201,6 +223,44 @@ class SchoolSettings(BaseModel):
             "Turn on the class community feed: replies, best answers, new post "
             "types, filters, live updates and lesson/quiz links. Requires "
             "Learning. Each teacher also turns it on for their own class."
+        ),
+    )
+    notification_quiet_hours_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "When on, in-app notifications created during quiet hours are held "
+            "back and delivered at the start of the next active window. "
+            "Default off — nothing changes until the school switches this on."
+        ),
+    )
+    quiet_hours_start = models.PositiveSmallIntegerField(
+        default=20,
+        validators=[_validate_hour],
+        help_text=(
+            "Hour (0–23, Nairobi time) when quiet hours begin. Default: 20 (8 pm). "
+            "Notifications created after this hour are held until quiet_hours_end."
+        ),
+    )
+    quiet_hours_end = models.PositiveSmallIntegerField(
+        default=6,
+        validators=[_validate_hour],
+        help_text=(
+            "Hour (0–23, Nairobi time) when quiet hours end. Default: 6 (6 am). "
+            "Held notifications are delivered from this hour."
+        ),
+    )
+    feed_teacher_starters = models.TextField(
+        blank=True,
+        help_text=(
+            "Question starters teachers can tap when replying on the class feed, "
+            "one per line. Leave blank to use the built-in set."
+        ),
+    )
+    feed_student_starters = models.TextField(
+        blank=True,
+        help_text=(
+            "Reply starters pupils can tap when helping a classmate, one per line. "
+            "Leave blank to use the built-in set."
         ),
     )
 
@@ -320,6 +380,49 @@ class SchoolSettings(BaseModel):
         """Return the singleton row, creating an empty one if none exists."""
         obj, _ = cls.objects.get_or_create(pk=cls.SINGLETON_PK)
         return obj
+
+
+class NotificationPreference(BaseModel):
+    """
+    Per-user opt-in/opt-out for notification categories.
+
+    Created lazily (get_or_create on first use). A missing row means
+    all categories are ON — consistent with the default=True values here.
+
+    Teacher digests and safety notices are NOT here because they cannot
+    be turned off by the recipient. This table is for student/parent
+    social notifications only.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notification_preference",
+    )
+    notify_feed_reply = models.BooleanField(
+        default=True,
+        help_text="Notify me when someone first replies to my feed post.",
+    )
+    notify_feed_best_answer = models.BooleanField(
+        default=True,
+        help_text="Notify me when my question gets a Best Answer.",
+    )
+    notify_level_up = models.BooleanField(
+        default=True,
+        help_text="Notify me when I reach a new level.",
+    )
+
+    class Meta:
+        db_table = "core_notification_preference"
+
+    def __str__(self) -> str:
+        return f"Notification prefs for {self.user}"
+
+    @classmethod
+    def for_user(cls, user) -> "NotificationPreference":
+        """Return the preference row, creating defaults if it doesn't exist yet."""
+        pref, _ = cls.objects.get_or_create(user=user)
+        return pref
 
 
 class WorkerHeartbeat(BaseModel):
