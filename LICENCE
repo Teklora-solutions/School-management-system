@@ -61,9 +61,9 @@ data controller and is solely responsible for:
   - lawfulness, purpose limitation and retention of the data it holds;
   - the confidentiality of `backend/db.sqlite3` (or the production database),
     `backend/media/`, `.env`, and every `db.sqlite3.bak-*` snapshot;
-  - changing or deleting the seeded demo accounts and their documented
-    passwords (`REMOVED-DEMO-PASSWORD`, `REMOVED-DEMO-PASSWORD`, `REMOVED-DEMO-PASSWORD`, `REMOVED-DEMO-PASSWORD`,
-    `REMOVED-DEMO-PASSWORD`, `REMOVED-DEMO-PASSWORD`) before any real or public deployment;
+  - changing or deleting the seeded demo accounts before any real or public
+    deployment (the demo seeder generates a random password per role, prints it
+    once at creation, and refuses to run outside DEBUG without --force);
   - backups, restore drills and breach notification.
 
 Teklora Solutions accepts no liability for data loss, disclosure or regulatory
