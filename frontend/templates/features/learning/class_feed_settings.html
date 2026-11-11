@@ -1,0 +1,76 @@
+{% extends base_template %}
+
+{% block title %}Feed settings · {{ school_class.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-sliders me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Feed settings
+    </h1>
+    <p class="page-subtitle">{{ school_class.name }}</p>
+  </div>
+  <a href="{% url 'learning:class_feed' school_class.pk %}" class="btn btn-outline-secondary btn-sm mt-1">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to feed
+  </a>
+</div>
+
+{% if not school_switch_on %}
+<div class="alert alert-warning" role="note">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  The class community feed is switched off for the whole school. Ask the school
+  administrator to turn it on; this class switch will then take effect.
+</div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <div class="d-flex align-items-start gap-2 mb-3">
+        <input class="form-check-input mt-1" type="checkbox" id="id_is_active"
+               name="is_active" value="1" {% if feed_settings.is_active %}checked{% endif %}>
+        <div>
+          <label class="form-label mb-0 fw-600" for="id_is_active">
+            Turn on the community feed for this class
+          </label>
+          <div class="text-muted-sm">
+            Adds replies, best answers, question status, filters, live updates
+            and lesson/quiz links. Off by default. The original notice board
+            keeps working exactly as it does now while this is off.
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h6 fw-600">
+      <i class="bi bi-award me-1" aria-hidden="true"></i>Points
+    </h2>
+    {% if points_on %}
+    <p class="mb-0 text-muted-sm">
+      Points are on for this class. Students earn points for asking questions,
+      subject to the daily cap.
+    </p>
+    {% else %}
+    <p class="mb-0 text-muted-sm">
+      <strong>Points are off for this class.</strong>
+      Students can still post and reply; they simply earn no points until the
+      Progress and streaks module is switched on for the school and for this class.
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+  .text-muted-sm { color: var(--color-muted); font-size: 0.8rem; }
+  .fw-600 { font-weight: 600; }
+</style>
+{% endblock %}

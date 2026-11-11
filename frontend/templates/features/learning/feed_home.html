@@ -1,0 +1,52 @@
+{% extends base_template %}
+
+{% block title %}Class Feed | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+  <h1 class="page-title">
+    <i class="bi bi-megaphone me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Class Feed
+  </h1>
+  <p class="page-subtitle">Choose a class to open its feed</p>
+</div>
+
+{% if classes %}
+<div class="row g-3">
+  {% for school_class in classes %}
+  <div class="col-sm-6 col-lg-4">
+    <a href="{% url 'learning:class_feed' school_class.pk %}"
+       class="card h-100 text-decoration-none feed-home-card">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
+             style="width:42px;height:42px;font-size:0.9rem;">
+          {{ school_class.name|first|upper }}
+        </div>
+        <div class="min-w-0">
+          <div class="fw-600">{{ school_class.name }}</div>
+          <div class="text-muted-sm">{{ school_class.academic_year.name }}</div>
+        </div>
+        <i class="bi bi-chevron-right ms-auto" aria-hidden="true"></i>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center p-5" style="color:var(--color-muted);">
+    <i class="bi bi-people fs-1 d-block mb-2" aria-hidden="true"></i>
+    <p class="mb-0">No class feed is available for your account yet.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+  .text-muted-sm { color: var(--color-muted); font-size: 0.8rem; }
+  .fw-600 { font-weight: 600; }
+  .feed-home-card { transition: border-color 0.15s ease; }
+  .feed-home-card:hover { border-color: var(--accent) !important; }
+</style>
+{% endblock %}

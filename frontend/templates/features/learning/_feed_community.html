@@ -1,0 +1,87 @@
+<div id="feedCommunity"
+     data-feed-class-id="{{ school_class.pk }}"
+     data-feed-poll-url="{% url 'learning:feed_poll' school_class.pk %}"
+     data-feed-items-url="{% url 'learning:feed_items' school_class.pk %}"
+     data-feed-latest-id="{{ latest_visible_id }}"
+     data-feed-filter="{{ active_filter }}">
+
+  {# ── New posts button (revealed by the polite poll) ── #}
+  <div class="d-flex justify-content-center mb-3">
+    <button type="button" id="feedNewPostsBtn" class="btn btn-primary btn-sm feed-new-posts" hidden>
+      <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
+      <span id="feedNewPostsCount">0</span> new posts
+    </button>
+  </div>
+
+  {# ── Filters ── #}
+  <nav class="feed-filters mb-3" aria-label="Feed filters">
+    {% for slug, label in feed_filters %}
+    <a href="?filter={{ slug }}"
+       class="feed-filter {% if active_filter == slug %}feed-filter--active{% endif %}"
+       {% if active_filter == slug %}aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {# ── Pinned strip (All tab only) ── #}
+  {% if pinned_posts %}
+  <section class="mb-3" aria-label="Pinned posts">
+    <div class="feed-section-label">
+      <i class="bi bi-pin-angle-fill me-1" aria-hidden="true"></i>Pinned
+    </div>
+    <div class="d-flex flex-column gap-3">
+      {% for item in pinned_posts %}
+      {% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {# ── Stream ── #}
+  <div id="feedStream" class="d-flex flex-column gap-3"
+       role="feed"
+       aria-label="{{ school_class.name }} class feed"
+       data-feed-next-before="{{ next_before_id|default:'' }}"
+       data-feed-has-more="{% if has_more %}1{% else %}0{% endif %}">
+
+    {% if not posts %}
+    <div class="card feed-empty">
+      <div class="card-body text-center p-5" style="color:var(--color-muted);">
+        <i class="bi bi-chat-square-dots fs-1 d-block mb-2" aria-hidden="true"></i>
+        {% if active_filter == "questions" %}
+        <p class="mb-0">No questions here yet. Ask the first one.</p>
+        {% elif active_filter == "announcements" %}
+        <p class="mb-0">No announcements yet.</p>
+        {% elif active_filter == "pinned" %}
+        <p class="mb-0">Nothing is pinned in this class yet.</p>
+        {% elif active_filter == "mine" %}
+        <p class="mb-0">You have not posted in this class yet.</p>
+        {% elif active_filter == "unanswered" %}
+        <p class="mb-0">Every question has an answer. Nice work.</p>
+        {% else %}
+        <p class="mb-0">No posts yet. Be the first to share something with the class.</p>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    {% for item in posts %}
+    {% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent %}
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  {# ── Skeleton placeholders while "Show more" loads ── #}
+  <div id="feedSkeletons" class="d-flex flex-column gap-3 mt-3" hidden aria-hidden="true">
+    <div class="card feed-skeleton"><div class="card-body"><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--short"></div></div></div>
+    <div class="card feed-skeleton"><div class="card-body"><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--short"></div></div></div>
+  </div>
+
+  <div class="text-center mt-3">
+    <button type="button" id="feedShowMore" class="btn btn-outline-secondary btn-sm"
+            data-feed-items-url="{% url 'learning:feed_items' school_class.pk %}"
+            data-feed-filter="{{ active_filter }}"
+            data-feed-before="{{ next_before_id|default:'' }}"
+            {% if not has_more %}hidden{% endif %}>
+      Show more
+    </button>
+  </div>
+</div>

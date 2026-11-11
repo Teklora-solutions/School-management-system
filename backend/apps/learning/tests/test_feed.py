@@ -137,9 +137,14 @@ class ClassPostModelTests(TestCase):
                 emoji=ClassPostReaction.Emoji.HEART,
             )
 
-    def test_student_allowed_types_contains_only_question(self):
+    def test_student_allowed_types_are_question_and_community_types(self):
         self.assertEqual(
-            ClassPost.STUDENT_ALLOWED_TYPES, {ClassPost.PostType.QUESTION}
+            ClassPost.STUDENT_ALLOWED_TYPES,
+            {
+                ClassPost.PostType.QUESTION,
+                ClassPost.PostType.TIP,
+                ClassPost.PostType.CELEBRATION,
+            },
         )
 
 
@@ -427,14 +432,15 @@ class SetReactionTests(TestCase):
                 emoji="💀",  # not in allowed set
             )
 
-    def test_parent_can_react(self):
+    def test_parent_cannot_react(self):
+        """Parents are read-only in the feed; the server rejects the reaction."""
         parent_user, _ = make_parent_for(self.student)
-        r = set_reaction(
-            post=self.post,
-            user=parent_user,
-            emoji=ClassPostReaction.Emoji.HEART,
-        )
-        self.assertIsNotNone(r)
+        with self.assertRaises(PermissionDenied):
+            set_reaction(
+                post=self.post,
+                user=parent_user,
+                emoji=ClassPostReaction.Emoji.HEART,
+            )
 
 
 # ============================================================================
@@ -701,17 +707,17 @@ class ClassFeedViewPostTests(TestCase):
             ).exists()
         )
 
-    def test_student_post_is_always_question_type(self):
+    def test_student_cannot_post_a_teacher_type(self):
         self.client.force_login(self.student.user)
         self.client.post(
             self._url(),
             {"body": "What page are we on?", "post_type": "announcement"},
         )
-        post = ClassPost.objects.get(
-            school_class=self.school_class, author=self.student.user
+        self.assertFalse(
+            ClassPost.objects.filter(
+                school_class=self.school_class, author=self.student.user
+            ).exists()
         )
-        # Should be QUESTION regardless of what was submitted
-        self.assertEqual(post.post_type, ClassPost.PostType.QUESTION)
 
     def test_empty_body_does_not_create_post(self):
         self.client.force_login(self.teacher_user)

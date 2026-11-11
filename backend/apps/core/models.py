@@ -194,6 +194,14 @@ class SchoolSettings(BaseModel):
             "and show the shared class calendar. Requires Learning to also be on."
         ),
     )
+    feed_community_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Turn on the class community feed: replies, best answers, new post "
+            "types, filters, live updates and lesson/quiz links. Requires "
+            "Learning. Each teacher also turns it on for their own class."
+        ),
+    )
 
     # ── Public-site content ───────────────────────────────────────────────
     # These six feed the school's own website (apps/public). They are blankable

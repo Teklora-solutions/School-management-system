@@ -164,6 +164,9 @@ def school_settings_values(request=None) -> dict:
     values["engagement_enabled"] = row.engagement_enabled if row else False
     values["quizzes_enabled"] = row.quizzes_enabled if row else False
     values["live_classes_enabled"] = row.live_classes_enabled if row else False
+    values["feed_community_enabled"] = (
+        row.feed_community_enabled if row else False
+    )
     if request is not None:
         request._school_settings_values = values
     return values

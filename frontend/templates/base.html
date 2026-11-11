@@ -16,7 +16,7 @@
   {% block extra_css %}{% endblock %}
 </head>
 
-<body data-role="{{ request.user.role|default:'' }}">
+<body data-role="{{ request.user.role|default:'' }}" data-user-id="{{ request.user.pk|default:'' }}">
 
   {% block body %}
   {# ── App Shell: Navbar + Sidebar + Main ─────────────────────────────── #}
@@ -88,7 +88,7 @@
             </li>
             <li><hr class="dropdown-divider"></li>
             <li>
-              <form method="post" action="{% url 'accounts:logout' %}">
+              <form method="post" action="{% url 'accounts:logout' %}" data-logout-form>
                 {% csrf_token %}
                 <button type="submit" class="dropdown-item user-menu__logout">
                   <i class="bi bi-box-arrow-right me-2"></i>Sign Out

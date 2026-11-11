@@ -1,0 +1,108 @@
+{% extends base_template %}
+{% load static %}
+
+{% block title %}Post · {{ school_class.name }} Feed | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-chat-square-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ school_class.name }} Feed
+    </h1>
+    <p class="page-subtitle">One conversation at a time</p>
+  </div>
+  <a href="{% url 'learning:class_feed' school_class.pk %}" class="btn btn-outline-secondary btn-sm mt-1">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to feed
+  </a>
+</div>
+
+<div class="mb-4">
+  {% include "features/learning/_feed_post.html" with item=thread.post school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent thread_mode=True %}
+</div>
+
+{% include "features/learning/_feed_replies.html" with thread=thread school_class=school_class %}
+
+{# ── Reply composer ── #}
+<div class="card mt-4">
+  <div class="card-body">
+    {% if thread.can_reply %}
+    <form method="post"
+          action="{% url 'learning:feed_reply_create' school_class.pk thread.post.post.pk %}"
+          data-feed-reply-form
+          data-feed-reply-class="{{ school_class.pk }}"
+          data-feed-reply-post="{{ thread.post.post.pk }}"
+          data-feed-reply-clear="{% if replied %}1{% else %}0{% endif %}">
+      {% csrf_token %}
+      <label class="form-label" for="id_reply_body">
+        <i class="bi bi-reply me-1" aria-hidden="true"></i>Write a reply
+      </label>
+      <textarea class="form-control" id="id_reply_body" name="body" rows="3"
+                maxlength="1000" required
+                data-feed-reply-input
+                placeholder="Keep it kind and helpful. Plain text only."></textarea>
+      <div class="text-muted-sm mt-1">
+        Plain text only. Maximum 1&nbsp;000 characters.
+        <span class="feed-draft-note" hidden>Draft saved on this device.</span>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm mt-2">
+        <i class="bi bi-send me-1" aria-hidden="true"></i>Send reply
+      </button>
+    </form>
+    {% elif is_parent %}
+    <div class="alert alert-info mb-0" role="note">
+      <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+      Parents can read the class feed but cannot post or reply.
+    </div>
+    {% else %}
+    <div class="alert alert-secondary mb-0" role="note">
+      You cannot reply to this post.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+  .text-muted-sm { color: var(--color-muted); font-size: 0.8rem; }
+  .fw-600 { font-weight: 600; }
+  .reaction-btn { cursor: pointer; transition: all 0.15s ease; }
+  .reaction-btn:hover:not([disabled]) {
+    background: var(--accent-glow) !important;
+    border-color: var(--accent) !important;
+    transform: scale(1.1);
+  }
+  .reaction-btn--active { font-weight: 700; }
+  .feed-post__body,
+  .feed-reply__body {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+  .feed-link-btn {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    font-size: 0.8rem;
+  }
+  .feed-status { font-size: 0.72rem; font-weight: 600; }
+  .feed-status--waiting { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .feed-status--answered { background: rgba(16,185,129,0.15); color: #34d399; }
+  .feed-status--best { background: rgba(139,92,246,0.15); color: #a78bfa; }
+  .feed-reply--best {
+    border-color: rgba(139,92,246,0.5) !important;
+    box-shadow: 0 0 0 1px rgba(139,92,246,0.2);
+  }
+  .feed-reply--removed {
+    border-color: rgba(239,68,68,0.3) !important;
+    background: rgba(239,68,68,0.04);
+  }
+  .feed-draft-note { color: var(--color-muted); }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/class_feed.js' %}"></script>
+{% endblock %}

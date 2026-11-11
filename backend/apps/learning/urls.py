@@ -49,10 +49,41 @@ urlpatterns = [
     ),
 
     # ── Piece 2: class community feed ─────────────────────────────────────
+    path("feed/", views.FeedHomeView.as_view(), name="feed_home"),
     path(
         "class/<int:class_id>/feed/",
         views.ClassFeedView.as_view(),
         name="class_feed",
+    ),
+    path(
+        "class/<int:class_id>/feed/items/",
+        views.ClassFeedItemsView.as_view(),
+        name="feed_items",
+    ),
+    path(
+        "class/<int:class_id>/feed/poll/",
+        views.ClassFeedPollView.as_view(),
+        name="feed_poll",
+    ),
+    path(
+        "class/<int:class_id>/feed/settings/",
+        views.ClassFeedSettingsView.as_view(),
+        name="feed_settings",
+    ),
+    path(
+        "class/<int:class_id>/feed/post/<int:post_id>/",
+        views.ClassFeedThreadView.as_view(),
+        name="feed_post",
+    ),
+    path(
+        "class/<int:class_id>/feed/post/<int:post_id>/reply/",
+        views.ClassFeedReplyCreateView.as_view(),
+        name="feed_reply_create",
+    ),
+    path(
+        "class/<int:class_id>/feed/reply/<int:reply_id>/action/",
+        views.ClassFeedReplyActionView.as_view(),
+        name="feed_reply_action",
     ),
     path(
         "class/<int:class_id>/feed/post/<int:post_id>/action/",

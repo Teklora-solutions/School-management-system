@@ -81,4 +81,26 @@
     });
   });
 
+  /* ── Clear this user's feed drafts when they sign out ─────────────────── */
+  const userId = document.body.getAttribute("data-user-id") || "";
+  if (userId) {
+    const prefixes = [`feedDraft:u${userId}:`, `feedReplyDraft:u${userId}:`];
+    document.querySelectorAll("form[data-logout-form]").forEach((form) => {
+      form.addEventListener("submit", () => {
+        try {
+          const doomed = [];
+          for (let i = 0; i < localStorage.length; i += 1) {
+            const key = localStorage.key(i);
+            if (key && prefixes.some((prefix) => key.startsWith(prefix))) {
+              doomed.push(key);
+            }
+          }
+          doomed.forEach((key) => localStorage.removeItem(key));
+        } catch (err) {
+          /* storage blocked — the draft simply remains on this device */
+        }
+      });
+    });
+  }
+
 })();

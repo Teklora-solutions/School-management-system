@@ -258,6 +258,36 @@ class LessonAttachment(BaseModel):
         return "bi-file-earmark"
 
 
+class ClassFeedSettings(BaseModel):
+    """
+    Per-class switch for the class community feed.
+
+    Off by default. When off, the class keeps the original notice-board feed
+    (announcements, questions, tips, celebrations, reactions, pinning) and
+    none of the community features appear: no replies, new post types,
+    filters, live updates or lesson/quiz links. A teacher turns it on for
+    their class; the school-wide ``feed_community_enabled`` switch must also
+    be on.
+    """
+
+    school_class = models.OneToOneField(
+        "academics.SchoolClass",
+        on_delete=models.CASCADE,
+        related_name="feed_settings",
+    )
+    is_active = models.BooleanField(
+        default=False,
+        help_text="Turn on the class community feed for this class.",
+    )
+
+    class Meta:
+        db_table = "learning_class_feed_settings"
+
+    def __str__(self) -> str:
+        state = "on" if self.is_active else "off"
+        return f"Class feed ({state}) — {self.school_class}"
+
+
 class ClassEngagementSettings(BaseModel):
     """
     Per-class engagement switch and configuration.
@@ -378,13 +408,21 @@ class ClassPost(BaseModel):
     """
 
     class PostType(models.TextChoices):
-        ANNOUNCEMENT = "announcement", "Announcement"
-        QUESTION     = "question",     "Question"
-        TIP          = "tip",          "Tip"
-        CELEBRATION  = "celebration",  "Celebration"
+        ANNOUNCEMENT     = "announcement",     "Announcement"
+        QUESTION         = "question",         "Question"
+        TIP              = "tip",              "Tip"
+        CELEBRATION      = "celebration",      "Celebration"
+        CHALLENGE        = "challenge",        "Challenge"
+        DISCUSSION_PROMPT = "discussion_prompt", "Discussion prompt"
 
     # Posts accessible to anyone in these roles that is in the same class.
-    STUDENT_ALLOWED_TYPES = {PostType.QUESTION}
+    # ``tip`` is shown to students as "I figured it out"; ``celebration``
+    # as a thank-you or shout-out. The stored value stays the same.
+    STUDENT_ALLOWED_TYPES = {
+        PostType.QUESTION,
+        PostType.TIP,
+        PostType.CELEBRATION,
+    }
 
     school_class = models.ForeignKey(
         "academics.SchoolClass",
@@ -405,6 +443,22 @@ class ClassPost(BaseModel):
     )
     body = models.TextField(
         help_text="The post content. Plain text only; no HTML.",
+    )
+    lesson = models.ForeignKey(
+        "Lesson",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Optional lesson this post is about. Must belong to the same class.",
+    )
+    quiz = models.ForeignKey(
+        "Quiz",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Optional quiz this post is about. Must belong to the same class.",
     )
     is_pinned = models.BooleanField(
         default=False,
@@ -438,6 +492,70 @@ class ClassPost(BaseModel):
     def __str__(self) -> str:
         author = self.author.get_full_name() if self.author else "Unknown"
         return f"[{self.get_post_type_display()}] {author}: {self.body[:60]}"
+
+
+class ClassPostReply(BaseModel):
+    """
+    One reply under a feed post. Replies are deliberately one level deep:
+    no reply can reply to another reply, so the conversation stays readable
+    on a phone and never turns into a private thread.
+
+    ``is_best_answer`` marks the single reply the question's author or a
+    teacher chose. A partial unique index enforces at most one best answer
+    per post. Removing that reply clears the flag, which puts the question
+    back to "Waiting for an answer" unless another teacher reply remains.
+    """
+
+    post = models.ForeignKey(
+        ClassPost,
+        on_delete=models.CASCADE,
+        related_name="replies",
+    )
+    author = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="class_post_replies",
+    )
+    body = models.TextField(
+        help_text="Plain text only; no HTML and no clickable links.",
+    )
+    is_best_answer = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="The one reply chosen as the best answer for this question.",
+    )
+    is_removed = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Soft-delete by a teacher. Students and parents never see it.",
+    )
+    removed_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="class_post_replies_removed",
+    )
+    removed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "learning_class_post_reply"
+        ordering = ["created_at", "id"]
+        indexes = [
+            models.Index(fields=["post", "is_removed", "created_at"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["post"],
+                condition=models.Q(is_best_answer=True),
+                name="uniq_best_answer_per_post",
+            )
+        ]
+
+    def __str__(self) -> str:
+        author = self.author.get_full_name() if self.author else "Unknown"
+        return f"Reply by {author} on post {self.post_id}: {self.body[:60]}"
 
 
 class ClassPostReaction(BaseModel):
