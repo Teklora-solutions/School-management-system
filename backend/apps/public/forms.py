@@ -14,9 +14,9 @@ class ContactUsForm(forms.Form):
     The enquiry form on the public Contact page.
 
     ``website`` is a honeypot: no browser renders it and it is empty on every
-    real submission, while a bulk poster fills every field it can find. It is
-    checked in the view, which then answers as if the enquiry had gone through
-    — telling a spammer that the form rejected them teaches them what to fix.
+    real submission, while a bulk poster fills every field it can find. A
+    filled honeypot is refused with a neutral error — the enquiry is not
+    stored, and the visitor is never told the message was received.
     """
 
     name = forms.CharField(
