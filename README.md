@@ -226,7 +226,8 @@ governance state, homework with submissions, announcements and message threads.
 |---|---|
 | `--students-per-class N` | 2–100 pupils per class (default 10). |
 | `--dry-run` | Runs everything, then rolls every write back. |
-| `--force` | Allow running under the production settings module (refused otherwise). |
+| `--password VALUE` | Use a known password for every demo login instead of a generated one (tests, repeatable demos). |
+| `--force` | Run even with `DEBUG` off (a real database). Refused otherwise. |
 
 It is **idempotent** (natural keys + a fixed RNG seed of `20260901`), so a second run adds nothing.
 It seeds **no attendance**.
@@ -236,17 +237,23 @@ For statement-screening work there is a second seeder, `python manage.py seed_st
 covering every per-term statement state: settled, part-paid with carry-over, untouched, paid ahead, late,
 awarded, reversed, draft, holding a credit.
 
-Demo logins — these are the credentials `locustfile.py` expects, so change them before exposing the
-app anywhere:
+Demo logins — the seeder **generates a random password for each role and prints the table once** at
+the end of its output. Nothing in this repository contains those passwords. Write them down when
+they scroll past: re-running the seeder keeps the passwords the accounts already have rather than
+resetting them.
 
 | Username | Password | Role | Login identifier |
 |---|---|---|---|
-| `admin` | `REMOVED-DEMO-PASSWORD` | Admin | email |
-| `director` | `REMOVED-DEMO-PASSWORD` | Director | email |
-| `finance` | `REMOVED-DEMO-PASSWORD` | Finance officer | email |
-| `tch_001` … `tch_005` | `REMOVED-DEMO-PASSWORD` | Teacher | email |
-| `stu_001` … | `REMOVED-DEMO-PASSWORD` | Student | **admission number** |
-| `par_001` … | `REMOVED-DEMO-PASSWORD` | Parent | username |
+| `admin` | printed by the seeder | Admin | email |
+| `director` | printed by the seeder | Director | email |
+| `finance` | printed by the seeder | Finance officer | email |
+| `tch_001` … `tch_005` | printed by the seeder | Teacher | email |
+| `stu_001` … | printed by the seeder | Student | **admission number** |
+| `par_001` … | printed by the seeder | Parent | username |
+
+`locustfile.py` reads the same passwords from `LOCUST_ADMIN_PASSWORD`, `LOCUST_STUDENT_PASSWORD`,
+`LOCUST_PARENT_PASSWORD`, `LOCUST_DIRECTOR_PASSWORD` and `LOCUST_FINANCE_PASSWORD`, so a load test
+never needs a password written into a file.
 
 **Start over** by deleting `backend/db.sqlite3`, re-running `migrate`, then seeding again. There is
 no wipe flag because the ledger is append-only.
