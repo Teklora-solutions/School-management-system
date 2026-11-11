@@ -1,0 +1,65 @@
+{% extends base_template %}
+
+{% block title %}Notifications | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-bell me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Notifications
+    </h1>
+    <p class="page-subtitle">Website enquiries, class feed activity and anything else the system wants you to see.</p>
+  </div>
+  {% if unread_notification_count %}
+  <form method="post" action="{% url 'core_notifications:mark_all_read' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-secondary">
+      <i class="bi bi-check2-all me-1"></i>Mark all as read
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if notifications %}
+    <div class="list-group list-group-flush">
+      {% for notification in notifications %}
+      <a href="{% url 'core_notifications:open' notification.pk %}"
+         class="list-group-item list-group-item-action notification-row{% if not notification.is_read %} notification-row--unread{% endif %}">
+        <div class="notification-row__icon" aria-hidden="true">
+          {% if notification.category == "enquiry" %}
+            <i class="bi bi-envelope-paper"></i>
+          {% elif notification.category == "feed" %}
+            <i class="bi bi-chat-dots"></i>
+          {% else %}
+            <i class="bi bi-bell"></i>
+          {% endif %}
+        </div>
+        <div class="notification-row__body">
+          <div class="notification-row__title">
+            {{ notification.title }}
+            {% if not notification.is_read %}
+              <span class="badge text-bg-primary ms-1">New</span>
+            {% endif %}
+          </div>
+          {% if notification.message %}
+          <div class="notification-row__message">{{ notification.message }}</div>
+          {% endif %}
+        </div>
+        <div class="notification-row__time">{{ notification.created_at|timesince }} ago</div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+      <i class="bi bi-bell-slash d-block mb-2" style="font-size:2rem;color:var(--color-muted);" aria-hidden="true"></i>
+      <p class="text-muted-sm mb-0">Nothing here yet. Enquiries and class activity will show up in this list.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% include "partials/_pagination.html" %}
+{% endblock %}

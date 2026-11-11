@@ -20,7 +20,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import EmailMessage
 from django.http import JsonResponse
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.generic import FormView, TemplateView
 
 from . import selectors
@@ -220,6 +220,7 @@ class ContactView(PublicPageMixin, FormView):
             }
         )
         self.mail_to_school(enquiry)
+        self.notify_admins(enquiry)
 
         if _wants_json(self.request):
             return self._respond(JsonResponse({"ok": True}))
@@ -261,6 +262,35 @@ class ContactView(PublicPageMixin, FormView):
         except Exception:
             logger.warning(
                 "Website enquiry %s was saved but could not be mailed",
+                enquiry.pk,
+                exc_info=True,
+            )
+
+    def notify_admins(self, enquiry: ContactMessage) -> None:
+        """
+        Ring the in-app bell for every active admin.
+
+        The enquiry is already stored and the visitor is about to be told so,
+        so a notification failure is logged and never raised.
+        """
+        from apps.accounts.models import User
+        from apps.core.notifications import notify_many
+
+        try:
+            notify_many(
+                recipients=User.objects.filter(
+                    role=User.Role.ADMIN, is_active=True
+                ),
+                title="New website enquiry",
+                message=f"{enquiry.name} <{enquiry.email}>: {enquiry.message[:120]}",
+                link=reverse(
+                    "public_admin:enquiry_detail", args=[enquiry.pk]
+                ),
+                category="enquiry",
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Website enquiry %s was saved but admins could not be notified",
                 enquiry.pk,
                 exc_info=True,
             )

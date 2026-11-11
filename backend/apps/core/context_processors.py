@@ -7,6 +7,7 @@ Injects into every template:
   - navigation: sidebar nav items with resolved URLs and active flags
   - parent_children / selected_child: child-switcher data for parent role
   - unread_announcement_count: unread badge for student/parent navbar
+  - unread_notification_count: unread badge on the navbar bell
 """
 
 from __future__ import annotations
@@ -185,6 +186,27 @@ def parent_children(request: HttpRequest) -> dict:
         return {"parent_children": children, "selected_child": selected}
     except Exception:  # noqa: BLE001
         return {"parent_children": [], "selected_child": None}
+
+
+def unread_notifications(request: HttpRequest) -> dict:
+    """
+    Injects ``unread_notification_count`` for the navbar bell.
+
+    One indexed COUNT per rendered page for a signed-in user; redirect and JSON
+    answers never render, so they pay nothing.
+    """
+    if not request.user.is_authenticated:
+        return {"unread_notification_count": 0}
+    try:
+        from .models import Notification
+
+        return {
+            "unread_notification_count": Notification.objects.filter(
+                recipient=request.user, is_read=False
+            ).count()
+        }
+    except Exception:  # noqa: BLE001
+        return {"unread_notification_count": 0}
 
 
 def unread_count(request: HttpRequest) -> dict:

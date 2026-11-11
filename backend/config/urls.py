@@ -47,6 +47,11 @@ urlpatterns = [
     path("school/", include("apps.core.urls_school", namespace="core_school")),
     # Activity feed and daily report (admin only)
     path("activity/", include("apps.core.urls_activity", namespace="core_activity")),
+    # In-app notifications for every signed-in role (navbar bell)
+    path(
+        "notifications/",
+        include("apps.core.urls_notifications", namespace="core_notifications"),
+    ),
     # App routes
     # The school's own website: open to anyone.
     # public.urls owns the root path so "/" serves the home page directly -

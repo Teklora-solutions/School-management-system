@@ -52,6 +52,18 @@
 
       <div class="navbar-actions">
         {% block navbar_actions %}{% endblock %}
+        {# Notifications bell #}
+        {% if request.user.is_authenticated %}
+        <a class="navbar-icon-btn navbar-bell"
+           href="{% url 'core_notifications:list' %}"
+           title="Notifications"
+           aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}">
+          <i class="bi bi-bell" aria-hidden="true"></i>
+          {% if unread_notification_count %}
+          <span class="navbar-bell__badge">{{ unread_notification_count }}</span>
+          {% endif %}
+        </a>
+        {% endif %}
         {# Role badge #}
         {% if request.user.is_authenticated %}
           <span class="badge-role badge-role-{{ request.user.role }}">

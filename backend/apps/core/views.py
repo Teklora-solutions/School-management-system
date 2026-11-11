@@ -8,9 +8,12 @@ and the School Settings page (Module 1).
 from __future__ import annotations
 
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.utils import timezone
+from django.views import View
 from django.views.generic import ListView, TemplateView, UpdateView
 
 from . import selectors
@@ -21,7 +24,7 @@ from .forms import (
     SystemEventFilterForm,
 )
 from .mixins import AdminRequiredMixin
-from .models import AuditLog, SchoolSettings
+from .models import AuditLog, Notification, SchoolSettings
 from .services import update_school_settings
 
 
@@ -147,3 +150,42 @@ class SchoolSettingsView(AdminRequiredMixin, UpdateView):
         # What each field currently renders as, after the .env fallback.
         ctx["effective"] = selectors.school_settings_values()
         return ctx
+
+
+# ── In-app notifications (every signed-in role) ──────────────────────────────
+class NotificationListView(LoginRequiredMixin, ListView):
+    """A user's own notifications, newest first — the bell's landing page."""
+
+    template_name = "features/core/notification_list.html"
+    context_object_name = "notifications"
+    paginate_by = 30
+
+    def get_queryset(self):
+        return self.request.user.notifications.order_by("-created_at")
+
+
+class NotificationOpenView(LoginRequiredMixin, View):
+    """
+    Mark one notification read, then follow its link.
+
+    The recipient filter is the permission check: a notification you were not
+    sent does not exist as far as this view is concerned.
+    """
+
+    def get(self, request, pk):
+        notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
+        if not notification.is_read:
+            Notification.objects.filter(pk=notification.pk).update(is_read=True)
+        if notification.link:
+            return redirect(notification.link)
+        return redirect("core_notifications:list")
+
+
+class NotificationMarkAllReadView(LoginRequiredMixin, View):
+    """POST: clear the bell badge without opening every notification."""
+
+    def post(self, request):
+        updated = request.user.notifications.filter(is_read=False).update(is_read=True)
+        if updated:
+            messages.success(request, "All notifications marked as read.")
+        return redirect("core_notifications:list")

@@ -187,6 +187,17 @@ URL_ROLE_MATRIX = [
     ("public_admin:enquiry_detail", {"pk": "__enquiry__"}, {"admin"}, "enquiry inbox"),
     ("public_admin:enquiry_handled", {"pk": "__enquiry__"}, set(), "POST only"),
     ("public_admin:enquiry_delete", {"pk": "__enquiry__"}, set(), "POST only"),
+    # ── In-app notifications ─────────────────────────────────────────────
+    # Personal data, so every signed-in role may read its own list. Opening a
+    # single notification is owner-only by queryset filter and is pinned in
+    # apps/core/tests/test_notifications.py.
+    (
+        "core_notifications:list",
+        {},
+        {"admin", "director", "teacher", "student", "parent", "finance"},
+        "own notifications only",
+    ),
+    ("core_notifications:mark_all_read", {}, set(), "POST only"),
 ]
 
 ALL_ROLES = {"admin", "director", "teacher", "student", "parent", "finance"}

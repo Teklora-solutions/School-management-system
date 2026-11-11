@@ -114,6 +114,7 @@ TEMPLATES = [
                 "apps.core.context_processors.navigation",
                 "apps.core.context_processors.parent_children",
                 "apps.core.context_processors.unread_count",
+                "apps.core.context_processors.unread_notifications",
             ],
         },
     },
