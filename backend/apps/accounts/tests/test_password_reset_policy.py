@@ -8,8 +8,8 @@ Proves the password-reset access policy:
 
   2. Students and parents CAN self-reset — a reset email IS sent.
 
-  3. Admin CAN reset any staff member's password via the staff management
-     page at /accounts/staff/<pk>/reset-password/.
+  3. Admin sets any staff member's password by typing it on the staff page at
+     /accounts/staff/<pk>/reset-password/ — nothing is generated or emailed.
 
   4. Non-admin roles are blocked from the admin reset endpoint.
 """
@@ -18,8 +18,10 @@ from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
+
+from apps.core.models import AuditLog
 
 User = get_user_model()
 
@@ -164,14 +166,14 @@ class NonStaffSelfResetAllowedTest(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# 3. Admin can reset staff passwords via the staff management page
+# 3. Admin sets staff passwords by typing them on the staff page
 # ---------------------------------------------------------------------------
 
 
 class AdminStaffResetTest(TestCase):
     """
-    The admin can reset any staff member's password through the staff detail
-    page.  This is the ONLY legitimate path for staff password resets.
+    The admin chooses the new password and hands it over. Nothing is generated,
+    shown back or emailed — staff cannot self-reset (see part 1).
     """
 
     def setUp(self):
@@ -179,50 +181,128 @@ class AdminStaffResetTest(TestCase):
         self.teacher = _make_user(User.Role.TEACHER, 1)
         self.client.force_login(self.admin)
 
-    def test_admin_can_reset_teacher_password(self):
-        response = self.client.post(
-            reverse("accounts:staff_reset_password", kwargs={"pk": self.teacher.pk}),
-            follow=True,
+    def _url(self):
+        return reverse(
+            "accounts:staff_reset_password", kwargs={"pk": self.teacher.pk}
         )
+
+    def _payload(self, password="ChosenPass123!", confirm=None, force=True):
+        data = {"password": password, "password_confirm": confirm or password}
+        if force:
+            data["must_change_password"] = "on"
+        return data
+
+    def test_the_form_opens_with_two_password_fields(self):
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="password"')
+        self.assertContains(response, 'name="password_confirm"')
+
+    def test_admin_chosen_password_is_the_one_stored(self):
+        response = self.client.post(self._url(), self._payload(), follow=True)
         self.assertEqual(response.status_code, 200)
 
-        # The teacher's password hash must have changed
         self.teacher.refresh_from_db()
+        self.assertTrue(self.teacher.check_password("ChosenPass123!"))
         self.assertFalse(self.teacher.check_password("OldPass123!"))
         self.assertTrue(
             self.teacher.must_change_password,
             "Teacher must be flagged for password change on next login",
         )
+        self.assertEqual(len(mail.outbox), 0, "a chosen password is never emailed")
 
-    def test_admin_reset_sets_must_change_password(self):
-        self.client.post(
-            reverse("accounts:staff_reset_password", kwargs={"pk": self.teacher.pk}),
-        )
+    def test_admin_can_leave_the_forced_change_off(self):
+        self.client.post(self._url(), self._payload(force=False))
         self.teacher.refresh_from_db()
-        self.assertTrue(self.teacher.must_change_password)
+        self.assertFalse(self.teacher.must_change_password)
+        self.assertTrue(self.teacher.check_password("ChosenPass123!"))
+
+    def test_mismatch_is_refused_and_the_password_unchanged(self):
+        response = self.client.post(
+            self._url(), self._payload(confirm="Different123!")
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "did not match")
+        self.teacher.refresh_from_db()
+        self.assertTrue(self.teacher.check_password("OldPass123!"))
+
+    @override_settings(
+        AUTH_PASSWORD_VALIDATORS=[
+            {
+                "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+                "OPTIONS": {"min_length": 12},
+            }
+        ]
+    )
+    def test_a_hand_typed_password_is_validated(self):
+        response = self.client.post(self._url(), self._payload(password="short"))
+        self.assertEqual(response.status_code, 200)
+        self.teacher.refresh_from_db()
+        self.assertTrue(self.teacher.check_password("OldPass123!"))
+
+    def test_the_edit_page_links_to_the_password_form(self):
+        response = self.client.get(
+            reverse("accounts:staff_update", kwargs={"pk": self.teacher.pk})
+        )
+        self.assertContains(response, self._url())
+
+    def test_the_reset_is_audited_without_the_password(self):
+        self.client.post(self._url(), self._payload())
+        entry = AuditLog.objects.get(
+            action="user.password_reset", object_id=str(self.teacher.pk)
+        )
+        self.assertEqual(entry.change_summary, {"email": self.teacher.email})
+
+    def test_the_return_url_is_honoured(self):
+        edit = reverse("accounts:staff_update", kwargs={"pk": self.teacher.pk})
+        response = self.client.post(self._url(), dict(self._payload(), next=edit))
+        self.assertRedirects(response, edit)
+
+    def test_an_external_return_url_is_ignored(self):
+        response = self.client.post(
+            self._url(), dict(self._payload(), next="https://evil.example.com/")
+        )
+        self.assertRedirects(
+            response,
+            reverse("accounts:staff_detail", kwargs={"pk": self.teacher.pk}),
+        )
 
 
 # ---------------------------------------------------------------------------
-# 4. Non-admin roles are blocked from the admin reset endpoint
+# 4. Non-admin roles are blocked from the admin password page
 # ---------------------------------------------------------------------------
 
 
 class NonAdminBlockedFromStaffResetTest(TestCase):
     """
-    Only admin can reset staff passwords.  All other roles must be rejected
-    (403 or redirect) when they POST to the staff reset endpoint.
+    Only admin can set staff passwords.  All other roles must be rejected
+    (403 or redirect) and the target's password must be untouched.
     """
 
     def setUp(self):
         self.teacher = _make_user(User.Role.TEACHER, 1)
         self.target = _make_user(User.Role.FINANCE, 2)
 
+    def _payload(self):
+        return {
+            "password": "Hijacked123!",
+            "password_confirm": "Hijacked123!",
+            "must_change_password": "on",
+        }
+
     def _try_reset_as(self, role: str):
         user = _make_user(role, 99)
         self.client.force_login(user)
-        return self.client.post(
+        response = self.client.post(
             reverse("accounts:staff_reset_password", kwargs={"pk": self.target.pk}),
+            self._payload(),
         )
+        self.target.refresh_from_db()
+        self.assertTrue(
+            self.target.check_password("OldPass123!"),
+            f"{role} must not be able to set a staff password",
+        )
+        return response
 
     def test_teacher_blocked(self):
         response = self._try_reset_as(User.Role.TEACHER)
@@ -244,9 +324,17 @@ class NonAdminBlockedFromStaffResetTest(TestCase):
         response = self._try_reset_as(User.Role.PARENT)
         self.assertIn(response.status_code, (403, 302))
 
+    def test_teacher_cannot_even_open_the_form(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(
+            reverse("accounts:staff_reset_password", kwargs={"pk": self.target.pk})
+        )
+        self.assertIn(response.status_code, (403, 302))
+
     def test_unauthenticated_blocked(self):
         self.client.logout()
         response = self.client.post(
             reverse("accounts:staff_reset_password", kwargs={"pk": self.target.pk}),
+            self._payload(),
         )
         self.assertIn(response.status_code, (302, 301))

@@ -64,11 +64,19 @@
             </div>
           </div>
 
+          <div class="form-check mb-4">
+            {{ form.must_change_password }}
+            <label class="form-check-label fw-600" for="{{ form.must_change_password.id_for_label }}">
+              {{ form.must_change_password.label }}
+            </label>
+            {% if form.must_change_password.help_text %}<div class="form-text">{{ form.must_change_password.help_text }}</div>{% endif %}
+          </div>
+
           <div class="alert alert-info d-flex align-items-start gap-2 mb-4" style="font-size:0.875rem;">
             <i class="bi bi-info-circle-fill mt-1 flex-shrink-0" aria-hidden="true"></i>
             <span>
-              <strong>Admin-controlled passwords:</strong> Staff members cannot reset or change their own passwords.
-              You are the only person who can reset a staff password — use the <em>Reset Password</em> button on the staff detail page.
+              <strong>Admin-controlled passwords:</strong> only an administrator can set a forgotten staff password — use the <em>Set password</em> button on the staff page.
+              The staff member signs in with the password you set here and chooses their own the first time.
             </span>
           </div>
 

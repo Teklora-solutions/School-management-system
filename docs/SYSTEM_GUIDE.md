@@ -173,7 +173,7 @@ user, enrolment errors out rather than hijacking the account.
 - **Staff cannot self-reset.** `admin/director/teacher/finance` are blocked from
   `/accounts/password_reset/` and get a neutral page with no email
   ([backend/apps/accounts/views.py:32](backend/apps/accounts/views.py#L32)); they must ask an admin, who
-  uses Staff users → Reset password (POST-only). Students and parents can self-reset.
+  uses Staff users → Set password and types the new one (nothing is generated). Students and parents can self-reset.
 - Logout is **POST-only** ([backend/apps/accounts/views.py:75](backend/apps/accounts/views.py#L75)).
 - Staff creation UI: `/staff/add/`, admin only, role dropdown limited to teacher/director/finance
   ([backend/apps/accounts/forms.py:57](backend/apps/accounts/forms.py#L57)). **The admin types the initial
@@ -974,7 +974,7 @@ the test fails if the list grows.
 | Waived money still showing as debt on an invoice page | adjustments don't change `Invoice.total_amount`; and invoice-less adjustments don't reach `fee_totals` | Attach the invoice to the adjustment; read term/class figures, not the invoice row |
 | Class totals doubled after re-billing | fee structure revised after posting → a second posted invoice per pupil (§8.2) | Don't re-post; correct deliberately and record why |
 | Login says locked out with a JSON body | 5 failed attempts, 1-hour axes cooloff | Wait, or an admin can clear `axes_accessattempt` |
-| Staff cannot reset their own password | by design (`STAFF_ROLES` blocked) | Admin → Staff users → Reset password |
+| Staff cannot reset their own password | by design (`STAFF_ROLES` blocked) | Admin → Staff users → Set password (admin types it) |
 | New parent/student never gets a credential email | `qcluster` not running; `async_task` silently queues | Run `python manage.py qcluster`, or read the password off the success message and force a change |
 | Teacher/finance user gets 403 on Director pages | correct — Director URLs are director-only | Ask for the right role account |
 | Superuser gets 403 everywhere admin-only | the superuser account was given a `role` | Clear its role, or use a proper admin account |

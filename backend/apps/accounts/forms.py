@@ -153,6 +153,54 @@ class StaffUserCreateForm(forms.Form):
         return cleaned
 
 
+class StaffSetPasswordForm(forms.Form):
+    """
+    The admin types the new password for a staff member.
+
+    The system never invents this one, so it is never shown back and never
+    emailed: the admin knows it and hands it over. ``must_change_password``
+    mirrors the create-staff checkbox.
+    """
+
+    password = forms.CharField(
+        label="New password",
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control",
+                "autocomplete": "new-password",
+                "placeholder": "Type the password they will sign in with",
+            }
+        ),
+    )
+    password_confirm = forms.CharField(
+        label="Confirm new password",
+        widget=forms.PasswordInput(
+            attrs={"class": "form-control", "autocomplete": "new-password"}
+        ),
+    )
+    must_change_password = forms.BooleanField(
+        label="Force a password change on first login",
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Ticked: they must set their own password the first time they sign in.",
+    )
+
+    def clean_password(self):
+        """``set_password()`` never runs the validators, so the form does."""
+        password = self.cleaned_data["password"]
+        validate_password(password)
+        return password
+
+    def clean(self):
+        cleaned = super().clean()
+        password = cleaned.get("password")
+        confirm = cleaned.get("password_confirm")
+        if password and confirm and password != confirm:
+            self.add_error("password_confirm", "The two passwords did not match.")
+        return cleaned
+
+
 class StaffUserUpdateForm(forms.Form):
     """
     Edit an existing staff account's identity details.
@@ -160,9 +208,9 @@ class StaffUserUpdateForm(forms.Form):
     No ``role`` field and no password field, on purpose: a role change means
     moving the profile row that holds ``staff_id`` and re-deriving what the
     account can see, and a password change belongs to
-    ``reset_user_password`` — the only path that audits it and emails the new
-    credentials. The view passes ``initial={"staff_id": …}`` because that value
-    lives on the role's profile row, not on the user.
+    ``staff_reset_password`` — the only path that audits it. The view passes
+    ``initial={"staff_id": …}`` because that value lives on the role's profile
+    row, not on the user.
     """
 
     first_name = forms.CharField(

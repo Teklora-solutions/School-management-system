@@ -72,16 +72,20 @@
           <div class="alert alert-info d-flex align-items-start gap-2 mb-4" style="font-size:0.875rem;">
             <i class="bi bi-info-circle-fill mt-1 flex-shrink-0" aria-hidden="true"></i>
             <span>
-              Role and password are not editable here. Use <em>Reset Password</em> for a
-              password, and create a new account if someone is changing role — moving an
-              account between roles would mean moving the profile row that holds their
-              staff ID, assignments and marks.
+              Role is not editable here. Use <em>Set password</em> to choose the
+              password they sign in with, and create a new account if someone is
+              changing role — moving an account between roles would mean moving
+              the profile row that holds their staff ID, assignments and marks.
             </span>
           </div>
 
           <input type="hidden" name="next" value="{{ request.GET.next }}">
 
           <div class="d-flex gap-2 justify-content-end mt-4">
+            <a href="{% url 'accounts:staff_reset_password' staff_user.pk %}?next={{ request.get_full_path|urlencode }}"
+               class="btn btn-outline-warning me-auto" id="btn-set-pwd-staff-edit">
+              <i class="bi bi-key me-1"></i>Set password
+            </a>
             <a href="{{ back_url }}" class="btn btn-outline-secondary" id="btn-cancel-staff-edit">Cancel</a>
             <button type="submit" class="btn btn-primary" id="btn-save-staff-edit">
               <i class="bi bi-check2 me-1"></i>Save Changes

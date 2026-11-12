@@ -75,7 +75,7 @@ def update_staff_user(
     Deliberately excluded: **role** (moving a user between roles means moving
     their profile row and re-deriving what they can see, which no route here is
     able to do safely) and **password** (``reset_user_password`` is the audited
-    path, and it is the only one that emails the new credentials).
+    path, and the admin types the password there).
 
     Note what an email change costs: staff sign in *with their email*
     (``EmailOrAdmissionBackend`` looks the account up by email), so the old
@@ -377,10 +377,21 @@ def reset_user_password(
     actor: UserType | None = None,
     request: HttpRequest | None = None,
     send_credentials: bool = True,
+    password: str | None = None,
+    must_change_password: bool = True,
 ) -> str:
-    temp_password = _generate_temp_password()
-    user.set_password(temp_password)
-    user.must_change_password = True
+    """
+    Set a new password for ``user`` and flag the forced change.
+
+    ``password`` is the admin's own choice; when it is omitted the system
+    generates one for callers that never hand it to a human (tests). A chosen
+    password is never emailed — the admin already knows it and tells the staff
+    member directly. ``set_password()`` bypasses Django's validators, so a
+    hand-typed password is checked by ``StaffSetPasswordForm``.
+    """
+    password_used = password or _generate_temp_password()
+    user.set_password(password_used)
+    user.must_change_password = must_change_password
     user.save(update_fields=["password", "must_change_password", "updated_at"])
     log_action(
         actor=actor,
@@ -390,9 +401,9 @@ def reset_user_password(
         change_summary={"email": user.email},
         request=request,
     )
-    if send_credentials:
-        enqueue_credentials_email(user, temp_password)
-    return temp_password
+    if send_credentials and password is None:
+        enqueue_credentials_email(user, password_used)
+    return password_used
 
 
 # ─── Deleting a staff account ─────────────────────────────────────────────────

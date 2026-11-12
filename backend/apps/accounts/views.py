@@ -23,6 +23,7 @@ from . import selectors, services
 from .forms import (
     ForcePasswordChangeForm,
     LoginForm,
+    StaffSetPasswordForm,
     StaffUserCreateForm,
     StaffUserFilterForm,
     StaffUserUpdateForm,
@@ -154,10 +155,11 @@ class RoleLoginView(View):
                 )
             else:
                 login(request, user)
-                # Staff passwords are managed exclusively by the admin
-                # (/accounts/staff/<pk>/reset-password/), so staff roles are
-                # never sent to the self-service force-change screen.
-                if user.must_change_password and user.role not in STAFF_ROLES:
+                # Anyone holding an admin-set or admin-reset password chooses
+                # their own the first time they sign in. A forgotten password
+                # is still an admin reset; the self-service email stays closed
+                # to staff.
+                if user.must_change_password:
                     return redirect("accounts:force_password_change")
                 return redirect(next_url or user.get_dashboard_url())
         return render(
@@ -228,39 +230,21 @@ class ForcePasswordChangeView(LoginRequiredMixin, View):
     """
     Shown once when user.must_change_password is True.
 
-    Staff roles (admin, director, teacher, finance) are NOT allowed to
-    change their own password — only the admin can reset staff passwords
-    via the staff management page (/accounts/staff/<pk>/reset-password/).
-    Students and parents keep the normal self-service flow.
+    Admin-set and admin-reset passwords are temporary for every role,
+    including staff: the first sign-in must replace it. The self-service
+    *reset* email stays closed to staff, so a forgotten password is an
+    admin reset, not an email link.
     """
 
     template_name = "auth/force_password_change.html"
 
-    def _is_staff_role(self, user):
-        return user.role in STAFF_ROLES
-
     def get(self, request):
-        # Staff cannot self-reset — redirect them to their dashboard
-        if self._is_staff_role(request.user):
-            messages.error(
-                request,
-                "Staff passwords can only be changed by the school administrator. "
-                "Please contact your administrator to reset your password.",
-            )
-            return redirect(request.user.get_dashboard_url())
         if not request.user.must_change_password:
             return redirect(request.user.get_dashboard_url())
         form = ForcePasswordChangeForm(user=request.user)
         return render(request, self.template_name, {"form": form})
 
     def post(self, request):
-        # Block staff from POSTing a password change
-        if self._is_staff_role(request.user):
-            messages.error(
-                request,
-                "Staff passwords can only be changed by the school administrator.",
-            )
-            return redirect(request.user.get_dashboard_url())
         form = ForcePasswordChangeForm(user=request.user, data=request.POST)
         if form.is_valid():
             user = form.save()
@@ -550,13 +534,47 @@ class StaffUserDeleteView(AdminRequiredMixin, View):
 
 
 class StaffResetPasswordView(AdminRequiredMixin, View):
-    def post(self, request, pk):
-        user = get_object_or_404(selectors.staff_user_list(), pk=pk)
-        temp_password = services.reset_user_password(
-            user=user, actor=request.user, request=request
-        )
-        messages.success(
+    """
+    ``/staff/<pk>/reset-password/`` — the admin types the new password.
+
+    Staff cannot self-reset by email (``StaffBlockedPasswordResetView``), so
+    this form is the only way back into a staff account whose password is lost.
+    """
+
+    template_name = "features/accounts/staff_reset_password.html"
+
+    def _staff_user(self):
+        return get_object_or_404(selectors.staff_user_list(), pk=self.kwargs["pk"])
+
+    def _render(self, request, user, form):
+        return render(
             request,
-            f"Password reset for {user.full_name}. Temporary password: {temp_password}",
+            self.template_name,
+            {
+                "staff_user": user,
+                "form": form,
+                "back_url": _safe_next(request, include_post=True)
+                or reverse_lazy("accounts:staff_detail", kwargs={"pk": user.pk}),
+            },
         )
-        return redirect("accounts:staff_detail", pk=pk)
+
+    def get(self, request, pk):
+        return self._render(request, self._staff_user(), StaffSetPasswordForm())
+
+    def post(self, request, pk):
+        user = self._staff_user()
+        form = StaffSetPasswordForm(request.POST)
+        if form.is_valid():
+            services.reset_user_password(
+                user=user,
+                password=form.cleaned_data["password"],
+                must_change_password=form.cleaned_data["must_change_password"],
+                actor=request.user,
+                request=request,
+            )
+            messages.success(request, f"Password updated for {user.full_name}.")
+            next_url = _safe_next(request, include_post=True)
+            if next_url:
+                return redirect(next_url)
+            return redirect("accounts:staff_detail", pk=pk)
+        return self._render(request, user, form)

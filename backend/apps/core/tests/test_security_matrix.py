@@ -84,6 +84,12 @@ URL_ROLE_MATRIX = [
     ("accounts:staff_list", {}, {"admin"}, "Module 1"),
     ("accounts:staff_create", {}, {"admin"}, "Module 1"),
     ("accounts:staff_detail", {"pk": "__staff__"}, {"admin"}, "Module 1"),
+    (
+        "accounts:staff_reset_password",
+        {"pk": "__staff__"},
+        {"admin"},
+        "admin types the password",
+    ),
     # ── Academics structure ──────────────────────────────────────────────
     ("academics:year_list", {}, {"admin", "director", "finance"}, "read-only"),
     ("academics:year_create", {}, {"admin"}, "Module 1"),
@@ -144,7 +150,6 @@ URL_ROLE_MATRIX = [
     # ── POST-only admin endpoints (GET → 405 for admin, 403 for others) ──
     ("accounts:staff_deactivate", {"pk": "__staff__"}, set(), "POST only"),
     ("accounts:staff_reactivate", {"pk": "__staff__"}, set(), "POST only"),
-    ("accounts:staff_reset_password", {"pk": "__staff__"}, set(), "POST only"),
     ("academics:year_set_current", {"pk": "__year__"}, set(), "POST only"),
     ("academics:year_delete", {"pk": "__year__"}, set(), "POST only"),
     ("academics:term_set_current", {"pk": "__term__"}, set(), "POST only"),

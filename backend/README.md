@@ -180,8 +180,8 @@ admission number, parents by username.** Portals come from one `PORTALS` registr
 First-login password change is enforced twice — by the login view and by
 `ForcePasswordChangeMiddleware` with an exempt-prefix list. Staff (admin/director/teacher/finance)
 cannot self-reset: `config/urls.py:23` installs `StaffBlockedPasswordResetView` **before** the
-`django.contrib.auth.urls` include, and admin-driven reset lives at
-`/accounts/staff/<pk>/reset-password/`. Logout is POST-only.
+`django.contrib.auth.urls` include, and the admin sets a new staff password at
+`/accounts/staff/<pk>/reset-password/` (the admin types it; nothing is generated). Logout is POST-only.
 
 ### Row-level checks
 Ownership is resolved inside views/services, never trusted from a querystring: student identity comes
