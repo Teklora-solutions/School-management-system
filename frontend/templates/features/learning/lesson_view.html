@@ -568,7 +568,7 @@
     .then(function (r) { return r.json(); })
     .then(function (json) {
       if (json.ok && status) {
-        status.textContent = 'Saved ✓';
+        status.textContent = 'Saved';
         setTimeout(function () { status.textContent = ''; }, 3000);
       }
     })

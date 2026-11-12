@@ -29,7 +29,7 @@
               <option value="{{ t.pk }}"
                       {% if t.pk == term.pk %}selected{% endif %}>
                 {{ t.academic_year.name }} — {{ t.get_name_display }}
-                {% if t.is_current %}✓ Current{% endif %}
+                {% if t.is_current %} (Current){% endif %}
               </option>
               {% endfor %}
             </select>

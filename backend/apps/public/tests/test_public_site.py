@@ -140,12 +140,17 @@ class PublicPagesTest(TestCase):
         for name in PAGE_URL_NAMES:
             self.assertIn(reverse(f"public:{name}"), body)
 
-    def test_the_root_sends_a_visitor_to_public_home_and_a_user_to_their_dashboard(self):
-        self.assertRedirects(self.client.get("/"), reverse("public:home"), status_code=302)
+    def test_the_root_serves_the_public_home_and_dashboard_routes_users(self):
+        resp = self.client.get("/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTemplateUsed(resp, "public/home.html")
         for role in ALL_ROLES:
             self.client.force_login(self.users[role])
+            root = self.client.get("/")
+            self.assertEqual(root.status_code, 200)
+            self.assertTemplateUsed(root, "public/home.html")
             self.assertRedirects(
-                self.client.get("/"),
+                self.client.get(reverse("accounts:dashboard_redirect")),
                 self.users[role].get_dashboard_url(),
                 status_code=302,
             )
