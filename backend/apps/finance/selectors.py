@@ -339,8 +339,77 @@ def trial_balance() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+def _statement_status(*, invoices, total_paid, total_adjusted, balance) -> str:
+    """The one sentence a family needs above a term statement."""
+    posted = any(invoice.status == Invoice.Status.POSTED for invoice in invoices)
+    if not posted:
+        if any(invoice.status == Invoice.Status.DRAFT for invoice in invoices):
+            return "Draft only"
+        return "Not billed yet"
+    if balance < ZERO:
+        return "In credit"
+    if balance == ZERO:
+        return "Settled"
+    if total_paid == ZERO and total_adjusted == ZERO:
+        return "Unpaid"
+    return "Part-paid"
+
+
+def _credit_held(payments) -> Decimal:
+    """
+    Money the school is still holding for this pupil, from prefetched receipts.
+
+    Read from the prefetched rows instead of ``Payment.unapplied_amount`` so a
+    statement with forty receipts stays one query: the property asks the
+    database again per receipt.
+    """
+    held = ZERO
+    for payment in payments:
+        if payment.is_reversed or to_money(payment.amount) <= 0:
+            continue
+        applied = sum(
+            (allocation.allocated_amount for allocation in payment.allocations.all()),
+            ZERO,
+        )
+        held += to_money(payment.amount) - applied
+    return held
+
+
+def _brought_forward(*, student, term) -> Decimal:
+    """Everything earlier terms still owe, net of the money that touched them."""
+    earlier = Invoice.objects.filter(
+        student=student,
+        status=Invoice.Status.POSTED,
+        term__start_date__lt=term.start_date,
+    )
+    earlier_ids = list(earlier.values_list("pk", flat=True))
+    billed = _money_sum(earlier, "total_amount")
+    paid = _money_sum(
+        PaymentAllocation.objects.filter(invoice_id__in=earlier_ids).live(),
+        "allocated_amount",
+    )
+    adjusted = _money_sum(
+        Adjustment.objects.filter(invoice_id__in=earlier_ids).live(), "amount"
+    )
+    return billed - paid - adjusted
+
+
 def student_statement(*, student_id: int, term=None) -> dict:
-    """Full finance record for one student."""
+    """
+    Full finance record for one student, for one term or for everything to date.
+
+    A term statement answers "what did this term cost, what did this term
+    collect, what is left" — so its money is scoped the same way the rest of the
+    fee interface scopes a period: bills of that term, live allocations against
+    those bills, posted reductions of those bills. ``student_balance`` still
+    reads the all-terms figure, and that mode keeps its original arithmetic.
+
+    Term mode adds:
+      ``brought_forward``  earlier terms' open amount, by term start date
+      ``closing_balance``  brought forward + this term's open
+      ``credit_held``      receipts still unapplied, a today figure (both modes)
+      ``term_status``      Settled / Part-paid / Unpaid / In credit / ...
+    """
     from apps.students.models import Student
 
     student = (
@@ -363,12 +432,18 @@ def student_statement(*, student_id: int, term=None) -> dict:
     )
     if term:
         invoices_qs = invoices_qs.filter(term=term)
+    posted_invoices = invoices_qs.filter(status=Invoice.Status.POSTED)
+    posted_ids = list(posted_invoices.values_list("pk", flat=True))
+    invoices = list(invoices_qs)
 
-    payments_qs = (
+    # Credit is not term-dated: a receipt the school is holding is held today.
+    # Read from the pupil's whole history even when the page is filtered.
+    all_payments_qs = (
         Payment.objects.filter(student=student)
         .prefetch_related("allocations__invoice")
         .order_by("payment_date")
     )
+    credit_held = _credit_held(all_payments_qs)
 
     adjustments_qs = (
         Adjustment.objects.filter(student=student)
@@ -376,26 +451,74 @@ def student_statement(*, student_id: int, term=None) -> dict:
         .order_by("created_at")
     )
 
-    total_billed = invoices_qs.filter(status=Invoice.Status.POSTED).aggregate(
-        t=Coalesce(Sum("total_amount"), Decimal(0), output_field=DecimalField())
-    )["t"]
-    total_paid = payments_qs.filter(is_reversed=False).aggregate(
-        t=Coalesce(Sum("amount"), Decimal(0), output_field=DecimalField())
-    )["t"]
-    total_adjusted = adjustments_qs.live().aggregate(
-        t=Coalesce(Sum("amount"), Decimal(0), output_field=DecimalField())
-    )["t"]
-    balance = total_billed - total_paid - total_adjusted
+    if term:
+        payments_qs = all_payments_qs.filter(
+            allocations__invoice_id__in=posted_ids
+        ).distinct()
+        adjustments_qs = adjustments_qs.filter(invoice_id__in=posted_ids)
+
+        total_billed = _money_sum(posted_invoices, "total_amount")
+        total_paid = _money_sum(
+            PaymentAllocation.objects.filter(invoice_id__in=posted_ids).live(),
+            "allocated_amount",
+        )
+        total_adjusted = _money_sum(adjustments_qs.live(), "amount")
+        balance = total_billed - total_paid - total_adjusted
+
+        brought_forward = _brought_forward(student=student, term=term)
+        closing_balance = brought_forward + balance
+        term_status = _statement_status(
+            invoices=invoices,
+            total_paid=total_paid,
+            total_adjusted=total_adjusted,
+            balance=balance,
+        )
+
+        term_ids = set(posted_ids)
+        payments = list(payments_qs)
+        for payment in payments:
+            # A term receipt shows its share of this term, not other terms it
+            # also paid and not the unallocated part held as credit.
+            here = [
+                allocation
+                for allocation in payment.allocations.all()
+                if allocation.invoice_id in term_ids
+            ]
+            payment.term_allocations = here
+            payment.shown_amount = sum(
+                (allocation.allocated_amount for allocation in here), ZERO
+            )
+    else:
+        payments_qs = all_payments_qs
+        total_billed = _money_sum(posted_invoices, "total_amount")
+        total_paid = _money_sum(
+            payments_qs.filter(is_reversed=False), "amount"
+        )
+        total_adjusted = _money_sum(adjustments_qs.live(), "amount")
+        balance = total_billed - total_paid - total_adjusted
+
+        brought_forward = ZERO
+        closing_balance = balance
+        term_status = ""
+
+        payments = list(payments_qs)
+        for payment in payments:
+            payment.term_allocations = list(payment.allocations.all())
+            payment.shown_amount = payment.amount
 
     return {
         "student": student,
-        "invoices": list(invoices_qs),
-        "payments": list(payments_qs),
+        "invoices": invoices,
+        "payments": payments,
         "adjustments": list(adjustments_qs),
         "total_billed": total_billed,
         "total_paid": total_paid,
         "total_adjusted": total_adjusted,
         "balance": balance,
+        "brought_forward": brought_forward,
+        "closing_balance": closing_balance,
+        "credit_held": credit_held,
+        "term_status": term_status,
         "term": term,
     }
 

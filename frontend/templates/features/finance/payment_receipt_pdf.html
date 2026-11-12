@@ -19,6 +19,7 @@
     .amount-box .label { font-size: 9pt; color: #666; }
     .amount-box .value { font-size: 20pt; font-weight: 700; }
     .reversed { color: #cf222e; font-weight: 700; text-transform: uppercase; }
+    .duplicate { border: 3px solid #cf222e; color: #cf222e; font-size: 16pt; font-weight: 700; text-align: center; letter-spacing: 0.12em; padding: 8px; margin-bottom: 16px; text-transform: uppercase; }
     .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 9pt; color: #777; text-align: center; }
   </style>
 </head>
@@ -30,6 +31,10 @@
   </div>
 
   <div class="doc-title">Official Payment Receipt</div>
+
+  {% if duplicate %}
+    <div class="duplicate">Duplicate copy</div>
+  {% endif %}
 
   {% if payment.is_reversed %}
     <p class="reversed">Reversed{% if payment.reversal_reason %}: {{ payment.reversal_reason }}{% endif %}</p>
@@ -57,6 +62,16 @@
     <tr>
       <td>Payment Reference:</td>
       <td colspan="3">{{ payment.reference }}</td>
+    </tr>
+    {% if payment.payer_name %}
+    <tr>
+      <td>Received from:</td>
+      <td colspan="3">{{ payment.payer_name }}</td>
+    </tr>
+    {% endif %}
+    <tr>
+      <td>Verification code:</td>
+      <td colspan="3" style="font-weight:600;letter-spacing:0.08em;">{{ payment.verification_code }}</td>
     </tr>
   </table>
 

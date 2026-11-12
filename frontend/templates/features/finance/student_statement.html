@@ -56,6 +56,44 @@
 </form>
 
 <div class="row g-3 mb-3">
+  {% if term %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-calendar3 me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          {{ term }}
+        </h2>
+        <span class="badge" style="background:{% if term_status == 'Settled' %}var(--color-success){% elif term_status == 'In credit' %}var(--accent-light){% elif term_status == 'Not billed yet' or term_status == 'Draft only' %}var(--color-muted){% else %}var(--color-warning);color:#000{% endif %};">
+          {{ term_status }}
+        </span>
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-7 text-muted-sm">Brought forward</dt>
+          <dd class="col-5 text-end mb-1">{{ currency }} {{ brought_forward|floatformat:2|intcomma }}</dd>
+          <dt class="col-7 text-muted-sm">Billed this term</dt>
+          <dd class="col-5 text-end mb-1">{{ currency }} {{ total_billed|floatformat:2|intcomma }}</dd>
+          <dt class="col-7 text-muted-sm">Paid against this term</dt>
+          <dd class="col-5 text-end mb-1 text-success">&minus; {{ currency }} {{ total_paid|floatformat:2|intcomma }}</dd>
+          <dt class="col-7 text-muted-sm">Waived on this term</dt>
+          <dd class="col-5 text-end mb-1 text-warning">&minus; {{ currency }} {{ total_adjusted|floatformat:2|intcomma }}</dd>
+          <dt class="col-7 fw-600 border-top pt-2">Closing balance</dt>
+          <dd class="col-5 text-end fw-600 border-top pt-2 {% if closing_balance > 0 %}text-danger{% else %}text-success{% endif %}">
+            {{ currency }} {{ closing_balance|floatformat:2|intcomma }}
+          </dd>
+        </dl>
+        {% if credit_held > 0 %}
+        <p class="text-muted-sm mb-0 mt-2">
+          <i class="bi bi-wallet2 me-1" aria-hidden="true"></i>
+          Credit held on account today: <strong>{{ currency }} {{ credit_held|floatformat:2|intcomma }}</strong>
+          — money received but not yet applied to a bill, so not counted in this term.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
   <div class="col-sm-6 col-xl-3">
     <div class="stat-card">
       <div class="stat-icon"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></div>
@@ -106,6 +144,7 @@
       </div>
     </div>
   </div>
+  {% endif %}
 </div>
 
 {% if student.sponsor or student.payment_plan_notes %}
@@ -172,8 +211,12 @@
             <td class="text-end">{{ currency }} {{ invoice.total_amount|floatformat:2|intcomma }}</td>
             <td class="text-end text-success">{{ currency }} {{ invoice.paid_here|floatformat:2|intcomma }}</td>
             <td class="text-end text-warning">{{ currency }} {{ invoice.adjusted_here|floatformat:2|intcomma }}</td>
-            <td class="text-end fw-600 {% if invoice.outstanding_here > 0 %}text-danger{% endif %}">
-              {{ currency }} {{ invoice.outstanding_here|floatformat:2|intcomma }}
+            <td class="text-end fw-600 {% if invoice.status == 'posted' and invoice.outstanding_here > 0 %}text-danger{% endif %}">
+              {% if invoice.status == 'posted' %}
+                {{ currency }} {{ invoice.outstanding_here|floatformat:2|intcomma }}
+              {% else %}
+                —
+              {% endif %}
             </td>
           </tr>
           {% empty %}
@@ -186,6 +229,10 @@
         </tbody>
       </table>
     </div>
+  </div>
+  <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+    Only posted bills count towards the totals. A draft bill is listed for the
+    office's benefit, but nothing has been billed on it yet.
   </div>
 </div>
 
@@ -205,7 +252,7 @@
               <th scope="col">Date</th>
               <th scope="col">Receipt</th>
               <th scope="col">Method</th>
-              <th scope="col" class="text-end">Amount</th>
+              <th scope="col" class="text-end">{% if term %}Applied here{% else %}Amount{% endif %}</th>
               <th scope="col">Applied to</th>
             </tr>
           </thead>
@@ -227,10 +274,10 @@
               </td>
               <td class="text-muted-sm">{{ payment.get_method_display }}</td>
               <td class="text-end {% if not payment.is_reversed %}text-success{% endif %}">
-                {{ currency }} {{ payment.amount|floatformat:2|intcomma }}
+                {{ currency }} {{ payment.shown_amount|floatformat:2|intcomma }}
               </td>
               <td class="text-muted-sm">
-                {% for alloc in payment.allocations.all %}
+                {% for alloc in payment.term_allocations %}
                   {{ alloc.invoice.invoice_number }}
                   <span style="font-size:0.75rem;">
                     ({{ currency }} {{ alloc.allocated_amount|floatformat:2|intcomma }})
@@ -247,8 +294,16 @@
         </table>
       </div>
       <div class="card-footer text-muted-sm" style="font-size:0.78rem;">
+        {% if term %}
+        Only receipts that touched a bill in this term are listed, and each shows
+        the part that went to this term — a receipt that also paid another term
+        appears on that term's statement for the rest. Credit still held is not a
+        payment for any term. A reversed receipt is shown for the record but is
+        not added to “paid”.
+        {% else %}
         “Paid” counts the money still standing: a reversed receipt is listed here
         for the record but is not added to it.
+        {% endif %}
       </div>
     </div>
   </div>

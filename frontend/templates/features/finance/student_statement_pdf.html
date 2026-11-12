@@ -46,6 +46,12 @@
       <td class="label">Period:</td>
       <td>{% if term %}{{ term }}{% else %}All terms to date{% endif %}</td>
     </tr>
+    {% if term %}
+    <tr>
+      <td class="label">Status:</td>
+      <td colspan="3">{{ term_status }}</td>
+    </tr>
+    {% endif %}
     {% if student.sponsor %}
     <tr>
       <td class="label">Sponsor:</td>
@@ -78,7 +84,7 @@
         <td class="right">{{ currency }} {{ invoice.total_amount|floatformat:2 }}</td>
         <td class="right">{{ currency }} {{ invoice.paid_here|floatformat:2 }}</td>
         <td class="right">{{ currency }} {{ invoice.adjusted_here|floatformat:2 }}</td>
-        <td class="right">{{ currency }} {{ invoice.outstanding_here|floatformat:2 }}</td>
+        <td class="right">{% if invoice.status == 'posted' %}{{ currency }} {{ invoice.outstanding_here|floatformat:2 }}{% else %}—{% endif %}</td>
       </tr>
       {% empty %}
       <tr><td colspan="8" class="muted">No bills have been raised.</td></tr>
@@ -94,7 +100,7 @@
         <th>Receipt</th>
         <th>Method</th>
         <th>Reference</th>
-        <th class="right">Amount</th>
+        <th class="right">{% if term %}Applied here{% else %}Amount{% endif %}</th>
       </tr>
     </thead>
     <tbody>
@@ -105,7 +111,7 @@
         <td>{{ payment.get_method_display }}</td>
         <td>{{ payment.reference|default:"—" }}</td>
         <td class="right{% if payment.is_reversed %} reversed{% endif %}">
-          {{ currency }} {{ payment.amount|floatformat:2 }}
+          {{ currency }} {{ payment.shown_amount|floatformat:2 }}
         </td>
       </tr>
       {% empty %}
@@ -142,22 +148,34 @@
 
   <table class="lines">
     <tfoot>
+      {% if term %}
       <tr>
-        <th colspan="3">Total billed</th>
+        <th colspan="3">Brought forward</th>
+        <th class="right">{{ currency }} {{ brought_forward|floatformat:2 }}</th>
+      </tr>
+      {% endif %}
+      <tr>
+        <th colspan="3">Total billed{% if term %} this term{% endif %}</th>
         <th class="right">{{ currency }} {{ total_billed|floatformat:2 }}</th>
       </tr>
       <tr>
-        <th colspan="3">Total paid</th>
+        <th colspan="3">Total paid{% if term %} against this term{% endif %}</th>
         <th class="right">{{ currency }} {{ total_paid|floatformat:2 }}</th>
       </tr>
       <tr>
-        <th colspan="3">Waived / adjusted</th>
+        <th colspan="3">Waived / adjusted{% if term %} on this term{% endif %}</th>
         <th class="right">{{ currency }} {{ total_adjusted|floatformat:2 }}</th>
       </tr>
       <tr>
-        <th colspan="3">{% if balance < 0 %}Credit on the account{% else %}Balance owing{% endif %}</th>
-        <th class="right">{{ currency }} {{ balance|floatformat:2 }}</th>
+        <th colspan="3">{% if term %}Closing balance{% elif balance < 0 %}Credit on the account{% else %}Balance owing{% endif %}</th>
+        <th class="right">{{ currency }} {{ closing_balance|floatformat:2 }}</th>
       </tr>
+      {% if credit_held > 0 %}
+      <tr>
+        <th colspan="3" class="muted">Credit held on account today</th>
+        <th class="right muted">{{ currency }} {{ credit_held|floatformat:2 }}</th>
+      </tr>
+      {% endif %}
     </tfoot>
   </table>
 
@@ -166,7 +184,10 @@
     the period; paid counts receipts still standing against them; waived counts
     reductions an officer has already approved. A receipt that was reversed is shown
     struck through and is not included in the totals, and a waiver still awaiting an
-    approval signature is listed but not deducted. {% if student.payment_plan_notes %}
+    approval signature is listed but not deducted. {% if term %}
+    A receipt that also paid another term is counted here only for its share of
+    this term, and credit still held is shown separately because it is not yet a
+    payment for any term. {% endif %}{% if student.payment_plan_notes %}
     Agreed plan on file: {{ student.payment_plan_notes }}{% endif %}
   </div>
 

@@ -25,7 +25,7 @@
         <i class="bi bi-person-lines-fill me-1"></i>Statement
       </a>
       <a href="{% url 'finance:payment_receipt_pdf' payment.pk %}" class="btn btn-outline-primary btn-sm">
-        <i class="bi bi-printer me-1"></i>Print receipt
+        <i class="bi bi-printer me-1"></i>{% if payment.print_count %}Reprint (DUPLICATE){% else %}Print receipt{% endif %}
       </a>
       {% if not payment.is_reversed and not payment.reverses %}
       <a href="{% url 'finance:payment_reverse' payment.pk %}" class="btn btn-outline-danger btn-sm">
@@ -203,9 +203,9 @@
               <td class="text-muted-sm">Copies printed</td>
               <td>
                 {{ payment.print_count }}
-                {% if payment.print_count > 1 %}
+                {% if payment.print_count > 0 %}
                   <div class="text-muted-sm" style="font-size:0.75rem;">
-                    The 2nd and later copies are marked DUPLICATE.
+                    The next copy will be marked DUPLICATE.
                   </div>
                 {% endif %}
               </td>

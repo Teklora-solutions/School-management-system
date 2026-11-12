@@ -35,8 +35,11 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
+
+from apps.core.models import AuditLog
 
 from apps.dashboards.tests.fixtures import (
     make_accounts,
@@ -50,7 +53,7 @@ from apps.dashboards.tests.fixtures import (
 )
 
 from .. import selectors, services
-from ..models import FeeStructureUploadJob, Payment
+from ..models import Adjustment, FeeStructureUploadJob, Invoice, Payment
 
 PAYMENT_DATE = datetime.date(2025, 9, 10)
 D = Decimal
@@ -656,3 +659,262 @@ class MarkupCarriesNoArithmeticTests(FinancePageTestBase):
             text = read_template(name)
             for annotation in ("paid_here", "adjusted_here", "outstanding_here"):
                 self.assertIn(annotation, text, f"{name} lost {annotation}")
+
+
+class TermStatementTests(FinancePageTestBase):
+    """
+    FS-4: a statement for one term may only count that term's money.
+
+    A Term 1 statement used to subtract Term 2's receipts, so the page could
+    show a family a balance the term had already settled — or, worse, one that
+    another term's payment had quietly reduced.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.term2_structure = make_fee_structure(
+            cls.school_class, cls.other_term, D("500.00")
+        )
+        cls.term2_invoice = make_posted_invoice(
+            cls.student, cls.other_term, cls.term2_structure, D("500.00")
+        )
+        cls.term2_payment = services.record_payment(
+            student=cls.student,
+            amount=D("300.00"),
+            method=Payment.Method.BANK,
+            reference="PG-REF-T2",
+            payment_date=datetime.date(2026, 2, 10),
+            recorded_by=cls.officer,
+            allocations=[
+                {"invoice": cls.term2_invoice, "amount": D("300.00")}
+            ],
+        )
+        services.apply_adjustment(
+            student=cls.student,
+            invoice=cls.term2_invoice,
+            adjustment_type="scholarship",
+            amount=D("20.00"),
+            reason="Term 2 bursary",
+            actor=cls.officer,
+        )
+        # An ask awaiting a signature: listed, never deducted.
+        Adjustment.objects.create(
+            student=cls.student,
+            invoice=cls.term2_invoice,
+            adjustment_type=Adjustment.AdjustmentType.WRITE_OFF,
+            status=Adjustment.Status.PENDING,
+            amount=D("30.00"),
+            reason="Awaiting an admin signature",
+        )
+        cls.draft_invoice = Invoice.objects.create(
+            student=cls.classmate,
+            term=cls.other_term,
+            fee_structure=cls.term2_structure,
+            issued_date=datetime.date(2026, 1, 12),
+            total_amount=D("500.00"),
+            status=Invoice.Status.DRAFT,
+        )
+
+    def statement(self, term=None, student=None) -> dict:
+        return selectors.student_statement(
+            student_id=(student or self.student).pk, term=term
+        )
+
+    def test_a_term_statement_counts_only_that_terms_money(self):
+        term1 = self.statement(term=self.term)
+
+        self.assertEqual(term1["total_billed"], D("500.00"))
+        self.assertEqual(term1["total_paid"], D("200.00"))
+        self.assertEqual(term1["total_adjusted"], D("50.00"))
+        self.assertEqual(term1["balance"], D("250.00"))
+        self.assertEqual(term1["brought_forward"], D("0.00"))
+        self.assertEqual(term1["closing_balance"], D("250.00"))
+        # The Term 2 receipt and bursary must not be on this statement.
+        self.assertEqual([p.pk for p in term1["payments"]], [self.payment.pk])
+        self.assertEqual([a.pk for a in term1["adjustments"]], [self.adjustment.pk])
+
+    def test_the_later_term_carries_the_earlier_balance_forward(self):
+        term2 = self.statement(term=self.other_term)
+
+        self.assertEqual(term2["total_billed"], D("500.00"))
+        self.assertEqual(term2["total_paid"], D("300.00"))
+        # The pending 30.00 is listed but not deducted.
+        self.assertEqual(term2["total_adjusted"], D("20.00"))
+        self.assertEqual(term2["balance"], D("180.00"))
+        self.assertEqual(term2["brought_forward"], D("250.00"))
+        self.assertEqual(term2["closing_balance"], D("430.00"))
+        self.assertEqual(len(term2["adjustments"]), 2)
+        self.assertEqual(term2["term_status"], "Part-paid")
+
+    def test_all_terms_keeps_its_original_arithmetic(self):
+        everything = self.statement()
+
+        self.assertEqual(everything["total_billed"], D("1000.00"))
+        self.assertEqual(everything["total_paid"], D("500.00"))
+        self.assertEqual(everything["total_adjusted"], D("70.00"))
+        self.assertEqual(everything["balance"], D("430.00"))
+        self.assertEqual(everything["brought_forward"], D("0.00"))
+        self.assertEqual(everything["closing_balance"], D("430.00"))
+        self.assertEqual(selectors.student_balance(student_id=self.student.pk), D("430.00"))
+
+    def test_credit_held_is_reported_outside_the_terms(self):
+        services.record_payment(
+            student=self.settled,
+            amount=D("100.00"),
+            method=Payment.Method.MOBILE_MONEY,
+            reference="PG-REF-CREDIT",
+            payment_date=datetime.date(2026, 2, 11),
+            recorded_by=self.officer,
+        )
+
+        term1 = self.statement(term=self.term, student=self.settled)
+
+        self.assertEqual(term1["total_paid"], D("500.00"))
+        self.assertEqual(term1["balance"], D("0.00"))
+        self.assertEqual(term1["credit_held"], D("100.00"))
+        self.assertEqual(term1["term_status"], "Settled")
+
+    def test_a_draft_bill_is_listed_but_not_billed(self):
+        draft = self.statement(term=self.other_term, student=self.classmate)
+
+        self.assertEqual(draft["total_billed"], D("0.00"))
+        self.assertEqual(draft["balance"], D("0.00"))
+        self.assertEqual(draft["term_status"], "Draft only")
+        self.assertEqual([i.pk for i in draft["invoices"]], [self.draft_invoice.pk])
+
+    def test_the_page_and_printed_statement_show_the_terms_arithmetic(self):
+        self.as_officer()
+        query = f"term={self.other_term.pk}"
+
+        response = self.get_page(
+            "student_statement", kwargs={"pk": self.student.pk}, query=query
+        )
+        self.assertEqual(response.context["brought_forward"], D("250.00"))
+        self.assertEqual(response.context["closing_balance"], D("430.00"))
+        self.assertEqual(response.context["term_status"], "Part-paid")
+        content = response.content.decode()
+        self.assertIn("Brought forward", content)
+        self.assertIn("Closing balance", content)
+        self.assertIn("430.00", content)
+        self.assertIn(self.term2_payment.receipt_number, content)
+        self.assertNotIn(self.payment.receipt_number, content)
+        self.assertIn("Awaiting approval", content)
+
+        with _engine:
+            rendered = self.get_page(
+                "student_statement_pdf", kwargs={"pk": self.student.pk}, query=query
+            )
+        self.assertEqual(rendered.status_code, 200)
+
+    def test_a_pupil_sees_the_term_filter_but_not_a_classmate(self):
+        self.client.force_login(self.student.user)
+        query = f"term={self.other_term.pk}"
+
+        own = self.get_page(
+            "student_statement", kwargs={"pk": self.student.pk}, query=query
+        )
+        self.assertEqual(own.status_code, 200)
+        self.assertEqual(own.context["closing_balance"], D("430.00"))
+
+        theirs = self.get_page(
+            "student_statement", kwargs={"pk": self.classmate.pk}, query=query
+        )
+        self.assertEqual(theirs.status_code, 403)
+
+
+class _RecordingHTML(_FakeHTML):
+    """The stub PDF engine, keeping the HTML it was asked to print."""
+
+    last = None
+
+    def __init__(self, string=None, base_url=None):
+        super().__init__(string=string, base_url=base_url)
+        type(self).last = string
+
+
+class ReceiptPrintingTests(FinancePageTestBase):
+    """
+    FS-5: the printed receipt records itself.
+
+    A receipt printed twice and presented twice as proof of two payments is the
+    oldest trick in a fee office, so the second and later copies carry a
+    DUPLICATE mark and the count is visible on the record.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.as_officer()
+        self.payment.refresh_from_db()
+
+    def printed_html(self, payment=None) -> str:
+        _RecordingHTML.last = None
+        with patch.dict(
+            sys.modules, {"weasyprint": SimpleNamespace(HTML=_RecordingHTML)}
+        ):
+            response = self.get_page(
+                "payment_receipt_pdf", kwargs={"pk": (payment or self.payment).pk}
+            )
+        self.assertEqual(response.status_code, 200)
+        return _RecordingHTML.last
+
+    def test_the_first_copy_is_the_receipt_and_the_next_is_a_duplicate(self):
+        first = self.printed_html()
+
+        self.assertNotIn("Duplicate copy", first)
+        self.assertIn(self.payment.verification_code, first)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.print_count, 1)
+        self.assertIsNotNone(self.payment.last_printed_at)
+
+        second = self.printed_html()
+
+        self.assertIn("Duplicate copy", second)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.print_count, 2)
+        self.assertEqual(
+            AuditLog.objects.filter(
+                action="finance.receipt_printed", object_id=str(self.payment.pk)
+            ).count(),
+            2,
+        )
+
+    def test_a_failed_pdf_is_not_counted_as_a_print(self):
+        with patch(
+            "apps.core.pdf.pdf_response",
+            return_value=HttpResponse(status=503),
+        ):
+            response = self.get_page(
+                "payment_receipt_pdf", kwargs={"pk": self.payment.pk}
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.payment.refresh_from_db()
+        self.assertEqual(
+            self.payment.print_count,
+            0,
+            msg="The count is the control, so a 503 that produced no paper must "
+            "not burn a copy.",
+        )
+
+    def test_the_detail_page_offers_a_duplicate_reprint_once_printed(self):
+        content = self.get_page(
+            "payment_detail", kwargs={"pk": self.payment.pk}
+        ).content.decode()
+        self.assertIn("Print receipt", content)
+        self.assertNotIn("Reprint (DUPLICATE)", content)
+
+        services.mark_receipt_printed(payment=self.payment, actor=self.officer)
+
+        content = self.get_page(
+            "payment_detail", kwargs={"pk": self.payment.pk}
+        ).content.decode()
+        self.assertIn("Reprint (DUPLICATE)", content)
+        self.assertIn("The next copy will be marked DUPLICATE.", content)
+
+    def test_a_pupil_cannot_print_a_receipt_from_the_finance_pages(self):
+        self.client.force_login(self.student.user)
+        response = self.get_page(
+            "payment_receipt_pdf", kwargs={"pk": self.payment.pk}
+        )
+        self.assertEqual(response.status_code, 403)

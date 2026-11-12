@@ -771,14 +771,25 @@ class PaymentRecordView(FinanceWriteMixin, TemplateView):
 
 
 class PaymentReceiptPdfView(FinanceReadMixin, View):
+    """
+    The printed receipt records itself.
+
+    The first copy is the receipt; every later copy is stamped DUPLICATE, so
+    one receipt cannot be presented twice as proof of two payments. The count
+    only moves once a PDF was actually produced — a 503 from the PDF engine is
+    not a print.
+    """
+
     def get(self, request, *args, **kwargs):
         payment = selectors.get_payment(kwargs["pk"])
+        duplicate = payment.print_count >= 1
         from django.template.loader import render_to_string
 
         html = render_to_string(
             "features/finance/payment_receipt_pdf.html",
             {
                 "payment": payment,
+                "duplicate": duplicate,
                 "currency": currency_code(self.request),
                 "SCHOOL_NAME": __import__(
                     "django.conf", fromlist=["settings"]
@@ -788,11 +799,16 @@ class PaymentReceiptPdfView(FinanceReadMixin, View):
         )
         from apps.core.pdf import pdf_response
 
-        return pdf_response(
+        response = pdf_response(
             html=html,
             filename=f"receipt_{payment.receipt_number}.pdf",
             base_url=request.build_absolute_uri("/"),
         )
+        if response.status_code == 200:
+            services.mark_receipt_printed(
+                payment=payment, actor=request.user, request=request
+            )
+        return response
 
 
 class PaymentReverseView(FinanceWriteMixin, TemplateView):

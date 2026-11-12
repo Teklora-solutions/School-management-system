@@ -20,7 +20,7 @@ live in one of their own and no existing pupil is ever billed by this command.
 
 The figures this leaves behind are printed at the end, term by term, computed
 from the rows themselves. That table is the acceptance sheet for the statement
-work; it does not claim how the page should read.
+work: every row must read ``page == open``.
 """
 
 from __future__ import annotations
@@ -473,8 +473,8 @@ class Command(BaseCommand):
 
         ``paid`` counts the live allocations that sit on that term's posted
         invoices — the only per-term attribution the data actually carries.
-        ``page`` is what ``student_statement(term=...)`` returns today, so the
-        gap between the two is visible in the same table.
+        ``page`` is what ``student_statement(term=...)`` returns, so every row
+        must read ``page == open``.
         """
         rows = []
         for admission, _first, _last, label in SCENARIOS:
@@ -551,7 +551,7 @@ class Command(BaseCommand):
         write("Scenario ledger as the rows stand (money in the school's currency)")
         write(
             "  open = billed - paid - adjusted for that term; page = the balance "
-            "student_statement(term=...) returns today"
+            "the term statement shows - every row must agree"
         )
         write("")
         current = None

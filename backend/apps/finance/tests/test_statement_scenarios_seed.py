@@ -36,6 +36,7 @@ from ..management.commands.seed_statement_scenarios import (
     SCENARIO_CLASS,
     SCENARIOS,
 )
+from .. import selectors as finance_selectors
 from .. import services as finance_services
 
 ZERO = Decimal("0.00")
@@ -210,6 +211,64 @@ class SeedStatementScenariosTests(TestCase):
             ),
             Decimal("300.00"),
         )
+
+    def test_every_term_statement_adds_up_to_the_rows_it_prints(self):
+        """
+        FS-4's acceptance sheet: ``page == open`` on every pupil, every term.
+
+        ``brought_forward`` is the running sum of the earlier terms' opens and
+        ``closing_balance`` is that plus this term's — the two figures the page
+        now prints beside the arithmetic they come from.
+        """
+        run_seed()
+
+        for admission, _first, _last, _label in SCENARIOS:
+            student = self._student(admission)
+            brought = ZERO
+            for term in self.terms:
+                expected = figures(student, term)
+                stmt = finance_selectors.student_statement(
+                    student_id=student.pk, term=term
+                )
+                self.assertEqual(stmt["total_billed"], expected["billed"], (admission, term))
+                self.assertEqual(stmt["total_paid"], expected["paid"], (admission, term))
+                self.assertEqual(stmt["total_adjusted"], expected["adjusted"], (admission, term))
+                self.assertEqual(stmt["balance"], expected["open"], (admission, term))
+                self.assertEqual(stmt["brought_forward"], brought, (admission, term))
+                self.assertEqual(
+                    stmt["closing_balance"], brought + expected["open"], (admission, term)
+                )
+                brought += expected["open"]
+
+    def test_a_receipt_for_another_term_is_not_counted_here(self):
+        """
+        S2 pays 200 in Term 1 and 600 in Term 2. The Term 1 statement must count
+        the 200 and not the later receipt — that was the defect FS-4 names.
+        """
+        run_seed()
+        student = self._student("SCN-S2-CARRY")
+        t1, _t2, _t3 = self.terms
+
+        stmt = finance_selectors.student_statement(student_id=student.pk, term=t1)
+
+        self.assertEqual(stmt["total_paid"], Decimal("200.00"))
+        self.assertEqual(stmt["balance"], Decimal("400.00"))
+        # The later receipt is not listed on the earlier term at all.
+        self.assertEqual(
+            [payment.amount for payment in stmt["payments"]], [Decimal("200.00")]
+        )
+
+    def test_credit_held_is_reported_apart_from_the_term(self):
+        run_seed()
+        student = self._student("SCN-S9-CREDIT")
+        stmt = finance_selectors.student_statement(
+            student_id=student.pk, term=self.terms[2]
+        )
+
+        self.assertEqual(stmt["credit_held"], Decimal("300.00"))
+        # The credit is not money against the term's bill.
+        self.assertEqual(stmt["total_paid"], ZERO)
+        self.assertEqual(stmt["balance"], Decimal("600.00"))
 
     def test_the_reversal_is_a_second_row_not_a_deletion(self):
         run_seed()
