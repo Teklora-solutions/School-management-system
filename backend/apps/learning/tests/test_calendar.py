@@ -19,6 +19,7 @@ from apps.homework.models import Homework
 from apps.learning import calendar_selectors, live_class_services
 from apps.learning.models import CourseModule, Lesson, Quiz
 from apps.students.models import Student
+from apps.teachers.models import TeacherAssignment, TeacherProfile
 
 User = get_user_model()
 
@@ -60,6 +61,15 @@ class ClassCalendarTests(TestCase):
             password="test-only",
             role=User.Role.TEACHER,
             must_change_password=False,
+        )
+        teacher_profile = TeacherProfile.objects.create(
+            user=self.teacher_user, staff_id="TCH-010"
+        )
+        TeacherAssignment.objects.create(
+            teacher=teacher_profile,
+            school_class=self.school_class,
+            subject=self.subject,
+            academic_year=self.year,
         )
         self.student_user = User.objects.create_user(
             username="student_yaw",

@@ -48,6 +48,8 @@ class TeacherLiveClassListView(TeacherRequiredMixin, LiveClassesEnabledMixin, Vi
     def get(self, request, class_id: int, subject_id: int):
         school_class = get_object_or_404(SchoolClass, pk=class_id)
         subject = get_object_or_404(Subject, pk=subject_id)
+        if not live_class_services.teacher_can_access_classroom(request.user, school_class, subject):
+            raise PermissionDenied("You are not assigned to this classroom.")
         sessions = live_class_selectors.get_live_sessions_for_classroom(class_id, subject_id)
 
         return render(
@@ -68,6 +70,8 @@ class TeacherLiveClassCreateView(TeacherRequiredMixin, LiveClassesEnabledMixin, 
     def get(self, request, class_id: int, subject_id: int):
         school_class = get_object_or_404(SchoolClass, pk=class_id)
         subject = get_object_or_404(Subject, pk=subject_id)
+        if not live_class_services.teacher_can_access_classroom(request.user, school_class, subject):
+            raise PermissionDenied("You are not assigned to this classroom.")
         now = timezone.localtime()
         default_start = (now + timezone.timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
         form = LiveClassSessionForm(initial={"scheduled_start": default_start.strftime("%Y-%m-%dT%H:%M")})
@@ -85,6 +89,8 @@ class TeacherLiveClassCreateView(TeacherRequiredMixin, LiveClassesEnabledMixin, 
     def post(self, request, class_id: int, subject_id: int):
         school_class = get_object_or_404(SchoolClass, pk=class_id)
         subject = get_object_or_404(Subject, pk=subject_id)
+        if not live_class_services.teacher_can_access_classroom(request.user, school_class, subject):
+            raise PermissionDenied("You are not assigned to this classroom.")
         form = LiveClassSessionForm(request.POST)
 
         if form.is_valid():
@@ -132,6 +138,10 @@ class TeacherLiveClassEditView(TeacherRequiredMixin, LiveClassesEnabledMixin, Vi
         session = live_class_selectors.get_live_session(session_id)
         if session.school_class_id != class_id or session.subject_id != subject_id:
             raise PermissionDenied("Session does not belong to this classroom.")
+        if not live_class_services.teacher_can_access_classroom(
+            request.user, session.school_class, session.subject
+        ):
+            raise PermissionDenied("You are not assigned to this classroom.")
         form = LiveClassSessionForm(instance=session)
         return render(
             request,
@@ -149,6 +159,10 @@ class TeacherLiveClassEditView(TeacherRequiredMixin, LiveClassesEnabledMixin, Vi
         session = live_class_selectors.get_live_session(session_id)
         if session.school_class_id != class_id or session.subject_id != subject_id:
             raise PermissionDenied("Session does not belong to this classroom.")
+        if not live_class_services.teacher_can_access_classroom(
+            request.user, session.school_class, session.subject
+        ):
+            raise PermissionDenied("You are not assigned to this classroom.")
         form = LiveClassSessionForm(request.POST, instance=session)
         if form.is_valid():
             try:
@@ -191,6 +205,10 @@ class TeacherLiveClassCancelView(TeacherRequiredMixin, LiveClassesEnabledMixin, 
         session = live_class_selectors.get_live_session(session_id)
         if session.school_class_id != class_id or session.subject_id != subject_id:
             raise PermissionDenied("Session does not belong to this classroom.")
+        if not live_class_services.teacher_can_access_classroom(
+            request.user, session.school_class, session.subject
+        ):
+            raise PermissionDenied("You are not assigned to this classroom.")
         live_class_services.cancel_live_session(session=session, actor=request.user, request=request)
         messages.info(request, f"Session '{session.title}' was cancelled.")
         return redirect(
@@ -205,6 +223,10 @@ class TeacherLiveClassActionView(TeacherRequiredMixin, LiveClassesEnabledMixin, 
         session = live_class_selectors.get_live_session(session_id)
         if session.school_class_id != class_id or session.subject_id != subject_id:
             raise PermissionDenied("Session does not belong to this classroom.")
+        if not live_class_services.teacher_can_access_classroom(
+            request.user, session.school_class, session.subject
+        ):
+            raise PermissionDenied("You are not assigned to this classroom.")
         if action == "start":
             live_class_services.start_live_session(session=session, actor=request.user, request=request)
             messages.success(request, f"Session '{session.title}' is now LIVE.")
@@ -227,13 +249,13 @@ class LiveClassDetailView(RoleRequiredMixin, LiveClassesEnabledMixin, View):
 
     def get(self, request, session_id: int):
         session = live_class_selectors.get_live_session(session_id)
+        if not live_class_services.can_view_session_detail(request.user, session):
+            raise PermissionDenied("You are not allowed to view this live class.")
         is_teacher = request.user.role in ("teacher", "admin", "director")
         attendances = live_class_selectors.get_session_attendances(session_id) if is_teacher else []
         has_joined = False
         if request.user.role == "student":
             student = _resolve_student(request)
-            if student.current_class_id != session.school_class_id:
-                raise PermissionDenied("You are not enrolled in this class.")
             has_joined = live_class_selectors.has_student_joined(session, student)
         return render(
             request,
@@ -317,6 +339,9 @@ class ClassCalendarView(RoleRequiredMixin, LiveClassesEnabledMixin, View):
             student = _resolve_student(request)
             if student.current_class_id != class_id:
                 raise PermissionDenied("Your child is not enrolled in this class.")
+        elif request.user.role == "teacher":
+            if not live_class_services.teacher_can_access_classroom(request.user, school_class):
+                raise PermissionDenied("You are not assigned to this class.")
 
         year = request.GET.get("year")
         month = request.GET.get("month")

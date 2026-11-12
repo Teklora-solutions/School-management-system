@@ -24,6 +24,90 @@ if TYPE_CHECKING:
     from apps.students.models import Student
 
 
+def teacher_can_access_classroom(
+    user,
+    school_class,
+    subject=None,
+    academic_year_id: int | None = None,
+) -> bool:
+    """
+    Scope for a teacher's classroom (a class, plus a subject where one applies).
+
+    Admins and directors oversee everything. A teacher needs to be the class
+    teacher, or hold a TeacherAssignment for that class — narrowed to the
+    subject and academic year when those are given.
+    """
+    role = getattr(user, "role", "")
+    if role in ("admin", "director"):
+        return True
+    if role != "teacher":
+        return False
+    if school_class.class_teacher_id == user.pk:
+        return True
+
+    from apps.teachers.models import TeacherAssignment
+
+    year_id = (
+        academic_year_id
+        if academic_year_id is not None
+        else school_class.academic_year_id
+    )
+    if year_id is None:
+        return False
+    assignments = TeacherAssignment.objects.filter(
+        teacher__user=user,
+        school_class_id=school_class.pk,
+        academic_year_id=year_id,
+    )
+    if subject is not None:
+        assignments = assignments.filter(subject_id=subject.pk)
+    return assignments.exists()
+
+
+def can_view_session_detail(user, session: LiveClassSession) -> bool:
+    """
+    Object-level scope for the shared live-session detail page.
+
+    Admin and director may oversee any session. A teacher needs an assignment
+    for that class and subject in the session's academic year, or to be the
+    class teacher. A student must be in the session's class. A parent must
+    have at least one child in that class (read-only).
+    """
+    role = getattr(user, "role", "")
+    if role in ("admin", "director"):
+        return True
+
+    if role == "teacher":
+        year_id = (
+            session.term.academic_year_id
+            if session.term_id
+            else session.school_class.academic_year_id
+        )
+        return teacher_can_access_classroom(
+            user,
+            session.school_class,
+            session.subject,
+            academic_year_id=year_id,
+        )
+
+    if role == "student":
+        student = getattr(user, "student_profile", None)
+        return (
+            student is not None
+            and student.current_class_id == session.school_class_id
+        )
+
+    if role == "parent":
+        parent = getattr(user, "parent_profile", None)
+        if parent is None:
+            return False
+        return parent.children_links.filter(
+            student__current_class_id=session.school_class_id
+        ).exists()
+
+    return False
+
+
 @transaction.atomic
 def schedule_live_session(
     *,
