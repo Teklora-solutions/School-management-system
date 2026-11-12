@@ -147,7 +147,8 @@ FIELD_TABS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "engagement_enabled", "quizzes_enabled", "live_classes_enabled",
             "feed_community_enabled", "notification_quiet_hours_enabled",
             "quiet_hours_start", "quiet_hours_end", "feed_teacher_starters",
-            "feed_student_starters",
+            "feed_student_starters", "homework_grading_enabled",
+            "homework_late_penalty_enabled",
         ),
     ),
 )
@@ -192,6 +193,8 @@ class SchoolSettingsForm(forms.ModelForm):
             "quiet_hours_end",
             "feed_teacher_starters",
             "feed_student_starters",
+            "homework_grading_enabled",
+            "homework_late_penalty_enabled",
             "logo",
             "address",
             "established_on",

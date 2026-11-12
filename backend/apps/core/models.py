@@ -263,6 +263,21 @@ class SchoolSettings(BaseModel):
             "Leave blank to use the built-in set."
         ),
     )
+    homework_grading_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Turn on to let teachers mark homework and release feedback to "
+            "pupils and parents. Off by default: homework stays set-and-submit "
+            "exactly as it is today until the school switches this on."
+        ),
+    )
+    homework_late_penalty_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "When on, the marking screen offers a lateness deduction in marks. "
+            "Off by default: late work is accepted and marked with no deduction."
+        ),
+    )
 
     # ── Public-site content ───────────────────────────────────────────────
     # These six feed the school's own website (apps/public). They are blankable

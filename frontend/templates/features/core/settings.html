@@ -437,6 +437,35 @@
               {% endwith %}
 
               <hr class="my-4">
+              <p class="fw-600 mb-1">Homework marking and feedback</p>
+              <p class="text-muted-sm">
+                Turning this on adds a marking screen to each homework: a mark out of
+                the homework's total, a status, and written feedback. Nothing is shown
+                to a pupil or parent until the teacher releases it, and marking never
+                changes homework points. Off by default.
+              </p>
+
+              {% with field=form.homework_grading_enabled %}
+              <div class="mb-3 d-flex align-items-start gap-2">
+                {{ field }}
+                <div>
+                  <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                </div>
+              </div>
+              {% endwith %}
+
+              {% with field=form.homework_late_penalty_enabled %}
+              <div class="mb-3 d-flex align-items-start gap-2">
+                {{ field }}
+                <div>
+                  <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                </div>
+              </div>
+              {% endwith %}
+
+              <hr class="my-4">
               <p class="fw-600 mb-1">Quiet hours for in-app notifications</p>
               <p class="text-muted-sm">
                 When this is on, a notification created between the two hours below

@@ -14,6 +14,7 @@
       · {{ homework.school_class.name }} · {{ homework.subject.name }}
       {% if homework.stream %} · {{ homework.stream.name }}{% endif %}
       · due {{ homework.due_date|date:"M j, Y" }}
+      {% if homework.max_score %}· out of {{ homework.max_score|floatformat:"-1" }}{% endif %}
       {% if homework.status == "draft" %}<span class="badge bg-secondary ms-1">Draft</span>{% endif %}
     </p>
   </div>
@@ -69,6 +70,52 @@
   </div>
 </div>
 
+{# ── Marking ─────────────────────────────────────────────────────── #}
+{% if grading_enabled %}
+<div class="card mb-3">
+  <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-pencil-square me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Marking
+    </h2>
+    <span class="badge bg-secondary">
+      {{ marked_count }} marked{% if awaiting_release_count %} · {{ awaiting_release_count }} not released{% endif %}
+    </span>
+  </div>
+  <div class="card-body">
+    {% if not homework.max_score %}
+    <div class="alert alert-warning py-2 mb-3" role="status">
+      <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+      Set the total mark on <a href="{% url 'homework:teacher_edit' homework.pk %}">the homework</a> before marking.
+    </div>
+    {% endif %}
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      {% if first_mark_student_id %}
+      <a href="{% url 'homework:teacher_mark' homework.pk first_mark_student_id %}" class="btn btn-primary">
+        <i class="bi bi-pencil-square me-1"></i>Start marking
+      </a>
+      {% endif %}
+      {% if marks_released %}
+      <span class="badge" style="background:var(--color-success);color:#fff;">
+        <i class="bi bi-check2-all me-1"></i>Released to the class
+      </span>
+      {% elif awaiting_release_count %}
+      <form method="post" action="{% url 'homework:teacher_release' homework.pk %}" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" class="btn btn-outline-primary">
+          <i class="bi bi-send me-1"></i>Release all marks to the class
+        </button>
+      </form>
+      {% endif %}
+      <span class="text-muted-sm">
+        Marks stay private until you release them. Pupils are told once, kindly.
+      </span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {# ── Roster ──────────────────────────────────────────────────────── #}
 <div class="card">
   <div class="card-body p-0">
@@ -82,6 +129,7 @@
             <th scope="col">Handed in</th>
             <th scope="col">Note</th>
             <th scope="col">Files</th>
+            {% if grading_enabled %}<th scope="col">Mark</th>{% endif %}
           </tr>
         </thead>
         <tbody>
@@ -121,7 +169,7 @@
               {% endif %}
             </td>
             <td>
-              {% for att in row.submission.attachments.all %}
+              {% for att in row.submission.current_attachments %}
               <a href="{% url 'homework:submission_file' homework.pk row.submission.pk att.pk %}?download=1"
                  class="btn btn-sm btn-outline-secondary mb-1" title="Download {{ att }}">
                 <i class="bi bi-download me-1"></i>{{ att }}
@@ -130,6 +178,33 @@
               <span class="text-muted-sm">—</span>
               {% endfor %}
             </td>
+            {% if grading_enabled %}
+            <td style="white-space:nowrap;">
+              {% if row.mark and row.mark.status %}
+                {% if row.mark.status == "excellent" %}
+                <span class="badge" style="background:var(--color-success);color:#fff;">{{ row.mark.get_status_display }}</span>
+                {% elif row.mark.status == "good" %}
+                <span class="badge bg-primary">{{ row.mark.get_status_display }}</span>
+                {% elif row.mark.status == "needs_revision" %}
+                <span class="badge bg-warning text-dark">{{ row.mark.get_status_display }}</span>
+                {% else %}
+                <span class="badge bg-secondary">{{ row.mark.get_status_display }}</span>
+                {% endif %}
+                {% if row.mark.final_score is not None %}
+                <span class="fw-600 ms-1">{{ row.mark.final_score|floatformat:"-1" }}{% if homework.max_score %}/{{ homework.max_score|floatformat:"-1" }}{% endif %}</span>
+                {% endif %}
+                {% if not row.mark.released_at and not marks_released %}
+                <span class="text-muted-sm d-block" style="font-size:.75rem;">Not released</span>
+                {% endif %}
+              {% else %}
+              <span class="text-muted-sm">—</span>
+              {% endif %}
+              <a href="{% url 'homework:teacher_mark' homework.pk row.student.pk %}"
+                 class="btn btn-sm {% if row.mark and row.mark.status %}btn-outline-secondary{% else %}btn-outline-primary{% endif %} ms-1">
+                {% if row.mark and row.mark.status %}Review{% else %}Mark{% endif %}
+              </a>
+            </td>
+            {% endif %}
           </tr>
           {% endfor %}
         </tbody>

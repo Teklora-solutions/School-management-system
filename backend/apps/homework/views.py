@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.views.generic import TemplateView, View
 
 from apps.academics.selectors import get_current_term
+from apps.core.features import feature_disabled_message, feature_enabled
 from apps.core.mixins import RoleRequiredMixin
 
 from . import selectors, services
@@ -119,17 +120,24 @@ def submission_context(request, homework: Homework, student) -> dict:
     )
     today = date.today()
     is_student = getattr(request.user, "role", "") == "student"
+    window_open, used, allowed = selectors.resubmission_window(
+        homework=homework, student=student
+    )
     locked = bool(
         submission
         and (submission.is_late or today > homework.due_date)
+        and not window_open
     )
     submission_attachments = (
-        list(submission.attachments.all()) if submission is not None else []
+        submission.current_attachments if submission is not None else []
     )
     if submission is None:
         state = "overdue" if today > homework.due_date else "missing"
     else:
         state = "late" if submission.is_late else "submitted"
+    released_mark = selectors.released_mark(
+        homework_id=homework.pk, student_id=student.pk
+    )
     return {
         "student": student,
         "submission": submission,
@@ -141,6 +149,19 @@ def submission_context(request, homework: Homework, student) -> dict:
         "late_warning": submission is None and today > homework.due_date,
         "accepted_types": ACCEPTED_FILE_TYPES,
         "max_submission_files": MAX_SUBMISSION_ATTACHMENTS,
+        "grading_enabled": feature_enabled(
+            "homework_grading", request=request
+        ),
+        "released_mark": released_mark,
+        "resubmission_open": window_open,
+        "resubmission_used": used,
+        "resubmission_allowed": allowed,
+        "mark_is_stale": bool(
+            released_mark
+            and submission
+            and released_mark.marked_at
+            and released_mark.marked_at < submission.submitted_at
+        ),
     }
 
 
@@ -489,3 +510,59 @@ class HomeworkAttachmentDownloadView(HomeworkFileMixin, View):
             as_attachment=True,
             filename=hw.attachment.name.split("/")[-1],
         )
+
+
+class MyMarkedWorkView(StudentOrParentMixin, TemplateView):
+    """
+    Every homework the pupil has had feedback on, newest first.
+
+    Only released marks appear: an unreleased mark is a private draft, and a
+    parent looking at this page must see exactly what the pupil sees.
+    """
+
+    template_name = "features/homework/homework_marked.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        student = _resolve_student(self.request)
+        grading_enabled = feature_enabled(
+            "homework_grading", request=self.request
+        )
+        if not grading_enabled:
+            ctx.update(
+                {
+                    "student": student,
+                    "grading_enabled": False,
+                    "disabled_message": feature_disabled_message(
+                        "homework_grading"
+                    ),
+                    "marks": [],
+                    "terms": [],
+                    "selected_term_id": None,
+                }
+            )
+            return ctx
+
+        from apps.academics.models import Term
+
+        term_raw = self.request.GET.get("term")
+        term_id = int(term_raw) if term_raw and term_raw.isdigit() else None
+        marks = list(
+            selectors.released_marks_for_student(
+                student_id=student.pk, term_id=term_id
+            )
+        )
+        terms = Term.objects.select_related("academic_year").order_by(
+            "-academic_year__start_date", "name"
+        )
+        ctx.update(
+            {
+                "student": student,
+                "grading_enabled": True,
+                "marks": marks,
+                "terms": terms,
+                "selected_term_id": term_id,
+                "today": date.today(),
+            }
+        )
+        return ctx

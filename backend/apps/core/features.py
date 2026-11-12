@@ -52,6 +52,13 @@ FEATURES: dict[str, dict[str, str]] = {
             "Each teacher also switches it on for their own class."
         ),
     },
+    "homework_grading": {
+        "label": "Homework marking and feedback",
+        "field": "homework_grading_enabled",
+        "disabled_message": (
+            "Available once the school switches on homework marking."
+        ),
+    },
 }
 
 

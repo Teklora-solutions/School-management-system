@@ -7,6 +7,7 @@ Students and parents can view homework due for the student's current class.
 
 import os
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
@@ -81,6 +82,21 @@ class Homework(BaseModel):
         db_index=True,
     )
     published_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    max_score = models.DecimalField(
+        max_digits=5,
+        decimal_places=1,
+        null=True,
+        blank=True,
+        help_text=(
+            "What a full mark is out of. Leave blank until the homework is "
+            "ready to mark; marking is refused while this is blank."
+        ),
+    )
+    marks_released_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Set when marks for the whole class were released to students.",
+    )
 
     class Meta:
         db_table = "homework_homework"
@@ -177,6 +193,51 @@ class HomeworkSubmission(BaseModel):
     def __str__(self) -> str:
         return f"{self.student} → {self.homework.title}"
 
+    @property
+    def current_attachments(self) -> list:
+        """
+        Files belonging to the latest attempt.
+
+        Files from earlier attempts stay on disk and stay attached to their
+        revision; they are merely left out of what "this submission" shows.
+        """
+        return [a for a in self.attachments.all() if a.revision_id is None]
+
+
+class HomeworkSubmissionRevision(BaseModel):
+    """
+    An earlier attempt, kept when a pupil hands work in again.
+
+    Only the "Needs revision" loop creates these: the live submission always
+    holds the latest attempt, and each revision holds the note and timing of
+    the attempt it replaced. Its files move with it (see
+    ``HomeworkSubmissionAttachment.revision``), so nothing is copied on disk
+    and every version stays openable by the teacher.
+    """
+
+    submission = models.ForeignKey(
+        HomeworkSubmission,
+        on_delete=models.CASCADE,
+        related_name="revisions",
+    )
+    number = models.PositiveSmallIntegerField()
+    note = models.TextField(blank=True)
+    submitted_at = models.DateTimeField()
+    is_late = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "homework_submission_revision"
+        ordering = ["number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["submission", "number"],
+                name="uniq_homework_revision_number",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.submission} — attempt {self.number}"
+
 
 def submission_upload_path(
     instance: "HomeworkSubmissionAttachment", filename: str
@@ -197,6 +258,14 @@ class HomeworkSubmissionAttachment(BaseModel):
         HomeworkSubmission,
         on_delete=models.CASCADE,
         related_name="attachments",
+    )
+    revision = models.ForeignKey(
+        HomeworkSubmissionRevision,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+        help_text="Set when this file belongs to an earlier attempt.",
     )
     file = models.FileField(upload_to=submission_upload_path)
     original_name = models.CharField(max_length=255, blank=True)
@@ -224,4 +293,94 @@ class HomeworkSubmissionAttachment(BaseModel):
         if not self.file_size:
             return 0
         return max(1, round(self.file_size / 1024))
+
+
+class HomeworkMark(BaseModel):
+    """
+    One teacher's mark for one pupil's homework.
+
+    Deliberately separate from ``HomeworkSubmission``: a pupil who handed
+    nothing in still needs a status (Not submitted), and marking must never
+    rewrite the evidence of what arrived and when. One row per pupil per
+    homework, kept whether or not anything was handed in.
+
+    A mark stays invisible to the pupil and their parents until either the
+    homework's ``marks_released_at`` (whole class) or this row's
+    ``released_at`` (one pupil) is set.
+    """
+
+    class Status(models.TextChoices):
+        EXCELLENT = "excellent", "Excellent"
+        GOOD = "good", "Good"
+        NEEDS_REVISION = "needs_revision", "Needs revision"
+        NOT_SUBMITTED = "not_submitted", "Not submitted"
+
+    homework = models.ForeignKey(
+        Homework,
+        on_delete=models.CASCADE,
+        related_name="marks",
+    )
+    student = models.ForeignKey(
+        "students.Student",
+        on_delete=models.CASCADE,
+        related_name="homework_marks",
+    )
+    score = models.DecimalField(
+        max_digits=5,
+        decimal_places=1,
+        null=True,
+        blank=True,
+        help_text="Mark out of the homework's total. Blank when nothing was handed in.",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, blank=True)
+    feedback = models.TextField(
+        blank=True,
+        help_text="What the pupil should read. Shown alongside the mark once released.",
+    )
+    late_deduction = models.DecimalField(
+        max_digits=5,
+        decimal_places=1,
+        default=Decimal("0"),
+        help_text="Marks taken off for lateness, only when the school switch is on.",
+    )
+    resubmissions_allowed = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Extra attempts granted when the work is sent back for revision.",
+    )
+    marked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="homework_marks_made",
+    )
+    marked_at = models.DateTimeField(null=True, blank=True)
+    released_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Set when this one pupil's mark was released.",
+    )
+
+    class Meta:
+        db_table = "homework_mark"
+        ordering = [
+            "student__user__last_name",
+            "student__user__first_name",
+            "student__admission_number",
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["homework", "student"],
+                name="uniq_homework_mark_student",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.student} → {self.homework.title}"
+
+    @property
+    def final_score(self) -> Decimal | None:
+        """The mark the pupil sees: the score less any late deduction."""
+        if self.score is None:
+            return None
+        return max(Decimal("0"), self.score - (self.late_deduction or Decimal("0")))
 

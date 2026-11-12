@@ -218,6 +218,12 @@
         {% endif %}
 
         {% if show_submission_form %}
+          {% if resubmission_open %}
+          <div class="alert alert-warning py-2" role="status">
+            <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>
+            Your teacher has asked you to try again. Send your new attempt below when it is ready.
+          </div>
+          {% endif %}
           {% if late_warning %}
           <div class="alert alert-warning py-2" role="status">
             <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
@@ -298,6 +304,66 @@
           <p class="text-muted-sm mb-0">
             {% if submission_state == "overdue" %}The due date has passed and nothing was handed in.{% else %}Nothing has been handed in yet.{% endif %}
           </p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not preview and released_mark %}
+    <div class="card mt-3" id="feedback-card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-chat-heart me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          {% if can_submit %}Your feedback{% else %}Feedback{% endif %}
+        </h2>
+        {% if released_mark.status == "excellent" %}
+        <span class="badge" style="background:var(--color-success);color:#fff;">{{ released_mark.get_status_display }}</span>
+        {% elif released_mark.status == "good" %}
+        <span class="badge bg-primary">{{ released_mark.get_status_display }}</span>
+        {% elif released_mark.status == "needs_revision" %}
+        <span class="badge bg-warning text-dark">{{ released_mark.get_status_display }}</span>
+        {% else %}
+        <span class="badge bg-secondary">{{ released_mark.get_status_display }}</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if mark_is_stale %}
+        <div class="alert alert-info py-2" role="status">
+          <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+          This feedback is about the attempt before your latest one. Your teacher will look at the new work in its turn.
+        </div>
+        {% endif %}
+
+        {% if released_mark.final_score is not None %}
+        <p class="mb-3">
+          <span class="fw-700" style="font-size:1.7rem;">{{ released_mark.final_score|floatformat:"-1" }}</span>
+          {% if homework.max_score %}<span class="text-muted-sm">/ {{ homework.max_score|floatformat:"-1" }}</span>{% endif %}
+          {% if released_mark.late_deduction %}
+          <span class="text-muted-sm d-block">Includes {{ released_mark.late_deduction|floatformat:"-1" }} taken off for lateness.</span>
+          {% endif %}
+        </p>
+        {% elif released_mark.status == "not_submitted" %}
+        <p class="text-muted-sm mb-3">Nothing was handed in for this homework.</p>
+        {% endif %}
+
+        {% if released_mark.feedback %}
+        <div style="font-size:.95rem;">{{ released_mark.feedback|linebreaks }}</div>
+        {% else %}
+        <p class="text-muted-sm mb-0">Your teacher gave a status but no written note.</p>
+        {% endif %}
+
+        {% if released_mark.status == "needs_revision" %}
+          {% if resubmission_open %}
+          <div class="alert alert-warning mt-3 mb-2" role="status">
+            <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>
+            You may try again. This is how learning works — have another go.
+          </div>
+          <a href="#submission-card" class="btn btn-primary">Try again</a>
+          {% else %}
+          <p class="text-muted-sm mt-3 mb-0">
+            Your teacher asked for another attempt, and that attempt has been handed in.
+          </p>
+          {% endif %}
         {% endif %}
       </div>
     </div>

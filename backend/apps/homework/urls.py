@@ -8,6 +8,7 @@ app_name = "homework"
 
 urlpatterns = [
     path("", views.HomeworkListView.as_view(), name="list"),
+    path("marked/", views.MyMarkedWorkView.as_view(), name="marked_work"),
     path("teaching/", teacher_views.TeacherHomeworkListView.as_view(), name="teacher_list"),
     path("teaching/new/", teacher_views.TeacherHomeworkCreateView.as_view(), name="teacher_create"),
     path("teaching/<int:pk>/edit/", teacher_views.TeacherHomeworkEditView.as_view(), name="teacher_edit"),
@@ -25,6 +26,21 @@ urlpatterns = [
         "teaching/<int:pk>/submissions/",
         teacher_views.TeacherHomeworkSubmissionsView.as_view(),
         name="teacher_submissions",
+    ),
+    path(
+        "teaching/<int:pk>/mark/<int:student_id>/",
+        teacher_views.TeacherHomeworkMarkView.as_view(),
+        name="teacher_mark",
+    ),
+    path(
+        "teaching/<int:pk>/mark/<int:student_id>/autosave/",
+        teacher_views.TeacherHomeworkMarkAutosaveView.as_view(),
+        name="teacher_mark_autosave",
+    ),
+    path(
+        "teaching/<int:pk>/release/",
+        teacher_views.TeacherHomeworkReleaseView.as_view(),
+        name="teacher_release",
     ),
     path(
         "<int:pk>/files/<int:attachment_id>/",

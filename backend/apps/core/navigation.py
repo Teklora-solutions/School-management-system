@@ -419,6 +419,12 @@ NAVIGATION: dict[str, list[dict]] = {
             "url_name": "homework:list",
         },
         {
+            "label": "Marked work",
+            "icon": "bi-chat-heart",
+            "url_name": "homework:marked_work",
+            "feature": "homework_grading",
+        },
+        {
             "label": "Messages",
             "icon": "bi-chat-square-text",
             "url_name": "communications:my_messages",
@@ -580,6 +586,12 @@ NAVIGATION: dict[str, list[dict]] = {
             "label": "Homework",
             "icon": "bi-journal-bookmark",
             "url_name": "homework:list",
+        },
+        {
+            "label": "Marked work",
+            "icon": "bi-chat-heart",
+            "url_name": "homework:marked_work",
+            "feature": "homework_grading",
         },
         {
             "label": "Messages",

@@ -1,0 +1,295 @@
+{% extends base_template %}
+
+{% block title %}Mark · {{ student.user.get_full_name|default:student.user.username }} · {{ homework.title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-end justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-pencil-square me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Marking
+    </h1>
+    <p class="page-subtitle">
+      {{ homework.title }} · {{ homework.school_class.name }} · {{ homework.subject.name }}
+      {% if homework.max_score %}· out of {{ homework.max_score|floatformat:"-1" }}{% endif %}
+      {% if position %}· pupil {{ position }} of {{ row_count }}{% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-2 align-items-center flex-wrap">
+    {% if prev_url %}<a href="{{ prev_url }}" class="btn btn-outline-secondary"><i class="bi bi-chevron-left me-1"></i>Previous</a>{% endif %}
+    {% if next_url %}<a href="{{ next_url }}" class="btn btn-outline-secondary">Next<i class="bi bi-chevron-right ms-1"></i></a>{% endif %}
+    <a href="{% url 'homework:teacher_submissions' homework.pk %}" class="btn btn-outline-primary">
+      <i class="bi bi-people me-1"></i>All submissions
+    </a>
+  </div>
+</div>
+
+{% if not homework.max_score %}
+<div class="alert alert-warning" role="status">
+  <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+  This homework has no total mark yet. <a href="{% url 'homework:teacher_edit' homework.pk %}">Set it on the homework</a> before marking.
+</div>
+{% endif %}
+
+<div class="row g-3">
+  {# ── Left: what the pupil handed in ─────────────────────────────── #}
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">{{ student.user.get_full_name|default:student.user.username }}</h2>
+        {% if submission %}
+          {% if submission.is_late %}
+          <span class="badge bg-danger">Handed in late</span>
+          {% else %}
+          <span class="badge" style="background:var(--color-success);color:#fff;">Handed in on time</span>
+          {% endif %}
+        {% else %}
+        <span class="badge bg-secondary">Nothing handed in</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <p class="text-muted-sm mb-2">Admission {{ student.admission_number }}</p>
+
+        {% if submission %}
+        <p class="text-muted-sm mb-3">
+          <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
+          Handed in {{ submission.submitted_at|date:"M j, Y H:i" }}{% if submission.is_late %} · after the due date{% endif %}
+        </p>
+        {% if submission.note %}
+        <div class="mb-3" style="font-size:.92rem;">{{ submission.note|linebreaks }}</div>
+        {% endif %}
+        {% for att in submission_attachments %}
+        <a href="{% url 'homework:submission_file' homework.pk submission.pk att.pk %}?download=1"
+           class="btn btn-sm btn-outline-secondary me-1 mb-1">
+          <i class="bi bi-download me-1"></i>{{ att }}
+        </a>
+        {% empty %}
+        <p class="text-muted-sm mb-0">No files were attached.</p>
+        {% endfor %}
+        {% else %}
+        <p class="text-muted-sm mb-0">
+          Nothing was handed in. You can still save a status of Not submitted,
+          which is kinder than leaving the row empty.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if revisions %}
+    <div class="card mt-3">
+      <div class="card-header">
+        <h2 class="card-title mb-0"><i class="bi bi-clock-history me-2" aria-hidden="true"></i>Earlier attempts</h2>
+      </div>
+      <div class="card-body">
+        {% for revision in revisions %}
+        <div class="{% if not forloop.last %}border-bottom pb-3 mb-3{% endif %}">
+          <div class="fw-600">Attempt {{ revision.number }} · {{ revision.submitted_at|date:"M j, Y H:i" }}{% if revision.is_late %} · late{% endif %}</div>
+          {% if revision.note %}<div class="mt-1" style="font-size:.9rem;">{{ revision.note|linebreaks }}</div>{% endif %}
+          {% for att in revision.attachments.all %}
+          <a href="{% url 'homework:submission_file' homework.pk submission.pk att.pk %}?download=1"
+             class="btn btn-sm btn-outline-secondary me-1 mt-2">
+            <i class="bi bi-download me-1"></i>{{ att }}
+          </a>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if mark and mark.status and not mark.released_at and not homework.marks_released_at %}
+    <div class="alert alert-info mt-3 mb-0" role="status">
+      <i class="bi bi-eye-slash me-1" aria-hidden="true"></i>
+      This mark is private. The pupil and their parents will see it once you release it.
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── Right: the mark ────────────────────────────────────────────── #}
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="card-title mb-0">
+          <i class="bi bi-journal-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+          Mark and feedback
+        </h2>
+        <span id="autosave-status" class="text-muted-sm" aria-live="polite">
+          {% if mark and mark.marked_at %}Saved {{ mark.marked_at|date:"M j, H:i" }}{% endif %}
+        </span>
+      </div>
+      <div class="card-body">
+        {% if mark_is_stale %}
+        <div class="alert alert-warning py-2" role="status">
+          <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+          This pupil handed in again after you marked. The saved mark and feedback below
+          describe the earlier attempt — please look at the new work and save again.
+        </div>
+        {% endif %}
+
+        <form method="post" id="mark-form"
+              action="{% url 'homework:teacher_mark' homework.pk student.pk %}"
+              data-autosave-url="{% url 'homework:teacher_mark_autosave' homework.pk student.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="filter" value="{{ filter_key }}">
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger py-2" role="alert">
+            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label for="id_status" class="form-label fw-600">Status</label>
+            {{ form.status }}
+            {% for error in form.status.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3" id="score-group">
+            <label for="id_score" class="form-label fw-600">
+              Mark{% if homework.max_score %} <span class="text-muted-sm fw-normal">out of {{ homework.max_score|floatformat:"-1" }}</span>{% endif %}
+            </label>
+            {{ form.score }}
+            {% for error in form.score.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+          </div>
+
+          {% if late_penalty and submission and submission.is_late %}
+          <div class="mb-3" id="deduction-group">
+            <label for="id_late_deduction" class="form-label fw-600">Deduction for lateness</label>
+            {{ form.late_deduction }}
+            <div class="form-text text-muted-sm">Leave at 0 for no deduction. The pupil still sees the mark you entered.</div>
+            {% for error in form.late_deduction.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="mb-3" id="resubmission-group">
+            <label for="id_resubmissions_allowed" class="form-label fw-600">Extra attempts if sent back</label>
+            {{ form.resubmissions_allowed }}
+            <div class="form-text text-muted-sm">
+              Only used with Needs revision. One extra attempt by default; raise it if you want to allow more.
+            </div>
+            {% for error in form.resubmissions_allowed.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label for="id_feedback" class="form-label fw-600">Feedback</label>
+            {{ form.feedback }}
+            {% for error in form.feedback.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check2 me-1"></i>Save mark
+            </button>
+            {% if next_url %}
+            <button type="submit" name="goto" value="next" class="btn btn-outline-primary">
+              Save and next<i class="bi bi-chevron-right ms-1"></i>
+            </button>
+            {% endif %}
+            <span class="text-muted-sm">Saved as you type too.</span>
+          </div>
+        </form>
+
+        {% if mark and mark.status %}
+        <hr>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          {% if mark.released_at or homework.marks_released_at %}
+          <span class="badge" style="background:var(--color-success);color:#fff;">
+            <i class="bi bi-check2-all me-1"></i>Released to the family
+          </span>
+          {% else %}
+          <form method="post" action="{% url 'homework:teacher_release' homework.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="student_id" value="{{ student.pk }}">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="btn btn-outline-success">
+              <i class="bi bi-send me-1"></i>Release to this pupil
+            </button>
+          </form>
+          <span class="text-muted-sm">Or use Release all on the submissions page.</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if submission and mark and mark.status %}
+    <p class="text-muted-sm mt-3">
+      {% if resubmission_allowed %}
+      This pupil has used {{ resubmission_used }} of {{ resubmission_allowed }} extra attempt{{ resubmission_allowed|pluralize }} allowed.
+      {% endif %}
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById("mark-form");
+  if (!form) return;
+  var statusField = document.getElementById("id_status");
+  var statusEl = document.getElementById("autosave-status");
+  var scoreGroup = document.getElementById("score-group");
+  var resubGroup = document.getElementById("resubmission-group");
+  var timer = null;
+
+  function syncFields() {
+    var value = statusField ? statusField.value : "";
+    if (scoreGroup) {
+      scoreGroup.style.display = value === "not_submitted" ? "none" : "";
+    }
+    if (resubGroup) {
+      resubGroup.style.display = value === "needs_revision" ? "" : "none";
+    }
+  }
+
+  function save() {
+    if (!statusField || !statusField.value) {
+      if (statusEl) statusEl.textContent = "Choose a status to save.";
+      return;
+    }
+    var body = new FormData(form);
+    fetch(form.dataset.autosaveUrl, {
+      method: "POST",
+      body: body,
+      headers: { "X-Requested-With": "XMLHttpRequest" }
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        return { ok: response.ok, data: data };
+      });
+    }).then(function (result) {
+      if (!statusEl) return;
+      if (result.ok && result.data.ok) {
+        statusEl.className = "text-muted-sm";
+        statusEl.textContent = "Saved at " + result.data.saved_at;
+      } else {
+        statusEl.className = "text-danger";
+        statusEl.textContent = (result.data.errors || ["Could not save."]).join(" ");
+      }
+    }).catch(function () {
+      if (statusEl) {
+        statusEl.className = "text-danger";
+        statusEl.textContent = "Could not save — check your connection.";
+      }
+    });
+  }
+
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(save, 700);
+  }
+
+  if (statusField) {
+    statusField.addEventListener("change", function () {
+      syncFields();
+      schedule();
+    });
+  }
+  form.querySelectorAll("input, textarea").forEach(function (field) {
+    if (field.type === "hidden" || field.type === "submit") return;
+    field.addEventListener("input", schedule);
+    field.addEventListener("change", schedule);
+  });
+  syncFields();
+})();
+</script>
+{% endblock content %}

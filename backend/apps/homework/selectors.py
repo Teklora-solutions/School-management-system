@@ -216,3 +216,113 @@ def submission_counts(*, homework_ids) -> dict[int, int]:
     )
     return {row["homework_id"]: row["total"] for row in rows}
 
+
+# ---------------------------------------------------------------------------
+# Marking and feedback
+# ---------------------------------------------------------------------------
+
+#: A mark is visible to the family when either release is set.
+_RELEASED = Q(released_at__isnull=False) | Q(
+    homework__marks_released_at__isnull=False
+)
+
+
+def mark_for(*, homework_id: int, student_id: int):
+    from .models import HomeworkMark
+
+    return HomeworkMark.objects.filter(
+        homework_id=homework_id, student_id=student_id
+    ).first()
+
+
+def marks_for_homework(*, homework_id: int) -> dict[int, object]:
+    """One pupil's mark each, keyed by student id."""
+    from .models import HomeworkMark
+
+    return {
+        mark.student_id: mark
+        for mark in HomeworkMark.objects.filter(homework_id=homework_id)
+    }
+
+
+def resubmission_window(*, homework, student) -> tuple[bool, int, int]:
+    """
+    ``(open, used, allowed)`` for the "Needs revision" loop.
+
+    Open only when the pupil's work was sent back, the family has actually
+    been told (the mark is released), and attempts remain. Counting starts
+    from the revisions, which are written only for this loop.
+    """
+    from .models import HomeworkMark, HomeworkSubmissionRevision
+
+    mark = HomeworkMark.objects.filter(
+        homework=homework, student=student
+    ).first()
+    if mark is None or mark.status != HomeworkMark.Status.NEEDS_REVISION:
+        return (False, 0, 0)
+    if not _released_for(mark, homework):
+        return (False, 0, 0)
+    used = HomeworkSubmissionRevision.objects.filter(
+        submission__homework=homework,
+        submission__student=student,
+    ).count()
+    allowed = mark.resubmissions_allowed
+    return (used < allowed, used, allowed)
+
+
+def _released_for(mark, homework) -> bool:
+    return mark.released_at is not None or homework.marks_released_at is not None
+
+
+def released_mark(*, homework_id: int, student_id: int):
+    """The pupil's mark, but only once it has been released."""
+    from .models import HomeworkMark
+
+    return (
+        HomeworkMark.objects.filter(
+            homework_id=homework_id,
+            student_id=student_id,
+        )
+        .exclude(status="")
+        .filter(_RELEASED)
+        .select_related("homework")
+        .first()
+    )
+
+
+def released_marks_for_student(*, student_id: int, term_id: int | None = None):
+    """Every released mark for one pupil, newest homework first."""
+    from .models import HomeworkMark
+
+    qs = (
+        HomeworkMark.objects.filter(student_id=student_id)
+        .exclude(status="")
+        .filter(_RELEASED)
+        .select_related("homework__subject", "homework__term", "homework__school_class")
+    )
+    if term_id:
+        qs = qs.filter(homework__term_id=term_id)
+    return qs.order_by("-homework__due_date", "homework__subject__name")
+
+
+def marks_awaiting_release(*, homework_ids) -> dict[int, int]:
+    """How many marked pupils are still waiting, per homework, in one query."""
+    from django.db.models import Count
+
+    from .models import HomeworkMark
+
+    homework_ids = list(homework_ids)
+    if not homework_ids:
+        return {}
+    rows = (
+        HomeworkMark.objects.filter(
+            homework_id__in=homework_ids,
+            released_at__isnull=True,
+            homework__marks_released_at__isnull=True,
+        )
+        .exclude(status="")
+        .values("homework_id")
+        .annotate(total=Count("id"))
+    )
+    return {row["homework_id"]: row["total"] for row in rows}
+

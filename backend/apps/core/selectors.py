@@ -192,6 +192,12 @@ def school_settings_values(request=None) -> dict:
     values["notification_quiet_hours_enabled"] = (
         row.notification_quiet_hours_enabled if row else False
     )
+    values["homework_grading_enabled"] = (
+        row.homework_grading_enabled if row else False
+    )
+    values["homework_late_penalty_enabled"] = (
+        row.homework_late_penalty_enabled if row else False
+    )
     values["quiet_hours_start"] = row.quiet_hours_start if row else 20
     values["quiet_hours_end"] = row.quiet_hours_end if row else 6
     if request is not None:

@@ -223,6 +223,13 @@
             </div>
             {% for error in form.due_date.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
           </div>
+
+          <div>
+            <label for="id_max_score" class="form-label fw-600">Total mark <span class="text-muted-sm fw-normal">(optional)</span></label>
+            <div style="max-width:220px;">{{ form.max_score }}</div>
+            <div class="form-text text-muted-sm">{{ form.max_score.help_text }}</div>
+            {% for error in form.max_score.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+          </div>
         </div>
       </div>
 

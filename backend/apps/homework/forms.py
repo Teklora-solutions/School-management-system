@@ -13,6 +13,7 @@ homework for someone else's class.
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from django import forms
 
@@ -20,6 +21,7 @@ from apps.academics.models import SchoolClass, Stream, Subject, Term
 from apps.academics.selectors import get_current_term, get_current_year
 
 from . import selectors
+from .models import HomeworkMark
 
 
 class HomeworkForm(forms.Form):
@@ -74,6 +76,25 @@ class HomeworkForm(forms.Form):
             attrs={"class": "form-control", "type": "date"}
         ),
     )
+    max_score = forms.DecimalField(
+        required=False,
+        min_value=Decimal("0.1"),
+        max_digits=5,
+        decimal_places=1,
+        label="Total mark",
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "step": "0.5",
+                "min": "0.1",
+                "placeholder": "e.g. 20",
+            }
+        ),
+        help_text=(
+            "What a full mark is out of. Optional — leave it blank until you "
+            "are ready to mark the work."
+        ),
+    )
 
     def __init__(
         self,
@@ -117,6 +138,7 @@ class HomeworkForm(forms.Form):
             self.initial.setdefault("title", instance.title)
             self.initial.setdefault("description", instance.description)
             self.initial.setdefault("due_date", instance.due_date)
+            self.initial.setdefault("max_score", instance.max_score)
         elif not self.is_bound and self.current_term is not None:
             self.initial.setdefault("term", self.current_term.pk)
 
@@ -218,3 +240,65 @@ class HomeworkForm(forms.Form):
                 "term", "That term is not in the current academic year."
             )
         return cleaned
+
+
+class HomeworkMarkForm(forms.Form):
+    """
+    The teacher's marking form for one pupil.
+
+    Types are checked here so a mistyped mark is a field error rather than a
+    stack trace; the rules that matter (bounds against the homework's total,
+    lateness deductions, extra attempts) live in the service.
+    """
+
+    status = forms.ChoiceField(
+        choices=[("", "Choose a status")] + list(HomeworkMark.Status.choices),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    score = forms.DecimalField(
+        required=False,
+        min_value=Decimal("0"),
+        max_digits=5,
+        decimal_places=1,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control", "step": "0.5", "min": "0"}
+        ),
+    )
+    feedback = forms.CharField(
+        required=False,
+        max_length=4000,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 5,
+                "placeholder": (
+                    "What went well, and one thing to try next. The pupil and "
+                    "their parents read this word for word."
+                ),
+            }
+        ),
+    )
+    late_deduction = forms.DecimalField(
+        required=False,
+        min_value=Decimal("0"),
+        max_digits=5,
+        decimal_places=1,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control", "step": "0.5", "min": "0"}
+        ),
+    )
+    resubmissions_allowed = forms.IntegerField(
+        required=False,
+        min_value=0,
+        max_value=10,
+        initial=1,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control", "min": "0", "max": "10", "step": "1"}
+        ),
+    )
+
+    def __init__(self, *args, late_penalty: bool = False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.late_penalty = late_penalty
+        if not late_penalty:
+            self.fields.pop("late_deduction")
