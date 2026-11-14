@@ -1,208 +1,120 @@
 {% extends base_template %}
-{% load static %}
+{% load static feed_tags %}
 
 {% block title %}Post · {{ school_class.name }} Feed | {{ SCHOOL_NAME }}{% endblock %}
 
 {% block content %}
-<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
-  <div>
-    <h1 class="page-title">
-      <i class="bi bi-chat-square-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
-      {{ school_class.name }} Feed
-    </h1>
-    <p class="page-subtitle">One conversation at a time</p>
+<div class="feed-app">
+
+  <header class="feed-head feed-thread-head">
+    <div>
+      <h1 class="page-title feed-head__title">
+        <i class="bi bi-chat-square-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {{ school_class.name }} Feed
+      </h1>
+      <p class="feed-head__sub">One conversation at a time</p>
+    </div>
+    <div class="feed-head__actions">
+      <a href="{% url 'learning:class_feed' school_class.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i><span class="d-none d-sm-inline">Back to feed</span>
+      </a>
+    </div>
+  </header>
+
+  <div class="mb-4">
+    {% include "features/learning/_feed_post.html" with item=thread.post school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent can_post=can_post thread_mode=True poll_from_page="thread" %}
   </div>
-  <a href="{% url 'learning:class_feed' school_class.pk %}" class="btn btn-outline-secondary btn-sm mt-1">
-    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to feed
-  </a>
-</div>
 
-<div class="mb-4">
-  {% include "features/learning/_feed_post.html" with item=thread.post school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent thread_mode=True poll_from_page="thread" %}
-</div>
+  {% include "features/learning/_feed_replies.html" with thread=thread school_class=school_class %}
 
-{% include "features/learning/_feed_replies.html" with thread=thread school_class=school_class %}
+  {# ── Reply composer ── #}
+  <div class="card mt-4 feed-reply-compose">
+    <div class="card-body">
+      {% if thread.can_reply %}
+      <form method="post"
+            action="{% url 'learning:feed_reply_create' school_class.pk thread.post.post.pk %}"
+            data-feed-reply-form
+            data-feed-reply-class="{{ school_class.pk }}"
+            data-feed-reply-post="{{ thread.post.post.pk }}"
+            data-feed-reply-clear="{% if replied %}1{% else %}0{% endif %}">
+        {% csrf_token %}
+        <label class="form-label" for="id_reply_body">
+          <i class="bi bi-reply me-1" aria-hidden="true"></i>Write a reply
+        </label>
 
-{# ── Reply composer ── #}
-<div class="card mt-4">
-  <div class="card-body">
-    {% if thread.can_reply %}
-    <form method="post"
-          action="{% url 'learning:feed_reply_create' school_class.pk thread.post.post.pk %}"
-          data-feed-reply-form
-          data-feed-reply-class="{{ school_class.pk }}"
-          data-feed-reply-post="{{ thread.post.post.pk }}"
-          data-feed-reply-clear="{% if replied %}1{% else %}0{% endif %}">
-      {% csrf_token %}
-      <label class="form-label" for="id_reply_body">
-        <i class="bi bi-reply me-1" aria-hidden="true"></i>Write a reply
-      </label>
-
-      {% if reply_starters %}
-      <div class="feed-starters">
-        {% if is_moderator %}
-        <details>
-          <summary class="feed-starters__summary">
-            <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Guiding questions
-          </summary>
+        {% if reply_starters %}
+        <div class="feed-starters">
+          {% if is_moderator %}
+          <details>
+            <summary class="feed-starters__summary">
+              <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Guiding questions
+            </summary>
+            <div class="feed-starters__row">
+              {% for starter in reply_starters %}
+              <button type="button" class="feed-starter" data-feed-starter="{{ starter }}">{{ starter }}</button>
+              {% endfor %}
+            </div>
+          </details>
+          {% else %}
+          <p class="feed-starters__summary mb-1">
+            <i class="bi bi-chat-heart me-1" aria-hidden="true"></i>Need a way to start? Tap one, then add your own words.
+          </p>
           <div class="feed-starters__row">
             {% for starter in reply_starters %}
             <button type="button" class="feed-starter" data-feed-starter="{{ starter }}">{{ starter }}</button>
             {% endfor %}
           </div>
-        </details>
-        {% else %}
-        <p class="feed-starters__summary mb-1">
-          <i class="bi bi-chat-heart me-1" aria-hidden="true"></i>Need a way to start? Tap one, then add your own words.
-        </p>
-        <div class="feed-starters__row">
-          {% for starter in reply_starters %}
-          <button type="button" class="feed-starter" data-feed-starter="{{ starter }}">{{ starter }}</button>
-          {% endfor %}
+          {% endif %}
         </div>
         {% endif %}
+
+        <textarea class="form-control" id="id_reply_body" name="body" rows="3"
+                  maxlength="1000" required
+                  data-feed-reply-input
+                  placeholder="Keep it kind and helpful. Plain text only."></textarea>
+        <div class="text-muted-sm mt-1">
+          Plain text only. Maximum 1&nbsp;000 characters.
+          <span class="feed-draft-note" hidden>Draft saved on this device.</span>
+        </div>
+
+        <div class="feed-compose__foot">
+          {% if mention_names %}
+          <details>
+            <summary class="feed-tool"><i class="bi bi-at" aria-hidden="true"></i>Mention</summary>
+            <div class="feed-mention-list" aria-label="People in this class">
+              {% for name in mention_names %}
+              <button type="button" class="feed-mention-chip"
+                      data-feed-mention="{{ name }}">@{{ name }}</button>
+              {% endfor %}
+            </div>
+          </details>
+          {% else %}
+          <span></span>
+          {% endif %}
+          <button type="submit" class="btn btn-primary feed-compose__submit">
+            <i class="bi bi-send me-1" aria-hidden="true"></i>Send reply
+          </button>
+        </div>
+      </form>
+      {% elif is_parent %}
+      <div class="alert alert-info mb-0" role="note">
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+        Parents can read the class feed but cannot post or reply.
+      </div>
+      {% else %}
+      <div class="alert alert-secondary mb-0" role="note">
+        You cannot reply to this post.
       </div>
       {% endif %}
-
-      <textarea class="form-control" id="id_reply_body" name="body" rows="3"
-                maxlength="1000" required
-                data-feed-reply-input
-                placeholder="Keep it kind and helpful. Plain text only."></textarea>
-      <div class="text-muted-sm mt-1">
-        Plain text only. Maximum 1&nbsp;000 characters.
-        <span class="feed-draft-note" hidden>Draft saved on this device.</span>
-      </div>
-      <button type="submit" class="btn btn-primary btn-sm mt-2">
-        <i class="bi bi-send me-1" aria-hidden="true"></i>Send reply
-      </button>
-    </form>
-    {% elif is_parent %}
-    <div class="alert alert-info mb-0" role="note">
-      <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-      Parents can read the class feed but cannot post or reply.
     </div>
-    {% else %}
-    <div class="alert alert-secondary mb-0" role="note">
-      You cannot reply to this post.
-    </div>
-    {% endif %}
   </div>
-</div>
 
+  {% include "features/learning/_feed_lightbox.html" %}
+</div>
 {% endblock content %}
 
 {% block extra_css %}
-<style>
-  .text-muted-sm { color: var(--color-muted); font-size: 0.8rem; }
-  .fw-600 { font-weight: 600; }
-  .reaction-btn { cursor: pointer; transition: all 0.15s ease; }
-  .reaction-btn:hover:not([disabled]) {
-    background: var(--accent-glow) !important;
-    border-color: var(--accent) !important;
-    transform: scale(1.1);
-  }
-  .reaction-btn--active { font-weight: 700; }
-  .feed-post__body,
-  .feed-reply__body {
-    white-space: pre-wrap;
-    font-size: 0.9rem;
-    line-height: 1.65;
-    overflow-wrap: anywhere;
-    color: var(--color-text);
-  }
-  .feed-link-btn {
-    background: var(--color-surface-2);
-    border: 1px solid var(--color-border);
-    font-size: 0.8rem;
-  }
-  .feed-status { font-size: 0.72rem; font-weight: 600; }
-  .feed-status--waiting { background: rgba(245,158,11,0.15); color: #fbbf24; }
-  .feed-status--answered { background: rgba(16,185,129,0.15); color: #34d399; }
-  .feed-status--best { background: rgba(139,92,246,0.15); color: #a78bfa; }
-  .feed-reply--best {
-    border-color: rgba(139,92,246,0.5) !important;
-    box-shadow: 0 0 0 1px rgba(139,92,246,0.2);
-  }
-  .feed-reply--removed {
-    border-color: rgba(239,68,68,0.3) !important;
-    background: rgba(239,68,68,0.04);
-  }
-  .feed-draft-note { color: var(--color-muted); }
-  .feed-starters { margin-bottom: .6rem; }
-  .feed-starters__summary {
-    color: var(--color-muted);
-    font-size: 0.78rem;
-    cursor: pointer;
-    margin-bottom: .35rem;
-  }
-  .feed-starters__row {
-    display: flex;
-    gap: .4rem;
-    overflow-x: auto;
-    padding-bottom: .3rem;
-    -webkit-overflow-scrolling: touch;
-  }
-  .feed-starter {
-    flex: 0 0 auto;
-    max-width: 260px;
-    text-align: left;
-    white-space: normal;
-    background: var(--color-surface-2);
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    color: var(--color-text);
-    font-size: 0.78rem;
-    line-height: 1.35;
-    padding: .4rem .7rem;
-  }
-  .feed-starter:active { background: var(--accent-glow); border-color: var(--accent); }
-  .feed-poll {
-    background: var(--color-surface-2);
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    padding: .75rem;
-    color: var(--color-text);
-  }
-  .feed-poll__badge { background: rgba(6,182,212,0.15); color: #22d3ee; }
-  .feed-poll__state { background: rgba(148,163,184,0.18); color: var(--color-muted); }
-  .feed-poll__options { border: 0; padding: 0; margin: 0 0 .6rem; }
-  .feed-poll__option {
-    display: flex;
-    align-items: center;
-    gap: .6rem;
-    min-height: 48px;
-    padding: .65rem .8rem;
-    margin-bottom: .45rem;
-    border: 1px solid var(--color-border);
-    border-radius: 10px;
-    background: var(--color-surface);
-    cursor: pointer;
-  }
-  .feed-poll__option input { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; }
-  .feed-poll__option--chosen { border-color: var(--accent); background: var(--accent-glow); }
-  .feed-poll__option-text { font-size: .9rem; }
-  .feed-poll__tick { margin-left: auto; font-size: .75rem; color: var(--accent-light); white-space: nowrap; }
-  .feed-poll__submit { min-height: 46px; font-weight: 600; }
-  .feed-poll__voted { font-size: .85rem; color: var(--accent-light); }
-  .feed-poll__results { list-style: none; padding: 0; margin: 0 0 .4rem; }
-  .feed-poll__result { margin-bottom: .55rem; }
-  .feed-poll__result-label { font-size: .85rem; overflow-wrap: anywhere; }
-  .feed-poll__result-count { font-size: .8rem; color: var(--color-muted); white-space: nowrap; }
-  .feed-poll__bar {
-    height: 10px;
-    margin-top: .2rem;
-    border-radius: 99px;
-    background: var(--color-border);
-    overflow: hidden;
-  }
-  .feed-poll__bar span {
-    display: block;
-    height: 100%;
-    min-width: 2px;
-    border-radius: 99px;
-    background: var(--accent);
-  }
-</style>
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
 {% endblock %}
 
 {% block extra_js %}

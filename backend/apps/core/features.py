@@ -52,6 +52,22 @@ FEATURES: dict[str, dict[str, str]] = {
             "Each teacher also switches it on for their own class."
         ),
     },
+    "feed_media": {
+        "label": "Class feed photos and files",
+        "field": "feed_media_enabled",
+        "disabled_message": (
+            "Available once the school switches on photos and files for class "
+            "feeds. Each teacher also switches them on for their own class."
+        ),
+    },
+    "feed_student_uploads": {
+        "label": "Pupil uploads on the class feed",
+        "field": "feed_student_uploads_enabled",
+        "disabled_message": (
+            "Available once the school allows pupils to attach photos and "
+            "files. Each teacher also switches it on for their own class."
+        ),
+    },
     "homework_grading": {
         "label": "Homework marking and feedback",
         "field": "homework_grading_enabled",

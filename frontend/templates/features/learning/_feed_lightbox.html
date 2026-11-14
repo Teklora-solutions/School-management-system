@@ -1,0 +1,22 @@
+{% comment %}
+Full-screen viewer for feed photos. Opened by class_feed.js from a
+`[data-feed-photo]` button; the image URL is served by the permission-checked
+view, never a public media path.
+{% endcomment %}
+<div class="feed-lightbox" data-feed-lightbox hidden role="dialog" aria-modal="true"
+     aria-label="Photo viewer">
+  <div class="feed-lightbox__bar">
+    <a class="feed-lightbox__download" data-feed-lightbox-download href="#"
+       download>
+      <i class="bi bi-download" aria-hidden="true"></i>Download
+    </a>
+    <button type="button" class="feed-lightbox__close" data-feed-lightbox-close
+            aria-label="Close photo">
+      <i class="bi bi-x-lg" aria-hidden="true"></i>
+    </button>
+  </div>
+  <figure class="feed-lightbox__figure">
+    <div class="feed-lightbox__stage" data-feed-lightbox-stage></div>
+    <figcaption class="feed-lightbox__caption" data-feed-lightbox-caption></figcaption>
+  </figure>
+</div>

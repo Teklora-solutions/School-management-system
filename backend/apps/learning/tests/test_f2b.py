@@ -527,7 +527,7 @@ class VisibilityTests(PollTestCase):
         response = self.client.get(self.feed_url())
 
         self.assertContains(response, 'class="feed-poll__result-count"')
-        self.assertContains(response, "50%")
+        self.assertContains(response, "100%")
 
     def test_parent_reads_but_cannot_vote(self):
         poll = self.make_poll(

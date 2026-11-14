@@ -41,6 +41,7 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 media/
+private_feed/
 
 # Static (collected)
 staticfiles/

@@ -86,6 +86,11 @@ urlpatterns = [
         name="feed_reply_create",
     ),
     path(
+        "class/<int:class_id>/feed/post/<int:post_id>/edit/",
+        views.ClassFeedPostEditView.as_view(),
+        name="feed_post_edit",
+    ),
+    path(
         "class/<int:class_id>/feed/post/<int:post_id>/vote/",
         views.ClassFeedPollVoteView.as_view(),
         name="feed_poll_vote",
@@ -99,6 +104,17 @@ urlpatterns = [
         "class/<int:class_id>/feed/post/<int:post_id>/action/",
         views.ClassFeedPostActionView.as_view(),
         name="feed_post_action",
+    ),
+    path(
+        "class/<int:class_id>/feed/post/<int:post_id>/attachment/<int:attachment_id>/",
+        views.ClassFeedAttachmentFileView.as_view(),
+        name="feed_attachment_file",
+    ),
+    path(
+        "class/<int:class_id>/feed/post/<int:post_id>/attachment/"
+        "<int:attachment_id>/action/",
+        views.ClassFeedAttachmentActionView.as_view(),
+        name="feed_attachment_action",
     ),
     # ── Piece 3: points, levels and badges ────────────────────────────────
     path(

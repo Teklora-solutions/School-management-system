@@ -16,6 +16,10 @@ Public API
   restore_post(post, restored_by, request=None)
       Un-removes a post.
 
+  edit_post(post, actor, body)
+      The author rewrites their own words; stamps edited_at and re-resolves
+      @mentions.
+
   toggle_pin(post, actor)
       Flips is_pinned.  Only teachers and above may pin.
 
@@ -50,7 +54,9 @@ Design rules:
 from __future__ import annotations
 
 import logging
+import re
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils import timezone
@@ -79,6 +85,15 @@ COMMUNITY_ONLY_STUDENT_TYPES = {
     ClassPost.PostType.TIP,
     ClassPost.PostType.CELEBRATION,
 }
+
+#: Nobody may be mentioned more than this many times in one post.
+MENTION_LIMIT = 10
+
+#: ``@`` followed by one or two words.  Names are matched against the class
+#: roster afterwards, so a stray ``@`` simply stays ordinary text.
+_MENTION_TOKEN = re.compile(
+    r"@([A-Za-z][A-Za-z'’.\-]*(?:[ \t]+[A-Za-z][A-Za-z'’.\-]*)?)"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +231,91 @@ def _clean_link(link, school_class, kind: str):
 
 
 # ---------------------------------------------------------------------------
+# Mentions — resolved against the class roster, never free text
+# ---------------------------------------------------------------------------
+
+
+def resolve_mentions(body: str, school_class) -> list[dict]:
+    """
+    Return ``[{'id', 'name'}]`` for every recognised ``@Name`` in *body*.
+
+    A full name wins; a single first name is accepted only when it is unique
+    in the class.  Anything else stays plain text, so a pupil writing
+    "@everyone" or an email address never becomes a notification.
+    """
+    from .feed_selectors import mention_candidates
+
+    roster = mention_candidates(school_class)
+    by_full: dict[str, list[dict]] = {}
+    by_first: dict[str, list[dict]] = {}
+    for row in roster:
+        by_full.setdefault(row["name"].lower(), []).append(row)
+        by_first.setdefault(row["first"].lower(), []).append(row)
+
+    found: list[dict] = []
+    seen: set[int] = set()
+    for match in _MENTION_TOKEN.finditer(body):
+        words = match.group(1).split()
+        candidate = None
+        if len(words) >= 2:
+            # Two pupils with the same full name: do not guess which one,
+            # because a notification would reach the wrong family.
+            full_matches = by_full.get(" ".join(words[:2]).lower(), [])
+            if len(full_matches) == 1:
+                candidate = full_matches[0]
+        if candidate is None:
+            hits = by_first.get(words[0].lower(), [])
+            if len(hits) == 1:
+                candidate = hits[0]
+        if candidate is None or candidate["id"] in seen:
+            continue
+        seen.add(candidate["id"])
+        found.append({"id": candidate["id"], "name": candidate["name"]})
+        if len(found) >= MENTION_LIMIT:
+            break
+    return found
+
+
+def _notify_mention_rows(*, mentions, school_class, actor, link, only_ids=None) -> None:
+    """One quiet notification per mentioned person, never the author."""
+    if not mentions:
+        return
+    from .feed_selectors import can_view_feed
+
+    User = get_user_model()
+    for row in mentions:
+        if only_ids is not None and row.get("id") not in only_ids:
+            continue
+        user = User.objects.filter(pk=row.get("id"), is_active=True).first()
+        if user is None or user.pk == getattr(actor, "pk", None):
+            continue
+        # Membership is re-checked at send time: a pupil who moved class since
+        # the post was written must not receive it.
+        if not can_view_feed(user, school_class):
+            continue
+        try:
+            notify(
+                recipient=user,
+                title=f"{actor.first_name or 'Someone'} mentioned you in {school_class.name}",
+                message="",
+                link=link,
+                category="feed_mention",
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("Mention notification failed for %s", link)
+
+
+def _notify_mentions(post: ClassPost, actor, only_ids=None) -> None:
+    _notify_mention_rows(
+        mentions=post.mentions,
+        school_class=post.school_class,
+        actor=actor,
+        link=f"/learning/class/{post.school_class_id}/feed/post/{post.pk}/",
+        only_ids=only_ids,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -230,9 +330,15 @@ def create_post(
     lesson=None,
     quiz=None,
     allow_poll: bool = False,
+    scheduled_at=None,
 ) -> ClassPost:
     """
     Create a class feed post.
+
+    ``scheduled_at`` (teachers and above only) keeps the post out of pupils'
+    and parents' feeds until that moment; the author and other teachers see
+    it at once with a "Scheduled" label.  No notification is sent for a
+    scheduled post, because there is no background job to send it later.
 
     Raises PermissionDenied when:
       - The author's role cannot post (parent, finance, etc.).
@@ -289,6 +395,18 @@ def create_post(
     if len(body) > 2000:
         raise ValueError("Post body cannot exceed 2000 characters.")
 
+    if scheduled_at is not None:
+        if role not in MODERATOR_ROLES:
+            raise PermissionDenied("Only teachers can schedule a post.")
+        if not community_on:
+            raise PermissionDenied(
+                "Scheduling needs the class community feed switched on."
+            )
+        if timezone.is_naive(scheduled_at):
+            scheduled_at = timezone.make_aware(scheduled_at, timezone.get_current_timezone())
+        if scheduled_at <= timezone.now():
+            raise ValueError("Choose a time in the future.")
+
     post = ClassPost.objects.create(
         author=author,
         school_class=school_class,
@@ -296,11 +414,15 @@ def create_post(
         body=body,
         lesson=lesson,
         quiz=quiz,
+        scheduled_at=scheduled_at,
+        mentions=resolve_mentions(body, school_class),
     )
 
     # Notifications
     if role == "student":
         _notify_teacher(post)
+    if scheduled_at is None:
+        _notify_mentions(post, author)
 
     # ── Piece 3: award points for student questions ──────────────────────
     # Only student questions earn points, not teacher posts.
@@ -427,7 +549,7 @@ def restore_post(*, post: ClassPost, restored_by, request=None) -> ClassPost:
 
 
 @transaction.atomic
-def toggle_pin(*, post: ClassPost, actor) -> ClassPost:
+def toggle_pin(*, post: ClassPost, actor, request=None) -> ClassPost:
     """Pin or unpin a post. Only teachers and above."""
     role = getattr(actor, "role", "")
     if role not in MODERATOR_ROLES:
@@ -435,6 +557,70 @@ def toggle_pin(*, post: ClassPost, actor) -> ClassPost:
     _assert_can_view(actor, post.school_class)
     post.is_pinned = not post.is_pinned
     post.save(update_fields=["is_pinned", "updated_at"])
+    _audit(
+        actor=actor,
+        action="feed.post.pinned" if post.is_pinned else "feed.post.unpinned",
+        obj=post,
+        summary={
+            "post_type": post.post_type,
+            "author_id": post.author_id,
+            "class_id": post.school_class_id,
+        },
+        request=request,
+    )
+    return post
+
+
+@transaction.atomic
+def edit_post(*, post: ClassPost, actor, body: str, request=None) -> ClassPost:
+    """
+    Change the words of a post.  Only its own author may edit it — a teacher
+    correcting a pupil's wording would put words in the pupil's mouth.
+
+    Editing stamps ``edited_at`` so the card can say "Edited".  Mentions are
+    resolved again; people newly mentioned are notified once.
+    """
+    if post.is_removed:
+        raise PermissionDenied("This post has been removed.")
+    if post.author_id is None or post.author_id != getattr(actor, "pk", None):
+        raise PermissionDenied("Only the author can edit this post.")
+    _assert_community(post.school_class)
+    _assert_in_class(actor, post.school_class)
+
+    body = (body or "").strip()
+    if not body:
+        raise ValueError("Post body cannot be empty.")
+    if len(body) > 2000:
+        raise ValueError("Post body cannot exceed 2000 characters.")
+    if body == post.body:
+        return post
+
+    previously_mentioned = {
+        row.get("id") for row in (post.mentions or []) if row.get("id")
+    }
+    mentions = resolve_mentions(body, post.school_class)
+    post.body = body
+    post.mentions = mentions
+    post.edited_at = timezone.now()
+    post.save(update_fields=["body", "mentions", "edited_at", "updated_at"])
+
+    _audit(
+        actor=actor,
+        action="feed.post.edited",
+        obj=post,
+        summary={
+            "post_type": post.post_type,
+            "class_id": post.school_class_id,
+            "mentioned": [row["id"] for row in mentions],
+        },
+        request=request,
+    )
+
+    new_mentions = {
+        row["id"] for row in mentions if row.get("id")
+    } - previously_mentioned
+    if new_mentions:
+        _notify_mentions(post, actor, only_ids=new_mentions)
     return post
 
 
@@ -459,6 +645,8 @@ def set_reaction(
     role = getattr(user, "role", "")
     if role not in POSTER_ROLES:
         raise PermissionDenied("Your role cannot react to feed posts.")
+    if post.is_scheduled and role not in MODERATOR_ROLES:
+        raise PermissionDenied("This post is not visible yet.")
     _assert_can_view(user, post.school_class)
 
     # Validate emoji is in the allowed set
@@ -503,6 +691,8 @@ def create_reply(*, post: ClassPost, author, body: str) -> ClassPostReply:
 
     if post.is_removed:
         raise PermissionDenied("This post has been removed.")
+    if post.is_scheduled:
+        raise PermissionDenied("This post is not available yet.")
 
     body = body.strip()
     if not body:
@@ -521,12 +711,24 @@ def create_reply(*, post: ClassPost, author, body: str) -> ClassPostReply:
             "Add your own thoughts after the starter and try again."
         )
 
-    reply = ClassPostReply.objects.create(post=post, author=author, body=body)
+    reply = ClassPostReply.objects.create(
+        post=post,
+        author=author,
+        body=body,
+        mentions=resolve_mentions(body, post.school_class),
+    )
 
     # ── Notify the question's author on their FIRST reply ──────────────
     # Rules: only once (first visible reply), never the author's own reply,
     # only when the post is a question, reply is not removed.
     _notify_first_reply(post=post, reply=reply)
+    if reply.mentions:
+        _notify_mention_rows(
+            mentions=reply.mentions,
+            school_class=post.school_class,
+            actor=author,
+            link=f"/learning/class/{post.school_class_id}/feed/post/{post.pk}/",
+        )
 
     return reply
 
@@ -580,7 +782,7 @@ def _notify_first_reply(*, post: ClassPost, reply: ClassPostReply) -> None:
 
 
 @transaction.atomic
-def mark_best_answer(*, reply: ClassPostReply, actor) -> ClassPostReply:
+def mark_best_answer(*, reply: ClassPostReply, actor, request=None) -> ClassPostReply:
     """
     Choose *reply* as the one best answer.
 
@@ -611,6 +813,20 @@ def mark_best_answer(*, reply: ClassPostReply, actor) -> ClassPostReply:
 
     reply.is_best_answer = True
     reply.save(update_fields=["is_best_answer", "updated_at"])
+
+    if not was_already_best:
+        _audit(
+            actor=actor,
+            action="feed.reply.best_answer",
+            obj=reply,
+            summary={
+                "post_id": post.pk,
+                "reply_id": reply.pk,
+                "reply_author_id": reply.author_id,
+                "class_id": post.school_class_id,
+            },
+            request=request,
+        )
 
     # ── Notifications ──────────────────────────────────────────────────
     # Re-clicking Best answer on the same reply must not notify twice.

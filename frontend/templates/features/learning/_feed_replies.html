@@ -1,3 +1,4 @@
+{% load feed_tags %}
 <section id="replies" aria-label="Replies">
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
     <h2 class="h6 mb-0 fw-600">
@@ -17,7 +18,7 @@
 
   {% if not thread.replies %}
   <div class="card feed-empty">
-    <div class="card-body text-center p-4" style="color:var(--color-muted);">
+    <div class="card-body">
       <p class="mb-0">No replies yet.{% if thread.can_reply %} Be the first to help.{% endif %}</p>
     </div>
   </div>
@@ -27,73 +28,74 @@
     <article class="card feed-reply {% if reply.is_best_answer %}feed-reply--best{% endif %} {% if reply.is_removed %}feed-reply--removed{% endif %}"
              id="reply-{{ reply.pk }}"
              aria-label="Reply by {% if reply.author %}{{ reply.author.get_full_name }}{% else %}Unknown{% endif %}">
-      <div class="card-body">
-        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-          <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
-               style="width:28px;height:28px;font-size:0.7rem;">
-            {% if reply.author %}{{ reply.author.first_name|first|upper }}{{ reply.author.last_name|first|upper }}
-            {% else %}??{% endif %}
-          </div>
-          <div class="flex-grow-1 min-w-0">
-            <div class="fw-600" style="font-size:0.82rem;">
-              {% if reply.author %}{{ reply.author.get_full_name }}{% else %}Deleted user{% endif %}
-              {% if reply.author %}
-              <span class="badge-role badge-role-{{ reply.author.role }} ms-1"
-                    style="font-size:0.62rem;vertical-align:middle;">
-                {{ reply.author.get_role_display }}
-              </span>
-              {% endif %}
-            </div>
-            <div class="text-muted-sm" style="font-size:0.75rem;">
-              {{ reply.created_at|date:"d M Y, g:i a" }}
-              {% if reply.is_removed %}
-              · <span style="color:var(--color-danger);">Removed by {{ reply.removed_by.get_full_name }}</span>
-              {% endif %}
-            </div>
-          </div>
-          {% if reply.is_best_answer %}
-          <span class="badge feed-status feed-status--best">
-            <i class="bi bi-star-fill me-1" aria-hidden="true"></i>Best answer
-          </span>
-          {% endif %}
+
+      <div class="feed-reply__head">
+        <div class="feed-reply__avatar" aria-hidden="true">
+          {% if reply.author %}{{ reply.author.first_name|first|upper }}{{ reply.author.last_name|first|upper }}
+          {% else %}??{% endif %}
         </div>
-
-        <p class="mb-0 feed-reply__body {% if reply.is_removed %}opacity-50{% endif %}">{{ reply.body }}</p>
-
-        {% if not reply.is_removed %}
-        <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
-          {% if thread.can_choose_best and not reply.is_best_answer %}
-          <form method="post"
-                action="{% url 'learning:feed_reply_action' school_class.pk reply.pk %}">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="best">
-            <button type="submit"
-                    class="btn btn-sm"
-                    style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);color:#a78bfa;font-size:0.78rem;">
-              <i class="bi bi-star me-1" aria-hidden="true"></i>Best answer
+        <div class="feed-post__who">
+          <div class="feed-post__name">
+            {% if reply.author %}{{ reply.author.get_full_name }}{% else %}Deleted user{% endif %}
+            {% if reply.author %}
+            <span class="badge-role badge-role-{{ reply.author.role }}">
+              {{ reply.author.get_role_display }}
+            </span>
+            {% endif %}
+          </div>
+          <div class="feed-post__meta">
+            <button type="button" class="feed-time" data-feed-time
+                    aria-label="Tap for the exact time">
+              <span class="feed-time__rel">{{ reply.created_at|feed_relative }}</span>
+              <span class="feed-time__exact">{{ reply.created_at|feed_exact }}</span>
             </button>
-          </form>
-          {% endif %}
-
-          {% if thread.can_moderate %}
-          <form method="post" class="d-flex flex-wrap gap-1 align-items-center"
-                action="{% url 'learning:feed_reply_action' school_class.pk reply.pk %}"
-                onsubmit="return confirm('Remove this reply? Students will no longer see it.');">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="remove">
-            <input type="text" name="reason" maxlength="200" class="form-control form-control-sm"
-                   style="max-width:190px;" placeholder="Reason (optional)"
-                   aria-label="Reason for removing this reply">
-            <button type="submit"
-                    class="btn btn-sm"
-                    style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.78rem;">
-              <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Remove
-            </button>
-          </form>
-          {% endif %}
+            {% if reply.is_removed %}
+            · <span style="color:var(--color-danger);">Removed by {{ reply.removed_by.get_full_name }}</span>
+            {% endif %}
+          </div>
         </div>
+        {% if reply.is_best_answer %}
+        <span class="badge feed-status feed-status--best">
+          <i class="bi bi-star-fill me-1" aria-hidden="true"></i>Best answer
+        </span>
         {% endif %}
       </div>
+
+      <p class="feed-reply__body {% if reply.is_removed %}opacity-50{% endif %}">{% for seg in reply.body_segments %}{% if seg.mention %}<span class="feed-mention">{{ seg.text }}</span>{% else %}{{ seg.text }}{% endif %}{% endfor %}</p>
+
+      {% if not reply.is_removed %}
+      <div class="feed-reply__foot">
+        {% if thread.can_choose_best and not reply.is_best_answer and reply.author_id != request.user.pk %}
+        <form method="post"
+              action="{% url 'learning:feed_reply_action' school_class.pk reply.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="best">
+          <button type="submit"
+                  class="btn btn-sm"
+                  style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);color:#a78bfa;font-size:0.78rem;min-height:38px;">
+            <i class="bi bi-star me-1" aria-hidden="true"></i>Best answer
+          </button>
+        </form>
+        {% endif %}
+
+        {% if thread.can_moderate %}
+        <form method="post" class="feed-reply__remove ms-auto"
+              action="{% url 'learning:feed_reply_action' school_class.pk reply.pk %}"
+              onsubmit="return confirm('Remove this reply? Pupils will no longer see it.');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="remove">
+          <input type="text" name="reason" maxlength="200" class="form-control form-control-sm"
+                 placeholder="Reason (optional)"
+                 aria-label="Reason for removing this reply">
+          <button type="submit"
+                  class="btn btn-sm"
+                  style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.78rem;min-height:38px;">
+            <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Remove
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
     </article>
     {% endfor %}
   </div>

@@ -189,6 +189,10 @@ def school_settings_values(request=None) -> dict:
     values["feed_community_enabled"] = (
         row.feed_community_enabled if row else False
     )
+    values["feed_media_enabled"] = row.feed_media_enabled if row else False
+    values["feed_student_uploads_enabled"] = (
+        row.feed_student_uploads_enabled if row else False
+    )
     values["notification_quiet_hours_enabled"] = (
         row.notification_quiet_hours_enabled if row else False
     )

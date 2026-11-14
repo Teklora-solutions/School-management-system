@@ -1,381 +1,363 @@
 {% extends base_template %}
-{% load static %}
+{% load static feed_tags %}
 
 {% block title %}Class Feed · {{ school_class.name }} | {{ SCHOOL_NAME }}{% endblock %}
 
 {% block content %}
-<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
-  <div>
-    <h1 class="page-title">
-      <i class="bi bi-megaphone me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
-      {{ school_class.name }} Feed
-    </h1>
-    <p class="page-subtitle">
-      {% if community_on %}The living heart of this class — ask, answer and celebrate together
-      {% else %}Class notice board — everyone in this class can see posts here{% endif %}
-    </p>
+<div class="feed-app" id="feedApp">
+
+  {# ── Page header ── #}
+  <header class="feed-head">
+    <div>
+      <h1 class="page-title feed-head__title">
+        <i class="bi bi-chat-square-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {{ school_class.name }} Feed
+      </h1>
+      <p class="feed-head__sub">
+        {% if community_on %}Ask, answer and celebrate together
+        {% else %}Class notice board — everyone in this class can see posts here{% endif %}
+      </p>
+    </div>
+    <div class="feed-head__actions">
+      {% if can_manage_feed %}
+      <a href="{% url 'learning:feed_settings' school_class.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-sliders" aria-hidden="true"></i><span class="d-none d-sm-inline">Feed settings</span>
+      </a>
+      {% endif %}
+      <a href="{% url 'learning:feed_home' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i><span class="d-none d-sm-inline">All classes</span>
+      </a>
+    </div>
+  </header>
+
+  {# ── Community rules (dismissed once per session) ── #}
+  {% if community_on %}
+  <div class="alert alert-info d-flex gap-2 align-items-start mb-2 feed-rules-banner"
+       id="feedRulesBanner" role="note" style="font-size:0.82rem;padding:0.6rem 0.75rem;">
+    <i class="bi bi-info-circle-fill flex-shrink-0" aria-hidden="true"></i>
+    <div>
+      <strong>Community rules:</strong>
+      Be kind and respectful. Only post things you would say in class.
+      Teachers can see and remove anything that is not appropriate.
+      {% if is_parent %}Parents can read but cannot post or reply.{% endif %}
+    </div>
+    <button type="button" class="btn-close ms-auto flex-shrink-0"
+            aria-label="Dismiss" onclick="dismissFeedRules()"></button>
   </div>
-  <div class="d-flex gap-2 flex-wrap mt-1">
-    {% if can_manage_feed %}
-    <a href="{% url 'learning:feed_settings' school_class.pk %}" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-sliders me-1" aria-hidden="true"></i>Feed settings
-    </a>
+
+  {# ── Search ── #}
+  <form class="feed-search" method="get" role="search"
+        action="{% url 'learning:class_feed' school_class.pk %}">
+    {% if active_filter and active_filter != "all" %}
+    <input type="hidden" name="filter" value="{{ active_filter }}">
     {% endif %}
-    <a href="{% url 'learning:feed_home' %}" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All classes
-    </a>
-  </div>
-</div>
+    <i class="bi bi-search" aria-hidden="true"></i>
+    <label class="visually-hidden" for="feedSearchInput">Search this class feed</label>
+    <input type="search" id="feedSearchInput" name="q" value="{{ active_search }}"
+           maxlength="80" enterkeyhint="search"
+           placeholder="Search posts and names">
+    {% if active_search %}
+    <a class="feed-search__clear" href="?filter={{ active_filter }}"
+       aria-label="Clear search"><i class="bi bi-x-lg" aria-hidden="true"></i></a>
+    {% endif %}
+  </form>
+  {% endif %}
 
-{# ── Community rules banner (dismissed once per session) ── #}
-<div class="alert alert-info d-flex gap-2 align-items-start mb-3 feed-rules-banner"
-     id="feedRulesBanner" role="note" style="font-size:0.85rem;">
-  <i class="bi bi-info-circle-fill fs-5 flex-shrink-0 mt-1" aria-hidden="true"></i>
-  <div>
-    <strong>Community rules:</strong>
-    Be kind and respectful. Only post things you would say in class.
-    Teachers can see and remove anything that is not appropriate.
-    {% if is_parent %}Parents can read but cannot post or reply.{% endif %}
-  </div>
-  <button type="button" class="btn-close btn-close-white ms-auto flex-shrink-0"
-          aria-label="Dismiss" onclick="dismissFeedRules()"></button>
-</div>
+  {# ── Composer ── #}
+  {% if can_post %}
+  <section class="card feed-compose" data-feed-compose aria-label="Write a post">
+    <button type="button" class="feed-compose__bar" data-feed-compose-toggle
+            aria-expanded="false" aria-controls="feedComposeBody">
+      <span class="feed-post__avatar" aria-hidden="true">
+        {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+      </span>
+      <span>{% if is_teacher %}Write something for the class…{% else %}Ask a question or share something…{% endif %}</span>
+      <i class="bi bi-plus-lg feed-compose__plus" aria-hidden="true"></i>
+    </button>
 
-{# ── Composer ── #}
-{% if can_post %}
-<div class="card mb-4 feed-composer">
-  <div class="card-header">
-    <h2 class="card-title">
-      <i class="bi bi-pencil-square me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
-      Add a post
-    </h2>
-  </div>
-  <div class="card-body">
-    <form method="post" action="{% url 'learning:class_feed' school_class.pk %}" novalidate
+    <form method="post" action="{% url 'learning:class_feed' school_class.pk %}"
+          class="feed-compose__body" id="feedComposeBody" novalidate
+          enctype="multipart/form-data"
           data-feed-draft-kind="post" data-feed-draft-class="{{ school_class.pk }}">
       {% csrf_token %}
 
+      {% if copied_from %}
+      <p class="text-muted-sm mb-2" role="note">
+        <i class="bi bi-copy me-1" aria-hidden="true"></i>
+        Copied from {% if copied_from.author %}{{ copied_from.author.get_full_name }}{% else %}an earlier post{% endif %}.
+        Change it before posting — the copy is a new post.
+      </p>
+      {% endif %}
+
       {% if community_on %}
         {% if is_teacher %}
-        <div class="mb-3">
-          <label class="form-label" for="id_post_type">Post type</label>
-          <div class="d-flex flex-wrap gap-2" role="group" aria-label="Post type">
-            {% for value, label in post_types %}
-            <div class="form-check form-check-inline feed-type-option">
-              <input class="form-check-input" type="radio"
-                     name="post_type" id="pt_{{ value }}" value="{{ value }}"
-                     {% if value == "announcement" %}checked{% endif %}>
-              <label class="form-check-label" for="pt_{{ value }}">
-                {% if value == "announcement" %}<i class="bi bi-megaphone me-1" aria-hidden="true"></i>{% endif %}
-                {% if value == "question" %}<i class="bi bi-question-circle me-1" aria-hidden="true"></i>{% endif %}
-                {% if value == "tip" %}<i class="bi bi-lightbulb me-1" aria-hidden="true"></i>{% endif %}
-                {% if value == "celebration" %}<i class="bi bi-stars me-1" aria-hidden="true"></i>{% endif %}
-                {% if value == "challenge" %}<i class="bi bi-flag me-1" aria-hidden="true"></i>{% endif %}
-                {% if value == "discussion_prompt" %}<i class="bi bi-chat-dots me-1" aria-hidden="true"></i>{% endif %}
-                {{ label }}
-              </label>
-            </div>
-            {% endfor %}
+        <div class="feed-type-row" role="group" aria-label="Post type">
+          {% for value, label in post_types %}
+          <div class="feed-type-option">
+            <input type="radio" name="post_type" id="pt_{{ value }}" value="{{ value }}"
+                   {% if draft_type == value %}checked{% elif not draft_type and value == "announcement" %}checked{% endif %}>
+            <label for="pt_{{ value }}">
+              {% if value == "announcement" %}<i class="bi bi-megaphone" aria-hidden="true"></i>{% endif %}
+              {% if value == "question" %}<i class="bi bi-question-circle" aria-hidden="true"></i>{% endif %}
+              {% if value == "tip" %}<i class="bi bi-lightbulb" aria-hidden="true"></i>{% endif %}
+              {% if value == "celebration" %}<i class="bi bi-stars" aria-hidden="true"></i>{% endif %}
+              {% if value == "challenge" %}<i class="bi bi-flag" aria-hidden="true"></i>{% endif %}
+              {% if value == "discussion_prompt" %}<i class="bi bi-chat-dots" aria-hidden="true"></i>{% endif %}
+              {{ label }}
+            </label>
           </div>
+          {% endfor %}
         </div>
         {% else %}
-        <div class="mb-3">
-          <span class="form-label d-block">What would you like to share?</span>
-          <div class="d-flex flex-wrap gap-2" role="group" aria-label="Post type">
-            <div class="form-check form-check-inline feed-type-option">
-              <input class="form-check-input" type="radio" name="post_type" id="pt_question" value="question" checked>
-              <label class="form-check-label" for="pt_question">
-                <i class="bi bi-question-circle me-1" aria-hidden="true"></i>Ask a question
-              </label>
-            </div>
-            <div class="form-check form-check-inline feed-type-option">
-              <input class="form-check-input" type="radio" name="post_type" id="pt_tip" value="tip">
-              <label class="form-check-label" for="pt_tip">
-                <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>I figured it out
-              </label>
-            </div>
-            <div class="form-check form-check-inline feed-type-option">
-              <input class="form-check-input" type="radio" name="post_type" id="pt_celebration" value="celebration">
-              <label class="form-check-label" for="pt_celebration">
-                <i class="bi bi-stars me-1" aria-hidden="true"></i>Thank you / shout-out
-              </label>
-            </div>
+        <div class="feed-type-row" role="group" aria-label="Post type">
+          <div class="feed-type-option">
+            <input type="radio" name="post_type" id="pt_question" value="question"
+                   {% if not draft_type or draft_type == "question" %}checked{% endif %}>
+            <label for="pt_question"><i class="bi bi-question-circle" aria-hidden="true"></i>Ask a question</label>
           </div>
-        </div>
-        {% endif %}
-
-        {% if is_teacher and link_lessons or is_teacher and link_quizzes %}
-        <div class="row g-2 mb-3">
-          {% if link_lessons %}
-          <div class="col-sm-6">
-            <label class="form-label" for="id_lesson_id">Link a lesson (optional)</label>
-            <select class="form-select form-select-sm" id="id_lesson_id" name="lesson_id">
-              <option value="">No lesson</option>
-              {% for lesson in link_lessons %}
-              <option value="{{ lesson.pk }}">{{ lesson.module.subject.name }} — {{ lesson.title }}</option>
-              {% endfor %}
-            </select>
+          <div class="feed-type-option">
+            <input type="radio" name="post_type" id="pt_tip" value="tip"
+                   {% if draft_type == "tip" %}checked{% endif %}>
+            <label for="pt_tip"><i class="bi bi-lightbulb" aria-hidden="true"></i>I figured it out</label>
           </div>
-          {% endif %}
-          {% if link_quizzes %}
-          <div class="col-sm-6">
-            <label class="form-label" for="id_quiz_id">Link a quiz (optional)</label>
-            <select class="form-select form-select-sm" id="id_quiz_id" name="quiz_id">
-              <option value="">No quiz</option>
-              {% for quiz in link_quizzes %}
-              <option value="{{ quiz.pk }}">{{ quiz.lesson.module.subject.name }} — {{ quiz.title }}</option>
-              {% endfor %}
-            </select>
+          <div class="feed-type-option">
+            <input type="radio" name="post_type" id="pt_celebration" value="celebration"
+                   {% if draft_type == "celebration" %}checked{% endif %}>
+            <label for="pt_celebration"><i class="bi bi-stars" aria-hidden="true"></i>Thank you / shout-out</label>
           </div>
-          {% endif %}
         </div>
         {% endif %}
       {% else %}
         {% if is_teacher %}
-        <div class="mb-3">
-          <label class="form-label" for="id_post_type">Post type</label>
-          <div class="d-flex flex-wrap gap-2" role="group" aria-label="Post type">
-            {% for value, label in post_types %}
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio"
-                     name="post_type" id="pt_{{ value }}" value="{{ value }}"
-                     {% if value == "announcement" %}checked{% endif %}>
-              <label class="form-check-label" for="pt_{{ value }}">{{ label }}</label>
-            </div>
-            {% endfor %}
+        <div class="feed-type-row" role="group" aria-label="Post type">
+          {% for value, label in post_types %}
+          <div class="feed-type-option">
+            <input type="radio" name="post_type" id="pt_{{ value }}" value="{{ value }}"
+                   {% if value == "announcement" %}checked{% endif %}>
+            <label for="pt_{{ value }}">{{ label }}</label>
           </div>
+          {% endfor %}
         </div>
         {% else %}
         <input type="hidden" name="post_type" value="question">
         {% endif %}
       {% endif %}
 
-      <div class="mb-3">
-        <label class="form-label" for="id_body">
-          {% if is_teacher %}Your post{% else %}Your message{% endif %}
-        </label>
-        <textarea class="form-control feed-draft-input" id="id_body" name="body" rows="3"
-                  maxlength="2000"
-                  data-feed-draft-input
-                  placeholder="{% if is_teacher %}Write something for the class…{% else %}Ask a question or share something with the class…{% endif %}"
-                  required></textarea>
-        <div class="text-muted-sm mt-1">
-          Plain text only. Maximum 2&nbsp;000 characters.
-          {% if community_on %}<span class="feed-draft-note" hidden>Draft saved on this device.</span>{% endif %}
-        </div>
+      <label class="feed-compose__label" for="id_body">
+        {% if is_teacher %}Your post{% else %}Your message{% endif %}
+      </label>
+      <textarea class="form-control feed-draft-input" id="id_body" name="body" rows="3"
+                maxlength="2000" data-feed-draft-input
+                placeholder="{% if is_teacher %}Write something for the class…{% else %}Ask a question or share something with the class…{% endif %}"
+                required>{{ draft_body }}</textarea>
+      <div class="feed-compose__hint">
+        <span>Plain text only. Maximum 2&nbsp;000 characters.</span>
+        {% if community_on %}<span class="feed-draft-note" hidden>Draft saved on this device.</span>{% endif %}
       </div>
 
-      <button type="submit" class="btn btn-primary">
-        <i class="bi bi-send me-1" aria-hidden="true"></i>
-        {% if is_teacher %}Post to class{% else %}Share with class{% endif %}
-      </button>
+      {% if community_on %}
+      <div class="feed-compose__foot">
+        <div class="feed-compose__tools">
+          {% if mention_names %}
+          <details>
+            <summary class="feed-tool"><i class="bi bi-at" aria-hidden="true"></i>Mention</summary>
+            <div class="feed-mention-list" aria-label="People in this class">
+              {% for name in mention_names %}
+              <button type="button" class="feed-mention-chip"
+                      data-feed-mention="{{ name }}">@{{ name }}</button>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
+
+          {% if is_teacher and link_lessons or is_teacher and link_quizzes %}
+          <details>
+            <summary class="feed-tool"><i class="bi bi-link-45deg" aria-hidden="true"></i>Link</summary>
+            <div class="row g-2 mt-2">
+              {% if link_lessons %}
+              <div class="col-12">
+                <label class="form-label mb-1" for="id_lesson_id">Link a lesson (optional)</label>
+                <select class="form-select form-select-sm" id="id_lesson_id" name="lesson_id">
+                  <option value="">No lesson</option>
+                  {% for lesson in link_lessons %}
+                  <option value="{{ lesson.pk }}" {% if draft_lesson_id == lesson.pk %}selected{% endif %}>
+                    {{ lesson.module.subject.name }} — {{ lesson.title }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+              {% endif %}
+              {% if link_quizzes %}
+              <div class="col-12">
+                <label class="form-label mb-1" for="id_quiz_id">Link a quiz (optional)</label>
+                <select class="form-select form-select-sm" id="id_quiz_id" name="quiz_id">
+                  <option value="">No quiz</option>
+                  {% for quiz in link_quizzes %}
+                  <option value="{{ quiz.pk }}" {% if draft_quiz_id == quiz.pk %}selected{% endif %}>
+                    {{ quiz.lesson.module.subject.name }} — {{ quiz.title }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+              {% endif %}
+            </div>
+          </details>
+          {% endif %}
+
+          {% if can_upload_media %}
+          <details class="feed-media-tool">
+            <summary class="feed-tool">
+              <i class="bi bi-image" aria-hidden="true"></i>Photo or file
+            </summary>
+            <div class="feed-compose__more">
+              <label class="form-label mb-1" for="id_photos">
+                Photos (up to {{ photo_limit }}, {{ photo_max_mb }} MB each)
+              </label>
+              <input type="file" class="form-control form-control-sm" id="id_photos"
+                     name="photos" multiple
+                     accept="image/jpeg,image/png,image/webp,image/gif"
+                     data-feed-photo-input
+                     data-limit="{{ photo_limit }}" data-max-mb="{{ photo_max_mb }}">
+              <label class="form-label mb-1 mt-2" for="id_files">
+                Files (up to {{ file_limit }}, {{ file_max_mb }} MB each)
+              </label>
+              <input type="file" class="form-control form-control-sm" id="id_files"
+                     name="files" multiple
+                     accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp3"
+                     data-feed-file-input
+                     data-limit="{{ file_limit }}" data-max-mb="{{ file_max_mb }}">
+              <label class="form-label mb-1 mt-2" for="id_photo_alt">
+                Describe the photos
+              </label>
+              <input type="text" class="form-control form-control-sm" id="id_photo_alt"
+                     name="photo_alt" maxlength="200" data-feed-alt
+                     {% if media_alt_required %}data-required="1"{% endif %}
+                     placeholder="e.g. Our science project on the table">
+              <div class="text-muted-sm mt-1">
+                {% if is_teacher %}
+                A short description helps pupils who use a screen reader. Tap a
+                photo to open it full size.
+                {% else %}
+                A teacher checks your photos before classmates see them.
+                {% endif %}
+              </div>
+              <div class="feed-media-picked" data-feed-picked aria-live="polite"></div>
+            </div>
+          </details>
+          {% endif %}
+
+          {% if can_schedule %}
+          <details>
+            <summary class="feed-tool"><i class="bi bi-clock" aria-hidden="true"></i>Schedule</summary>
+            <div class="feed-compose__more">
+              <label class="form-label mb-1" for="id_scheduled_at">Show it to pupils at (Nairobi time)</label>
+              <input type="datetime-local" class="form-control form-control-sm"
+                     id="id_scheduled_at" name="scheduled_at">
+              <div class="text-muted-sm mt-1">
+                Pupils and parents see it from then. You and other teachers see it now.
+              </div>
+            </div>
+          </details>
+          {% endif %}
+        </div>
+
+        <button type="submit" class="btn btn-primary feed-compose__submit">
+          <i class="bi bi-send me-1" aria-hidden="true"></i>
+          {% if is_teacher %}Post to class{% else %}Share with class{% endif %}
+        </button>
+      </div>
+      {% else %}
+      <div class="feed-compose__foot">
+        <span></span>
+        <button type="submit" class="btn btn-primary feed-compose__submit">
+          <i class="bi bi-send me-1" aria-hidden="true"></i>
+          {% if is_teacher %}Post to class{% else %}Share with class{% endif %}
+        </button>
+      </div>
+      {% endif %}
     </form>
-  </div>
+  </section>
+  {% endif %}
+
+  {# ── Poll composer (teacher, collapsed) ── #}
+  {% if community_on and polls_on and is_teacher %}
+  <details class="card mb-3 feed-poll-composer">
+    <summary class="card-header" style="cursor:pointer;min-height:48px;">
+      <span class="card-title mb-0">
+        <i class="bi bi-bar-chart-line me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Create a poll
+      </span>
+      <i class="bi bi-chevron-down ms-auto" aria-hidden="true"></i>
+    </summary>
+    <div class="card-body">
+      <form method="post" action="{% url 'learning:feed_poll_create' school_class.pk %}" novalidate>
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label" for="id_poll_question">Question</label>
+          <textarea class="form-control" id="id_poll_question" name="question"
+                    rows="2" maxlength="2000" required
+                    placeholder="What should the class decide?"></textarea>
+        </div>
+
+        <fieldset class="mb-3">
+          <legend class="form-label">Options <span class="text-muted-sm">(2 to 6)</span></legend>
+          {% for n in "123456" %}
+          <div class="mb-2">
+            <label class="form-label mb-1" for="id_option_{{ n }}">
+              Option {{ n }}{% if n == "1" or n == "2" %} <span class="text-muted-sm">(required)</span>{% endif %}
+            </label>
+            <input type="text" class="form-control" id="id_option_{{ n }}"
+                   name="option_{{ n }}" maxlength="120">
+          </div>
+          {% endfor %}
+        </fieldset>
+
+        <fieldset class="mb-3">
+          <legend class="form-label">When can pupils see the results?</legend>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="results_visibility"
+                   id="results_after_close" value="after_close" checked>
+            <label class="form-check-label" for="results_after_close">
+              Only after the poll closes (needs a closing time)
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="results_visibility"
+                   id="results_live" value="live">
+            <label class="form-check-label" for="results_live">While pupils are voting</label>
+          </div>
+        </fieldset>
+
+        <div class="mb-3">
+          <label class="form-label" for="id_closes_at">Closing time (Nairobi time, optional)</label>
+          <input type="datetime-local" class="form-control" id="id_closes_at" name="closes_at">
+          <div class="text-muted-sm mt-1">
+            Required when results are shown only after closing. Leave empty for a
+            poll that stays open until you remove it.
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>Add poll
+        </button>
+      </form>
+    </div>
+  </details>
+  {% endif %}
+
+  {# ── Feed ── #}
+  {% if community_on %}
+    {% include "features/learning/_feed_community.html" %}
+    {% include "features/learning/_feed_lightbox.html" %}
+  {% else %}
+    {% include "features/learning/_feed_legacy.html" %}
+  {% endif %}
+
 </div>
-{% endif %}
-
-{# ── Poll composer (teachers, when polls are on for this class) ── #}
-{% if community_on and polls_on and is_teacher %}
-<div class="card mb-4 feed-poll-composer">
-  <div class="card-header">
-    <h2 class="card-title">
-      <i class="bi bi-bar-chart-line me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
-      Create a poll
-    </h2>
-  </div>
-  <div class="card-body">
-    <form method="post" action="{% url 'learning:feed_poll_create' school_class.pk %}" novalidate>
-      {% csrf_token %}
-      <div class="mb-3">
-        <label class="form-label" for="id_poll_question">Question</label>
-        <textarea class="form-control" id="id_poll_question" name="question"
-                  rows="2" maxlength="2000" required
-                  placeholder="What should the class decide?"></textarea>
-      </div>
-
-      <fieldset class="mb-3">
-        <legend class="form-label">Options <span class="text-muted-sm">(2 to 6)</span></legend>
-        {% for n in "123456" %}
-        <div class="mb-2">
-          <label class="form-label mb-1" for="id_option_{{ n }}">
-            Option {{ n }}{% if n == "1" or n == "2" %} <span class="text-muted-sm">(required)</span>{% endif %}
-          </label>
-          <input type="text" class="form-control" id="id_option_{{ n }}"
-                 name="option_{{ n }}" maxlength="120">
-        </div>
-        {% endfor %}
-      </fieldset>
-
-      <fieldset class="mb-3">
-        <legend class="form-label">When can pupils see the results?</legend>
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="radio" name="results_visibility"
-                 id="results_after_close" value="after_close" checked>
-          <label class="form-check-label" for="results_after_close">
-            Only after the poll closes (needs a closing time)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="radio" name="results_visibility"
-                 id="results_live" value="live">
-          <label class="form-check-label" for="results_live">
-            While pupils are voting
-          </label>
-        </div>
-      </fieldset>
-
-      <div class="mb-3">
-        <label class="form-label" for="id_closes_at">Closing time (Nairobi time, optional)</label>
-        <input type="datetime-local" class="form-control" id="id_closes_at" name="closes_at">
-        <div class="text-muted-sm mt-1">
-          Required when results are shown only after closing. Leave empty for a
-          poll that stays open until you remove it.
-        </div>
-      </div>
-
-      <button type="submit" class="btn btn-primary">
-        <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>Add poll
-      </button>
-    </form>
-  </div>
-</div>
-{% endif %}
-
-{# ── Feed ── #}
-{% if community_on %}
-  {% include "features/learning/_feed_community.html" %}
-{% else %}
-  {% include "features/learning/_feed_legacy.html" %}
-{% endif %}
-
 {% endblock content %}
 
 {% block extra_css %}
-<style>
-  .feed-post--pinned {
-    border-color: var(--color-warning) !important;
-    box-shadow: 0 0 0 1px rgba(245,158,11,0.25), var(--shadow-card);
-  }
-  .feed-post--removed {
-    border-color: rgba(239,68,68,0.3) !important;
-    background: rgba(239,68,68,0.04);
-  }
-  .text-muted-sm { color: var(--color-muted); font-size: 0.8rem; }
-  .fw-600 { font-weight: 600; }
-  .reaction-btn { cursor: pointer; transition: all 0.15s ease; }
-  .reaction-btn:hover:not([disabled]) {
-    background: var(--accent-glow) !important;
-    border-color: var(--accent) !important;
-    transform: scale(1.1);
-  }
-  .reaction-btn--active { font-weight: 700; }
-  .feed-rules-banner { display: none; }
-  .feed-rules-banner.visible { display: flex; }
-  .feed-post__body {
-    white-space: pre-wrap;
-    font-size: 0.9rem;
-    line-height: 1.65;
-    overflow-wrap: anywhere;
-    color: var(--color-text);
-  }
-  .feed-link-btn {
-    background: var(--color-surface-2);
-    border: 1px solid var(--color-border);
-    font-size: 0.8rem;
-  }
-  .feed-status { font-size: 0.72rem; font-weight: 600; }
-  .feed-status--waiting { background: rgba(245,158,11,0.15); color: #fbbf24; }
-  .feed-status--answered { background: rgba(16,185,129,0.15); color: #34d399; }
-  .feed-status--best { background: rgba(139,92,246,0.15); color: #a78bfa; }
-  .feed-filters {
-    display: flex;
-    gap: 0.4rem;
-    overflow-x: auto;
-    padding-bottom: 0.25rem;
-    -webkit-overflow-scrolling: touch;
-  }
-  .feed-filter {
-    flex: 0 0 auto;
-    padding: 0.35rem 0.85rem;
-    border-radius: 99px;
-    border: 1px solid var(--color-border);
-    background: var(--color-surface-2);
-    color: var(--color-muted);
-    font-size: 0.82rem;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-  .feed-filter--active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-    font-weight: 600;
-  }
-  .feed-section-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--color-muted);
-    margin-bottom: 0.4rem;
-  }
-  .feed-new-posts { border-radius: 99px; }
-  .feed-skeleton .skeleton-line {
-    height: 0.8rem;
-    border-radius: 6px;
-    background: var(--color-surface-2);
-    margin-bottom: 0.6rem;
-    animation: feedPulse 1.2s ease-in-out infinite;
-  }
-  .feed-skeleton .skeleton-line--short { width: 55%; margin-bottom: 0; }
-  @keyframes feedPulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
-  .feed-draft-note { color: var(--color-muted); }
-  .feed-poll {
-    background: var(--color-surface-2);
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    padding: .75rem;
-    color: var(--color-text);
-  }
-  .feed-poll__badge { background: rgba(6,182,212,0.15); color: #22d3ee; }
-  .feed-poll__state { background: rgba(148,163,184,0.18); color: var(--color-muted); }
-  .feed-poll__options { border: 0; padding: 0; margin: 0 0 .6rem; }
-  .feed-poll__option {
-    display: flex;
-    align-items: center;
-    gap: .6rem;
-    min-height: 48px;
-    padding: .65rem .8rem;
-    margin-bottom: .45rem;
-    border: 1px solid var(--color-border);
-    border-radius: 10px;
-    background: var(--color-surface);
-    cursor: pointer;
-  }
-  .feed-poll__option input { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; }
-  .feed-poll__option--chosen { border-color: var(--accent); background: var(--accent-glow); }
-  .feed-poll__option-text { font-size: .9rem; }
-  .feed-poll__tick { margin-left: auto; font-size: .75rem; color: var(--accent-light); white-space: nowrap; }
-  .feed-poll__submit { min-height: 46px; font-weight: 600; }
-  .feed-poll__voted { font-size: .85rem; color: var(--accent-light); }
-  .feed-poll__results { list-style: none; padding: 0; margin: 0 0 .4rem; }
-  .feed-poll__result { margin-bottom: .55rem; }
-  .feed-poll__result-label { font-size: .85rem; overflow-wrap: anywhere; }
-  .feed-poll__result-count { font-size: .8rem; color: var(--color-muted); white-space: nowrap; }
-  .feed-poll__bar {
-    height: 10px;
-    margin-top: .2rem;
-    border-radius: 99px;
-    background: var(--color-border);
-    overflow: hidden;
-  }
-  .feed-poll__bar span {
-    display: block;
-    height: 100%;
-    min-width: 2px;
-    border-radius: 99px;
-    background: var(--accent);
-  }
-</style>
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
 {% endblock %}
 
 {% block extra_js %}

@@ -145,7 +145,8 @@ FIELD_TABS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "show_positions", "fees_enabled", "learning_enabled",
             "engagement_enabled", "quizzes_enabled", "live_classes_enabled",
-            "feed_community_enabled", "notification_quiet_hours_enabled",
+            "feed_community_enabled", "feed_media_enabled",
+            "feed_student_uploads_enabled", "notification_quiet_hours_enabled",
             "quiet_hours_start", "quiet_hours_end", "feed_teacher_starters",
             "feed_student_starters", "homework_grading_enabled",
             "homework_late_penalty_enabled",
@@ -188,6 +189,8 @@ class SchoolSettingsForm(forms.ModelForm):
             "quizzes_enabled",
             "live_classes_enabled",
             "feed_community_enabled",
+            "feed_media_enabled",
+            "feed_student_uploads_enabled",
             "notification_quiet_hours_enabled",
             "quiet_hours_start",
             "quiet_hours_end",
@@ -280,7 +283,7 @@ class SchoolSettingsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for checkbox in ("show_positions", "fees_enabled", "learning_enabled", "engagement_enabled", "quizzes_enabled", "live_classes_enabled", "feed_community_enabled", "notification_quiet_hours_enabled"):
+        for checkbox in ("show_positions", "fees_enabled", "learning_enabled", "engagement_enabled", "quizzes_enabled", "live_classes_enabled", "feed_community_enabled", "feed_media_enabled", "feed_student_uploads_enabled", "notification_quiet_hours_enabled"):
             self.fields[checkbox].required = False
         # Integer fields: a POST that omits them (older tests, partial forms)
         # must keep the model default rather than saving NULL.

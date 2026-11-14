@@ -91,9 +91,80 @@
   if (composer) {
     var classId = composer.getAttribute('data-feed-draft-class');
     var composerText = composer.querySelector('[data-feed-draft-input]');
-    var postedNow = new URLSearchParams(window.location.search).get('posted') === '1';
+    var params = new URLSearchParams(window.location.search);
+    var postedNow = params.get('posted') === '1';
+    // A duplicate (?copy=) is server-rendered into the box; the older local
+    // draft must not overwrite it, so drop the saved draft and keep the copy.
+    if (params.get('copy')) clearDraft(postDraftKey(classId));
     wireDraft(composer, composerText, postDraftKey(classId), postedNow);
   }
+
+  // -----------------------------------------------------------------------
+  // Collapsible composer — phones start folded, a draft or ?copy= keeps it open
+  // -----------------------------------------------------------------------
+
+  document.querySelectorAll('[data-feed-compose]').forEach(function (box) {
+    var toggle = box.querySelector('[data-feed-compose-toggle]');
+    var bodyEl = box.querySelector('.feed-compose__body');
+    if (!toggle || !bodyEl) return;
+    var textarea = bodyEl.querySelector('textarea');
+    var hasText = textarea && textarea.value.trim();
+    var params = new URLSearchParams(window.location.search);
+    var forceOpen = params.get('copy') || window.location.hash === '#feedComposeBody';
+    var narrow = window.matchMedia('(max-width: 991px)').matches;
+    if (narrow && !hasText && !forceOpen) box.classList.add('is-collapsed');
+
+    function setOpen(open) {
+      box.classList.toggle('is-collapsed', !open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open && textarea) textarea.focus();
+    }
+
+    toggle.addEventListener('click', function () {
+      setOpen(box.classList.contains('is-collapsed'));
+    });
+    if (forceOpen) setOpen(true);
+  });
+
+  // -----------------------------------------------------------------------
+  // Relative time — tap the "2h ago" to see the exact Nairobi time
+  // -----------------------------------------------------------------------
+
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest('[data-feed-time]');
+    if (!btn) return;
+    var open = btn.classList.toggle('is-open');
+    btn.setAttribute('aria-pressed', open ? 'true' : 'false');
+  });
+
+  // -----------------------------------------------------------------------
+  // Mentions — insert "@Full Name " at the cursor, never free text
+  // -----------------------------------------------------------------------
+
+  document.querySelectorAll('[data-feed-mention]').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var name = chip.getAttribute('data-feed-mention');
+      if (!name) return;
+      var form = chip.closest('form');
+      var target = form && form.querySelector('textarea');
+      if (!target) target = document.querySelector('[data-feed-draft-input]');
+      if (!target) return;
+
+      var token = '@' + name + ' ';
+      var start = target.selectionStart || 0;
+      var end = target.selectionEnd || 0;
+      var value = target.value || '';
+      target.value = value.slice(0, start) + token + value.slice(end);
+      target.focus();
+      var caret = start + token.length;
+      try {
+        target.setSelectionRange(caret, caret);
+      } catch (err) {
+        /* old browsers: focus alone is enough */
+      }
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
 
   // Reply composer (thread page)
   var replyForm = document.querySelector('form[data-feed-reply-form]');
@@ -160,33 +231,32 @@
   // -----------------------------------------------------------------------
 
   function applyReaction(article, json) {
-    article.querySelectorAll('.reaction-btn').forEach(function (btn) {
+    article.querySelectorAll('.feed-react').forEach(function (btn) {
       var emoji = btn.getAttribute('data-emoji');
       if (!emoji) return;
       var count = (json.counts && json.counts[emoji]) || 0;
-      var countSpan = btn.querySelector('.reaction-count');
+      var countSpan = btn.querySelector('.feed-react__count');
       if (count > 0) {
         if (!countSpan) {
           countSpan = document.createElement('span');
-          countSpan.className = 'reaction-count';
+          countSpan.className = 'feed-react__count';
           countSpan.setAttribute('data-count-for', emoji);
-          btn.appendChild(document.createTextNode(' '));
           btn.appendChild(countSpan);
         }
         countSpan.textContent = count;
       } else if (countSpan) {
-        if (countSpan.previousSibling) countSpan.previousSibling.remove();
         countSpan.remove();
       }
-      btn.classList.remove('reaction-btn--active');
-      btn.style.background = 'var(--color-surface-2)';
-      btn.style.borderColor = 'var(--color-border)';
-      if (json.viewer_emoji && json.viewer_emoji === emoji) {
-        btn.classList.add('reaction-btn--active');
-        btn.style.background = 'var(--accent-glow)';
-        btn.style.borderColor = 'var(--accent)';
-      }
+      var active = json.viewer_emoji && json.viewer_emoji === emoji;
+      btn.classList.toggle('feed-react--active', !!active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
+    var hint = article.querySelector('.feed-react-hint');
+    var total = 0;
+    Object.keys(json.counts || {}).forEach(function (key) {
+      total += json.counts[key] || 0;
+    });
+    if (hint) hint.hidden = total > 0;
   }
 
   function wireReactions(scope) {
@@ -246,8 +316,10 @@
       var url = showMoreBtn.getAttribute('data-feed-items-url');
       var filter = showMoreBtn.getAttribute('data-feed-filter') || 'all';
       var before = showMoreBtn.getAttribute('data-feed-before') || '';
+      var search = showMoreBtn.getAttribute('data-feed-search') || '';
       var params = new URLSearchParams();
       params.set('filter', filter);
+      if (search) params.set('q', search);
       if (before) params.set('before_id', before);
 
       showMoreBtn.disabled = true;
@@ -368,5 +440,134 @@
     });
 
     schedule(randomBase());
+  }
+
+  // -----------------------------------------------------------------------
+  // Photos and files — picked list, size warnings, alt-text requirement
+  // -----------------------------------------------------------------------
+
+  function formatMb(bytes) {
+    return (Math.round((bytes / 1048576) * 10) / 10) + ' MB';
+  }
+
+  function pickedChip(text, warn) {
+    var el = document.createElement('span');
+    el.className = 'feed-media-picked__chip' + (warn ? ' feed-media-picked__chip--warn' : '');
+    el.textContent = text;
+    return el;
+  }
+
+  function trimFiles(input, limit) {
+    if (!input.files || input.files.length <= limit) return;
+    if (typeof DataTransfer === 'undefined') return;
+    var dt = new DataTransfer();
+    for (var i = 0; i < limit; i += 1) dt.items.add(input.files[i]);
+    input.files = dt.files;
+  }
+
+  var photoInput = document.querySelector('[data-feed-photo-input]');
+  var fileInput = document.querySelector('[data-feed-file-input]');
+  var pickedBox = document.querySelector('[data-feed-picked]');
+  var altInput = document.querySelector('[data-feed-alt]');
+
+  function renderPicked() {
+    if (!pickedBox) return;
+    pickedBox.innerHTML = '';
+    [photoInput, fileInput].forEach(function (input) {
+      if (!input || !input.files) return;
+      var maxMb = parseInt(input.getAttribute('data-max-mb'), 10) || 0;
+      Array.prototype.forEach.call(input.files, function (file) {
+        var tooBig = maxMb && file.size > maxMb * 1048576;
+        pickedBox.appendChild(pickedChip(
+          file.name + ' · ' + formatMb(file.size) +
+            (tooBig ? ' — too big, the limit is ' + maxMb + ' MB' : ''),
+          tooBig
+        ));
+      });
+    });
+    var hasPhotos = !!(photoInput && photoInput.files && photoInput.files.length);
+    if (altInput && altInput.getAttribute('data-required') === '1') {
+      if (hasPhotos) {
+        altInput.setAttribute('required', 'required');
+      } else {
+        altInput.removeAttribute('required');
+      }
+    }
+  }
+
+  [photoInput, fileInput].forEach(function (input) {
+    if (!input) return;
+    input.addEventListener('change', function () {
+      var limit = parseInt(input.getAttribute('data-limit'), 10) || 0;
+      var before = input.files ? input.files.length : 0;
+      if (limit) trimFiles(input, limit);
+      renderPicked();
+      if (limit && before > limit && pickedBox) {
+        pickedBox.appendChild(pickedChip('Only the first ' + limit + ' can be sent.', true));
+      }
+    });
+  });
+  renderPicked();
+
+  // -----------------------------------------------------------------------
+  // Photo viewer — one dialog per page, image from the permission-checked view
+  // -----------------------------------------------------------------------
+
+  var lightbox = document.querySelector('[data-feed-lightbox]');
+  if (lightbox) {
+    var lightboxStage = lightbox.querySelector('[data-feed-lightbox-stage]');
+    var lightboxCaption = lightbox.querySelector('[data-feed-lightbox-caption]');
+    var lightboxDownload = lightbox.querySelector('[data-feed-lightbox-download]');
+    var lightboxClose = lightbox.querySelector('[data-feed-lightbox-close]');
+    var lightboxReturn = null;
+
+    function openLightbox(trigger) {
+      var full = trigger.getAttribute('data-full');
+      if (!lightboxStage || !full) return;
+      var caption = trigger.getAttribute('data-caption') || '';
+      // The image is created only when asked for, so a page with no photos
+      // carries no <img> and a link card never looks like it has a preview.
+      var img = document.createElement('img');
+      img.className = 'feed-lightbox__img';
+      img.src = full;
+      img.alt = caption || 'Photo shared in the class feed';
+      lightboxStage.innerHTML = '';
+      lightboxStage.appendChild(img);
+      if (lightboxCaption) lightboxCaption.textContent = caption;
+      if (lightboxDownload) {
+        lightboxDownload.href = trigger.getAttribute('data-download') || full;
+      }
+      lightboxReturn = document.activeElement;
+      lightbox.hidden = false;
+      document.body.classList.add('feed-lightbox-open');
+      if (lightboxClose) lightboxClose.focus();
+    }
+
+    function closeLightbox() {
+      if (lightbox.hidden) return;
+      lightbox.hidden = true;
+      document.body.classList.remove('feed-lightbox-open');
+      if (lightboxStage) lightboxStage.innerHTML = '';
+      if (lightboxReturn && lightboxReturn.focus) lightboxReturn.focus();
+      lightboxReturn = null;
+    }
+
+    document.addEventListener('click', function (event) {
+      var trigger = event.target.closest('[data-feed-photo]');
+      if (trigger) {
+        event.preventDefault();
+        openLightbox(trigger);
+        return;
+      }
+      if (event.target.closest('[data-feed-lightbox-close]')) {
+        closeLightbox();
+        return;
+      }
+      if (event.target === lightbox) closeLightbox();
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') closeLightbox();
+    });
   }
 })();

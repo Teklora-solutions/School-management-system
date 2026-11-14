@@ -38,17 +38,20 @@ Public API
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Optional
 
 from django.db.models import Count, Exists, OuterRef, Q
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 
 from .models import (
     ClassFeedSettings,
     ClassPoll,
     ClassPost,
+    ClassPostAttachment,
     ClassPostReaction,
     ClassPostReply,
 )
@@ -119,9 +122,29 @@ class PostWithReactions:
     reply_count: int = 0
     has_best_answer: bool = False
     answered: bool = False
+    can_edit: bool = False
     lesson_link: Optional[dict] = None
     quiz_link: Optional[dict] = None
+    link_card: Optional[dict] = None
     poll: object = None
+    photos: list = field(default_factory=list)
+    files: list = field(default_factory=list)
+    pending_attachments: list = field(default_factory=list)
+    removed_attachments: list = field(default_factory=list)
+    media_controls: list = field(default_factory=list)
+
+    @property
+    def has_media(self) -> bool:
+        return bool(self.photos or self.files)
+
+    @property
+    def body_segments(self) -> list[dict]:
+        """Plain text and resolved @mention segments; never raw HTML."""
+        return self.post.body_segments
+
+    @property
+    def is_scheduled(self) -> bool:
+        return self.post.is_scheduled
 
     @property
     def is_removed(self) -> bool:
@@ -184,6 +207,31 @@ def _feature_row(request=None):
     return school_settings_values(request)
 
 
+def _class_feed_row(school_class):
+    """
+    This class's two switches in one query.  Read directly rather than through
+    the reverse one-to-one descriptor: the descriptor caches its row on the
+    class instance, so a switch flipped moments ago would still read stale.
+    """
+    return (
+        ClassFeedSettings.objects.filter(school_class=school_class)
+        .values_list(
+            "is_active", "polls_enabled", "media_enabled", "student_uploads_enabled"
+        )
+        .first()
+    )
+
+
+def school_media_switch_on(request=None) -> bool:
+    """The school-wide switch for photos and files on class feeds."""
+    return bool(_feature_row(request)["feed_media_enabled"])
+
+
+def school_student_uploads_switch_on(request=None) -> bool:
+    """The school-wide switch that lets pupils attach media."""
+    return bool(_feature_row(request)["feed_student_uploads_enabled"])
+
+
 def community_enabled_for(school_class, *, request=None) -> bool:
     """
     The class community feed needs BOTH switches on:
@@ -192,14 +240,73 @@ def community_enabled_for(school_class, *, request=None) -> bool:
     """
     if not _feature_row(request)["feed_community_enabled"]:
         return False
-    # Query directly: the reverse one-to-one descriptor caches its row on the
-    # class instance, so a switch flipped moments ago would still read stale.
-    is_active = (
-        ClassFeedSettings.objects.filter(school_class=school_class)
-        .values_list("is_active", flat=True)
-        .first()
+    row = _class_feed_row(school_class)
+    return bool(row and row[0])
+
+
+def mention_candidates(school_class) -> list[dict]:
+    """
+    Everyone who can read this class's feed: its pupils, the teachers
+    assigned to it, and its class teacher.  Admins/directors are deliberately
+    left out — a class feed should not become a way to ping the whole school.
+    """
+    from apps.teachers.models import TeacherAssignment
+
+    rows: list[dict] = []
+    seen: set[int] = set()
+
+    def add(user):
+        if user is None or user.pk in seen:
+            return
+        seen.add(user.pk)
+        rows.append(
+            {
+                "id": user.pk,
+                "name": user.get_full_name() or user.get_username(),
+                "first": (user.first_name or user.get_username()).strip(),
+            }
+        )
+
+    for student in (
+        school_class.students.select_related("user")
+        .filter(user__is_active=True)
+        .order_by("user__first_name", "user__last_name")
+    ):
+        add(student.user)
+
+    for assignment in (
+        TeacherAssignment.objects.filter(school_class=school_class)
+        .select_related("teacher__user")
+        .order_by("teacher__user__first_name")
+    ):
+        add(assignment.teacher.user)
+
+    add(school_class.class_teacher)
+    return rows
+
+
+def mention_picker_for(school_class) -> list[str]:
+    """Display names for the composer's "Mention" picker, pupils first."""
+    return [row["name"] for row in mention_candidates(school_class)]
+
+
+def _scheduled_visible(qs, viewer):
+    """Pupils and parents do not see a post before its scheduled time."""
+    if getattr(viewer, "role", "") in MODERATOR_ROLES:
+        return qs
+    now = timezone.now()
+    return qs.filter(Q(scheduled_at__isnull=True) | Q(scheduled_at__lte=now))
+
+
+def _apply_search(qs, search: str):
+    term = (search or "").strip()[:80]
+    if not term:
+        return qs
+    return qs.filter(
+        Q(body__icontains=term)
+        | Q(author__first_name__icontains=term)
+        | Q(author__last_name__icontains=term)
     )
-    return bool(is_active)
 
 
 def can_post(user, school_class) -> bool:
@@ -267,13 +374,14 @@ def polls_visible_to(viewer, school_class) -> bool:
     """
     if getattr(viewer, "role", "") in MODERATOR_ROLES:
         return True
-    from .poll_services import polls_enabled_for
-
-    return polls_enabled_for(school_class)
+    if not _feature_row(None)["feed_community_enabled"]:
+        return False
+    row = _class_feed_row(school_class)
+    return bool(row and row[0] and row[1])
 
 
 def can_reply(user, post, school_class=None) -> bool:
-    if post.is_removed:
+    if post.is_removed or post.is_scheduled:
         return False
     school_class = school_class or post.school_class
     if getattr(user, "role", "") not in POSTER_ROLES:
@@ -412,6 +520,36 @@ def _lesson_link(post, viewer) -> Optional[dict]:
     return {"url": url, "label": lesson.title}
 
 
+_URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
+
+
+def _link_card(post, viewer) -> Optional[dict]:
+    """
+    The first web address in the body, shown as a plain card below the post.
+
+    Only teachers and above get a clickable card for now: a pupil's link is
+    reviewed by a teacher before it becomes openable (C5).  The card shows
+    the address and host; nothing is fetched, so there is no preview, no
+    tracking pixel and no server-side request to the destination.
+    """
+    if getattr(viewer, "role", "") not in MODERATOR_ROLES:
+        return None
+    match = _URL_PATTERN.search(post.body or "")
+    if match is None:
+        return None
+    url = match.group(0).rstrip(".,;:!?)]}\"'")
+    if len(url) < 12:
+        return None
+    from urllib.parse import urlsplit
+
+    host = urlsplit(url).netloc.lower()
+    if not host:
+        return None
+    if host.startswith("www."):
+        host = host[4:]
+    return {"url": url, "domain": host}
+
+
 def _quiz_link(post, viewer) -> Optional[dict]:
     quiz = getattr(post, "quiz", None)
     if quiz is None:
@@ -436,6 +574,80 @@ def _quiz_link(post, viewer) -> Optional[dict]:
     return {"url": url, "label": quiz.title}
 
 
+def _attachment_entry(post, attachment) -> dict:
+    """One attachment rendered as a dict; every URL goes through the safe view."""
+    base = reverse(
+        "learning:feed_attachment_file",
+        args=[post.school_class_id, post.pk, attachment.pk],
+    )
+    name = attachment.original_name or attachment.file.name.rsplit("/", 1)[-1]
+    return {
+        "id": attachment.pk,
+        "name": name,
+        "alt": attachment.alt_text or "",
+        "size": attachment.size_label,
+        "ext": attachment.extension.lstrip(".").upper()[:5],
+        "icon": attachment.icon,
+        "is_image": attachment.is_image,
+        "status": attachment.approval_status,
+        "pending": attachment.is_pending,
+        "removed": attachment.is_removed,
+        "thumb_url": base + "?thumb=1" if attachment.is_image else "",
+        "url": base,
+        "download_url": base + "?download=1",
+        "uploaded_by": (
+            attachment.uploaded_by.get_full_name()
+            if attachment.uploaded_by
+            else "Unknown"
+        ),
+    }
+
+
+def _bundle_attachments(posts: list, viewer) -> dict[int, dict]:
+    """Group this page's visible attachments by post (one query)."""
+    from .feed_media_services import attachment_visible_to, media_enabled_for
+
+    if not posts:
+        return {}
+    if not media_enabled_for(posts[0].school_class):
+        return {}
+
+    post_by_id = {post.pk: post for post in posts}
+    grouped: dict[int, dict] = {}
+    moderator = is_moderator(viewer)
+    rows = (
+        ClassPostAttachment.objects.filter(post_id__in=post_by_id)
+        .select_related("uploaded_by")
+        .order_by("ordering", "pk")
+    )
+    for attachment in rows:
+        if not attachment_visible_to(attachment, viewer):
+            continue
+        post = post_by_id[attachment.post_id]
+        entry = _attachment_entry(post, attachment)
+        bucket = grouped.setdefault(
+            attachment.post_id,
+            {
+                "photos": [],
+                "files": [],
+                "pending": [],
+                "removed": [],
+                "controls": [],
+            },
+        )
+        if attachment.is_removed:
+            bucket["removed"].append(entry)
+        elif attachment.is_pending:
+            bucket["pending"].append(entry)
+        elif attachment.is_image:
+            bucket["photos"].append(entry)
+        else:
+            bucket["files"].append(entry)
+        if moderator:
+            bucket["controls"].append(entry)
+    return grouped
+
+
 def _bundle(posts: list, viewer) -> list[PostWithReactions]:
     """Attach reaction summaries, reply stats and poll data to posts."""
     if not posts:
@@ -443,6 +655,7 @@ def _bundle(posts: list, viewer) -> list[PostWithReactions]:
 
     from .poll_selectors import build_poll_summary
 
+    attachments_by_post = _bundle_attachments(posts, viewer)
     post_ids = [p.pk for p in posts]
     polls = {
         poll.post_id: poll
@@ -466,6 +679,10 @@ def _bundle(posts: list, viewer) -> list[PostWithReactions]:
     for post in posts:
         reply_count = int(getattr(post, "visible_reply_count", 0) or 0)
         has_best = bool(getattr(post, "best_answer_exists", False))
+        media = attachments_by_post.get(
+            post.pk,
+            {"photos": [], "files": [], "pending": [], "removed": [], "controls": []},
+        )
         result.append(
             PostWithReactions(
                 post=post,
@@ -476,13 +693,24 @@ def _bundle(posts: list, viewer) -> list[PostWithReactions]:
                 reply_count=reply_count,
                 has_best_answer=has_best,
                 answered=reply_count > 0,
+                can_edit=(
+                    post.author_id is not None
+                    and post.author_id == getattr(viewer, "pk", None)
+                    and not post.is_removed
+                ),
                 lesson_link=_lesson_link(post, viewer),
                 quiz_link=_quiz_link(post, viewer),
+                link_card=_link_card(post, viewer),
                 poll=(
                     build_poll_summary(polls[post.pk], viewer)
                     if post.pk in polls
                     else None
                 ),
+                photos=media["photos"],
+                files=media["files"],
+                pending_attachments=media["pending"],
+                removed_attachments=media["removed"],
+                media_controls=media["controls"],
             )
         )
     return result
@@ -504,6 +732,7 @@ def feed_for_classroom(*, school_class, viewer) -> list[PostWithReactions]:
     role = getattr(viewer, "role", "")
 
     qs = _base_posts_queryset(school_class).order_by("-is_pinned", "-created_at")
+    qs = _scheduled_visible(qs, viewer)
     if role not in MODERATOR_ROLES:
         qs = qs.filter(is_removed=False)
         if not polls_visible_to(viewer, school_class):
@@ -544,6 +773,7 @@ def feed_page(
     filter_key: str = "all",
     before_id: Optional[int] = None,
     limit: int = PAGE_SIZE,
+    search: str = "",
 ) -> FeedPage:
     """
     One page of the community feed.
@@ -551,7 +781,8 @@ def feed_page(
     The stream is ordered by id (creation order) so the ``before_id`` cursor
     can never skip or duplicate a post. On the "All" tab pinned posts get
     their own small strip and are not repeated in the stream; type filters
-    stay strictly chronological.
+    stay strictly chronological.  ``search`` is a simple case-insensitive
+    match on the body and the author's names (80 characters at most).
     """
     role = getattr(viewer, "role", "")
     valid_keys = {slug for slug, _ in FEED_FILTERS + MODERATOR_FILTERS}
@@ -561,6 +792,8 @@ def feed_page(
         filter_key = "all"
 
     base = _base_posts_queryset(school_class)
+    base = _scheduled_visible(base, viewer)
+    base = _apply_search(base, search)
     if role not in MODERATOR_ROLES:
         base = base.filter(is_removed=False)
         if not polls_visible_to(viewer, school_class):
@@ -608,6 +841,8 @@ def post_detail(*, post_id: int, viewer) -> Optional[PostWithReactions]:
 
     # Visibility: removed posts hidden from non-moderators
     if post.is_removed and role not in MODERATOR_ROLES:
+        return None
+    if post.is_scheduled and role not in MODERATOR_ROLES:
         return None
     if (
         post.post_type == ClassPost.PostType.POLL
@@ -662,6 +897,7 @@ def new_posts_count(
     if filter_key == "unanswered" and role not in MODERATOR_ROLES:
         filter_key = "all"
     qs = ClassPost.objects.filter(school_class=school_class, id__gt=after_id)
+    qs = _scheduled_visible(qs, viewer)
     if role not in MODERATOR_ROLES:
         qs = qs.filter(is_removed=False)
         if not polls_visible_to(viewer, school_class):
@@ -673,6 +909,7 @@ def latest_visible_post_id(*, school_class, viewer) -> int:
     """Highest visible post id for this viewer, or 0 when the feed is empty."""
     role = getattr(viewer, "role", "")
     qs = ClassPost.objects.filter(school_class=school_class)
+    qs = _scheduled_visible(qs, viewer)
     if role not in MODERATOR_ROLES:
         qs = qs.filter(is_removed=False)
         if not polls_visible_to(viewer, school_class):

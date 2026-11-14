@@ -1,3 +1,4 @@
+{% load feed_tags %}
 <div id="feedCommunity"
      data-feed-class-id="{{ school_class.pk }}"
      data-feed-poll-url="{% url 'learning:feed_poll' school_class.pk %}"
@@ -6,7 +7,7 @@
      data-feed-filter="{{ active_filter }}">
 
   {# ── New posts button (revealed by the polite poll) ── #}
-  <div class="d-flex justify-content-center mb-3">
+  <div class="d-flex justify-content-center mb-2">
     <button type="button" id="feedNewPostsBtn" class="btn btn-primary btn-sm feed-new-posts" hidden>
       <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
       <span id="feedNewPostsCount">0</span> new posts
@@ -14,30 +15,40 @@
   </div>
 
   {# ── Filters ── #}
-  <nav class="feed-filters mb-3" aria-label="Feed filters">
+  <nav class="feed-filters" aria-label="Feed filters">
     {% for slug, label in feed_filters %}
-    <a href="?filter={{ slug }}"
+    <a href="?filter={{ slug }}{% if active_search %}&amp;q={{ active_search|urlencode }}{% endif %}"
        class="feed-filter {% if active_filter == slug %}feed-filter--active{% endif %}"
        {% if active_filter == slug %}aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
   </nav>
 
-  {# ── Pinned strip (All tab only) ── #}
+  {# ── Pinned (All tab only) ── #}
   {% if pinned_posts %}
   <section class="mb-3" aria-label="Pinned posts">
     <div class="feed-section-label">
-      <i class="bi bi-pin-angle-fill me-1" aria-hidden="true"></i>Pinned
+      <i class="bi bi-pin-angle-fill" aria-hidden="true"></i>Pinned
     </div>
-    <div class="d-flex flex-column gap-3">
+    <div class="d-flex flex-column gap-2">
       {% for item in pinned_posts %}
-      {% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent poll_from_page="feed" %}
+      <details class="card feed-pinned-card">
+        <summary class="feed-pinned-summary">
+          <i class="bi bi-pin-angle-fill" aria-hidden="true"></i>
+          <span class="feed-pinned-summary__text">{{ item.post.body|truncatechars:90 }}</span>
+          <span class="feed-pinned-summary__time">{{ item.post.created_at|feed_relative }}</span>
+          <i class="bi bi-chevron-down feed-pinned-summary__chev" aria-hidden="true"></i>
+        </summary>
+        <div class="p-1">
+          {% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent can_post=can_post poll_from_page="feed" %}
+        </div>
+      </details>
       {% endfor %}
     </div>
   </section>
   {% endif %}
 
   {# ── Stream ── #}
-  <div id="feedStream" class="d-flex flex-column gap-3"
+  <div id="feedStream" class="feed-stream"
        role="feed"
        aria-label="{{ school_class.name }} class feed"
        data-feed-next-before="{{ next_before_id|default:'' }}"
@@ -45,9 +56,11 @@
 
     {% if not posts %}
     <div class="card feed-empty">
-      <div class="card-body text-center p-5" style="color:var(--color-muted);">
+      <div class="card-body">
         <i class="bi bi-chat-square-dots fs-1 d-block mb-2" aria-hidden="true"></i>
-        {% if active_filter == "questions" %}
+        {% if active_search %}
+        <p class="mb-0">No posts match “{{ active_search }}”. Try fewer words.</p>
+        {% elif active_filter == "questions" %}
         <p class="mb-0">No questions here yet. Ask the first one.</p>
         {% elif active_filter == "announcements" %}
         <p class="mb-0">No announcements yet.</p>
@@ -64,21 +77,25 @@
     </div>
     {% else %}
     {% for item in posts %}
-    {% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent poll_from_page="feed" %}
+    {% include "features/learning/_feed_post.html" with item=item school_class=school_class emoji_choices=emoji_choices is_moderator=is_moderator is_parent=is_parent can_post=can_post poll_from_page="feed" %}
     {% endfor %}
     {% endif %}
   </div>
 
-  {# ── Skeleton placeholders while "Show more" loads ── #}
-  <div id="feedSkeletons" class="d-flex flex-column gap-3 mt-3" hidden aria-hidden="true">
-    <div class="card feed-skeleton"><div class="card-body"><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--short"></div></div></div>
-    <div class="card feed-skeleton"><div class="card-body"><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--short"></div></div></div>
+  {# ── Skeletons for "Show more" (kept out of the layout until needed) ── #}
+  <div id="feedSkeletons" hidden aria-hidden="true">
+    <div class="feed-stream mt-3">
+      <div class="card feed-skeleton"><div class="card-body"><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--short"></div></div></div>
+      <div class="card feed-skeleton"><div class="card-body"><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--short"></div></div></div>
+    </div>
   </div>
 
   <div class="text-center mt-3">
     <button type="button" id="feedShowMore" class="btn btn-outline-secondary btn-sm"
+            style="min-height:44px;min-width:140px;"
             data-feed-items-url="{% url 'learning:feed_items' school_class.pk %}"
             data-feed-filter="{{ active_filter }}"
+            data-feed-search="{{ active_search }}"
             data-feed-before="{{ next_before_id|default:'' }}"
             {% if not has_more %}hidden{% endif %}>
       Show more

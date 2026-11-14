@@ -655,12 +655,14 @@ class ClassFeedViewGetTests(TestCase):
     def test_teacher_sees_add_post_form(self):
         self.client.force_login(self.teacher_user)
         r = self.client.get(self._url())
-        self.assertContains(r, "Add a post")
+        self.assertContains(r, 'aria-label="Write a post"')
+        self.assertContains(r, "Post to class")
 
     def test_parent_does_not_see_post_form(self):
         self.client.force_login(self.parent_user)
         r = self.client.get(self._url())
-        self.assertNotContains(r, "Add a post")
+        self.assertNotContains(r, 'aria-label="Write a post"')
+        self.assertNotContains(r, "Post to class")
 
     def test_learning_disabled_shows_disabled_page(self):
         row = SchoolSettings.load()

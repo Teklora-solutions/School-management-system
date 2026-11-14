@@ -57,8 +57,78 @@
           </div>
         </div>
       </div>
+      <hr class="my-3">
+      <div class="d-flex align-items-start gap-2 mb-3">
+        <input class="form-check-input mt-1" type="checkbox" id="id_media_enabled"
+               name="media_enabled" value="1" {% if feed_settings.media_enabled %}checked{% endif %}>
+        <div>
+          <label class="form-label mb-0 fw-600" for="id_media_enabled">
+            Allow photos and files on this class's feed
+          </label>
+          <div class="text-muted-sm">
+            Up to 3 photos (8 MB each) and 3 files (10 MB each) per post.
+            Photos are checked, stripped of location data and resized on the
+            server. Off by default, and the school switch must also be on.
+            Switching it off hides all feed media immediately.
+          </div>
+          {% if not school_media_on %}
+          <div class="text-warning-sm mt-1">
+            The school has not switched on feed photos and files yet.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="d-flex align-items-start gap-2 mb-3">
+        <input class="form-check-input mt-1" type="checkbox" id="id_student_uploads_enabled"
+               name="student_uploads_enabled" value="1" {% if feed_settings.student_uploads_enabled %}checked{% endif %}>
+        <div>
+          <label class="form-label mb-0 fw-600" for="id_student_uploads_enabled">
+            Let pupils attach photos and files
+          </label>
+          <div class="text-muted-sm">
+            Off by default. A teacher approves each pupil attachment before
+            classmates see it; the pupil still sees their own item marked
+            “Waiting for your teacher”. Requires the school switch as well.
+          </div>
+          {% if not school_student_uploads_on %}
+          <div class="text-warning-sm mt-1">
+            The school has not allowed pupil uploads yet.
+          </div>
+          {% endif %}
+        </div>
+      </div>
       <button type="submit" class="btn btn-primary btn-sm">Save</button>
     </form>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h6 fw-600">
+      <i class="bi bi-hdd me-1" aria-hidden="true"></i>Storage this term
+    </h2>
+    <p class="mb-1">
+      <strong>{{ quota.used_mb }} MB</strong> used of
+      {{ quota.soft_mb }} MB soft limit
+      <span class="text-muted-sm">(hard stop {{ quota.hard_mb }} MB)</span>
+    </p>
+    <div class="progress" role="progressbar" aria-label="Class storage used"
+         aria-valuenow="{{ quota.percent }}" aria-valuemin="0" aria-valuemax="100"
+         style="height:8px;">
+      <div class="progress-bar{% if quota.over_soft %} bg-warning{% endif %}"
+           style="width:{{ quota.percent }}%;"></div>
+    </div>
+    {% if quota.over_soft %}
+    <p class="text-warning-sm mt-2 mb-0">
+      This class is over its soft limit. New uploads still work until the hard
+      stop, but consider removing old photos and files.
+    </p>
+    {% else %}
+    <p class="text-muted-sm mt-2 mb-0">
+      Counts photos and files stored for this class this term, including
+      removed items kept for the school's records.
+    </p>
+    {% endif %}
   </div>
 </div>
 
@@ -86,6 +156,7 @@
 {% block extra_css %}
 <style>
   .text-muted-sm { color: var(--color-muted); font-size: 0.8rem; }
+  .text-warning-sm { color: var(--color-warning); font-size: 0.8rem; }
   .fw-600 { font-weight: 600; }
 </style>
 {% endblock %}

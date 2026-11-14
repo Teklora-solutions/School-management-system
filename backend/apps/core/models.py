@@ -225,6 +225,22 @@ class SchoolSettings(BaseModel):
             "Learning. Each teacher also turns it on for their own class."
         ),
     )
+    feed_media_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Allow photos and files on class feeds across the school. Requires "
+            "the class community feed. Each teacher also turns it on for their "
+            "own class; switching it off hides all feed media at once."
+        ),
+    )
+    feed_student_uploads_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Allow pupils to attach photos and files to feed posts. Off by "
+            "default. A teacher approves each pupil attachment before "
+            "classmates see it."
+        ),
+    )
     notification_quiet_hours_enabled = models.BooleanField(
         default=False,
         help_text=(

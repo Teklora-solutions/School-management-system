@@ -24,8 +24,11 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from apps.core.models import BaseModel
+
+from .storage import feed_media_storage
 
 
 def lesson_upload_path(instance: "Lesson", filename: str) -> str:
@@ -286,6 +289,21 @@ class ClassFeedSettings(BaseModel):
             "requires the community feed to be on."
         ),
     )
+    media_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Allow photos and files on this class's feed. Off by default; "
+            "the school switch must also be on. Turning it off hides all "
+            "feed media at once."
+        ),
+    )
+    student_uploads_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Allow pupils to attach photos and files. Off by default; a "
+            "teacher approves each pupil attachment before classmates see it."
+        ),
+    )
 
     class Meta:
         db_table = "learning_class_feed_settings"
@@ -468,6 +486,29 @@ class ClassPost(BaseModel):
         related_name="+",
         help_text="Optional quiz this post is about. Must belong to the same class.",
     )
+    edited_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Set when the author edits the post; the card shows 'Edited'.",
+    )
+    scheduled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "When set, pupils and parents see this post from this time. "
+            "Teachers see it earlier with a Scheduled label."
+        ),
+    )
+    mentions = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Users mentioned with @ in the body, stored as "
+            "[{'id': <pk>, 'name': '<display name>'}]. Always resolved "
+            "against this class's roster, never free text."
+        ),
+    )
     is_pinned = models.BooleanField(
         default=False,
         db_index=True,
@@ -505,11 +546,196 @@ class ClassPost(BaseModel):
         ordering = ["-is_pinned", "-created_at"]
         indexes = [
             models.Index(fields=["school_class", "is_removed", "created_at"]),
+            models.Index(fields=["school_class", "scheduled_at"]),
         ]
+
+    @property
+    def is_scheduled(self) -> bool:
+        """True while the post is still waiting for its scheduled time."""
+        return self.scheduled_at is not None and self.scheduled_at > timezone.now()
+
+    @property
+    def body_segments(self) -> list[dict]:
+        from .feed_text import body_segments
+
+        return body_segments(self.body, self.mentions)
 
     def __str__(self) -> str:
         author = self.author.get_full_name() if self.author else "Unknown"
         return f"[{self.get_post_type_display()}] {author}: {self.body[:60]}"
+
+
+# ---------------------------------------------------------------------------
+# Feed media (C2) — photos and files attached to a post
+# ---------------------------------------------------------------------------
+
+#: Same allow-list as lesson attachments; images are additionally re-encoded.
+FEED_ALLOWED_EXTENSIONS = {
+    ".pdf", ".doc", ".docx", ".ppt", ".pptx",
+    ".xls", ".xlsx",
+    ".jpg", ".jpeg", ".png", ".webp", ".gif",
+    ".mp3",
+}
+
+FEED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+#: Photos: up to 8 MB in, stored at most 1600 px on the long edge plus a
+#: 400 px thumbnail. Files: up to 10 MB, stored as sent after type checks.
+FEED_PHOTO_MAX_BYTES = 8 * 1024 * 1024
+FEED_FILE_MAX_BYTES = 10 * 1024 * 1024
+FEED_MAX_PHOTOS = 3
+FEED_MAX_FILES = 3
+FEED_PHOTO_MAX_EDGE = 1600
+FEED_PHOTO_THUMB_EDGE = 400
+
+#: Per-class, per-term storage budget (soft warning / hard stop).
+FEED_QUOTA_SOFT_BYTES = 250 * 1024 * 1024
+FEED_QUOTA_HARD_BYTES = 350 * 1024 * 1024
+
+
+def feed_attachment_upload_path(instance: "ClassPostAttachment", filename: str) -> str:
+    """
+    ``feed/<year>/class-<id>/<filename>`` under FEED_MEDIA_ROOT.
+
+    The service names each blob with a UUID, so no user text reaches the path.
+    """
+    name = os.path.basename(filename)
+    year = timezone.now().year
+    return f"feed/{year}/class-{instance.post.school_class_id}/{name}"
+
+
+class ClassPostAttachment(BaseModel):
+    """
+    One photo or file attached to a class-feed post.
+
+    Safety rules (C2):
+      - Real type check by magic bytes, allow-list only, size and count caps.
+      - Photos are re-encoded server-side: EXIF (including GPS) is stripped,
+        the long edge is capped at 1600 px and a 400 px thumbnail is kept.
+      - Stored outside MEDIA_ROOT and served only through a permission-checked
+        view; the storage's ``url()`` raises on purpose.
+      - A pupil's upload starts ``pending`` and classmates do not see it until
+        a teacher approves it. A teacher's upload is approved immediately.
+      - Removing keeps the blob and metadata as an audit copy; nothing that
+        was shared is silently destroyed.
+    """
+
+    class Kind(models.TextChoices):
+        IMAGE = "image", "Photo"
+        FILE = "file", "File"
+
+    class Approval(models.TextChoices):
+        PENDING = "pending", "Waiting for teacher"
+        APPROVED = "approved", "Approved"
+        REMOVED = "removed", "Removed"
+
+    post = models.ForeignKey(
+        ClassPost,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    uploaded_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="feed_attachments",
+    )
+    kind = models.CharField(max_length=8, choices=Kind.choices, db_index=True)
+    file = models.FileField(
+        storage=feed_media_storage,
+        upload_to=feed_attachment_upload_path,
+        max_length=255,
+    )
+    thumbnail = models.FileField(
+        storage=feed_media_storage,
+        upload_to=feed_attachment_upload_path,
+        max_length=255,
+        blank=True,
+    )
+    original_name = models.CharField(max_length=255, blank=True)
+    file_size = models.PositiveIntegerField(default=0)
+    thumb_size = models.PositiveIntegerField(default=0)
+    content_type = models.CharField(max_length=100, blank=True)
+    alt_text = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Description for screen readers. Required for teacher photos.",
+    )
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+    approval_status = models.CharField(
+        max_length=12,
+        choices=Approval.choices,
+        default=Approval.APPROVED,
+        db_index=True,
+    )
+    approved_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    removed_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="feed_attachments_removed",
+    )
+    removed_at = models.DateTimeField(null=True, blank=True)
+    ordering = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        db_table = "learning_class_post_attachment"
+        ordering = ["ordering", "pk"]
+        indexes = [
+            models.Index(fields=["post", "approval_status"]),
+        ]
+
+    def __str__(self) -> str:
+        return self.original_name or os.path.basename(self.file.name)
+
+    @property
+    def extension(self) -> str:
+        return os.path.splitext(self.original_name or self.file.name)[1].lower()
+
+    @property
+    def is_image(self) -> bool:
+        return self.kind == self.Kind.IMAGE
+
+    @property
+    def is_removed(self) -> bool:
+        return self.approval_status == self.Approval.REMOVED
+
+    @property
+    def is_pending(self) -> bool:
+        return self.approval_status == self.Approval.PENDING
+
+    @property
+    def size_label(self) -> str:
+        size = self.file_size or 0
+        if size >= 1024 * 1024:
+            return f"{size / (1024 * 1024):.1f} MB".replace(".0 MB", " MB")
+        return f"{max(1, round(size / 1024))} KB"
+
+    @property
+    def icon(self) -> str:
+        ext = self.extension
+        if ext == ".pdf":
+            return "bi-file-earmark-pdf"
+        if ext in FEED_IMAGE_EXTENSIONS:
+            return "bi-file-earmark-image"
+        if ext == ".mp3":
+            return "bi-file-earmark-music"
+        if ext in {".doc", ".docx"}:
+            return "bi-file-earmark-word"
+        if ext in {".ppt", ".pptx"}:
+            return "bi-file-earmark-slides"
+        if ext in {".xls", ".xlsx"}:
+            return "bi-file-earmark-spreadsheet"
+        return "bi-file-earmark"
 
 
 class ClassPostReply(BaseModel):
@@ -537,6 +763,14 @@ class ClassPostReply(BaseModel):
     )
     body = models.TextField(
         help_text="Plain text only; no HTML and no clickable links.",
+    )
+    mentions = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Users mentioned with @ in this reply, resolved against the "
+            "class roster and stored as [{'id': <pk>, 'name': '<name>'}]."
+        ),
     )
     is_best_answer = models.BooleanField(
         default=False,
@@ -570,6 +804,12 @@ class ClassPostReply(BaseModel):
                 name="uniq_best_answer_per_post",
             )
         ]
+
+    @property
+    def body_segments(self) -> list[dict]:
+        from .feed_text import body_segments
+
+        return body_segments(self.body, self.mentions)
 
     def __str__(self) -> str:
         author = self.author.get_full_name() if self.author else "Unknown"

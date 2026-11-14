@@ -180,6 +180,13 @@ STATIC_ROOT = Path(env("STATIC_ROOT", default=str(BASE_DIR / "staticfiles")))
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(env("MEDIA_ROOT", default=str(BASE_DIR / "media")))
 
+# Class-feed photos and files live outside MEDIA_ROOT so the dev-only
+# ``/media/`` route can never serve them. Every read goes through a
+# permission-checked view in apps.learning.views.
+FEED_MEDIA_ROOT = Path(
+    env("FEED_MEDIA_ROOT", default=str(BASE_DIR / "private_feed"))
+)
+
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
