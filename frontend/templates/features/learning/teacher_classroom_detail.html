@@ -16,9 +16,47 @@
         {% if classroom.stream_name %} · {{ classroom.stream_name }} stream{% endif %}
       </p>
     </div>
-    <a href="{% url 'learning:teacher_classrooms' %}" class="btn btn-outline-secondary btn-sm mt-1">
-      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All Classrooms
-    </a>
+    <div class="d-flex align-items-center gap-2 mt-1">
+      <details class="classroom-menu">
+        <summary class="btn btn-primary btn-sm">
+          <i class="bi bi-grid-3x3-gap me-1" aria-hidden="true"></i>Classroom menu
+          <i class="bi bi-chevron-down ms-1 classroom-menu__chevron" aria-hidden="true"></i>
+        </summary>
+        <div class="classroom-menu__panel">
+          <a class="classroom-menu__item"
+             href="{% url 'learning:teacher_live_sessions' classroom.school_class.pk classroom.subject.pk %}">
+            <i class="bi bi-broadcast" aria-hidden="true"></i>Live Classes
+          </a>
+          <a class="classroom-menu__item"
+             href="{% url 'learning:class_calendar' classroom.school_class.pk %}">
+            <i class="bi bi-calendar3" aria-hidden="true"></i>Class Calendar
+          </a>
+          <a class="classroom-menu__item"
+             href="{% url 'learning:class_feed' classroom.school_class.pk %}">
+            <i class="bi bi-megaphone" aria-hidden="true"></i>Class Feed
+          </a>
+          <a class="classroom-menu__item"
+             href="{% url 'learning:teacher_class_progress' classroom.school_class.pk classroom.subject.pk %}">
+            <i class="bi bi-graph-up" aria-hidden="true"></i>Class Progress
+          </a>
+          <a class="classroom-menu__item"
+             href="{% url 'learning:teacher_class_points' classroom.school_class.pk %}">
+            <i class="bi bi-award" aria-hidden="true"></i>Class Points
+          </a>
+          <a class="classroom-menu__item"
+             href="{% url 'learning:copy_course' classroom.school_class.pk classroom.subject.pk %}">
+            <i class="bi bi-files" aria-hidden="true"></i>Copy course
+          </a>
+          <a class="classroom-menu__item"
+             href="{% url 'learning:class_engagement_settings' classroom.school_class.pk classroom.subject.pk %}">
+            <i class="bi bi-gear" aria-hidden="true"></i>Settings
+          </a>
+        </div>
+      </details>
+      <a href="{% url 'learning:teacher_classrooms' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All Classrooms
+      </a>
+    </div>
   </div>
 </div>
 
@@ -86,38 +124,6 @@
       </div>
     </div>
   </div>
-</div>
-
-{# ── Quick actions ── #}
-<div class="d-flex flex-wrap gap-2 mb-4">
-  <a href="{% url 'learning:teacher_live_sessions' classroom.school_class.pk classroom.subject.pk %}"
-     class="btn btn-outline-danger btn-sm">
-    <i class="bi bi-broadcast me-1" aria-hidden="true"></i>Live Classes
-  </a>
-  <a href="{% url 'learning:class_calendar' classroom.school_class.pk %}"
-     class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Class Calendar
-  </a>
-  <a href="{% url 'learning:class_feed' classroom.school_class.pk %}"
-     class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-megaphone me-1" aria-hidden="true"></i>Class Feed
-  </a>
-  <a href="{% url 'learning:teacher_class_progress' classroom.school_class.pk classroom.subject.pk %}"
-     class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-graph-up me-1" aria-hidden="true"></i>Class Progress
-  </a>
-  <a href="{% url 'learning:teacher_class_points' classroom.school_class.pk %}"
-     class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-award me-1" aria-hidden="true"></i>Class Points
-  </a>
-  <a href="{% url 'learning:copy_course' classroom.school_class.pk classroom.subject.pk %}"
-     class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-files me-1" aria-hidden="true"></i>Copy course
-  </a>
-  <a href="{% url 'learning:class_engagement_settings' classroom.school_class.pk classroom.subject.pk %}"
-     class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-gear me-1" aria-hidden="true"></i>Settings
-  </a>
 </div>
 
 {# Course outline #}

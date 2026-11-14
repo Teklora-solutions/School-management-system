@@ -1124,3 +1124,47 @@ a:hover { color: #fff; }
 .msg-error .toast-icon { color: var(--color-danger); }
 .toast-msg__text { font-size: 0.875rem; }
 .toast-close { background: none; border: none; color: var(--color-muted); cursor: pointer; padding: 0; line-height: 1; }
+
+/* ── Classroom menu ───────────────────────────────────────────────────────
+   A native <details> dropdown, so the links still work with JavaScript off.
+   Used on the teacher and student classroom pages. */
+.classroom-menu { position: relative; }
+.classroom-menu > summary {
+  display: inline-flex;
+  align-items: center;
+  list-style: none;
+  cursor: pointer;
+}
+.classroom-menu > summary::-webkit-details-marker { display: none; }
+.classroom-menu__chevron { transition: transform 0.15s ease; }
+.classroom-menu[open] .classroom-menu__chevron { transform: rotate(180deg); }
+.classroom-menu__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 1050;
+  min-width: 220px;
+  padding: 0.35rem;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+.classroom-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+.classroom-menu__item:hover,
+.classroom-menu__item:focus-visible { background: var(--accent-glow); color: #fff; }
+.classroom-menu__item i {
+  width: 1.1rem;
+  text-align: center;
+  color: var(--accent-light);
+}

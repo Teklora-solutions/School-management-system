@@ -81,6 +81,20 @@
     });
   });
 
+  /* ── Classroom menu: close on an outside tap or Escape ────────────────── */
+  document.querySelectorAll("details.classroom-menu").forEach((menu) => {
+    document.addEventListener("click", (event) => {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    menu.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && menu.open) {
+        menu.open = false;
+        const summary = menu.querySelector("summary");
+        if (summary) summary.focus();
+      }
+    });
+  });
+
   /* ── Clear this user's feed drafts when they sign out ─────────────────── */
   const userId = document.body.getAttribute("data-user-id") || "";
   if (userId) {
