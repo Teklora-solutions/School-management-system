@@ -5,8 +5,9 @@ RC2 — the broadsheet PDF export and the report-card buttons on the
 on-screen broadsheet.
 
 Covers:
-  - BroadsheetPdfView renders landscape A4 with the identity header, topper
-    callout, ranked rows, positions and the subject-means footer
+  - BroadsheetPdfView renders landscape A4 with the identity header, the
+    class/term/year/exam mean-score line, ranked rows, positions, the
+    subject means/mean %/rank footer and the grade distribution
   - the download honours the same filters as the page and refuses to print
     an empty scope (redirect back with a message)
   - non-admins are denied
@@ -67,29 +68,34 @@ class BroadsheetPdfTests(BroadsheetDataMixin, TestCase):
     def setUp(self):
         SchoolSettings.objects.create(pk=SchoolSettings.SINGLETON_PK, name="PDF School")
 
-    def test_pdf_carries_identity_title_and_topper(self):
+    def test_pdf_carries_identity_meta_line_and_table(self):
         html = self._html_as(self.admin)
         self.assertIn("A4 landscape", html)
         self.assertIn("PDF School", html)
-        self.assertIn("Class Broadsheet", html)
         self.assertIn("Grade 5", html)
-        # Alice has the highest total (90 + 90 = 180) and tops the class.
-        self.assertIn("Top of class", html)
-        topper_block = html.split("Top of class")[1].split("</div>", 1)[0]
-        self.assertIn("Alice A", topper_block)
-        self.assertIn("180", topper_block)
-        self.assertIn("90.0%", topper_block)
+        self.assertIn("Term 1", html)
+        self.assertIn("Exam 1", html)
+        # Mean of totals 173.3; mean of student means 86.7%.
+        self.assertIn("173.30", html)
+        self.assertIn("86.70%", html)
+        self.assertIn("Student Name", html)
+        self.assertIn("ALICE A", html)
+        self.assertIn("ADM-001", html)
+        self.assertIn("Subject Mean", html)
+        self.assertIn("Subject Mean %", html)
+        self.assertIn("Subject Rank", html)
+        self.assertIn("Grade Distribution", html)
 
     def test_rows_are_ranked_with_positions_and_subject_means(self):
         html = self._html_as(self.admin)
         body = html.split("<tbody>")[1].split("</tbody>")[0]
-        self.assertLess(body.index("Alice A"), body.index("Bob B"))
-        self.assertLess(body.index("Bob B"), body.index("Cara C"))
+        self.assertLess(body.index("ALICE A"), body.index("BOB B"))
+        self.assertLess(body.index("BOB B"), body.index("CARA C"))
         # Alice is position 1; Bob and Cara tie at 170 and share position 2.
         squashed = html.replace(" ", "").replace("\n", "")
-        self.assertIn('pos">1<', squashed)
-        self.assertIn('pos">2<', squashed)
-        self.assertNotIn('pos">3<', squashed)
+        self.assertIn('strong">1<', squashed)
+        self.assertIn('strong">2<', squashed)
+        self.assertNotIn('strong">3<', squashed)
         # ENG and MATH both average (90 + 90 + 80) / 3 = 86.7.
         self.assertIn("86.7", squashed)
 
@@ -99,9 +105,8 @@ class BroadsheetPdfTests(BroadsheetDataMixin, TestCase):
         )
         html = self._html_as(self.admin)
         self.assertNotIn(">Pos</th>", html)
-        self.assertNotIn('class="center pos"', html)
 
-    def test_topper_callout_is_absent_without_scores(self):
+    def test_rows_still_print_without_scores(self):
         from apps.results.models import ScoreEntry
 
         ScoreEntry.objects.all().delete()
@@ -110,9 +115,10 @@ class BroadsheetPdfTests(BroadsheetDataMixin, TestCase):
         with _recorder:
             response = self.client.get(reverse("results:broadsheet_pdf"), self._query())
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn("Top of class", _rendered[-1])
         # Dan D has no scores: he is listed but unranked.
-        self.assertIn("Dan D", _rendered[-1])
+        self.assertIn("DAN D", _rendered[-1])
+        # With no marks there is nothing to distribute.
+        self.assertNotIn("Grade Distribution", _rendered[-1])
 
     def test_missing_scope_redirects_back_with_a_message(self):
         empty_year = self.year.__class__.objects.create(

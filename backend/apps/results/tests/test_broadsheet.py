@@ -24,7 +24,14 @@ from apps.accounts.models import User
 from apps.students.models import Student
 
 from .. import selectors
-from ..models import Exam, GradeBand, ResultSheet, ScoreEntry
+from ..models import (
+    Exam,
+    GradeBand,
+    GradeScale,
+    GradeScaleBand,
+    ResultSheet,
+    ScoreEntry,
+)
 from ..services import confirm_sheet, ensure_exams_for_term, publish_sheet, submit_sheet
 
 
@@ -253,6 +260,95 @@ class BroadsheetSelectorTests(BroadsheetDataMixin, TestCase):
         self.assertEqual(data["progress"]["expected"], 8)
         self.assertEqual(data["progress"]["pct"], 75)
 
+    def test_columns_carry_mean_pct_and_rank(self):
+        data = self._broadsheet()
+        self.assertEqual(
+            [col["subject"].code for col in data["columns"]], ["ENG", "MATH"]
+        )
+        for col in data["columns"]:
+            self.assertEqual(col["mean"], 86.7)
+            self.assertEqual(col["mean_pct"], 86.7)
+            # Both subjects average the same, so they share first place.
+            self.assertEqual(col["rank"], 1)
+
+    def test_subject_rank_follows_the_means(self):
+        ScoreEntry.objects.filter(
+            result_sheet=self.eng_sheet, student=self.cara
+        ).update(raw_score=Decimal(60), total=Decimal(60))
+        data = self._broadsheet()
+        by_code = {col["subject"].code: col for col in data["columns"]}
+        self.assertEqual(by_code["MATH"]["mean"], 86.7)
+        self.assertEqual(by_code["ENG"]["mean"], 80)
+        self.assertEqual(by_code["MATH"]["rank"], 1)
+        self.assertEqual(by_code["ENG"]["rank"], 2)
+
+    def test_grade_distribution_uses_the_year_bands(self):
+        data = self._broadsheet()
+        bands = data["distribution"]
+        # Highest band first, and bands with no students are still listed.
+        self.assertEqual([b["grade"] for b in bands], ["A", "B", "C", "F"])
+        self.assertEqual([b["description"] for b in bands][0], "Excellent")
+        self.assertEqual(bands[0]["range"], "85 – 100")
+        self.assertEqual(bands[3]["range"], "0 – 49")
+        by_grade = {b["grade"]: b for b in bands}
+        # Alice 90, Bob 85 and Cara 85 all land in A; Dan has no marks.
+        self.assertEqual(by_grade["A"]["count"], 3)
+        self.assertEqual(by_grade["B"]["count"], 0)
+        self.assertEqual(by_grade["C"]["count"], 0)
+        self.assertEqual(by_grade["F"]["count"], 0)
+        self.assertEqual(data["distribution_total"], 3)
+        self.assertEqual(by_grade["A"]["pct"], 100.0)
+
+    def test_distribution_percentages_sum_to_100(self):
+        ScoreEntry.objects.filter(
+            result_sheet=self.math_sheet, student=self.cara
+        ).update(raw_score=Decimal(20), total=Decimal(20))
+        data = self._broadsheet()
+        by_grade = {b["grade"]: b for b in data["distribution"]}
+        self.assertEqual(data["distribution_total"], 3)
+        self.assertEqual(by_grade["A"]["count"], 2)
+        self.assertEqual(by_grade["C"]["count"], 1)
+        self.assertEqual(
+            round(sum(b["pct"] for b in data["distribution"]), 1), 100.0
+        )
+
+    def test_distribution_follows_the_class_grade_scale(self):
+        scale = GradeScale.objects.create(
+            academic_year=self.year, name="Senior Scale"
+        )
+        GradeScaleBand.objects.create(
+            scale=scale,
+            min_score=0,
+            max_score=Decimal("49.99"),
+            grade="F",
+            remark="Below expectations",
+        )
+        GradeScaleBand.objects.create(
+            scale=scale,
+            min_score=50,
+            max_score=100,
+            grade="A",
+            remark="At or above expectations",
+        )
+        SchoolClass.objects.filter(pk=self.school_class.pk).update(
+            grade_scale_id=scale.pk
+        )
+        self.school_class.refresh_from_db()
+
+        data = self._broadsheet()
+        bands = data["distribution"]
+        self.assertEqual([b["grade"] for b in bands], ["A", "F"])
+        self.assertEqual([b["count"] for b in bands], [3, 0])
+        self.assertEqual(bands[0]["range"], "50 – 100")
+        self.assertEqual(bands[1]["range"], "0 – 49.99")
+        self.assertEqual(bands[1]["description"], "Below expectations")
+
+    def test_distribution_is_empty_without_bands(self):
+        GradeBand.objects.all().delete()
+        data = self._broadsheet()
+        self.assertEqual(data["distribution"], [])
+        self.assertEqual(data["distribution_total"], 0)
+
     def test_raw_score_falls_back_to_total(self):
         ScoreEntry.objects.filter(
             result_sheet=self.math_sheet, student=self.cara
@@ -296,9 +392,23 @@ class BroadsheetViewTests(BroadsheetDataMixin, TestCase):
         content = response.content.decode()
         self.assertIn("Class Broadsheet", content)
         self.assertIn("Grade 5", content)
-        self.assertIn("Alice A", content)
+        self.assertIn("ALICE A", content)
+        self.assertIn("ADM-001", content)
+        self.assertIn("Student Name", content)
         self.assertIn("MATH", content)
+        self.assertIn("Subject Mean", content)
+        self.assertIn("Subject Rank", content)
+        self.assertIn("Grade Distribution", content)
         self.assertNotIn("Left L", content)
+
+    def test_rows_are_listed_in_position_order(self):
+        self.client.force_login(self.admin)
+        content = self.client.get(reverse("results:broadsheet")).content.decode()
+        body = content.split("<tbody>")[1].split("</tbody>")[0]
+        self.assertLess(body.index("ALICE A"), body.index("BOB B"))
+        self.assertLess(body.index("BOB B"), body.index("CARA C"))
+        # Unmarked pupils are listed last.
+        self.assertLess(body.index("CARA C"), body.index("DAN D"))
 
     def test_view_honours_filters(self):
         other_exam = Exam.objects.get(term=self.term, order=3)

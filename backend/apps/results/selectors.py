@@ -119,6 +119,11 @@ def _mean(values: list) -> float | None:
     return round(float(sum(values) / len(values)), 1)
 
 
+def _band_score_label(value) -> str:
+    """Band bounds without trailing zeros (50.00 prints as 50, 49.99 stays)."""
+    return f"{float(value):g}"
+
+
 def broadsheet_subjects(school_class, term) -> list:
     """
     Subjects shown as columns on a class broadsheet.
@@ -268,6 +273,67 @@ def exam_broadsheet(*, school_class, term, exam) -> dict:
         for subject in subjects
     }
 
+    columns = [
+        {
+            "subject": subject,
+            "mean": subject_means[subject.pk]["mean"],
+            "mean_pct": subject_means[subject.pk]["mean"],
+            "count": subject_means[subject.pk]["count"],
+            "rank": None,
+        }
+        for subject in subjects
+    ]
+    ranked_columns = sorted(
+        (col for col in columns if col["mean"] is not None),
+        key=lambda col: col["mean"],
+        reverse=True,
+    )
+    previous_mean = None
+    column_rank = 0
+    for index, col in enumerate(ranked_columns, start=1):
+        if previous_mean is None or col["mean"] != previous_mean:
+            column_rank = index
+            previous_mean = col["mean"]
+        col["rank"] = column_rank
+
+    band_counts = [
+        (
+            band,
+            sum(
+                1
+                for row in ranked
+                if band.min_score <= row["mean"] <= band.max_score
+            ),
+        )
+        for band in bands
+    ]
+    distribution_total = sum(count for _, count in band_counts)
+    if distribution_total:
+        percentages = [
+            round(count * 100.0 / distribution_total, 1) for _, count in band_counts
+        ]
+        drift = round(100.0 - sum(percentages), 1)
+        if drift:
+            largest = max(
+                range(len(percentages)), key=lambda i: band_counts[i][1]
+            )
+            percentages[largest] = round(percentages[largest] + drift, 1)
+    else:
+        percentages = [0.0 for _ in band_counts]
+    distribution = [
+        {
+            "grade": band.grade,
+            "description": band.remark,
+            "range": (
+                f"{_band_score_label(band.min_score)} – "
+                f"{_band_score_label(band.max_score)}"
+            ),
+            "count": count,
+            "pct": percentages[index],
+        }
+        for index, (band, count) in enumerate(band_counts)
+    ]
+
     statuses = {sheet.status for sheet in sheets}
     if not sheets:
         status = {"label": "No sheets", "tone": "muted"}
@@ -292,16 +358,11 @@ def exam_broadsheet(*, school_class, term, exam) -> dict:
 
     return {
         "subjects": subjects,
-        "columns": [
-            {
-                "subject": subject,
-                "mean": subject_means[subject.pk]["mean"],
-                "count": subject_means[subject.pk]["count"],
-            }
-            for subject in subjects
-        ],
+        "columns": columns,
         "students": rows,
         "subject_means": subject_means,
+        "distribution": distribution,
+        "distribution_total": distribution_total,
         "class_mean_total": _mean([row["total"] for row in ranked]),
         "class_mean_pct": _mean([row["mean"] for row in ranked]),
         "exam": exam,

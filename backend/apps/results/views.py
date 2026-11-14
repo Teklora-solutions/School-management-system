@@ -323,6 +323,20 @@ def _resolve_broadsheet_scope(request) -> dict:
     }
 
 
+def _ranked_broadsheet_students(broadsheet) -> list:
+    """Rows in position order; unmarked students last, ties by admission number."""
+    if not broadsheet:
+        return []
+    return sorted(
+        broadsheet["students"],
+        key=lambda row: (
+            row["position"] is None,
+            row["position"] or 0,
+            row["student"].admission_number,
+        ),
+    )
+
+
 class ClassBroadsheetView(AdminRequiredMixin, TemplateView):
     """Admin: class broadsheet for one year + class + term + exam."""
 
@@ -342,6 +356,10 @@ class ClassBroadsheetView(AdminRequiredMixin, TemplateView):
                 "exam_options": scope["exam_options"],
                 "selected_exam": scope["exam"],
                 "broadsheet": scope["broadsheet"],
+                "ranked_students": _ranked_broadsheet_students(
+                    scope["broadsheet"]
+                ),
+                "identity": selectors.result_identity(request=self.request),
             }
         )
         return ctx
@@ -350,8 +368,8 @@ class ClassBroadsheetView(AdminRequiredMixin, TemplateView):
 class BroadsheetPdfView(AdminRequiredMixin, View):
     """
     Download the class broadsheet as a PDF, honouring the same filters as the
-    on-screen page. Landscape A4 with the school identity header, a topper
-    callout, the ranked table with positions, and the subject-means row.
+    on-screen page. Landscape A4 with the school identity header, the ranked
+    table (subject means, mean %, ranks), and the grade distribution.
     """
 
     def get(self, request, *args, **kwargs):
@@ -365,17 +383,7 @@ class BroadsheetPdfView(AdminRequiredMixin, View):
             return redirect("results:broadsheet")
 
         identity = selectors.result_identity(request=request)
-        ranked_students = sorted(
-            broadsheet["students"],
-            key=lambda row: (
-                row["position"] is None,
-                row["position"] or 0,
-                row["student"].admission_number,
-            ),
-        )
-        topper = next(
-            (row for row in ranked_students if row["position"] == 1), None
-        )
+        ranked_students = _ranked_broadsheet_students(broadsheet)
 
         from django.template.loader import render_to_string
 
@@ -384,7 +392,6 @@ class BroadsheetPdfView(AdminRequiredMixin, View):
             {
                 "broadsheet": broadsheet,
                 "ranked_students": ranked_students,
-                "topper": topper,
                 "identity": identity,
                 "request": request,
             },

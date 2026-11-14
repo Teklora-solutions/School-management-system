@@ -2,8 +2,122 @@
 
 {% block title %}Class Broadsheet | {{ SCHOOL_NAME }}{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* The sheet is a document: white paper on the dark app, and the only thing
+     that prints. Everything around it is marked .no-print. */
+  .broadsheet-sheet {
+    background: #fff;
+    color: #111;
+    border: 1px solid #1f3a5f;
+    border-radius: 6px;
+    padding: 22px 26px 28px;
+  }
+  .broadsheet-sheet .bs-identity { text-align: center; }
+  .broadsheet-sheet .bs-crest {
+    height: 54px; width: 54px; object-fit: contain; margin-bottom: 4px;
+  }
+  .broadsheet-sheet .bs-school {
+    font-family: var(--font-heading, inherit);
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #111;
+  }
+  .broadsheet-sheet .bs-motto {
+    font-style: italic; font-size: 0.85rem; color: #555; margin-top: 2px;
+  }
+  .broadsheet-sheet .bs-meta {
+    border-top: 2px solid #111;
+    border-bottom: 2px solid #111;
+    margin: 12px 0 14px;
+    padding: 7px 4px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px 8px;
+    font-size: 0.82rem;
+    color: #222;
+    text-align: center;
+  }
+  .broadsheet-sheet .bs-meta .sep { color: #999; }
+  .broadsheet-sheet .bs-meta strong { color: #111; }
+
+  .broadsheet-sheet table.bs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    color: #111;
+    margin: 0;
+  }
+  .broadsheet-sheet table.bs-table th,
+  .broadsheet-sheet table.bs-table td {
+    border: 1px solid #6b7686;
+    padding: 4px 6px;
+    vertical-align: middle;
+  }
+  .broadsheet-sheet table.bs-table thead th {
+    background: #1f3a5f;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  .broadsheet-sheet table.bs-table thead th.bs-student { text-align: left; }
+  .broadsheet-sheet table.bs-table tbody tr:nth-child(even) td { background: #f2f4f7; }
+  .broadsheet-sheet .bs-num { text-align: center; white-space: nowrap; }
+  .broadsheet-sheet .bs-strong { font-weight: 700; }
+  .broadsheet-sheet .bs-adm {
+    display: block;
+    font-size: 0.7rem;
+    color: #555;
+    letter-spacing: 0.02em;
+  }
+  .broadsheet-sheet .bs-card-link {
+    margin-left: 4px;
+    font-size: 0.72rem;
+    color: #1f3a5f;
+  }
+  .broadsheet-sheet table.bs-table tfoot td {
+    border-top: 2px solid #111;
+    font-weight: 700;
+    background: #eef1f6;
+    font-size: 0.74rem;
+    letter-spacing: 0.02em;
+  }
+  .broadsheet-sheet .bs-subheading {
+    margin: 22px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #111;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #111;
+  }
+  .broadsheet-sheet .bs-empty { text-align: center; color: #555; padding: 18px 0; }
+  .broadsheet-sheet .bs-note { font-size: 0.8rem; color: #555; }
+
+  @media print {
+    @page { size: A4 landscape; margin: 10mm; }
+    body, .app-wrapper, .app-main { background: #fff !important; }
+    .app-navbar, .app-sidebar, .sidebar-overlay, .page-header, .app-footer,
+    .no-print { display: none !important; }
+    .app-wrapper { display: block !important; }
+    .app-main { padding: 0 !important; margin: 0 !important; }
+    .broadsheet-sheet { border: 0; border-radius: 0; padding: 0; }
+    .broadsheet-sheet .table-responsive { overflow: visible !important; }
+    .broadsheet-sheet table.bs-table thead { display: table-header-group; }
+    .broadsheet-sheet table.bs-table tr { page-break-inside: avoid; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
+<div class="page-header no-print">
   <div>
     <h1 class="page-title">
       <i class="bi bi-grid-3x3-gap-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
@@ -11,7 +125,7 @@
     </h1>
     <p class="page-subtitle">
       {% if broadsheet %}
-        {{ broadsheet.school_class.name }} · {{ broadsheet.term.name|title }}
+        {{ broadsheet.school_class.name }} · {{ broadsheet.term.get_name_display }}
         ({{ broadsheet.term.academic_year.name }}) · {{ broadsheet.exam.name }}
       {% else %}
         One row per student, one column per subject, for a class and term.
@@ -24,7 +138,7 @@
 </div>
 
 {# ── Filters ─────────────────────────────────────────────────────────────── #}
-<div class="card mb-3">
+<div class="card mb-3 no-print">
   <div class="card-body">
     <form method="get" class="row g-2 align-items-end">
       <div class="col-sm-3 col-lg-2">
@@ -47,7 +161,7 @@
         <label class="form-label" for="filter-term">Term</label>
         <select name="term" id="filter-term" class="form-select form-select-sm">
           {% for t in term_options %}
-          <option value="{{ t.pk }}" {% if selected_term and t.pk == selected_term.pk %}selected{% endif %}>{{ t.name|title }}</option>
+          <option value="{{ t.pk }}" {% if selected_term and t.pk == selected_term.pk %}selected{% endif %}>{{ t.get_name_display }}</option>
           {% endfor %}
         </select>
       </div>
@@ -70,29 +184,29 @@
 </div>
 
 {% if not years %}
-<div class="card">
+<div class="card no-print">
   <div class="card-body text-center text-muted-sm py-5">
     <i class="bi bi-calendar-x fs-1 d-block mb-2"></i>
     No academic years exist yet. Set up an academic year before using the broadsheet.
   </div>
 </div>
 {% elif not class_options %}
-<div class="card">
+<div class="card no-print">
   <div class="card-body text-center text-muted-sm py-5">
     <i class="bi bi-mortarboard fs-1 d-block mb-2"></i>
     {{ selected_year.name }} has no classes yet.
   </div>
 </div>
 {% elif not term_options %}
-<div class="card">
+<div class="card no-print">
   <div class="card-body text-center text-muted-sm py-5">
     <i class="bi bi-calendar-x fs-1 d-block mb-2"></i>
     {{ selected_year.name }} has no terms yet.
   </div>
 </div>
 {% elif broadsheet %}
-{# ── Snapshot ────────────────────────────────────────────────────────────── #}
-<div class="card mb-3">
+{# ── Toolbar ─────────────────────────────────────────────────────────────── #}
+<div class="card mb-3 no-print">
   <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-3">
     <div class="d-flex align-items-center flex-wrap gap-3">
       {% if broadsheet.status.tone == "success" %}
@@ -111,8 +225,8 @@
         ({{ broadsheet.progress.pct }}%)
       </span>
     </div>
-    <div class="text-end d-flex align-items-center gap-3">
-      <div>
+    <div class="text-end d-flex align-items-center gap-2">
+      <div class="me-2">
         <div class="text-muted-sm">Class mean</div>
         <div class="fw-600 fs-5">
           {% if broadsheet.class_mean_pct is not None %}
@@ -122,6 +236,9 @@
           {% endif %}
         </div>
       </div>
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
       {% if selected_year and selected_class and selected_term and selected_exam %}
       <a
         href="{% url 'results:broadsheet_pdf' %}?year={{ selected_year.pk }}&class={{ selected_class.pk }}&term={{ selected_term.pk }}&exam={{ selected_exam.pk }}"
@@ -134,113 +251,183 @@
   </div>
 </div>
 
-{# ── Broadsheet table ────────────────────────────────────────────────────── #}
-<div class="card">
-  <div class="card-body p-0">
-    {% if broadsheet.students %}
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0 broadsheet-table">
-        <thead>
-          <tr>
-            <th scope="col" class="text-muted-sm">#</th>
-            <th scope="col">Admission #</th>
-            <th scope="col">Student</th>
-            {% for col in broadsheet.columns %}
-            <th scope="col" class="text-center">
-              {{ col.subject.code }}
-              <span class="d-block text-muted-sm fw-normal">{{ col.subject.name }}</span>
-            </th>
-            {% endfor %}
-            <th scope="col" class="text-center">Total</th>
-            <th scope="col" class="text-center">Mean</th>
-            <th scope="col" class="text-center">Grade</th>
-            <th scope="col" class="text-center">Pos</th>
-            {% if broadsheet.status.tone == "success" %}
-            <th scope="col" class="text-center">Card</th>
-            {% endif %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in broadsheet.students %}
-          <tr>
-            <td class="text-muted-sm">{{ forloop.counter }}</td>
-            <td class="text-muted-sm">{{ row.student.admission_number }}</td>
-            <td class="fw-600">{{ row.student.user.full_name }}</td>
-            {% for cell in row.cells %}
-            <td class="text-center">
-              {% if cell.score is not None %}
-                <span class="fw-600">{{ cell.score|floatformat:"-2" }}</span>
-                {% if cell.grade %}<span class="d-block text-muted-sm">{{ cell.grade }}</span>{% endif %}
-              {% else %}
-                <span class="text-muted-sm">—</span>
-              {% endif %}
-            </td>
-            {% endfor %}
-            <td class="text-center fw-600">
-              {% if row.total is not None %}{{ row.total|floatformat:"-2" }}{% else %}—{% endif %}
-            </td>
-            <td class="text-center">
-              {% if row.mean is not None %}{{ row.mean|floatformat:1 }}{% else %}—{% endif %}
-            </td>
-            <td class="text-center">{{ row.grade|default:"—" }}</td>
-            <td class="text-center fw-600">{{ row.position|default:"—" }}</td>
-            {% if broadsheet.status.tone == "success" %}
-            <td class="text-center">
-              <a
-                href="{% url 'results:report_card_pdf' row.student.pk selected_term.pk %}"
-                class="btn btn-outline-secondary btn-sm py-0 px-1"
-                title="Download report card PDF for {{ row.student.user.full_name }}"
-              >
-                <i class="bi bi-file-earmark-pdf"></i>
-              </a>
-            </td>
-            {% endif %}
-          </tr>
-          {% endfor %}
-        </tbody>
-        <tfoot>
-          <tr>
-            <th scope="row" colspan="3" class="text-end text-muted-sm">Subject mean</th>
-            {% for col in broadsheet.columns %}
-            <td class="text-center text-muted-sm">
-              {% if col.mean is not None %}{{ col.mean|floatformat:1 }}{% else %}—{% endif %}
-            </td>
-            {% endfor %}
-            <td class="text-center text-muted-sm">
-              {% if broadsheet.class_mean_total is not None %}{{ broadsheet.class_mean_total|floatformat:1 }}{% else %}—{% endif %}
-            </td>
-            <td class="text-center text-muted-sm">
-              {% if broadsheet.class_mean_pct is not None %}{{ broadsheet.class_mean_pct|floatformat:1 }}{% else %}—{% endif %}
-            </td>
-            {% if broadsheet.status.tone == "success" %}
-            <td colspan="3"></td>
-            {% else %}
-            <td colspan="2"></td>
-            {% endif %}
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    {% else %}
-    <div class="p-4 text-center text-muted-sm">
-      <i class="bi bi-people fs-1 d-block mb-2"></i>
-      No active students are on this class roll.
-    </div>
+{# ── The sheet ───────────────────────────────────────────────────────────── #}
+<div class="broadsheet-sheet" id="broadsheet-sheet">
+  <div class="bs-identity">
+    {% if identity.logo_url %}
+      <img src="{{ identity.logo_url }}" alt="" class="bs-crest">
     {% endif %}
+    <div class="bs-school">{{ identity.name }}</div>
+    {% if identity.motto %}<div class="bs-motto">{{ identity.motto }}</div>{% endif %}
   </div>
+
+  <div class="bs-meta">
+    <span>Class: <strong>{{ broadsheet.school_class.name }}</strong></span>
+    <span class="sep">|</span>
+    <span>Term: <strong>{{ broadsheet.term.get_name_display }}</strong></span>
+    <span class="sep">|</span>
+    <span>Year: <strong>{{ broadsheet.term.academic_year.name }}</strong></span>
+    <span class="sep">|</span>
+    <span>Exam: <strong>{{ broadsheet.exam.name }}</strong></span>
+    <span class="sep">|</span>
+    <span>
+      Mean Score:
+      <strong>
+        {% if broadsheet.class_mean_total is not None %}
+          {{ broadsheet.class_mean_total|floatformat:2 }}
+          ({% if broadsheet.class_mean_pct is not None %}{{ broadsheet.class_mean_pct|floatformat:2 }}%{% else %}—{% endif %})
+        {% else %}
+          —
+        {% endif %}
+      </strong>
+    </span>
+  </div>
+
+  <div class="table-responsive">
+    <table class="bs-table">
+      <thead>
+        <tr>
+          <th class="bs-student">Student Name</th>
+          {% for col in broadsheet.columns %}
+          <th class="bs-num">{{ col.subject.code|upper }}</th>
+          {% endfor %}
+          <th class="bs-num">Tot</th>
+          <th class="bs-num">Mean</th>
+          <th class="bs-num">Pos</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in ranked_students %}
+        <tr>
+          <td class="bs-student">
+            {{ row.student.user.full_name|upper }}
+            {% if broadsheet.status.tone == "success" %}
+            <a
+              href="{% url 'results:report_card_pdf' row.student.pk selected_term.pk %}"
+              class="bs-card-link no-print"
+              title="Download report card PDF for {{ row.student.user.full_name }}"
+              aria-label="Download report card PDF for {{ row.student.user.full_name }}"
+            ><i class="bi bi-file-earmark-pdf"></i></a>
+            {% endif %}
+            <span class="bs-adm">{{ row.student.admission_number }}</span>
+          </td>
+          {% for cell in row.cells %}
+          <td class="bs-num">
+            {% if cell.score is not None %}{{ cell.score|floatformat:"-2" }}{% else %}–{% endif %}
+          </td>
+          {% endfor %}
+          <td class="bs-num bs-strong">
+            {% if row.total is not None %}{{ row.total|floatformat:"-2" }}{% else %}–{% endif %}
+          </td>
+          <td class="bs-num">
+            {% if row.mean is not None %}{{ row.mean|floatformat:2 }}{% else %}–{% endif %}
+          </td>
+          <td class="bs-num bs-strong">{{ row.position|default:"–" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="{{ broadsheet.columns|length|add:4 }}" class="bs-empty">
+            No active students are on this class roll.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if ranked_students %}
+      <tfoot>
+        <tr>
+          <td class="bs-student">Subject Mean</td>
+          {% for col in broadsheet.columns %}
+          <td class="bs-num">
+            {% if col.mean is not None %}{{ col.mean|floatformat:2 }}{% else %}–{% endif %}
+          </td>
+          {% endfor %}
+          <td class="bs-num">
+            {% if broadsheet.class_mean_total is not None %}{{ broadsheet.class_mean_total|floatformat:2 }}{% else %}–{% endif %}
+          </td>
+          <td class="bs-num">
+            {% if broadsheet.class_mean_pct is not None %}{{ broadsheet.class_mean_pct|floatformat:2 }}{% else %}–{% endif %}
+          </td>
+          <td></td>
+        </tr>
+        <tr>
+          <td class="bs-student">Subject Mean %</td>
+          {% for col in broadsheet.columns %}
+          <td class="bs-num">
+            {% if col.mean_pct is not None %}{{ col.mean_pct|floatformat:2 }}%{% else %}–{% endif %}
+          </td>
+          {% endfor %}
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td class="bs-student">Subject Rank</td>
+          {% for col in broadsheet.columns %}
+          <td class="bs-num">{{ col.rank|default:"–" }}</td>
+          {% endfor %}
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+
+  {% if broadsheet.distribution and broadsheet.distribution_total %}
+  <div class="bs-subheading">Grade Distribution (Based on Student Mean Score)</div>
+  <div class="table-responsive">
+    <table class="bs-table">
+      <thead>
+        <tr>
+          <th>Grade</th>
+          <th>Description</th>
+          <th>Range</th>
+          <th class="bs-num">No. of Students</th>
+          <th class="bs-num">Percentage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for band in broadsheet.distribution %}
+        <tr>
+          <td class="bs-strong">{{ band.grade }}</td>
+          <td>{{ band.description|default:"—" }}</td>
+          <td>{{ band.range }}</td>
+          <td class="bs-num">{{ band.count }}</td>
+          <td class="bs-num">{{ band.pct|floatformat:1 }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3">Total</td>
+          <td class="bs-num">{{ broadsheet.distribution_total }}</td>
+          <td class="bs-num">
+            {% if broadsheet.distribution_total %}100%{% else %}–{% endif %}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% elif ranked_students %}
+  <p class="bs-note mt-3 mb-0">
+    No grade scale bands are configured for this class yet, so the grade
+    distribution cannot be computed.
+  </p>
+  {% endif %}
 </div>
 
 {% if not broadsheet.subjects %}
-<div class="alert alert-info mt-3">
+<div class="alert alert-info mt-3 no-print">
   No subjects are attached to {{ broadsheet.school_class.name }} yet. Add class subjects
   in Academics, or create result sheets for the class, to fill the subject columns.
 </div>
 {% endif %}
 {% elif not exam_options %}
-<div class="card">
+<div class="card no-print">
   <div class="card-body text-center text-muted-sm py-5">
     <i class="bi bi-clipboard-x fs-1 d-block mb-2"></i>
-    No exams exist for {{ selected_term.name|title }}.
+    No exams exist for {{ selected_term.get_name_display }}.
   </div>
 </div>
 {% endif %}
