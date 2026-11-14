@@ -337,30 +337,32 @@ NAVIGATION: dict[str, list[dict]] = {
             "icon": "bi-easel2",
             "url_name": "learning:teacher_classrooms",
             "feature": "learning",
-        },
-        {
-            "label": "Class Feed",
-            "icon": "bi-megaphone",
-            "url_name": "learning:feed_home",
-            "feature": "learning",
-        },
-        {
-            "label": "Live Classes",
-            "icon": "bi-broadcast",
-            "url_name": "learning:teacher_classrooms",
-            "feature": "live_classes",
-        },
-        {
-            "label": "Class Progress",
-            "icon": "bi-graph-up",
-            "url_name": "learning:teacher_classrooms",
-            "feature": "engagement",
-        },
-        {
-            "label": "Class Points",
-            "icon": "bi-award",
-            "url_name": "learning:teacher_classrooms",
-            "feature": "engagement",
+            "children": [
+                {
+                    "label": "Class Feed",
+                    "icon": "bi-megaphone",
+                    "url_name": "learning:feed_home",
+                    "feature": "learning",
+                },
+                {
+                    "label": "Live Classes",
+                    "icon": "bi-broadcast",
+                    "url_name": "learning:teacher_classrooms",
+                    "feature": "live_classes",
+                },
+                {
+                    "label": "Class Progress",
+                    "icon": "bi-graph-up",
+                    "url_name": "learning:teacher_classrooms",
+                    "feature": "engagement",
+                },
+                {
+                    "label": "Class Points",
+                    "icon": "bi-award",
+                    "url_name": "learning:teacher_classrooms",
+                    "feature": "engagement",
+                },
+            ],
         },
         {
             "label": "Homework",
@@ -395,30 +397,32 @@ NAVIGATION: dict[str, list[dict]] = {
             "icon": "bi-bookshelf",
             "url_name": "learning:classrooms",
             "feature": "learning",
-        },
-        {
-            "label": "Class Feed",
-            "icon": "bi-megaphone",
-            "url_name": "learning:feed_home",
-            "feature": "learning",
-        },
-        {
-            "label": "My Progress",
-            "icon": "bi-graph-up-arrow",
-            "url_name": "learning:student_progress",
-            "feature": "engagement",
-        },
-        {
-            "label": "My Badges",
-            "icon": "bi-award",
-            "url_name": "learning:student_badges",
-            "feature": "engagement",
-        },
-        {
-            "label": "Class Calendar",
-            "icon": "bi-calendar3",
-            "url_name": "learning:classrooms",
-            "feature": "live_classes",
+            "children": [
+                {
+                    "label": "Class Feed",
+                    "icon": "bi-megaphone",
+                    "url_name": "learning:feed_home",
+                    "feature": "learning",
+                },
+                {
+                    "label": "My Progress",
+                    "icon": "bi-graph-up-arrow",
+                    "url_name": "learning:student_progress",
+                    "feature": "engagement",
+                },
+                {
+                    "label": "My Badges",
+                    "icon": "bi-award",
+                    "url_name": "learning:student_badges",
+                    "feature": "engagement",
+                },
+                {
+                    "label": "Class Calendar",
+                    "icon": "bi-calendar3",
+                    "url_name": "learning:classrooms",
+                    "feature": "live_classes",
+                },
+            ],
         },
         {
             "label": "My Results",
