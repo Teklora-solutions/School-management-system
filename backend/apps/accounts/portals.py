@@ -30,6 +30,11 @@ class Portal:
     icon: str
     self_reset: bool
 
+    @property
+    def uses_email(self) -> bool:
+        """Staff sign in with an email. Students and parents do not."""
+        return self.role not in {User.Role.STUDENT, User.Role.PARENT}
+
 
 PORTALS: dict[str, Portal] = {
     portal.slug: portal
@@ -41,7 +46,7 @@ PORTALS: dict[str, Portal] = {
             heading="Administration Portal",
             blurb="Full control of students, results, fees and staff accounts.",
             field_label="Email address",
-            placeholder="you@school.edu",
+            placeholder="Enter your email address",
             credential="your staff email address",
             icon="bi-shield-lock-fill",
             self_reset=False,
@@ -53,7 +58,7 @@ PORTALS: dict[str, Portal] = {
             heading="Director Portal",
             blurb="Read-only oversight: enrolment, results, attendance and books.",
             field_label="Email address",
-            placeholder="you@school.edu",
+            placeholder="Enter your email address",
             credential="your staff email address",
             icon="bi-briefcase-fill",
             self_reset=False,
@@ -65,7 +70,7 @@ PORTALS: dict[str, Portal] = {
             heading="Finance Portal",
             blurb="Fee structures, invoicing, payments and the ledger.",
             field_label="Email address",
-            placeholder="you@school.edu",
+            placeholder="Enter your email address",
             credential="your staff email address",
             icon="bi-cash-stack",
             self_reset=False,
@@ -77,7 +82,7 @@ PORTALS: dict[str, Portal] = {
             heading="Teacher Portal",
             blurb="Your classes, results sheets and homework.",
             field_label="Email address",
-            placeholder="you@school.edu",
+            placeholder="Enter your email address",
             credential="your staff email address",
             icon="bi-pencil-square",
             self_reset=False,
@@ -89,9 +94,8 @@ PORTALS: dict[str, Portal] = {
             heading="Student Portal",
             blurb="Your classes, results, homework and fee statement.",
             field_label="Admission number",
-            placeholder="e.g. adm_2025_014",
-            credential="the admission number we issued, written with underscores "
-            "instead of slashes",
+            placeholder="Enter your admission number",
+            credential="the admission number on your letter, such as ADM/2026/014",
             icon="bi-mortarboard-fill",
             self_reset=True,
         ),
@@ -102,8 +106,8 @@ PORTALS: dict[str, Portal] = {
             heading="Parent Portal",
             blurb="Follow your children's progress and fees.",
             field_label="Username",
-            placeholder="the username from your welcome email",
-            credential="the username given to you at enrolment",
+            placeholder="Enter your username",
+            credential="the username from your welcome email",
             icon="bi-people-fill",
             self_reset=True,
         ),

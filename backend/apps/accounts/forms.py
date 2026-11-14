@@ -19,7 +19,7 @@ class LoginForm(AuthenticationForm):
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
-                "placeholder": "Staff email  or  Student admission no.",
+                "placeholder": "Enter your email address",
                 "autofocus": True,
                 "id": "id_login_username",
                 "autocomplete": "username",
@@ -30,8 +30,9 @@ class LoginForm(AuthenticationForm):
         widget=forms.PasswordInput(
             attrs={
                 "class": "form-control",
-                "placeholder": "Password",
+                "placeholder": "Enter your password",
                 "id": "id_login_password",
+                "autocomplete": "current-password",
             }
         )
     )

@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Sign in to the {{ portal.heading }} at {{ SCHOOL_NAME }}.">
   <title>{{ portal.heading }} Sign In | {{ SCHOOL_NAME }}</title>
   <link rel="stylesheet" href="{% static 'vendor/bootstrap/5.3.3/bootstrap.min.css' %}">
@@ -14,120 +14,94 @@
 <body data-role="{{ portal.slug }}">
 
 <div class="login-page">
-  <div class="login-card">
+  {% include "partials/_messages.html" %}
 
-    {# Logo / Brand #}
-    <div class="login-logo">
-      <div class="login-logo-icon">
-        <i class="bi {{ portal.icon }}" aria-hidden="true" style="color:#fff;"></i>
+  <div class="login-stage">
+    <aside class="login-aside">
+      <div class="login-logo-icon" aria-hidden="true">
+        <i class="bi {{ portal.icon }}"></i>
       </div>
-      <h1 style="font-size:1.5rem;margin-bottom:0.25rem;">{{ portal.heading }}</h1>
-      <p style="color:var(--color-muted);font-size:0.875rem;">{{ SCHOOL_NAME }}</p>
-    </div>
+      <p class="login-kicker">{{ SCHOOL_NAME }}</p>
+      <h1>{{ portal.heading }}</h1>
+      <p class="login-aside__blurb">{{ portal.blurb }}</p>
+      <p class="login-aside__hint">Sign in with {{ portal.credential }}.</p>
+    </aside>
 
-    <h2 style="font-size:1.1rem;font-weight:700;text-align:center;margin-bottom:1.75rem;">
-      Sign in to your account
-    </h2>
+    <section class="login-panel">
+      <h2>Sign in</h2>
 
-    {# Non-field errors (wrong credentials / lockout) #}
-    {% if form.non_field_errors %}
-    <div class="alert alert-danger" role="alert" style="background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.3);color:#fca5a5;border-radius:var(--radius-sm);">
-      <i class="bi bi-exclamation-triangle-fill me-2"></i>
-      {% for error in form.non_field_errors %}{{ error }}{% endfor %}
-    </div>
-    {% endif %}
-
-    <form method="post" id="login-form" novalidate>
-      {% csrf_token %}
-
-      {# Credential field — what goes in the box differs by portal #}
-      <div class="mb-3">
-        <label for="id_login_username" class="form-label">{{ portal.field_label }}</label>
-        {{ form.username }}
-        <div style="font-size:0.75rem;color:var(--color-muted);margin-top:0.35rem;">
-          <i class="bi bi-info-circle me-1"></i>
-          Sign in with {{ portal.credential }}.
-        </div>
-        {% if form.username.errors %}
-          <div class="invalid-feedback d-block" style="color:var(--color-danger);">
-            {{ form.username.errors.0 }}
-          </div>
-        {% endif %}
+      {% if form.non_field_errors %}
+      <div class="login-alert" role="alert">
+        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+        <span>{% for error in form.non_field_errors %}{{ error }}{% endfor %}</span>
       </div>
-
-      {# Password #}
-      <div class="mb-4">
-        <label for="id_login_password" class="form-label">Password</label>
-        <div class="position-relative">
-          {{ form.password }}
-          <button type="button" id="toggle-password"
-                  style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--color-muted);cursor:pointer;padding:0;"
-                  aria-label="Toggle password visibility">
-            <i class="bi bi-eye" id="pw-eye-icon"></i>
-          </button>
-        </div>
-        {% if form.password.errors %}
-          <div class="invalid-feedback d-block" style="color:var(--color-danger);">
-            {{ form.password.errors.0 }}
-          </div>
-        {% endif %}
-      </div>
-
-      <button type="submit" class="btn btn-primary w-100 py-2" id="login-submit-btn"
-              style="font-weight:700;letter-spacing:0.02em;">
-        <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
-      </button>
-    </form>
-
-    {# Password recovery — only students and parents may self-reset #}
-    <div style="text-align:center;margin-top:1.5rem;font-size:0.8125rem;color:var(--color-muted);">
-      {% if portal.self_reset %}
-        <p class="mb-0">
-          Forgot your password?
-          <a href="{% url 'password_reset' %}" style="color:var(--accent-light);">Reset it here</a>
-        </p>
-      {% else %}
-        <p class="mb-0" style="font-size:0.75rem;opacity:0.75;">
-          Forgot your password? The school administrator resets staff passwords.
-        </p>
       {% endif %}
-    </div>
 
-    <hr style="margin:1.5rem 0;border-color:var(--color-border);">
+      <form method="post" id="login-form" novalidate>
+        {% csrf_token %}
 
-    <p style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-muted);margin-bottom:0.5rem;">
-      Not your portal?
-    </p>
-    <div class="d-flex flex-wrap gap-2">
-      {% for other in other_portals %}
-        <a class="btn btn-sm btn-outline-secondary"
-           href="{% url 'accounts:role_login' other.slug %}{% if next %}?next={{ next|urlencode }}{% endif %}">{{ other.label }}</a>
-      {% endfor %}
-    </div>
+        <div class="login-field">
+          <label for="id_login_username">{{ portal.field_label }}</label>
+          {{ form.username }}
+          {% if form.username.errors %}
+            <p class="login-field__error">{{ form.username.errors.0 }}</p>
+          {% endif %}
+        </div>
 
-    <p style="text-align:center;margin-top:1.25rem;font-size:0.8125rem;">
-      <a href="{% url 'accounts:login' %}" style="color:var(--color-muted);">
-        <i class="bi bi-arrow-left me-1"></i>All portals
-      </a>
-    </p>
+        <div class="login-field">
+          <label for="id_login_password">Password</label>
+          <div class="login-password">
+            {{ form.password }}
+            <button type="button" id="toggle-password" class="login-password__toggle" aria-label="Show password">
+              <i class="bi bi-eye" id="pw-eye-icon" aria-hidden="true"></i>
+            </button>
+          </div>
+          {% if form.password.errors %}
+            <p class="login-field__error">{{ form.password.errors.0 }}</p>
+          {% endif %}
+        </div>
 
+        <button type="submit" class="btn btn-primary login-submit" id="login-submit-btn">
+          Sign in
+        </button>
+      </form>
+
+      <p class="login-recover">
+        {% if portal.self_reset %}
+          Forgot your password?
+          <a href="{% url 'password_reset' %}">Reset it here</a>
+        {% else %}
+          Forgot your password? Ask the school administrator to reset it.
+        {% endif %}
+      </p>
+
+      <div class="login-switch">
+        <p class="login-switch__label">Not your portal?</p>
+        <div class="login-switch__links">
+          {% for other in other_portals %}
+            <a href="{% url 'accounts:role_login' other.slug %}{% if next %}?next={{ next|urlencode }}{% endif %}">{{ other.label }}</a>
+          {% endfor %}
+        </div>
+        <a class="login-back" href="{% url 'accounts:login' %}">
+          <i class="bi bi-arrow-left" aria-hidden="true"></i> All portals
+        </a>
+      </div>
+    </section>
   </div>
 </div>
-
-{% include "partials/_messages.html" %}
 
 <script src="{% static 'vendor/bootstrap/5.3.3/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'js/base.js' %}"></script>
 <script>
-  /* Password visibility toggle */
-  const toggleBtn  = document.getElementById('toggle-password');
-  const pwField    = document.getElementById('id_login_password');
-  const eyeIcon    = document.getElementById('pw-eye-icon');
+  const toggleBtn = document.getElementById('toggle-password');
+  const pwField = document.getElementById('id_login_password');
+  const eyeIcon = document.getElementById('pw-eye-icon');
 
   toggleBtn?.addEventListener('click', () => {
-    const isText = pwField.type === 'text';
-    pwField.type = isText ? 'password' : 'text';
-    eyeIcon.className = isText ? 'bi bi-eye' : 'bi bi-eye-slash';
+    const showing = pwField.type === 'text';
+    pwField.type = showing ? 'password' : 'text';
+    eyeIcon.className = showing ? 'bi bi-eye' : 'bi bi-eye-slash';
+    toggleBtn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
   });
 </script>
 </body>

@@ -119,7 +119,15 @@ class RoleLoginView(View):
     def _form(self, request, portal, data=None):
         """The shared form, with this portal's credential wording applied."""
         form = LoginForm(request, data=data)
-        form.fields["username"].widget.attrs["placeholder"] = portal.placeholder
+        widget = form.fields["username"].widget
+        widget.attrs["placeholder"] = portal.placeholder
+        widget.attrs["autocomplete"] = "email" if portal.uses_email else "username"
+        widget.attrs["inputmode"] = "email" if portal.uses_email else "text"
+        widget.attrs["autocapitalize"] = "none"
+        widget.attrs["spellcheck"] = "false"
+        # HTML type only. The field stays a plain text field on the server so a
+        # superuser username is still accepted; the form itself is novalidate.
+        widget.input_type = "email" if portal.uses_email else "text"
         return form
 
     def _ctx(self, request, portal, form, next_url):

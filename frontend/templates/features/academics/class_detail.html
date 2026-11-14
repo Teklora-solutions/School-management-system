@@ -28,9 +28,9 @@
       <div class="card-body">
         <dl class="row mb-0">
           <dt class="col-6 text-muted-sm">Academic Year</dt>
-          <dd class="col-6">{{ school_class.academic_year.name }}</dd>
+          <dd class="col-6 fw-600">{{ school_class.academic_year.name }}</dd>
           <dt class="col-6 text-muted-sm">Class Teacher</dt>
-          <dd class="col-6">
+          <dd class="col-6 fw-600">
             {{ school_class.class_teacher.get_full_name|default:"Not assigned" }}
           </dd>
         </dl>
