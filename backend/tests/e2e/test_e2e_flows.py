@@ -437,16 +437,19 @@ class E2E6FailureBehaviourTests(TestCase):
         )
         self.assertTrue(Payment.objects.filter(pk=payment.pk).exists())
 
-        # PDF failure is logged and reported as a 503 — never disguised as
-        # printable HTML. Inject a fake module so this never imports the real
-        # WeasyPrint native libraries.
+        # When neither PDF engine can make a document, the failure is logged
+        # and reported as a 503 — never disguised as printable HTML. Inject a
+        # fake module so this never imports the real WeasyPrint native
+        # libraries, and disable the Chromium fallback.
         def _broken_html(**_kwargs):
             raise RuntimeError("PDF engine down")
 
         self.client.force_login(self.student.user)
         with patch.dict(
             sys.modules, {"weasyprint": SimpleNamespace(HTML=_broken_html)}
-        ), self.assertLogs("apps.core.pdf", "ERROR"):
+        ), patch("apps.core.pdf._find_browser", return_value=None), self.assertLogs(
+            "apps.core.pdf", "ERROR"
+        ):
             response = self.client.get(
                 reverse(
                     "results:report_card_pdf",

@@ -160,7 +160,9 @@ class DirectorPdfExportTests(DirectorExportTestBase):
         self.assertEqual(response["Content-Type"], "application/pdf")
 
     def test_books_pdf_fails_loudly_when_the_engine_cannot_render(self):
-        with _broken, self.assertLogs("apps.core.pdf", "ERROR"):
+        with _broken, patch(
+            "apps.core.pdf._find_browser", return_value=None
+        ), self.assertLogs("apps.core.pdf", "ERROR"):
             response = self.client.get(reverse("dashboards:director_export_books_pdf"))
         self.assertEqual(response.status_code, 503)
         self.assertIn("text/plain", response["Content-Type"])
