@@ -97,6 +97,14 @@ class Homework(BaseModel):
         blank=True,
         help_text="Set when marks for the whole class were released to students.",
     )
+    counts_for_gradebook = models.BooleanField(
+        default=False,
+        help_text=(
+            "Tick to let this homework's marks feed the teacher's gradebook. "
+            "Off by default: existing homework does not affect an average until "
+            "the teacher chooses it."
+        ),
+    )
 
     class Meta:
         db_table = "homework_homework"

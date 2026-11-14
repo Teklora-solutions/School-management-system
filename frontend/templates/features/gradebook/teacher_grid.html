@@ -1,0 +1,260 @@
+{% extends base_template %}
+
+{% block title %}{{ school_class.name }} · {{ subject.name }} Gradebook | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .gb-scroll { max-height: 72vh; overflow: auto; }
+  .gb-grid { font-size: .84rem; margin-bottom: 0; }
+  .gb-grid th, .gb-grid td { white-space: nowrap; vertical-align: middle; }
+  .gb-grid thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--color-surface-2, #1c2330);
+    border-bottom: 1px solid var(--color-border, #333c4d);
+  }
+  .gb-grid .gb-name {
+    position: sticky; left: 0; z-index: 3;
+    background: var(--color-surface-2, #1c2330);
+    min-width: 190px; max-width: 240px;
+    white-space: normal;
+  }
+  .gb-grid thead .gb-name { z-index: 4; }
+  .gb-item-title { display: block; max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
+  .gb-item-meta { display: block; font-weight: 400; font-size: .7rem; opacity: .7; }
+  .gb-missing { background: rgba(220, 53, 69, .16); color: #ffb3ba; }
+  .gb-excused { background: rgba(108, 117, 125, .18); color: var(--color-muted, #9aa4b2); font-style: italic; }
+  .gb-bucket { background: rgba(255, 255, 255, .04); font-weight: 600; }
+  .gb-overall { font-weight: 700; font-size: .92rem; }
+  .gb-legend span { display: inline-flex; align-items: center; gap: .35rem; margin-right: 1rem; }
+  .gb-swatch { width: .8rem; height: .8rem; border-radius: .2rem; display: inline-block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-table me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        {{ school_class.name }}{% if assignment.stream %} · {{ assignment.stream.name }}{% endif %} — {{ subject.name }}
+      </h1>
+      <p class="page-subtitle">
+        {{ assignment.academic_year.name }} · Gradebook
+        {% if latest_release %}
+        <span class="badge bg-success-subtle text-success border border-success-subtle ms-2">
+          <i class="bi bi-send-check me-1" aria-hidden="true"></i>Released v{{ latest_release.version }} · {{ latest_release.created_at|date:"j M" }}
+        </span>
+        {% endif %}
+        {% if grid.term_locked %}
+        <span class="badge bg-warning text-dark ms-2"><i class="bi bi-lock me-1" aria-hidden="true"></i>Term locked</span>
+        {% endif %}
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if setup %}
+      <a href="{% url 'gradebook:teacher_release' setup.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-send me-1" aria-hidden="true"></i>Release
+      </a>
+      <a href="{% url 'gradebook:teacher_setup' setup.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-sliders me-1" aria-hidden="true"></i>Weights &amp; manual work
+      </a>
+      <a href="{% url 'gradebook:teacher_export' setup.pk 'csv' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>CSV
+      </a>
+      <a href="{% url 'gradebook:teacher_export' setup.pk 'xlsx' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel
+      </a>
+      {% endif %}
+      <a href="{% url 'gradebook:teacher_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All classrooms
+      </a>
+    </div>
+  </div>
+</div>
+
+{% if no_terms %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-calendar-x fs-1 d-block mb-2" aria-hidden="true"></i>
+    This academic year has no terms yet. A term is needed before a gradebook can exist.
+  </div>
+</div>
+{% else %}
+
+{# Term switcher #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex align-items-end flex-wrap gap-2">
+      <div>
+        <label for="id_term" class="text-muted-sm mb-1 d-block">Term</label>
+        <select name="term" id="id_term" class="form-select form-select-sm" style="min-width:180px;">
+          {% for t in terms %}
+          <option value="{{ t.pk }}" {% if t.pk == term.pk %}selected{% endif %}>
+            {{ t.get_name_display }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Show
+      </button>
+    </form>
+  </div>
+</div>
+
+{# Summary #}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ grid.roster_size }}</div>
+        <div class="stat-label">Pupils</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-bar-chart" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{% if grid.class_average is not None %}{{ grid.class_average|floatformat:1 }}%{% else %}—{% endif %}</div>
+        <div class="stat-label">Class average</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value {% if grid.missing_total %}text-danger{% endif %}">{{ grid.missing_total }}</div>
+        <div class="stat-label">Missing marks</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-check2-square" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ grid.scored_total }}</div>
+        <div class="stat-label">Marks counted</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Weights in use #}
+{% if grid.has_items %}
+<div class="card mb-3">
+  <div class="card-body py-3 d-flex flex-wrap gap-2 align-items-center">
+    <span class="text-muted-sm me-2">Weights in use:</span>
+    {% for bucket in grid.buckets %}
+    <span class="badge bg-secondary-subtle text-light border border-secondary-subtle">
+      {{ bucket.label }} {{ bucket.effective_weight|floatformat:1 }}%
+      <span class="fw-normal opacity-75">(set {{ bucket.weight }}%)</span>
+    </span>
+    {% endfor %}
+    {% if grid.term_locked %}
+    <span class="text-muted-sm ms-auto">
+      <i class="bi bi-lock me-1" aria-hidden="true"></i>This term is locked; marks show read-only.
+    </span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if not grid.has_items %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-inboxes fs-1 d-block mb-2" aria-hidden="true"></i>
+    <div class="fw-600 mb-1">Nothing is counted for this term yet.</div>
+    <p class="mb-0">
+      Tick <strong>Count towards the gradebook</strong> on a published homework or quiz,
+      or add a hand-recorded item, and it will appear here as a column.
+    </p>
+  </div>
+</div>
+{% else %}
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive gb-scroll">
+      <table class="table table-sm table-hover gb-grid mb-0">
+        <caption class="px-3 py-2 text-muted-sm">
+          Missing marks are shaded red; excused items are shaded grey and left out of that pupil's average.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" class="gb-name">Pupil</th>
+            {% for item in grid.items %}
+            <th scope="col" title="{{ item.title }}">
+              <span class="gb-item-title">{{ item.title }}</span>
+              <span class="gb-item-meta">{{ item.bucket_label }} · out of {{ item.max_score|floatformat }}</span>
+            </th>
+            {% endfor %}
+            {% for bucket in grid.buckets %}
+            <th scope="col" class="gb-bucket" title="{{ bucket.label }} average — weight {{ bucket.effective_weight|floatformat:1 }}%">
+              {{ bucket.label }}
+              <span class="gb-item-meta">avg · {{ bucket.effective_weight|floatformat:1 }}%</span>
+            </th>
+            {% endfor %}
+            <th scope="col" class="gb-overall">Overall</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in grid.rows %}
+          <tr>
+            <th scope="row" class="gb-name">
+              <span class="fw-600">{{ row.student.user.get_full_name|default:row.student.user.username }}</span>
+              <span class="gb-item-meta">{{ row.student.admission_number }}</span>
+            </th>
+            {% for cell in row.cells_list %}
+              {% if cell.is_excused %}
+              <td class="gb-excused" title="{{ cell.item_title }}: excused">
+                <span aria-label="Excused">Excused</span>
+              </td>
+              {% elif cell.is_missing %}
+              <td class="gb-missing" title="{{ cell.item_title }}: not handed in or not marked">
+                <span aria-label="Missing">—</span>
+              </td>
+              {% else %}
+              <td>{{ cell.display }}</td>
+              {% endif %}
+            {% endfor %}
+            {% for pct in row.bucket_values %}
+            <td class="gb-bucket">
+              {% if pct is not None %}{{ pct|floatformat:1 }}%{% else %}<span class="text-muted-sm">—</span>{% endif %}
+            </td>
+            {% endfor %}
+            <td class="gb-overall">
+              {% if row.overall_pct is not None %}{{ row.overall_pct|floatformat:1 }}%{% else %}<span class="text-muted-sm">—</span>{% endif %}
+              {% if row.missing_count %}
+              <span class="text-danger ms-1" title="{{ row.missing_count }} missing mark{{ row.missing_count|pluralize }}">
+                <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                <span class="visually-hidden">{{ row.missing_count }} missing</span>
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="{{ grid.colspan }}" class="text-center text-muted-sm py-4">
+              No pupils are enrolled in this class yet.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-body py-3 gb-legend text-muted-sm d-flex flex-wrap">
+    <span><i class="gb-swatch gb-missing" aria-hidden="true"></i>Missing — counts as zero</span>
+    <span><i class="gb-swatch gb-excused" aria-hidden="true"></i>Excused — left out for that pupil</span>
+    <span><i class="gb-swatch" style="background:rgba(255,255,255,.12);" aria-hidden="true"></i>Bucket average</span>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock content %}

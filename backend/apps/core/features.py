@@ -59,6 +59,13 @@ FEATURES: dict[str, dict[str, str]] = {
             "Available once the school switches on homework marking."
         ),
     },
+    "gradebook": {
+        "label": "Gradebook",
+        "field": "gradebook_enabled",
+        "disabled_message": (
+            "Available once the Gradebook module is activated."
+        ),
+    },
 }
 
 

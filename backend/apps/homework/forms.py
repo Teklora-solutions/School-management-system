@@ -95,6 +95,15 @@ class HomeworkForm(forms.Form):
             "are ready to mark the work."
         ),
     )
+    counts_for_gradebook = forms.BooleanField(
+        required=False,
+        label="Count towards the gradebook",
+        help_text=(
+            "Off by default. Tick to let this homework's marks feed the "
+            "class average once the work is marked and published."
+        ),
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
 
     def __init__(
         self,
@@ -139,6 +148,9 @@ class HomeworkForm(forms.Form):
             self.initial.setdefault("description", instance.description)
             self.initial.setdefault("due_date", instance.due_date)
             self.initial.setdefault("max_score", instance.max_score)
+            self.initial.setdefault(
+                "counts_for_gradebook", instance.counts_for_gradebook
+            )
         elif not self.is_bound and self.current_term is not None:
             self.initial.setdefault("term", self.current_term.pk)
 

@@ -1,0 +1,18 @@
+{% extends base_template %}
+
+{% block title %}Gradebook | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-table me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+    Gradebook
+  </h1>
+</div>
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-lock fs-1 d-block mb-2" aria-hidden="true"></i>
+    {{ disabled_message }}
+  </div>
+</div>
+{% endblock content %}

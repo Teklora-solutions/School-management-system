@@ -271,6 +271,14 @@ class SchoolSettings(BaseModel):
             "exactly as it is today until the school switches this on."
         ),
     )
+    gradebook_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Turn on the teacher gradebook: homework, quiz, lab and end-of-term "
+            "marks for one class and subject, with weights chosen by the teacher "
+            "and a release step for pupils and parents. Off by default."
+        ),
+    )
     homework_late_penalty_enabled = models.BooleanField(
         default=False,
         help_text=(

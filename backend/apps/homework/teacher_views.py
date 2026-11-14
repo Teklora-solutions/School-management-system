@@ -186,6 +186,9 @@ class TeacherHomeworkCreateView(TeacherRequiredMixin, View):
                     files=files,
                     publish=publish,
                     max_score=form.cleaned_data.get("max_score"),
+                    counts_for_gradebook=form.cleaned_data.get(
+                        "counts_for_gradebook", False
+                    ),
                     actor=request.user,
                     request=request,
                 )
@@ -260,6 +263,9 @@ class TeacherHomeworkEditView(TeacherRequiredMixin, View):
                     remove_ids=remove_ids,
                     action=action,
                     max_score=form.cleaned_data.get("max_score"),
+                    counts_for_gradebook=form.cleaned_data.get(
+                        "counts_for_gradebook", False
+                    ),
                     actor=request.user,
                     request=request,
                 )

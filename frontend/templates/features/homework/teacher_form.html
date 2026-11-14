@@ -230,6 +230,15 @@
             <div class="form-text text-muted-sm">{{ form.max_score.help_text }}</div>
             {% for error in form.max_score.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
           </div>
+
+          <div class="form-check mt-2">
+            {{ form.counts_for_gradebook }}
+            <label class="form-check-label fw-600" for="id_counts_for_gradebook">
+              {{ form.counts_for_gradebook.label }}
+            </label>
+            <div class="form-text text-muted-sm">{{ form.counts_for_gradebook.help_text }}</div>
+            {% for error in form.counts_for_gradebook.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+          </div>
         </div>
       </div>
 

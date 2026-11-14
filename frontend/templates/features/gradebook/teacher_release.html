@@ -1,0 +1,238 @@
+{% extends base_template %}
+
+{% block title %}Release gradebook · {{ setup.school_class.name }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-send me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Release — {{ setup.school_class.name }}{% if setup.stream %} · {{ setup.stream.name }}{% endif %} {{ setup.subject.name }}
+      </h1>
+      <p class="page-subtitle">
+        {{ setup.term.academic_year.name }} · {{ setup.term.get_name_display }}
+        {% if latest %}
+        <span class="badge bg-success-subtle text-success border border-success-subtle ms-2">
+          <i class="bi bi-send-check me-1" aria-hidden="true"></i>Latest: v{{ latest.version }}
+        </span>
+        {% else %}
+        <span class="badge bg-secondary-subtle text-light border border-secondary-subtle ms-2">Not released yet</span>
+        {% endif %}
+        {% if locked %}
+        <span class="badge bg-warning text-dark ms-2"><i class="bi bi-lock me-1" aria-hidden="true"></i>Term locked</span>
+        {% endif %}
+      </p>
+    </div>
+    <a href="{{ grid_href }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to the grid
+    </a>
+  </div>
+</div>
+
+{% if locked %}
+<div class="alert alert-warning" role="alert">
+  <i class="bi bi-lock me-1" aria-hidden="true"></i>
+  This term's gradebook is locked, so nothing new can be released until an
+  administrator unlocks it. The versions already released stay as they are.
+</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ grid.roster_size }}</div>
+        <div class="stat-label">Pupils</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-bar-chart" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{% if grid.class_average is not None %}{{ grid.class_average|floatformat:1 }}%{% else %}—{% endif %}</div>
+        <div class="stat-label">Class average</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value {% if grid.missing_total %}text-danger{% endif %}">{{ grid.missing_total }}</div>
+        <div class="stat-label">Missing marks</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-send-check" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{% if latest %}v{{ latest.version }}{% else %}—{% endif %}</div>
+        <div class="stat-label">Latest release</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not grid.has_items %}
+<div class="alert alert-secondary" role="alert">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  There is no counted work yet. Tick homework or quizzes for the gradebook, or add
+  hand-recorded work, then come back to release.
+</div>
+{% endif %}
+
+{% if unreleased_homework %}
+<div class="alert alert-warning" role="alert">
+  <i class="bi bi-eye-slash me-1" aria-hidden="true"></i>
+  {% if unreleased_homework == 1 %}
+  1 counted homework task still has marks the families have not been shown.
+  {% else %}
+  {{ unreleased_homework }} counted homework tasks still have marks the families have not been shown.
+  {% endif %}
+  You can release now — each family's gradebook page shows the weighted
+  percentage as it stands, and the individual homework marks stay on the
+  Homework screen until they are released there — or release those marks on the
+  Homework screen first.
+</div>
+{% endif %}
+
+{% if not locked and grid.has_items %}
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-send me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Release version {{ next_version }}
+    </h2>
+  </div>
+  <div class="card-body">
+    <p class="text-muted-sm">
+      Releasing freezes each pupil's numbers exactly as they are now. Families read
+      the newest release only, so every grade they have seen can be reconstructed.
+      {% if latest %}
+      Version {{ latest.version }} was released on {{ latest.created_at|date:"j M Y, H:i" }}{% if latest.released_by %} by
+      {{ latest.released_by.get_full_name|default:latest.released_by.username }}{% endif %}.
+      A correction made now becomes version {{ next_version }}.
+      {% else %}
+      This is the first release for this classroom.
+      {% endif %}
+    </p>
+
+    <form method="post" action="">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger py-2" role="alert">
+        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+      </div>
+      {% endif %}
+      <div class="mb-3">
+        <label class="form-label fw-600" for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
+        {{ form.reason }}
+        {% for error in form.reason.errors %}<div class="text-danger" style="font-size:.8rem;">{{ error }}</div>{% endfor %}
+        {% if latest %}
+        <div class="form-text text-muted-sm">Required. This is what the record shows a family's grade moved.</div>
+        {% endif %}
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-send me-1" aria-hidden="true"></i>Release version {{ next_version }}
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-file-earmark-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Report card
+    </h2>
+  </div>
+  <div class="card-body">
+    {% if exam_sheet %}
+    <p class="text-muted-sm">
+      End-of-term sheet:
+      <strong>{{ exam_sheet.subject.name }}</strong> ·
+      {{ exam_sheet.term.get_name_display }}
+      <span class="badge {% if exam_sheet.status == 'draft' %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning text-dark{% endif %} ms-1">
+        {{ exam_sheet.get_status_display }}
+      </span>
+    </p>
+    {% else %}
+    <p class="text-muted-sm">No end-of-term sheet has been chosen for this gradebook.</p>
+    {% endif %}
+
+    {% if can_send %}
+    <p class="text-muted-sm">
+      Sending copies version {{ latest.version }}'s weighted mark for each pupil onto
+      this sheet, where the school's grade scale turns it into a grade and remark.
+      Marks are only sent while the sheet is a draft.
+    </p>
+    <form method="post" action="{% url 'gradebook:send_to_report_card' setup.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-file-earmark-check me-1" aria-hidden="true"></i>
+        Send final marks to report card
+      </button>
+    </form>
+    {% else %}
+    <div class="alert alert-secondary py-2 mb-2" role="alert">
+      <i class="bi bi-info-circle me-1" aria-hidden="true"></i>{{ send_blocked }}
+    </div>
+    {% if not exam_sheet %}
+    <a href="{% url 'gradebook:teacher_setup' setup.pk %}" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-sliders me-1" aria-hidden="true"></i>Choose the end-of-term sheet
+    </a>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-clock-history me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Recent releases
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    {% if not releases %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-send fs-2 d-block mb-2" aria-hidden="true"></i>
+      Nothing has been released for this classroom yet.
+    </div>
+    {% else %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" style="font-size:.88rem;">
+        <thead>
+          <tr>
+            <th scope="col">Version</th>
+            <th scope="col">Released</th>
+            <th scope="col">By</th>
+            <th scope="col">Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for release in releases %}
+          <tr>
+            <td class="fw-600">v{{ release.version }}</td>
+            <td class="text-muted-sm">{{ release.created_at|date:"j M Y, H:i" }}</td>
+            <td class="text-muted-sm">
+              {% if release.released_by %}{{ release.released_by.get_full_name|default:release.released_by.username }}{% else %}—{% endif %}
+            </td>
+            <td class="text-muted-sm">{{ release.reason|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="p-3 text-muted-sm">
+      Showing the five most recent versions. Older versions stay on record.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

@@ -23,6 +23,7 @@ be traced back to the screen that produced it.
 
 from __future__ import annotations
 
+import csv
 import io
 
 from django.http import HttpResponse
@@ -31,6 +32,7 @@ from django.utils import timezone
 XLSX_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
+CSV_CONTENT_TYPE = "text/csv; charset=utf-8"
 
 #: Prefixes that turn a string into something a spreadsheet may evaluate.
 FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
@@ -101,5 +103,30 @@ def xlsx_response(workbook, filename: str) -> HttpResponse:
     workbook.save(buffer)
     buffer.seek(0)
     response = HttpResponse(buffer.read(), content_type=XLSX_CONTENT_TYPE)
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+def _csv_cell(value):
+    """
+    Literal text for one CSV cell.
+
+    CSV has no cell type to set, so a formula-looking string gets a leading
+    apostrophe — the marker a spreadsheet reads as "this is text". It is the
+    one visible addition to the cell, and the alternative is a name typed by an
+    importer that runs as a formula when somebody opens the download.
+    """
+    if is_formula_like(value):
+        return "'" + value
+    return value
+
+
+def csv_response(rows, filename: str) -> HttpResponse:
+    """Return ``rows`` (an iterable of sequences) as a downloadable CSV."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    for values in rows:
+        writer.writerow([_csv_cell(value) for value in values])
+    response = HttpResponse(buffer.getvalue(), content_type=CSV_CONTENT_TYPE)
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response

@@ -219,6 +219,42 @@ class HomeworkTeacherTests(TestCase):
         self.assertContains(detail, "Do questions 1 to 10.")
         self.assertContains(detail, "worksheet.pdf")
 
+    def test_homework_does_not_count_for_the_gradebook_unless_ticked(self):
+        response = self.client.post(
+            reverse("homework:teacher_create"), self._form_data()
+        )
+        self.assertEqual(response.status_code, 302)
+        homework = Homework.objects.get(title="Fractions worksheet")
+        self.assertFalse(homework.counts_for_gradebook)
+
+    def test_the_gradebook_tick_is_saved_on_create(self):
+        response = self.client.post(
+            reverse("homework:teacher_create"),
+            self._form_data(counts_for_gradebook="on"),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            Homework.objects.get(title="Fractions worksheet").counts_for_gradebook
+        )
+
+    def test_the_gradebook_tick_can_be_turned_off_on_edit(self):
+        homework = self._homework()
+        homework.counts_for_gradebook = True
+        homework.save(update_fields=["counts_for_gradebook"])
+
+        response = self.client.post(
+            reverse("homework:teacher_edit", args=[homework.pk]),
+            self._form_data(
+                title=homework.title,
+                description=homework.description,
+                due_date=homework.due_date.isoformat(),
+                action="save",
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        homework.refresh_from_db()
+        self.assertFalse(homework.counts_for_gradebook)
+
     def test_subject_not_taught_in_that_class_is_refused(self):
         response = self.client.post(
             reverse("homework:teacher_create"),

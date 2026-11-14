@@ -67,6 +67,7 @@ urlpatterns = [
     path("results/", include("apps.results.urls", namespace="results")),
     path("finance/", include("apps.finance.urls", namespace="finance")),
     path("homework/", include("apps.homework.urls", namespace="homework")),
+    path("gradebook/", include("apps.gradebook.urls", namespace="gradebook")),
     path("learning/", include("apps.learning.urls", namespace="learning")),
     path("attendance/", include("apps.attendance.urls", namespace="attendance")),
     path(

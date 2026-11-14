@@ -192,6 +192,7 @@ def school_settings_values(request=None) -> dict:
     values["notification_quiet_hours_enabled"] = (
         row.notification_quiet_hours_enabled if row else False
     )
+    values["gradebook_enabled"] = row.gradebook_enabled if row else False
     values["homework_grading_enabled"] = (
         row.homework_grading_enabled if row else False
     )

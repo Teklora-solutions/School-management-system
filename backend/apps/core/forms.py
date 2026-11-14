@@ -195,6 +195,7 @@ class SchoolSettingsForm(forms.ModelForm):
             "feed_student_starters",
             "homework_grading_enabled",
             "homework_late_penalty_enabled",
+            "gradebook_enabled",
             "logo",
             "address",
             "established_on",

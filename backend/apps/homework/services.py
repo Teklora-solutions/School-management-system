@@ -99,6 +99,7 @@ def _summary(homework: Homework, change: dict | None = None) -> dict:
         "due_date": homework.due_date.isoformat(),
         "attachments": homework.attachments.count(),
         "max_score": str(homework.max_score) if homework.max_score is not None else "",
+        "counts_for_gradebook": homework.counts_for_gradebook,
     }
     if change:
         data.update(change)
@@ -129,6 +130,7 @@ def create_homework(
     files=None,
     publish: bool = False,
     max_score=None,
+    counts_for_gradebook: bool = False,
     actor,
     request=None,
 ) -> Homework:
@@ -137,6 +139,10 @@ def create_homework(
         raise ValidationError("That term is not in the same academic year.")
     files = check_uploads(files or [])
     max_score = _clean_max_score(max_score)
+    if counts_for_gradebook:
+        from apps.gradebook.services import ensure_tick_writable
+
+        ensure_tick_writable(term)
 
     homework = Homework.objects.create(
         title=title,
@@ -148,6 +154,7 @@ def create_homework(
         set_by=actor,
         due_date=due_date,
         max_score=max_score,
+        counts_for_gradebook=counts_for_gradebook,
         status=Homework.Status.PUBLISHED if publish else Homework.Status.DRAFT,
         published_at=timezone.now() if publish else None,
     )
@@ -177,6 +184,7 @@ def update_homework(
     remove_ids=None,
     action: str = "save",
     max_score=None,
+    counts_for_gradebook: bool = False,
     actor,
     request=None,
 ) -> Homework:
@@ -190,6 +198,14 @@ def update_homework(
     """
     if term.academic_year_id != assignment.academic_year_id:
         raise ValidationError("That term is not in the same academic year.")
+
+    old_term = homework.term
+    if homework.counts_for_gradebook != counts_for_gradebook and (
+        homework.counts_for_gradebook or counts_for_gradebook
+    ):
+        from apps.gradebook.services import ensure_tick_writable
+
+        ensure_tick_writable(old_term, term)
 
     remove_ids = {int(pk) for pk in (remove_ids or [])}
     removals = [a for a in homework.attachments.all() if a.pk in remove_ids]
@@ -212,6 +228,7 @@ def update_homework(
     homework.term = term
     homework.due_date = due_date
     homework.max_score = _clean_max_score(max_score)
+    homework.counts_for_gradebook = counts_for_gradebook
     homework.save(
         update_fields=[
             "title",
@@ -222,6 +239,7 @@ def update_homework(
             "term",
             "due_date",
             "max_score",
+            "counts_for_gradebook",
             "status",
             "published_at",
             "updated_at",

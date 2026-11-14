@@ -1,0 +1,110 @@
+{% extends base_template %}
+
+{% block title %}My Gradebook | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-table me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {% if request.user.role == "parent" %}Gradebook{% else %}My Gradebook{% endif %}
+    </h1>
+    <p class="page-subtitle">
+      Shared marks only &mdash; {{ student.user.get_full_name|default:student.user.username }}
+      ({{ student.admission_number }}){% if student.current_class %} · {{ student.current_class.name }}{% endif %}
+    </p>
+  </div>
+</div>
+
+{% if terms %}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <span class="text-muted-sm me-1"><i class="bi bi-calendar3 me-1"></i>Term:</span>
+      {% for term in terms %}
+      <a href="?term={{ term.pk }}"
+         class="btn btn-sm {% if selected_term.pk == term.pk %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        {{ term.get_name_display }} ({{ term.academic_year.name }})
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if rows %}
+<div class="row g-3">
+  {% for row in rows %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h2 style="font-size:1rem;font-weight:600;margin-bottom:0;">
+            {{ row.setup.subject.name }}
+            {% if row.setup.stream %}
+            <span class="badge bg-secondary-subtle text-light border border-secondary-subtle ms-1" style="font-size:.65rem;">{{ row.setup.stream.name }}</span>
+            {% endif %}
+          </h2>
+          <span class="badge {% if row.result.overall_pct is None %}bg-secondary{% elif row.result.overall_pct >= 80 %}bg-success{% elif row.result.overall_pct >= 60 %}bg-primary{% elif row.result.overall_pct >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}" style="font-size:.9rem;">
+            {% if row.result.overall_pct is not None %}{{ row.result.overall_pct|floatformat:1 }}%{% else %}No mark{% endif %}
+          </span>
+        </div>
+
+        {% if row.buckets %}
+        <div class="mb-2">
+          {% for bucket in row.buckets %}
+          <div class="d-flex justify-content-between text-muted-sm py-1" style="border-bottom:1px solid var(--color-border);">
+            <span>{{ bucket.label }}</span>
+            <span class="fw-600">{% if bucket.pct is not None %}{{ bucket.pct|floatformat:1 }}%{% else %}—{% endif %}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted-sm mb-2">No counted work in this subject yet.</p>
+        {% endif %}
+
+        <div class="mt-auto d-flex justify-content-between align-items-end flex-wrap gap-2">
+          <div class="text-muted-sm" style="font-size:.75rem;">
+            {% if row.result.missing_count %}
+            <span class="text-danger"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ row.result.missing_count }} missing</span>
+            {% endif %}
+            {% if row.result.excused_count %}
+            <span class="ms-1">{{ row.result.excused_count }} excused</span>
+            {% endif %}
+          </div>
+          <span class="text-muted-sm" style="font-size:.72rem;">
+            v{{ row.release.version }} · {{ row.release.created_at|date:"j M Y" }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card mt-3">
+  <div class="card-body py-3 text-muted-sm">
+    <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+    These are the marks your teachers released. If a mark is corrected, the teacher
+    releases a new version and the newest one replaces the figure above.
+  </div>
+</div>
+
+{% elif has_releases %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-hourglass fs-1 d-block mb-2" aria-hidden="true"></i>
+    No gradebook marks have been shared for this term.
+  </div>
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-hourglass fs-1 d-block mb-2" aria-hidden="true"></i>
+    <div class="fw-600 mb-1">No gradebook marks have been shared with you yet.</div>
+    <p class="mb-0">Marks appear here once a teacher releases them. Check back later in the term.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

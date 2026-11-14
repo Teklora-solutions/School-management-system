@@ -12,6 +12,7 @@ apostrophe prepended to "fix" it.
 
 from __future__ import annotations
 
+import csv
 import io
 import zipfile
 from datetime import date
@@ -21,8 +22,10 @@ from django.test import SimpleTestCase
 from openpyxl import Workbook, load_workbook
 
 from apps.core.exports import (
+    CSV_CONTENT_TYPE,
     XLSX_CONTENT_TYPE,
     append_rows,
+    csv_response,
     format_column_widths,
     is_formula_like,
     stamp_document,
@@ -162,3 +165,21 @@ class XlsxResponseTests(SimpleTestCase):
             'attachment; filename="class_performance.xlsx"',
         )
         self.assertTrue(response.content[:2] == b"PK")
+
+
+class CsvResponseTests(SimpleTestCase):
+    def test_rows_are_returned_as_a_download(self):
+        response = csv_response([["Name", "Mark"], ["Ama", 75]], "grid.csv")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], CSV_CONTENT_TYPE)
+        self.assertEqual(
+            response["Content-Disposition"], 'attachment; filename="grid.csv"'
+        )
+        self.assertEqual(response.content.decode().splitlines()[1], "Ama,75")
+
+    def test_formula_looking_text_is_marked_as_text(self):
+        response = csv_response([["=1+1", "-2+3", "Ama"]], "grid.csv")
+        row = next(csv.reader(response.content.decode().splitlines()))
+        self.assertEqual(row[0], "'=1+1")
+        self.assertEqual(row[1], "'-2+3")
+        self.assertEqual(row[2], "Ama")

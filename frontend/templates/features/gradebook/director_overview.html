@@ -1,0 +1,163 @@
+{% extends base_template %}
+
+{% block title %}Gradebook overview | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-table me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Gradebook overview
+      </h1>
+      <p class="page-subtitle">
+        Released gradebooks only &mdash; class and subject figures, never pupil names.
+      </p>
+    </div>
+    {% if term and has_rows %}
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'gradebook:director_export' 'csv' %}?term={{ term.pk }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>CSV
+      </a>
+      <a href="{% url 'gradebook:director_export' 'xlsx' %}?term={{ term.pk }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if not terms %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-inboxes fs-1 d-block mb-2" aria-hidden="true"></i>
+    No gradebook has been set up for any term yet.
+  </div>
+</div>
+{% else %}
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex align-items-end flex-wrap gap-2">
+      <div>
+        <label for="id_term" class="text-muted-sm mb-1 d-block">Term</label>
+        <select name="term" id="id_term" class="form-select form-select-sm" style="min-width:200px;">
+          {% for t in terms %}
+          <option value="{{ t.pk }}" {% if t.pk == term.pk %}selected{% endif %}>
+            {{ t.get_name_display }} ({{ t.academic_year.name }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Show
+      </button>
+    </form>
+  </div>
+</div>
+
+{% if summary %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-easel2" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ summary.classrooms }}<small style="font-size:.55em;"> / {{ summary.classrooms_total }}</small></div>
+        <div class="stat-label">Released classrooms</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ summary.pupils }}</div>
+        <div class="stat-label">Pupil results</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-bar-chart" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{% if summary.average is not None %}{{ summary.average|floatformat:1 }}%{% else %}—{% endif %}</div>
+        <div class="stat-label">Average mark</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></div>
+      <div class="stat-body">
+        <div class="stat-value {% if summary.missing %}text-danger{% endif %}">{{ summary.missing }}</div>
+        <div class="stat-label">Missing marks</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if not has_rows %}
+<div class="card">
+  <div class="card-body text-center p-5 text-muted-sm">
+    <i class="bi bi-hourglass fs-1 d-block mb-2" aria-hidden="true"></i>
+    <div class="fw-600 mb-1">No classroom in this term has released a gradebook yet.</div>
+    {% if summary.not_released %}
+    <p class="mb-0">{{ summary.not_released }} classroom{{ summary.not_released|pluralize }} set up, waiting for the teacher's release.</p>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" style="font-size:.88rem;">
+        <thead>
+          <tr>
+            <th scope="col">Class</th>
+            <th scope="col">Subject</th>
+            <th scope="col" class="text-center">Pupils</th>
+            <th scope="col" class="text-center">Average</th>
+            <th scope="col" class="text-center">Missing</th>
+            <th scope="col" class="text-center">Released</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="fw-600">
+              {{ row.setup.school_class.name }}{% if row.setup.stream %} · {{ row.setup.stream.name }}{% endif %}
+            </td>
+            <td>{{ row.setup.subject.name }}</td>
+            <td class="text-center">{{ row.pupils }}</td>
+            <td class="text-center">
+              {% if row.average is not None %}
+              <span class="fw-600">{{ row.average|floatformat:1 }}%</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              {% if row.missing %}
+              <span class="text-danger">{{ row.missing }}{% if row.missing_rate is not None %} <span class="text-muted-sm">({{ row.missing_rate|floatformat:1 }}%)</span>{% endif %}</span>
+              {% else %}
+              <span class="text-muted-sm">0</span>
+              {% endif %}
+            </td>
+            <td class="text-center text-muted-sm">
+              v{{ row.release.version }} · {{ row.release.created_at|date:"j M Y" }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% if summary.not_released %}
+<div class="alert alert-secondary mt-3" role="alert">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  {{ summary.not_released }} classroom{{ summary.not_released|pluralize }} in this term {{ summary.not_released|pluralize:"has,have" }} not released a gradebook yet, so {{ summary.not_released|pluralize:"it is,they are" }} not in this table.
+</div>
+{% endif %}
+{% endif %}
+{% endif %}
+{% endblock content %}

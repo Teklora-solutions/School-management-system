@@ -1,0 +1,105 @@
+{% extends base_template %}
+
+{% block title %}Gradebook term locks | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-lock me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Gradebook term locks
+    </h1>
+    <p class="page-subtitle">
+      Locking a term freezes every classroom's gradebook in it: no weight changes,
+      hand-recorded marks, ticks, excuses or new releases. Result sheets, marks entry
+      and the homework screens keep their own locks and are not affected.
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if not rows %}
+    <div class="p-4 text-center text-muted-sm">
+      <i class="bi bi-calendar-x fs-2 d-block mb-2" aria-hidden="true"></i>
+      No terms exist yet. Create a term under Academics first.
+    </div>
+    {% else %}
+    <div class="table-responsive">
+      <table class="table align-middle mb-0" style="font-size:.88rem;">
+        <thead>
+          <tr>
+            <th scope="col">Term</th>
+            <th scope="col">Gradebooks</th>
+            <th scope="col">State</th>
+            <th scope="col">Locked</th>
+            <th scope="col" style="min-width:260px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>
+              <span class="fw-600">{{ row.term.get_name_display }}</span>
+              <span class="text-muted-sm d-block" style="font-size:.75rem;">{{ row.term.academic_year.name }}</span>
+            </td>
+            <td class="text-muted-sm">
+              {% if row.gradebook_count %}
+              {{ row.gradebook_count }} started
+              {% else %}
+              None yet
+              {% endif %}
+            </td>
+            <td>
+              {% if row.lock and row.lock.is_locked %}
+              <span class="badge bg-warning text-dark">
+                <i class="bi bi-lock me-1" aria-hidden="true"></i>Locked
+              </span>
+              {% else %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle">
+                <i class="bi bi-unlock me-1" aria-hidden="true"></i>Open
+              </span>
+              {% endif %}
+            </td>
+            <td class="text-muted-sm">
+              {% if row.lock and row.lock.is_locked %}
+                {% if row.lock.locked_by %}{{ row.lock.locked_by.get_full_name|default:row.lock.locked_by.username }}{% endif %}
+                {% if row.lock.locked_at %}<span class="d-block" style="font-size:.75rem;">{{ row.lock.locked_at|date:"j M Y, H:i" }}</span>{% endif %}
+                {% if row.lock.reason %}<span class="d-block" style="font-size:.75rem;">“{{ row.lock.reason }}”</span>{% endif %}
+              {% else %}
+              —
+              {% endif %}
+            </td>
+            <td>
+              <form method="post" action="" class="d-flex gap-2 flex-wrap align-items-center">
+                {% csrf_token %}
+                <input type="hidden" name="term_id" value="{{ row.term.pk }}">
+                <input type="text" name="reason" class="form-control form-control-sm"
+                       style="max-width:190px;" maxlength="200"
+                       placeholder="Reason (optional)"
+                       aria-label="Reason for changing the lock on {{ row.term.academic_year.name }} {{ row.term.get_name_display }}">
+                {% if row.lock and row.lock.is_locked %}
+                <button type="submit" name="action" value="unlock" class="btn btn-sm btn-outline-warning">
+                  <i class="bi bi-unlock me-1" aria-hidden="true"></i>Unlock
+                </button>
+                {% else %}
+                <button type="submit" name="action" value="lock" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-lock me-1" aria-hidden="true"></i>Lock
+                </button>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<p class="text-muted-sm mt-3">
+  Every lock and unlock is written to the audit log with the administrator, the
+  time and the reason given.
+</p>
+{% endblock content %}

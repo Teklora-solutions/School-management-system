@@ -131,6 +131,12 @@ NAVIGATION: dict[str, list[dict]] = {
                 },
             ],
         },
+        {
+            "label": "Gradebook",
+            "icon": "bi-table",
+            "url_name": "gradebook:admin_locks",
+            "feature": "gradebook",
+        },
         {"label": "Finance", "icon": "bi-cash-stack", "url_name": "finance:overview"},
         {
             "label": "Communications",
@@ -221,6 +227,12 @@ NAVIGATION: dict[str, list[dict]] = {
                     "url_name": "dashboards:director_performance",
                 },
             ],
+        },
+        {
+            "label": "Gradebook",
+            "icon": "bi-table",
+            "url_name": "gradebook:director_overview",
+            "feature": "gradebook",
         },
         {
             "label": "Fee Analysis",
@@ -356,6 +368,12 @@ NAVIGATION: dict[str, list[dict]] = {
             "url_name": "homework:teacher_list",
         },
         {
+            "label": "Gradebook",
+            "icon": "bi-table",
+            "url_name": "gradebook:teacher_list",
+            "feature": "gradebook",
+        },
+        {
             "label": "Enter Marks",
             "icon": "bi-pencil-square",
             "url_name": "teachers:marks_list",
@@ -406,6 +424,12 @@ NAVIGATION: dict[str, list[dict]] = {
             "label": "My Results",
             "icon": "bi-bar-chart",
             "url_name": "results:student_results",
+        },
+        {
+            "label": "My Gradebook",
+            "icon": "bi-table",
+            "url_name": "gradebook:my_gradebook",
+            "feature": "gradebook",
         },
         {
             "label": "Fee Statement",
@@ -575,6 +599,12 @@ NAVIGATION: dict[str, list[dict]] = {
             "label": "Results",
             "icon": "bi-bar-chart",
             "url_name": "results:student_results",
+        },
+        {
+            "label": "My Gradebook",
+            "icon": "bi-table",
+            "url_name": "gradebook:my_gradebook",
+            "feature": "gradebook",
         },
         {
             "label": "Fee Statement",
