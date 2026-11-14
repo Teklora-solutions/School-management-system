@@ -655,3 +655,118 @@ class QuizViewPermissionTests(TestCase):
         # Restore
         self.quiz.show_correct_after = True
         self.quiz.save(update_fields=["show_correct_after"])
+
+
+class QuizEntryLinksTests(TestCase):
+    """The classroom pages link to the quiz builder and to published quizzes."""
+
+    @classmethod
+    def setUpTestData(cls):
+        enable_quizzes()
+        _, cls.term, cls.sc, cls.subj, cls.teacher_user, cls.teacher = setup_classroom()
+        cls.module = CourseModule.objects.create(
+            school_class=cls.sc, subject=cls.subj, term=cls.term,
+            title="Mod", position=0, is_published=True,
+        )
+        cls.lesson = Lesson.objects.create(
+            module=cls.module, title="Lesson", position=0, is_published=True,
+        )
+        cls.student = make_student_user(cls.sc, admission_number="QZ-LNK-001")
+        cls.parent_user, _ = make_parent_for(cls.student)
+        PointConfig.objects.get_or_create(pk=1)
+        cls.quiz, _, _ = make_full_quiz(cls.lesson, cls.teacher_user)
+
+    def _teacher_url(self):
+        return reverse("learning:teacher_classroom", args=[self.sc.pk, self.subj.pk])
+
+    def _pupil_url(self):
+        return reverse("learning:classroom", args=[self.sc.pk, self.subj.pk])
+
+    def _builder_url(self):
+        return reverse(
+            "learning:teacher_quiz",
+            args=[self.sc.pk, self.subj.pk, self.module.pk, self.lesson.pk],
+        )
+
+    def _landing_url(self):
+        return reverse(
+            "learning:quiz_landing",
+            args=[self.sc.pk, self.subj.pk, self.lesson.pk],
+        )
+
+    def test_teacher_outline_links_to_quiz_builder(self):
+        self.client.force_login(self.teacher_user)
+        response = self.client.get(self._teacher_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self._builder_url())
+        self.assertContains(response, self.quiz.title)
+
+    def test_pupil_outline_links_to_published_quiz(self):
+        self.client.force_login(self.student.user)
+        response = self.client.get(self._pupil_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self._landing_url())
+
+    def test_parent_outline_links_to_quiz(self):
+        self.client.force_login(self.parent_user)
+        response = self.client.get(self._pupil_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self._landing_url())
+
+    def test_unpublished_quiz_not_linked_for_pupil(self):
+        unpublish_quiz(quiz=self.quiz, actor=self.teacher_user)
+        try:
+            self.client.force_login(self.student.user)
+            response = self.client.get(self._pupil_url())
+            self.assertEqual(response.status_code, 200)
+            self.assertNotContains(response, self._landing_url())
+        finally:
+            publish_quiz(quiz=self.quiz, actor=self.teacher_user)
+
+    def test_teacher_builder_link_still_shown_without_quiz(self):
+        """The icon is how a teacher starts a quiz; no quiz yet is not a gap."""
+        other_lesson = Lesson.objects.create(
+            module=self.module, title="Lesson two", position=1, is_published=True,
+        )
+        self.client.force_login(self.teacher_user)
+        response = self.client.get(self._teacher_url())
+        self.assertContains(
+            response,
+            reverse(
+                "learning:teacher_quiz",
+                args=[self.sc.pk, self.subj.pk, self.module.pk, other_lesson.pk],
+            ),
+        )
+
+    def test_links_hidden_when_quizzes_switch_is_off(self):
+        row = SchoolSettings.load()
+        row.quizzes_enabled = False
+        row.save(update_fields=["quizzes_enabled", "updated_at"])
+
+        self.client.force_login(self.teacher_user)
+        self.assertNotContains(self.client.get(self._teacher_url()), self._builder_url())
+
+        self.client.force_login(self.student.user)
+        self.assertNotContains(self.client.get(self._pupil_url()), self._landing_url())
+
+    def test_classroom_pages_do_not_render_comment_text(self):
+        self.client.force_login(self.teacher_user)
+        teacher_page = self.client.get(self._teacher_url())
+        self.assertNotContains(teacher_page, "════")
+        self.assertNotContains(teacher_page, "COURSE OUTLINE")
+
+        self.client.force_login(self.student.user)
+        pupil_page = self.client.get(self._pupil_url())
+        self.assertNotContains(pupil_page, "════")
+        self.assertNotContains(pupil_page, "COURSE OUTLINE")
+
+    def test_lesson_page_does_not_render_comment_text(self):
+        self.client.force_login(self.student.user)
+        response = self.client.get(
+            reverse(
+                "learning:lesson_view", args=[self.sc.pk, self.subj.pk, self.lesson.pk]
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "════")
+        self.assertNotContains(response, "STUDENT PRIVATE NOTES")

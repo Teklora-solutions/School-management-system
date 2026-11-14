@@ -148,6 +148,13 @@ def update_quiz_settings(
     counts_for_gradebook: bool,
     actor,
 ) -> Quiz:
+    if quiz.counts_for_gradebook != counts_for_gradebook and (
+        quiz.counts_for_gradebook or counts_for_gradebook
+    ):
+        from apps.gradebook.services import ensure_tick_writable
+
+        ensure_tick_writable(quiz.lesson.module.term)
+
     quiz.title = title.strip() or quiz.title
     quiz.instructions = instructions.strip()
     quiz.pass_mark = max(0, min(100, pass_mark))

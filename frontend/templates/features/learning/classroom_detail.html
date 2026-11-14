@@ -114,9 +114,7 @@
   {% endif %}
 </div>
 
-{# ══════════════════════════════════════════════════════════════
-   COURSE OUTLINE
-══════════════════════════════════════════════════════════════ #}
+{# Course outline #}
 
 {% if not modules %}
 <div class="card" style="border:2px dashed var(--color-border);background:transparent;">
@@ -194,6 +192,16 @@
           {% endwith %}
         </div>
       </div>
+
+      {# Quiz #}
+      {% if quizzes_enabled and lp.quiz %}
+      <a href="{% url 'learning:quiz_landing' classroom.school_class.pk classroom.subject.pk l.pk %}"
+         class="btn btn-sm btn-outline-secondary flex-shrink-0"
+         aria-label="Quiz for {{ l.title }}">
+        <i class="bi bi-patch-question" aria-hidden="true"></i>
+        <span class="d-none d-sm-inline ms-1">Quiz</span>
+      </a>
+      {% endif %}
 
       {# Open / Review button #}
       {% if not is_parent %}

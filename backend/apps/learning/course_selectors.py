@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .models import CourseModule, Lesson, LessonAttachment, LessonProgress
+from .models import CourseModule, Lesson, LessonAttachment, LessonProgress, Quiz
 
 
 # ---------------------------------------------------------------------------
@@ -43,6 +43,8 @@ class LessonWithProgress:
     lesson: Lesson
     completed: bool = False
     attachments: list = field(default_factory=list)
+    #: The lesson's quiz when it exists (published only for student views).
+    quiz: Optional[Quiz] = None
 
 
 @dataclass
@@ -89,6 +91,14 @@ def course_for_teacher(*, school_class, subject, term) -> list[ModuleWithLessons
         .prefetch_related("lessons__lesson_attachments")
         .order_by("position", "id")
     )
+    quiz_by_lesson = {
+        quiz.lesson_id: quiz
+        for quiz in Quiz.objects.filter(
+            lesson_id__in=[
+                lesson.pk for mod in modules for lesson in mod.lessons.all()
+            ]
+        )
+    }
     result = []
     for mod in modules:
         lessons = [
@@ -96,6 +106,7 @@ def course_for_teacher(*, school_class, subject, term) -> list[ModuleWithLessons
                 lesson=l,
                 completed=False,
                 attachments=list(l.lesson_attachments.all()),
+                quiz=quiz_by_lesson.get(l.pk),
             )
             for l in sorted(mod.lessons.all(), key=lambda l: (l.position, l.pk))
         ]
@@ -140,6 +151,14 @@ def course_for_student(
         ).values_list("lesson_id", flat=True)
     )
 
+    # Only a published quiz is offered to a pupil; drafts stay teacher-only.
+    quiz_by_lesson = {
+        quiz.lesson_id: quiz
+        for quiz in Quiz.objects.filter(
+            lesson_id__in=all_lesson_ids, is_published=True
+        )
+    }
+
     result = []
     for mod in modules:
         lessons = [
@@ -147,6 +166,7 @@ def course_for_student(
                 lesson=l,
                 completed=l.pk in completed_ids,
                 attachments=list(l.lesson_attachments.all()),
+                quiz=quiz_by_lesson.get(l.pk),
             )
             for l in sorted(mod.lessons.all(), key=lambda l: (l.position, l.pk))
             if l.is_published

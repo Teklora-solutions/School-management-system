@@ -120,9 +120,7 @@
   </a>
 </div>
 
-{# ══════════════════════════════════════════════════════════════
-   COURSE OUTLINE
-══════════════════════════════════════════════════════════════ #}
+{# Course outline #}
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
   <h2 style="font-size:1.05rem;font-weight:700;color:#fff;margin:0;">
     <i class="bi bi-collection me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
@@ -278,6 +276,14 @@
            target="_blank" rel="noopener" aria-label="Preview lesson">
           <i class="bi bi-eye" aria-hidden="true"></i>
         </a>
+        {% if quizzes_enabled %}
+        <a href="{% url 'learning:teacher_quiz' classroom.school_class.pk classroom.subject.pk mod.pk l.pk %}"
+           class="btn btn-sm cb-btn-icon"
+           title="{% if lp.quiz %}{{ lp.quiz.title }}{% else %}Set up a quiz{% endif %}"
+           aria-label="Quiz for {{ l.title }}">
+          <i class="bi bi-patch-question" aria-hidden="true"></i>
+        </a>
+        {% endif %}
         <a href="{% url 'learning:lesson_edit' classroom.school_class.pk classroom.subject.pk mod.pk l.pk %}"
            class="btn btn-sm cb-btn-icon" title="Edit lesson" aria-label="Edit lesson">
           <i class="bi bi-pencil" aria-hidden="true"></i>
