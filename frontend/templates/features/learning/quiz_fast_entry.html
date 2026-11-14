@@ -106,7 +106,7 @@
             <ul class="list-unstyled mb-1 ps-2" style="font-size:0.8rem;">
               {% for c_text, is_c in q.choices %}
               <li>
-                {% if is_c %}<span class="text-success fw-600">✓ {{ c_text }}</span>{% else %}<span class="text-muted-sm">• {{ c_text }}</span>{% endif %}
+                {% if is_c %}<span class="text-success fw-600"><i class="bi bi-check2 me-1" aria-hidden="true"></i>{{ c_text }}</span>{% else %}<span class="text-muted-sm">• {{ c_text }}</span>{% endif %}
               </li>
               {% endfor %}
             </ul>
