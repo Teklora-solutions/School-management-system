@@ -1,7 +1,20 @@
 {% extends base_template %}
-{% block title %}{{ quiz.title }} | {{ SCHOOL_NAME }}{% endblock %}
+{% block title %}{% if is_preview %}[Preview] {% endif %}{{ quiz.title }} | {{ SCHOOL_NAME }}{% endblock %}
 
 {% block content %}
+{# ── Preview Mode Banner ── #}
+{% if is_preview %}
+<div class="alert alert-info d-flex align-items-center justify-content-between mb-3" role="alert">
+  <div>
+    <i class="bi bi-eye-fill me-2 fs-5"></i>
+    <strong>Teacher Preview Mode:</strong> You are previewing what students see on desktop and mobile. No real attempt or scores will be saved.
+  </div>
+  <a href="{% url 'learning:teacher_quiz' school_class.pk subject.pk module.pk lesson.pk %}" class="btn btn-sm btn-outline-info">
+    Exit preview
+  </a>
+</div>
+{% endif %}
+
 {# ── Timer strip (only when time limit exists) ── #}
 {% if time_remaining is not None %}
 <div class="quiz-timer-bar" id="timer-bar" role="timer" aria-live="polite"
@@ -12,40 +25,118 @@
 </div>
 {% endif %}
 
-<div class="page-header">
-  <h1 class="page-title" style="font-size:1.25rem;">{{ quiz.title }}</h1>
-  <p class="page-subtitle">{{ lesson.title }} · {{ questions|length }} question{{ questions|length|pluralize }}</p>
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h1 class="page-title" style="font-size:1.25rem;">{{ quiz.title }}</h1>
+    <p class="page-subtitle">{{ lesson.title }} · {{ questions|length }} question{{ questions|length|pluralize }} ({{ quiz.total_points }} pt{{ quiz.total_points|pluralize }})</p>
+  </div>
+  {% if quiz.instructions %}
+  <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#quizInstructionsCollapse">
+    <i class="bi bi-info-circle me-1"></i>Instructions
+  </button>
+  {% endif %}
 </div>
 
+{% if quiz.instructions %}
+<div class="collapse mb-4" id="quizInstructionsCollapse">
+  <div class="card card-body bg-surface-2 text-muted-sm" style="font-size:0.875rem;">
+    {{ quiz.instructions|linebreaksbr }}
+  </div>
+</div>
+{% endif %}
+
 <form method="post" id="quiz-form"
-      action="{% url 'learning:quiz_take' school_class.pk subject.pk lesson.pk %}">
+      action="{% if is_preview %}{% url 'learning:teacher_quiz_preview' school_class.pk subject.pk module.pk lesson.pk %}{% else %}{% url 'learning:quiz_take' school_class.pk subject.pk lesson.pk %}{% endif %}">
 {% csrf_token %}
 
 <div class="d-flex flex-column gap-4">
 {% for qwc in questions %}
 {% with q=qwc.question %}
-<div class="card quiz-question" id="q-{{ q.pk }}" data-question-id="{{ q.pk }}">
-  <div class="card-header">
-    <span class="text-muted-sm" style="font-size:0.78rem;">Question {{ forloop.counter }} of {{ questions|length }}</span>
-    <h2 style="font-size:1rem;font-weight:600;color:#fff;margin:0.35rem 0 0;">
-      {{ q.body }}
-    </h2>
+<div class="card quiz-question" id="q-{{ q.pk }}" data-question-id="{{ q.pk }}" data-question-type="{{ q.question_type }}">
+  <div class="card-header d-flex justify-content-between align-items-start gap-2">
+    <div>
+      <span class="text-muted-sm" style="font-size:0.78rem;">Question {{ forloop.counter }} of {{ questions|length }}</span>
+      <h2 style="font-size:1rem;font-weight:600;color:#fff;margin:0.35rem 0 0;">
+        {{ q.body }}
+      </h2>
+    </div>
+    <span class="badge" style="background:var(--color-surface-2);color:var(--accent-light);font-size:0.75rem;flex-shrink:0;">
+      {{ q.points }} pt{{ q.points|pluralize }}
+    </span>
   </div>
+
   <div class="card-body p-0">
-    {% for c in qwc.choices %}
-    <label class="quiz-choice {% if qwc.student_answer_pk == c.pk %}quiz-choice--selected{% endif %}"
-           for="choice-{{ q.pk }}-{{ c.pk }}">
-      <input type="radio"
-             class="quiz-radio"
-             id="choice-{{ q.pk }}-{{ c.pk }}"
-             name="answer_{{ q.pk }}"
-             value="{{ c.pk }}"
-             data-question="{{ q.pk }}"
-             data-save-url="{{ save_answer_url }}"
-             {% if qwc.student_answer_pk == c.pk %}checked{% endif %}>
-      <span class="quiz-choice__text">{{ c.text }}</span>
-    </label>
-    {% endfor %}
+    {% if q.image %}
+    <div class="p-3 text-center border-bottom" style="border-color:var(--color-border) !important;">
+      <img src="{{ q.image.url }}" alt="Question diagram" style="max-height:220px;max-width:100%;border-radius:6px;border:1px solid var(--color-border);">
+    </div>
+    {% endif %}
+
+    {# ── 1. Multiple Choice & True/False ── #}
+    {% if q.question_type == 'mc' or q.question_type == 'tf' %}
+      {% for c in qwc.choices %}
+      <label class="quiz-choice {% if qwc.student_answer_pk == c.pk %}quiz-choice--selected{% endif %}"
+             for="choice-{{ q.pk }}-{{ c.pk }}">
+        <input type="radio"
+               class="quiz-radio"
+               id="choice-{{ q.pk }}-{{ c.pk }}"
+               name="answer_{{ q.pk }}"
+               value="{{ c.pk }}"
+               data-question="{{ q.pk }}"
+               data-save-url="{{ save_answer_url }}"
+               {% if qwc.student_answer_pk == c.pk %}checked{% endif %}>
+        <span class="quiz-choice__text">{{ c.text }}</span>
+      </label>
+      {% endfor %}
+
+    {# ── 2. Select All That Apply ── #}
+    {% elif q.question_type == 'select_all' %}
+      <div class="p-2 text-muted-sm" style="font-size:0.78rem;background:var(--color-surface-2);border-bottom:1px solid var(--color-border);">
+        <i class="bi bi-check2-square me-1"></i>Select all that apply:
+      </div>
+      {% for c in qwc.choices %}
+      <label class="quiz-choice {% if c.pk in qwc.student_answer_pks %}quiz-choice--selected{% endif %}"
+             for="choice-{{ q.pk }}-{{ c.pk }}">
+        <input type="checkbox"
+               class="quiz-checkbox form-check-input"
+               id="choice-{{ q.pk }}-{{ c.pk }}"
+               name="answer_{{ q.pk }}"
+               value="{{ c.pk }}"
+               data-question="{{ q.pk }}"
+               data-save-url="{{ save_answer_url }}"
+               {% if c.pk in qwc.student_answer_pks %}checked{% endif %}>
+        <span class="quiz-choice__text">{{ c.text }}</span>
+      </label>
+      {% endfor %}
+
+    {# ── 3. Fill in the Blank ── #}
+    {% elif q.question_type == 'fill_blank' %}
+      <div class="p-3">
+        <label for="input-{{ q.pk }}" class="form-label text-muted-sm" style="font-size:0.85rem;">Type your exact answer below:</label>
+        <input type="text"
+               class="form-control quiz-text-input"
+               id="input-{{ q.pk }}"
+               name="answer_{{ q.pk }}"
+               value="{{ qwc.student_answer_text }}"
+               data-question="{{ q.pk }}"
+               data-save-url="{{ save_answer_url }}"
+               placeholder="Your answer"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+
+    {# ── 4. Short Answer / Paragraph ── #}
+    {% elif q.question_type == 'short_answer' %}
+      <div class="p-3">
+        <label for="textarea-{{ q.pk }}" class="form-label text-muted-sm" style="font-size:0.85rem;">Write your response:</label>
+        <textarea class="form-control quiz-text-input"
+                  id="textarea-{{ q.pk }}"
+                  name="answer_{{ q.pk }}"
+                  rows="4"
+                  data-question="{{ q.pk }}"
+                  data-save-url="{{ save_answer_url }}"
+                  placeholder="Type your explanation or paragraph here...">{{ qwc.student_answer_text }}</textarea>
+      </div>
+    {% endif %}
   </div>
 </div>
 {% endwith %}
@@ -55,8 +146,7 @@
 {# ── Submit bar ── #}
 <div class="quiz-submit-bar mt-4">
   <div class="text-muted-sm" id="answer-status" aria-live="polite"></div>
-  <button type="submit" class="btn btn-primary btn-lg"
-          onclick="return confirm('Submit this quiz? You cannot change your answers after submitting.');">
+  <button type="submit" class="btn btn-primary btn-lg" id="submit-quiz-btn">
     <i class="bi bi-check-circle me-1" aria-hidden="true"></i>Submit quiz
   </button>
 </div>
@@ -92,12 +182,13 @@
   border-bottom: 1px solid var(--color-border);
   transition: background 0.15s;
   width: 100%;
+  margin-bottom: 0;
 }
 .quiz-choice:last-child { border-bottom: none; }
 .quiz-choice:hover { background: rgba(255,255,255,0.04); }
 .quiz-choice--selected { background: var(--accent-glow); }
-.quiz-choice--selected .quiz-choice__text { color: var(--accent-light); }
-.quiz-radio { flex-shrink: 0; margin-top: 0.15rem; accent-color: var(--accent); cursor: pointer; }
+.quiz-choice--selected .quiz-choice__text { color: var(--accent-light); font-weight: 500; }
+.quiz-radio, .quiz-checkbox { flex-shrink: 0; margin-top: 0.18rem; accent-color: var(--accent); cursor: pointer; }
 .quiz-choice__text { font-size: 0.9rem; line-height: 1.55; color: var(--color-text); }
 
 .quiz-submit-bar {
@@ -124,47 +215,122 @@
 {% block extra_js %}
 <script>
 (function () {
-  var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  var csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+  var csrfToken = csrfInput ? csrfInput.value : '';
+  var isPreview = {% if is_preview %}true{% else %}false{% endif %};
 
-  /* ── AJAX answer save ────────────────────────────────── */
+  function sendAnswer(data, saveUrl) {
+    if (isPreview || !saveUrl || saveUrl === '#') return;
+    var label = document.getElementById('answer-status');
+    if (label) label.textContent = 'Saving…';
+
+    var form = new FormData();
+    form.append('csrfmiddlewaretoken', csrfToken);
+    for (var k in data) {
+      if (Array.isArray(data[k])) {
+        for (var i = 0; i < data[k].length; i++) {
+          form.append(k + '[]', data[k][i]);
+        }
+      } else {
+        form.append(k, data[k]);
+      }
+    }
+
+    fetch(saveUrl, {
+      method: 'POST', body: form,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(j) {
+      if (label) {
+        label.textContent = j.ok ? 'Answer saved' : 'Save failed';
+        setTimeout(function(){ label.textContent = ''; }, 2000);
+      }
+    })
+    .catch(function() {
+      if (label) label.textContent = 'Answer not saved — check connection';
+    });
+  }
+
+  /* ── 1. Radio (MC / TF) ── */
   document.querySelectorAll('.quiz-radio').forEach(function (radio) {
     radio.addEventListener('change', function () {
       var questionId = this.getAttribute('data-question');
       var choiceId   = this.value;
       var saveUrl    = this.getAttribute('data-save-url');
-      var label = document.getElementById('answer-status');
 
-      // Visual highlight
       var card = document.getElementById('q-' + questionId);
-      if (card) card.querySelectorAll('.quiz-choice').forEach(function(c) {
-        c.classList.remove('quiz-choice--selected');
-      });
+      if (card) {
+        card.querySelectorAll('.quiz-choice').forEach(function(c) {
+          c.classList.remove('quiz-choice--selected');
+        });
+      }
       this.closest('.quiz-choice').classList.add('quiz-choice--selected');
 
-      var form = new FormData();
-      form.append('csrfmiddlewaretoken', csrfToken);
-      form.append('question_id', questionId);
-      form.append('choice_id', choiceId);
-
-      if (label) label.textContent = 'Saving…';
-      fetch(saveUrl, {
-        method: 'POST', body: form,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(j) {
-        if (label) {
-          label.textContent = j.ok ? 'Answer saved' : 'Save failed';
-          setTimeout(function(){ label.textContent = ''; }, 2000);
-        }
-      })
-      .catch(function() {
-        if (label) label.textContent = 'Answer not saved — check connection';
-      });
+      sendAnswer({ question_id: questionId, choice_id: choiceId }, saveUrl);
     });
   });
 
-  /* ── Countdown timer ─────────────────────────────────── */
+  /* ── 2. Checkboxes (Select All) ── */
+  document.querySelectorAll('.quiz-checkbox').forEach(function (chk) {
+    chk.addEventListener('change', function () {
+      var questionId = this.getAttribute('data-question');
+      var saveUrl    = this.getAttribute('data-save-url');
+      var card = document.getElementById('q-' + questionId);
+
+      var parentLabel = this.closest('.quiz-choice');
+      if (this.checked) {
+        parentLabel.classList.add('quiz-choice--selected');
+      } else {
+        parentLabel.classList.remove('quiz-choice--selected');
+      }
+
+      var selected = [];
+      if (card) {
+        card.querySelectorAll('.quiz-checkbox:checked').forEach(function(c) {
+          selected.push(c.value);
+        });
+      }
+      sendAnswer({ question_id: questionId, choice_ids: selected }, saveUrl);
+    });
+  });
+
+  /* ── 3. Text inputs (Fill-in-the-blank & short answer) ── */
+  document.querySelectorAll('.quiz-text-input').forEach(function (inp) {
+    inp.addEventListener('change', function () {
+      var questionId = this.getAttribute('data-question');
+      var saveUrl    = this.getAttribute('data-save-url');
+      sendAnswer({ question_id: questionId, answer_text: this.value }, saveUrl);
+    });
+  });
+
+  /* ── Pre-submit confirmation ── */
+  var submitBtn = document.getElementById('submit-quiz-btn');
+  if (submitBtn) {
+    submitBtn.addEventListener('click', function(e) {
+      if (isPreview) return; // teacher preview proceeds
+      var unanswered = 0;
+      document.querySelectorAll('.quiz-question').forEach(function(card) {
+        var qType = card.getAttribute('data-question-type');
+        if (qType === 'mc' || qType === 'tf') {
+          if (!card.querySelector('.quiz-radio:checked')) unanswered++;
+        } else if (qType === 'select_all') {
+          if (!card.querySelector('.quiz-checkbox:checked')) unanswered++;
+        } else {
+          var val = (card.querySelector('.quiz-text-input') || {}).value || '';
+          if (!val.trim()) unanswered++;
+        }
+      });
+      var msg = unanswered > 0
+        ? 'You have ' + unanswered + ' unanswered question' + (unanswered > 1 ? 's' : '') + '. Submit now?'
+        : 'Are you ready to submit your quiz? You cannot change your answers after submission.';
+      if (!confirm(msg)) {
+        e.preventDefault();
+      }
+    });
+  }
+
+  /* ── Countdown timer ── */
   var bar = document.getElementById('timer-bar');
   if (!bar) return;
 
@@ -185,22 +351,14 @@
     if (remaining <= 0) {
       clearInterval(interval);
       if (display) display.textContent = '00:00';
-      // Auto-submit: POST to the quiz submit URL
-      var f = document.createElement('form');
-      f.method = 'POST';
-      f.action = submitUrl;
-      var csrf = document.createElement('input');
-      csrf.type = 'hidden';
-      csrf.name = 'csrfmiddlewaretoken';
-      csrf.value = csrfToken;
-      f.appendChild(csrf);
-      document.body.appendChild(f);
-      f.submit();
+      if (!isPreview) {
+        document.getElementById('quiz-form').submit();
+      }
     }
   }, 1000);
 
-  // Initial display
   if (display) display.textContent = fmt(remaining);
 })();
 </script>
 {% endblock %}
+

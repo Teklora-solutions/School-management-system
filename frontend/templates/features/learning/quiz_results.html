@@ -11,77 +11,210 @@
 </div>
 
 {# ── Score banner ── #}
-<div class="card mb-4" style="max-width:480px;border-color:{% if attempt.passed %}var(--color-success){% else %}var(--color-danger){% endif %};">
+<div class="card mb-4" style="max-width:520px;border-color:{% if attempt.passed %}var(--color-success){% else %}var(--color-danger){% endif %};">
   <div class="card-body text-center py-4">
-    <div style="font-size:3rem;font-weight:800;color:{% if attempt.passed %}var(--color-success){% else %}var(--color-danger){% endif %};">
+    <div style="font-size:3.25rem;font-weight:800;color:{% if attempt.passed %}var(--color-success){% else %}var(--color-danger){% endif %};line-height:1;">
       {{ attempt.score_pct }}%
     </div>
-    <div class="fw-600 mt-1" style="font-size:1.1rem;color:#fff;">
+
+    <div class="fw-700 mt-2" style="font-size:1.15rem;color:#fff;">
       {% if attempt.passed %}
       <i class="bi bi-check-circle-fill me-1" style="color:var(--color-success);" aria-hidden="true"></i>Passed!
       {% else %}
-      <i class="bi bi-x-circle me-1" style="color:var(--color-danger);" aria-hidden="true"></i>Not yet — keep going
+      <i class="bi bi-x-circle me-1" style="color:var(--color-danger);" aria-hidden="true"></i>Not quite — keep going
       {% endif %}
     </div>
-    <div class="text-muted-sm mt-1">Pass mark: {{ quiz.pass_mark }}%</div>
+
+    <div class="text-muted-sm mt-1">
+      Pass mark: {{ quiz.pass_mark }}%
+      {% if attempt.score_points is not None %}
+      · Points: <strong>{{ attempt.score_points }} / {{ attempt.total_possible_points }}</strong>
+      {% endif %}
+    </div>
+
+    {% if attempt.regraded_at %}
+    <div class="badge bg-warning-subtle text-warning mt-2 px-2 py-1" style="font-size:0.75rem;">
+      <i class="bi bi-arrow-repeat me-1"></i>Regraded by teacher: {{ attempt.regrade_reason }}
+    </div>
+    {% endif %}
+
     {% if attempt.answers_auto_submitted %}
     <div class="text-muted-sm mt-2" style="font-size:0.78rem;">
       <i class="bi bi-clock me-1" aria-hidden="true"></i>
       Time ran out — answers were submitted automatically.
     </div>
     {% endif %}
-    {% if not attempt.passed and summary.can_retry and not is_parent %}
-    <a href="{% url 'learning:quiz_take' school_class.pk subject.pk lesson.pk %}"
-       class="btn btn-primary mt-3">
-      <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Try again
-    </a>
+
+    {% if not attempt.passed %}
+    <div class="p-3 mt-3 rounded text-start" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);">
+      <div style="font-size:0.875rem;color:var(--color-text);margin-bottom:0.5rem;">
+        Not yet. You're closer than you think. Review the lesson and try again.
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'learning:lesson_view' school_class.pk subject.pk lesson.pk %}" class="btn btn-sm btn-outline-light">
+          <i class="bi bi-book me-1"></i>Review lesson
+        </a>
+        {% if summary.can_retry and not is_parent %}
+        <a href="{% url 'learning:quiz_take' school_class.pk subject.pk lesson.pk %}" class="btn btn-sm btn-primary">
+          <i class="bi bi-arrow-repeat me-1"></i>Try again
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% elif summary.can_retry and not is_parent %}
+    <div class="mt-3">
+      <a href="{% url 'learning:quiz_take' school_class.pk subject.pk lesson.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-arrow-repeat me-1"></i>Take quiz again
+      </a>
+    </div>
     {% endif %}
   </div>
 </div>
 
-{# ── Question-by-question breakdown (only when show_correct_after=True) ── #}
-{% if show_correct and rows %}
-<h2 style="font-size:1rem;font-weight:700;color:#fff;margin-bottom:0.75rem;">Review</h2>
+{# ── Question-by-question breakdown ── #}
+<h2 style="font-size:1.05rem;font-weight:700;color:#fff;margin-bottom:0.75rem;">
+  Question Review
+</h2>
+
 <div class="d-flex flex-column gap-3 mb-4">
 {% for row in rows %}
-<div class="card {% if row.is_correct %}quiz-result--correct{% else %}quiz-result--wrong{% endif %}">
-  <div class="card-header d-flex align-items-start gap-2">
-    <i class="bi {% if row.is_correct %}bi-check-circle-fill{% else %}bi-x-circle-fill{% endif %} fs-5 flex-shrink-0 mt-1"
-       style="color:{% if row.is_correct %}var(--color-success){% else %}var(--color-danger){% endif %};"
-       aria-label="{% if row.is_correct %}Correct{% else %}Incorrect{% endif %}"></i>
-    <div class="fw-600" style="font-size:0.9rem;">{{ row.question.body }}</div>
-  </div>
-  <div class="card-body py-2">
-    {% for choice in row.question.choices.all %}
-    <div class="d-flex align-items-center gap-2 py-1">
-      {% if choice.pk == row.correct_choice_pk %}
-      <i class="bi bi-check-circle-fill" style="color:var(--color-success);" aria-label="Correct answer"></i>
-      {% elif choice.pk == row.student_answer_pk and not row.is_correct %}
-      <i class="bi bi-x-circle" style="color:var(--color-danger);" aria-label="Your wrong answer"></i>
-      {% else %}
-      <i class="bi bi-circle" style="color:var(--color-muted);" aria-hidden="true"></i>
-      {% endif %}
-      <span style="font-size:0.875rem;{% if choice.pk == row.student_answer_pk and not row.is_correct %}color:var(--color-danger);{% elif choice.pk == row.correct_choice_pk %}color:var(--color-success);{% endif %}">
-        {{ choice.text }}
-        {% if choice.pk == row.student_answer_pk %}<span class="text-muted-sm">(your answer)</span>{% endif %}
+<div class="card {% if row.is_correct %}quiz-result--correct{% elif row.is_correct is None %}quiz-result--pending{% else %}quiz-result--wrong{% endif %}">
+  <div class="card-header d-flex align-items-start justify-content-between gap-2">
+    <div class="d-flex align-items-start gap-2">
+      {# Accessible badge + icon (never colour alone) #}
+      {% if row.is_correct %}
+      <span class="badge bg-success px-2 py-1 flex-shrink-0 mt-1">
+        <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>Correct
       </span>
+      {% elif row.points_awarded > 0 %}
+      <span class="badge bg-warning text-dark px-2 py-1 flex-shrink-0 mt-1">
+        <i class="bi bi-dash-circle-fill me-1" aria-hidden="true"></i>Partial credit
+      </span>
+      {% elif row.is_correct is None %}
+      <span class="badge bg-info text-dark px-2 py-1 flex-shrink-0 mt-1">
+        <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Awaiting marking
+      </span>
+      {% else %}
+      <span class="badge bg-danger px-2 py-1 flex-shrink-0 mt-1">
+        <i class="bi bi-x-circle-fill me-1" aria-hidden="true"></i>Not quite
+      </span>
+      {% endif %}
+
+      <div class="fw-600" style="font-size:0.92rem;">
+        {{ forloop.counter }}. {{ row.question.body }}
+      </div>
     </div>
-    {% endfor %}
-    {% if row.explanation %}
+
+    <span class="badge" style="background:var(--color-surface-2);color:var(--accent-light);font-size:0.78rem;flex-shrink:0;">
+      {{ row.points_awarded }} / {{ row.points_possible }} pt{{ row.points_possible|pluralize }}
+    </span>
+  </div>
+
+  <div class="card-body py-2">
+    {% if row.question.image %}
+    <div class="mb-2">
+      <img src="{{ row.question.image.url }}" alt="Question diagram" style="max-height:140px;border-radius:4px;border:1px solid var(--color-border);">
+    </div>
+    {% endif %}
+
+    {# ── Multiple Choice & True/False ── #}
+    {% if row.question.question_type == 'mc' or row.question.question_type == 'tf' %}
+      {% for choice in row.question.choices.all %}
+      <div class="d-flex align-items-center gap-2 py-1">
+        {% if show_correct and choice.pk == row.correct_choice_pk %}
+        <i class="bi bi-check-circle-fill" style="color:var(--color-success);" aria-label="Correct answer"></i>
+        {% elif choice.pk == row.student_answer_pk and not row.is_correct %}
+        <i class="bi bi-x-circle" style="color:var(--color-danger);" aria-label="Your answer"></i>
+        {% elif choice.pk == row.student_answer_pk and row.is_correct %}
+        <i class="bi bi-check-circle-fill" style="color:var(--color-success);" aria-label="Your answer"></i>
+        {% else %}
+        <i class="bi bi-circle" style="color:var(--color-muted);" aria-hidden="true"></i>
+        {% endif %}
+
+        <span style="font-size:0.875rem;{% if choice.pk == row.student_answer_pk and not row.is_correct %}color:var(--color-danger);{% elif show_correct and choice.pk == row.correct_choice_pk %}color:var(--color-success);font-weight:600;{% endif %}">
+          {{ choice.text }}
+          {% if choice.pk == row.student_answer_pk %}<span class="badge bg-secondary ms-1">Your answer</span>{% endif %}
+          {% if show_correct and choice.pk == row.correct_choice_pk %}<span class="badge bg-success ms-1">Correct answer</span>{% endif %}
+        </span>
+      </div>
+      {% endfor %}
+
+    {# ── Select All That Apply ── #}
+    {% elif row.question.question_type == 'select_all' %}
+      {% for choice in row.question.choices.all %}
+      <div class="d-flex align-items-center gap-2 py-1">
+        {% if choice.pk in row.student_answer_pks and show_correct and choice.pk in row.correct_choice_pks %}
+        <i class="bi bi-check-square-fill" style="color:var(--color-success);"></i>
+        {% elif choice.pk in row.student_answer_pks and show_correct and choice.pk not in row.correct_choice_pks %}
+        <i class="bi bi-x-square-fill" style="color:var(--color-danger);"></i>
+        {% elif choice.pk in row.student_answer_pks %}
+        <i class="bi bi-check-square" style="color:var(--accent-light);"></i>
+        {% elif show_correct and choice.pk in row.correct_choice_pks %}
+        <i class="bi bi-square" style="color:var(--color-success);"></i>
+        {% else %}
+        <i class="bi bi-square" style="color:var(--color-muted);"></i>
+        {% endif %}
+
+        <span style="font-size:0.875rem;{% if show_correct and choice.pk in row.correct_choice_pks %}color:var(--color-success);font-weight:600;{% elif choice.pk in row.student_answer_pks and show_correct and choice.pk not in row.correct_choice_pks %}color:var(--color-danger);{% endif %}">
+          {{ choice.text }}
+          {% if choice.pk in row.student_answer_pks %}<span class="badge bg-secondary ms-1">Selected</span>{% endif %}
+          {% if show_correct and choice.pk in row.correct_choice_pks %}<span class="badge bg-success ms-1">Correct</span>{% endif %}
+        </span>
+      </div>
+      {% endfor %}
+
+    {# ── Fill in the Blank ── #}
+    {% elif row.question.question_type == 'fill_blank' %}
+      <div class="py-1" style="font-size:0.875rem;">
+        <div><strong>Your answer:</strong> <span class="{% if row.is_correct %}text-success fw-600{% else %}text-danger{% endif %}">{{ row.student_answer_text|default:'(none entered)' }}</span></div>
+        {% if show_correct %}
+        <div class="mt-1 text-muted-sm">
+          <strong>Accepted answers:</strong>
+          {% for a in row.accepted_answers %}
+          <span class="badge bg-success-subtle text-success me-1">{{ a }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+    {# ── Short Answer / Paragraph ── #}
+    {% elif row.question.question_type == 'short_answer' %}
+      <div class="py-1" style="font-size:0.875rem;">
+        <div><strong>Your response:</strong></div>
+        <div class="p-2 rounded mt-1 text-muted-sm" style="background:var(--color-surface-2);">
+          {{ row.student_answer_text|linebreaksbr|default:'(none entered)' }}
+        </div>
+        {% if row.is_override %}
+        <div class="text-info mt-1" style="font-size:0.8rem;">
+          <i class="bi bi-pencil-fill me-1"></i>Adjusted by teacher: {{ row.override_reason }}
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {# ── Explanation ── #}
+    {% if show_correct and row.explanation %}
     <div class="mt-2 p-2 rounded text-muted-sm" style="background:var(--color-surface-2);font-size:0.82rem;border-left:3px solid var(--accent);">
       <i class="bi bi-lightbulb me-1" style="color:var(--accent-light);" aria-hidden="true"></i>
-      {{ row.explanation }}
+      <strong>Explanation:</strong> {{ row.explanation }}
     </div>
     {% endif %}
   </div>
 </div>
 {% endfor %}
 </div>
-{% elif not show_correct %}
+
+{% if not show_correct %}
 <div class="card mb-4">
   <div class="card-body text-muted-sm text-center py-4">
     <i class="bi bi-eye-slash fs-2 d-block mb-2" aria-hidden="true"></i>
+    {% if quiz.answer_visibility == 'after_deadline' %}
+    Correct answers and explanations will become visible after the quiz deadline.
+    {% elif quiz.answer_visibility == 'when_released' %}
+    Answers and explanations will become visible once released by your teacher.
+    {% else %}
     The teacher has turned off answer review for this quiz.
+    {% endif %}
   </div>
 </div>
 {% endif %}
@@ -102,5 +235,7 @@
 <style>
 .quiz-result--correct { border-color: rgba(16,185,129,0.4) !important; }
 .quiz-result--wrong   { border-color: rgba(239,68,68,0.3) !important; }
+.quiz-result--pending { border-color: rgba(59,130,246,0.3) !important; }
 </style>
 {% endblock %}
+

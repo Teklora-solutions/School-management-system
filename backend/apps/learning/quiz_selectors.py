@@ -1,7 +1,7 @@
 """
 apps/learning/quiz_selectors.py
 ---------------------------------
-Read-only queries for the quiz system (Checkpoint C).
+Read-only queries for the quiz system (Checkpoints C & Q1).
 
 Public API
 ----------
@@ -10,13 +10,14 @@ Public API
 
   quiz_questions_for_student(quiz, attempt)
       → list[QuestionWithChoices]
-      Choices NEVER include is_correct.  Question order follows attempt.question_order.
+      Choices NEVER include is_correct. Question order follows attempt.question_order.
       Choice order shuffled per attempt if quiz.shuffle_choices.
 
   quiz_questions_for_teacher(quiz) → list[QuestionWithChoices]  (includes is_correct)
+  quiz_questions_for_results(quiz, attempt, show_correct) → list[StudentResultRow]
 
   student_attempt_summary(quiz, student)  → AttemptSummary
-  teacher_quiz_results(quiz)              → TeacherResultsData
+  teacher_quiz_results(quiz, school_class) → TeacherResultsData
 
   best_attempt(quiz, student) → QuizAttempt | None
   attempts_remaining(quiz, student) → int | None  (None = unlimited)
@@ -26,6 +27,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Optional
 
 from .models import Quiz, QuizAttempt, QuizAttemptAnswer, QuizChoice, QuizQuestion
@@ -47,8 +49,10 @@ class ChoiceData:
 class QuestionWithChoices:
     question: QuizQuestion
     choices: list[ChoiceData] = field(default_factory=list)
-    student_answer_pk: Optional[int] = None  # selected choice pk, if any
-    is_correct: Optional[bool] = None        # None before submission
+    student_answer_pk: Optional[int] = None      # for MC / TF
+    student_answer_pks: list[int] = field(default_factory=list)  # for select_all
+    student_answer_text: str = ""                # for fill_blank / short_answer
+    is_correct: Optional[bool] = None            # None before submission
 
 
 @dataclass
@@ -61,16 +65,26 @@ class AttemptSummary:
     attempts_used: int
     attempts_allowed: int           # 0 = unlimited
     can_retry: bool
-    show_correct: bool              # quiz.show_correct_after AND attempt submitted
+    show_correct: bool              # True only if student is allowed to see answers now
+    policy_score: Optional[int] = None
 
 
 @dataclass
 class StudentResultRow:
     question: QuizQuestion
-    student_answer_pk: Optional[int]
-    correct_choice_pk: Optional[int]
-    is_correct: Optional[bool]
-    explanation: str
+    student_answer_pk: Optional[int] = None
+    correct_choice_pk: Optional[int] = None
+    student_answer_pks: list[int] = field(default_factory=list)
+    correct_choice_pks: list[int] = field(default_factory=list)
+    student_answer_text: str = ""
+    accepted_answers: list[str] = field(default_factory=list)
+    accepted_matched: str = ""
+    points_awarded: Decimal = Decimal("0.00")
+    points_possible: int = 1
+    is_correct: Optional[bool] = None
+    is_override: bool = False
+    override_reason: str = ""
+    explanation: str = ""
 
 
 @dataclass
@@ -145,41 +159,45 @@ def quiz_questions_for_student(
     Questions and choices for the take-quiz page.
 
     IMPORTANT: ``is_correct`` is NEVER included in choices here.
-    ``student_answer_pk`` is populated so the UI can show which choice
-    the student already selected (for resume support).
     """
     questions_by_pk = {
         q.pk: q
         for q in QuizQuestion.objects.filter(quiz=quiz).prefetch_related("choices")
     }
 
-    # Follow the stored question order (shuffle seed)
+    # Follow stored question order (shuffle seed)
     order = attempt.question_order or list(questions_by_pk.keys())
     ordered = [questions_by_pk[pk] for pk in order if pk in questions_by_pk]
 
-    # Existing answers for resume
-    saved_answers = {
-        a["question_id"]: a["selected_choice_id"]
-        for a in QuizAttemptAnswer.objects.filter(attempt=attempt)
-        .values("question_id", "selected_choice_id")
-    }
+    # Pre-fetch saved answers
+    answers_qs = (
+        QuizAttemptAnswer.objects.filter(attempt=attempt)
+        .prefetch_related("selected_choices")
+    )
+    saved_answers = {a.question_id: a for a in answers_qs}
 
     result = []
     for q in ordered:
         choices_qs = list(q.choices.order_by("position", "id"))
         if quiz.shuffle_choices and not attempt.is_submitted:
-            # Use attempt pk as stable seed so same student sees same order on resume
             rng = random.Random(attempt.pk + q.pk)
             rng.shuffle(choices_qs)
         choices = [
-            ChoiceData(pk=c.pk, text=c.text, is_correct=None)   # is_correct hidden
+            ChoiceData(pk=c.pk, text=c.text, is_correct=None)
             for c in choices_qs
         ]
+        ans = saved_answers.get(q.pk)
+        selected_pk = ans.selected_choice_id if ans else None
+        selected_pks = [c.pk for c in ans.selected_choices.all()] if ans else []
+        text_val = ans.answer_text if ans else ""
+
         result.append(
             QuestionWithChoices(
                 question=q,
                 choices=choices,
-                student_answer_pk=saved_answers.get(q.pk),
+                student_answer_pk=selected_pk,
+                student_answer_pks=selected_pks,
+                student_answer_text=text_val,
             )
         )
     return result
@@ -190,28 +208,42 @@ def quiz_questions_for_results(
 ) -> list[StudentResultRow]:
     """
     Questions with marking data for the student result page.
-
-    ``show_correct`` is True only when attempt is submitted AND
-    quiz.show_correct_after is True.  When False, correct_choice_pk and
-    explanations are withheld.
     """
     answers = {
         a.question_id: a
         for a in QuizAttemptAnswer.objects.filter(attempt=attempt)
         .select_related("selected_choice")
+        .prefetch_related("selected_choices")
     }
     rows = []
     for q in quiz.questions.prefetch_related("choices").order_by("position", "id"):
         ans = answers.get(q.pk)
         correct_pk = None
+        correct_pks: list[int] = []
+        accepted: list[str] = []
+
         if show_correct:
-            correct_choice = q.choices.filter(is_correct=True).first()
-            correct_pk = correct_choice.pk if correct_choice else None
+            correct_choices = [c for c in q.choices.all() if c.is_correct]
+            if correct_choices:
+                correct_pk = correct_choices[0].pk
+                correct_pks = [c.pk for c in correct_choices]
+            accepted = list(q.accepted_answers)
+
+        selected_pks = [c.pk for c in ans.selected_choices.all()] if ans else []
         rows.append(StudentResultRow(
             question=q,
             student_answer_pk=ans.selected_choice_id if ans else None,
             correct_choice_pk=correct_pk,
+            student_answer_pks=selected_pks,
+            correct_choice_pks=correct_pks,
+            student_answer_text=ans.answer_text if ans else "",
+            accepted_answers=accepted,
+            accepted_matched=ans.accepted_answer_matched if ans else "",
+            points_awarded=ans.points_awarded if ans else Decimal("0.00"),
+            points_possible=q.points,
             is_correct=ans.is_correct if ans else False,
+            is_override=ans.is_override if ans else False,
+            override_reason=ans.override_reason if ans else "",
             explanation=q.explanation if show_correct else "",
         ))
     return rows
@@ -261,14 +293,24 @@ def student_attempt_summary(*, quiz: Quiz, student) -> AttemptSummary:
     used = len(submitted)
     limit = quiz.attempts_allowed
     can_retry = (
-        in_progress is not None
-        or limit == Quiz.Attempts.UNLIMITED
-        or used < limit
+        (in_progress is not None or limit == Quiz.Attempts.UNLIMITED or used < limit)
+        and quiz.is_open_now
     )
     current = in_progress or (submitted[0] if submitted else None)
     show = bool(
-        current and current.is_submitted and quiz.show_correct_after
+        current and current.is_submitted and quiz.can_view_answers_now
     )
+
+    # Calculate policy score
+    policy_score = None
+    if submitted:
+        if quiz.grading_policy == Quiz.GradingPolicy.BEST:
+            policy_score = best.score_pct if best else 0
+        elif quiz.grading_policy == Quiz.GradingPolicy.LATEST:
+            policy_score = submitted[0].score_pct if submitted else 0
+        elif quiz.grading_policy == Quiz.GradingPolicy.AVERAGE:
+            policy_score = round(sum(a.score_pct or 0 for a in submitted) / len(submitted))
+
     return AttemptSummary(
         quiz=quiz,
         attempt=current,
@@ -278,13 +320,13 @@ def student_attempt_summary(*, quiz: Quiz, student) -> AttemptSummary:
         attempts_allowed=limit,
         can_retry=can_retry,
         show_correct=show,
+        policy_score=policy_score,
     )
 
 
 def teacher_quiz_results(*, quiz: Quiz, school_class) -> TeacherResultsData:
     """
     Full results for the teacher screen.
-    Two bulk queries: one for all attempts, one for all answers.
     """
     from apps.students.models import Student
 
@@ -326,14 +368,13 @@ def teacher_quiz_results(*, quiz: Quiz, school_class) -> TeacherResultsData:
         if scores else 0
     )
 
-    # Question difficulty: count wrong answers across all submitted attempts
     all_answers = list(
         QuizAttemptAnswer.objects.filter(
             attempt__quiz=quiz,
             attempt__submitted_at__isnull=False,
         ).values("question_id", "is_correct")
     )
-    from collections import Counter, defaultdict
+    from collections import defaultdict
     total_map: dict[int, int] = defaultdict(int)
     wrong_map: dict[int, int] = defaultdict(int)
     for ans in all_answers:
@@ -359,3 +400,4 @@ def teacher_quiz_results(*, quiz: Quiz, school_class) -> TeacherResultsData:
         pass_rate=pass_rate,
         question_difficulty=difficulty,
     )
+

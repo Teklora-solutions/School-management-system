@@ -59,9 +59,11 @@ from apps.learning.models import (
     Quiz,
     QuizAttempt,
     QuizAttemptAnswer,
+    QuizAuditLog,
     QuizChoice,
     QuizQuestion,
 )
+from apps.learning import quiz_services, quiz_selectors
 from apps.learning.quiz_services import (
     QuizLockedError,
     add_choice,
@@ -770,3 +772,324 @@ class QuizEntryLinksTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "════")
         self.assertNotContains(response, "STUDENT PRIVATE NOTES")
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint Q1 Tests: Question Types, Fast Entry, Regrade, Preview
+# ---------------------------------------------------------------------------
+
+
+class QuizTestBase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        enable_quizzes()
+        _, cls.term, cls.sc, cls.subj, cls.teacher_user, _ = setup_classroom()
+        cls.module = CourseModule.objects.create(
+            school_class=cls.sc, subject=cls.subj, term=cls.term,
+            title="Module Q1", position=0,
+        )
+        cls.lesson = Lesson.objects.create(module=cls.module, title="Lesson Q1", position=0)
+        cls.student = make_student_user(cls.sc, admission_number="STU-Q1-001")
+        PointConfig.objects.get_or_create(pk=1)
+
+    def _make_student(self, suffix="2"):
+        return make_student_user(self.sc, admission_number=f"STU-Q1-{suffix}")
+
+
+class QuizQ1QuestionTypesAndMarkingTests(QuizTestBase):
+    def test_quiz_type_defaults(self):
+        q_exam = quiz_services.create_quiz(
+            lesson=self.lesson,
+            title="Final Exam",
+            quiz_type=Quiz.QuizType.FINAL_EXAM,
+            actor=self.teacher_user,
+        )
+        self.assertEqual(q_exam.attempts_allowed, 1)
+        self.assertEqual(q_exam.answer_visibility, Quiz.AnswerVisibility.WHEN_RELEASED)
+        self.assertEqual(q_exam.pass_mark, 70)
+        self.assertFalse(q_exam.show_correct_after)
+
+    def test_select_all_marking_all_or_nothing(self):
+        quiz = quiz_services.create_quiz(
+            lesson=self.lesson,
+            title="Protocols Quiz",
+            actor=self.teacher_user,
+        )
+        q = quiz_services.add_question(
+            quiz=quiz,
+            body="Which protocols use TCP?",
+            question_type=QuizQuestion.QuestionType.SELECT_ALL,
+            points=2,
+            partial_credit=False,
+            actor=self.teacher_user,
+        )
+        c1 = quiz_services.add_choice(question=q, text="HTTP", is_correct=True, actor=self.teacher_user)
+        c2 = quiz_services.add_choice(question=q, text="SSH", is_correct=True, actor=self.teacher_user)
+        c3 = quiz_services.add_choice(question=q, text="DNS", is_correct=False, actor=self.teacher_user)
+        quiz_services.publish_quiz(quiz=quiz, actor=self.teacher_user)
+
+        # 1. Correct: selects both c1 and c2
+        att1 = quiz_services.start_or_resume_attempt(quiz=quiz, student=self.student)
+        quiz_services.save_answer(attempt=att1, question_id=q.pk, choice_ids=[c1.pk, c2.pk])
+        quiz_services.submit_attempt(attempt=att1, student=self.student)
+        ans1 = att1.answers.get(question=q)
+        self.assertTrue(ans1.is_correct)
+        self.assertEqual(ans1.points_awarded, 2)
+        self.assertEqual(att1.score_pct, 100)
+
+        # 2. Incomplete: selects only c1
+        stu2 = self._make_student("p2")
+        att2 = quiz_services.start_or_resume_attempt(quiz=quiz, student=stu2)
+        quiz_services.save_answer(attempt=att2, question_id=q.pk, choice_ids=[c1.pk])
+        quiz_services.submit_attempt(attempt=att2, student=stu2)
+        ans2 = att2.answers.get(question=q)
+        self.assertFalse(ans2.is_correct)
+        self.assertEqual(ans2.points_awarded, 0)
+        self.assertEqual(att2.score_pct, 0)
+
+    def test_select_all_marking_partial_credit(self):
+        quiz = quiz_services.create_quiz(
+            lesson=self.lesson,
+            title="Partial Credit Quiz",
+            actor=self.teacher_user,
+        )
+        q = quiz_services.add_question(
+            quiz=quiz,
+            body="Select TCP protocols",
+            question_type=QuizQuestion.QuestionType.SELECT_ALL,
+            points=4,
+            partial_credit=True,
+            actor=self.teacher_user,
+        )
+        c1 = quiz_services.add_choice(question=q, text="HTTP", is_correct=True, actor=self.teacher_user)
+        c2 = quiz_services.add_choice(question=q, text="SSH", is_correct=True, actor=self.teacher_user)
+        c3 = quiz_services.add_choice(question=q, text="DNS", is_correct=False, actor=self.teacher_user)
+        quiz_services.publish_quiz(quiz=quiz, actor=self.teacher_user)
+
+        # Student selects 1 of 2 correct (50% of 4 points = 2 points)
+        att = quiz_services.start_or_resume_attempt(quiz=quiz, student=self.student)
+        quiz_services.save_answer(attempt=att, question_id=q.pk, choice_ids=[c1.pk])
+        quiz_services.submit_attempt(attempt=att, student=self.student)
+        ans = att.answers.get(question=q)
+        self.assertEqual(ans.points_awarded, 2.0)
+        self.assertEqual(att.score_pct, 50)
+
+    def test_fill_in_the_blank_forgiving_matching(self):
+        quiz = quiz_services.create_quiz(
+            lesson=self.lesson,
+            title="Acronyms Quiz",
+            actor=self.teacher_user,
+        )
+        q = quiz_services.add_question(
+            quiz=quiz,
+            body="What protocol resolves IP to MAC?",
+            question_type=QuizQuestion.QuestionType.FILL_BLANK,
+            points=3,
+            accepted_answers=["ARP", "Address Resolution Protocol"],
+            allow_minor_typos=True,
+            actor=self.teacher_user,
+        )
+        quiz_services.publish_quiz(quiz=quiz, actor=self.teacher_user)
+
+        # 1. Lowercase matching
+        att1 = quiz_services.start_or_resume_attempt(quiz=quiz, student=self.student)
+        quiz_services.save_answer(attempt=att1, question_id=q.pk, answer_text="   arp   ")
+        quiz_services.submit_attempt(attempt=att1, student=self.student)
+        ans1 = att1.answers.get(question=q)
+        self.assertTrue(ans1.is_correct)
+        self.assertEqual(ans1.points_awarded, 3)
+
+        # 2. Minor 1-letter typo ("addres resolution protocol")
+        stu2 = self._make_student("p2")
+        att2 = quiz_services.start_or_resume_attempt(quiz=quiz, student=stu2)
+        quiz_services.save_answer(attempt=att2, question_id=q.pk, answer_text="addres resolution protocol")
+        quiz_services.submit_attempt(attempt=att2, student=stu2)
+        ans2 = att2.answers.get(question=q)
+        self.assertTrue(ans2.is_correct)
+        self.assertEqual(ans2.points_awarded, 3)
+
+        # 3. Completely wrong answer
+        stu3 = self._make_student("p3")
+        att3 = quiz_services.start_or_resume_attempt(quiz=quiz, student=stu3)
+        quiz_services.save_answer(attempt=att3, question_id=q.pk, answer_text="DHCP")
+        quiz_services.submit_attempt(attempt=att3, student=stu3)
+        ans3 = att3.answers.get(question=q)
+        self.assertFalse(ans3.is_correct)
+        self.assertEqual(ans3.points_awarded, 0)
+
+
+class QuizQ1FastEntryAndCsvTests(QuizTestBase):
+    def test_parse_pasted_questions(self):
+        raw = """
+Q: What layer of the OSI model does an IP router operate at?
+* Network
+Transport
+Data Link
+Physical
+Points: 2
+Explanation: Routers operate at Layer 3.
+
+Q: Switches operate at the Network layer.
+* False
+True
+
+Q: Which protocols use TCP? [select_all, partial]
+* HTTP
+* SSH
+DNS
+* HTTPS
+Points: 3
+
+Q: What protocol resolves IP to MAC? [fill_blank, typos]
+= ARP
+= Address Resolution Protocol
+"""
+        questions, errors = quiz_services.parse_pasted_questions(raw)
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(len(questions), 4)
+
+        # Q1: MC
+        self.assertEqual(questions[0]["question_type"], QuizQuestion.QuestionType.MULTIPLE_CHOICE)
+        self.assertEqual(questions[0]["points"], 2)
+
+        # Q2: TF
+        self.assertEqual(questions[1]["question_type"], QuizQuestion.QuestionType.TRUE_FALSE)
+
+        # Q3: Select All
+        self.assertEqual(questions[2]["question_type"], QuizQuestion.QuestionType.SELECT_ALL)
+        self.assertTrue(questions[2]["partial_credit"])
+
+        # Q4: Fill Blank
+        self.assertEqual(questions[3]["question_type"], QuizQuestion.QuestionType.FILL_BLANK)
+        self.assertEqual(questions[3]["accepted_answers"], ["ARP", "Address Resolution Protocol"])
+        self.assertTrue(questions[3]["allow_minor_typos"])
+
+    def test_bulk_create_and_duplicate_question(self):
+        quiz = quiz_services.create_quiz(
+            lesson=self.lesson,
+            title="Bulk Quiz",
+            actor=self.teacher_user,
+        )
+        raw = """
+Q: Question 1
+* Option A
+Option B
+
+Q: Question 2
+* Option True
+Option False
+"""
+        q_data, _ = quiz_services.parse_pasted_questions(raw)
+        created = quiz_services.bulk_create_questions(quiz=quiz, questions_data=q_data, actor=self.teacher_user)
+        self.assertEqual(len(created), 2)
+        self.assertEqual(quiz.questions.count(), 2)
+
+        # Duplicate question 1
+        dup = quiz_services.duplicate_question(question=created[0], actor=self.teacher_user)
+        self.assertEqual(quiz.questions.count(), 3)
+        self.assertIn("(copy)", dup.body)
+
+
+class QuizQ1RegradeAndAuditTests(QuizTestBase):
+    def test_fix_answer_and_regrade(self):
+        quiz = quiz_services.create_quiz(
+            lesson=self.lesson,
+            title="Regrade Quiz",
+            actor=self.teacher_user,
+        )
+        q = quiz_services.add_question(
+            quiz=quiz,
+            body="What is 2 + 2?",
+            question_type=QuizQuestion.QuestionType.MULTIPLE_CHOICE,
+            points=1,
+            actor=self.teacher_user,
+        )
+        c_wrong = quiz_services.add_choice(question=q, text="3", is_correct=True, actor=self.teacher_user) # mistaken key
+        c_right = quiz_services.add_choice(question=q, text="4", is_correct=False, actor=self.teacher_user)
+        quiz_services.publish_quiz(quiz=quiz, actor=self.teacher_user)
+
+        # Student answered "4" (c_right), which was marked wrong due to the mistake
+        att = quiz_services.start_or_resume_attempt(quiz=quiz, student=self.student)
+        quiz_services.save_answer(attempt=att, question_id=q.pk, choice_id=c_right.pk)
+        quiz_services.submit_attempt(attempt=att, student=self.student)
+        self.assertEqual(att.score_pct, 0)
+        self.assertFalse(att.passed)
+
+        # Teacher fixes answer key and regrades
+        result = quiz_services.fix_answer_and_regrade(
+            quiz=quiz,
+            question_id=q.pk,
+            correct_choice_pks=[c_right.pk],
+            reason="Mistake in answer key: 4 is the correct answer",
+            actor=self.teacher_user,
+        )
+        self.assertEqual(result["attempts_regraded"], 1)
+        self.assertEqual(result["scores_changed"], 1)
+        self.assertEqual(result["newly_passed"], 1)
+
+        att.refresh_from_db()
+        self.assertEqual(att.score_pct, 100)
+        self.assertTrue(att.passed)
+        self.assertEqual(att.regrade_reason, "Mistake in answer key: 4 is the correct answer")
+
+        # Verify audit log
+        audit = QuizAuditLog.objects.filter(quiz=quiz, action="regrade").first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.actor, self.teacher_user)
+
+
+class QuizQ1PreviewAndVisibilityTests(QuizTestBase):
+    def test_preview_mode_does_not_create_attempts(self):
+        quiz = quiz_services.create_quiz(
+            lesson=self.lesson,
+            title="Preview Quiz",
+            actor=self.teacher_user,
+        )
+        q = quiz_services.add_question(
+            quiz=quiz,
+            body="Sample question?",
+            actor=self.teacher_user,
+        )
+        quiz_services.add_choice(question=q, text="A", is_correct=True, actor=self.teacher_user)
+        quiz_services.add_choice(question=q, text="B", is_correct=False, actor=self.teacher_user)
+
+        self.client.force_login(self.teacher_user)
+        preview_url = reverse(
+            "learning:teacher_quiz_preview",
+            args=[self.sc.pk, self.subj.pk, self.module.pk, self.lesson.pk],
+        )
+        response = self.client.get(preview_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Teacher Preview Mode")
+        self.assertEqual(QuizAttempt.objects.filter(quiz=quiz).count(), 0)
+
+        # Post to preview
+        post_resp = self.client.post(preview_url)
+        self.assertEqual(post_resp.status_code, 302)
+        self.assertEqual(QuizAttempt.objects.filter(quiz=quiz).count(), 0)
+
+    def test_accessible_badges_on_results_page(self):
+        quiz = quiz_services.create_quiz(
+            lesson=self.lesson,
+            title="Accessible Results Quiz",
+            actor=self.teacher_user,
+        )
+        q = quiz_services.add_question(quiz=quiz, body="Q1", actor=self.teacher_user)
+        c = quiz_services.add_choice(question=q, text="Ans", is_correct=True, actor=self.teacher_user)
+        quiz_services.publish_quiz(quiz=quiz, actor=self.teacher_user)
+
+        att = quiz_services.start_or_resume_attempt(quiz=quiz, student=self.student)
+        quiz_services.save_answer(attempt=att, question_id=q.pk, choice_id=c.pk)
+        quiz_services.submit_attempt(attempt=att, student=self.student)
+
+        self.client.force_login(self.student.user)
+        results_url = reverse(
+            "learning:quiz_results",
+            args=[self.sc.pk, self.subj.pk, self.lesson.pk, att.pk],
+        )
+        response = self.client.get(results_url)
+        self.assertEqual(response.status_code, 200)
+        # Never colour alone: must show clear text "Correct"
+        self.assertContains(response, "Correct")
+        self.assertContains(response, "Question Review")
+

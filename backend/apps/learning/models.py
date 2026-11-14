@@ -1219,8 +1219,11 @@ class StudentLessonNote(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Quizzes — Checkpoint C
+# Quizzes — Checkpoint C & Checkpoint Q1
 # ---------------------------------------------------------------------------
+
+QUIZ_QUESTION_IMAGE_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+QUIZ_QUESTION_IMAGE_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 class Quiz(BaseModel):
@@ -1230,10 +1233,9 @@ class Quiz(BaseModel):
     Design rules:
     - Draft quizzes are invisible to students.
     - Once any student has a *submitted* attempt, questions and choices are
-      locked. The teacher can duplicate the quiz to create an editable copy.
+      locked from structural changes. Teachers can use 'Fix answer key and regrade'
+      to safely correct mistakes, which recalculates scores and logs the audit trail.
     - Correct answers NEVER leave the server before a student submits.
-      The template receives question and choice objects; is_correct is
-      excluded from the student-facing queryset.
     - ``counts_for_gradebook`` is stored now but not connected to report
       cards until the owner approves that design separately.
     """
@@ -1244,12 +1246,34 @@ class Quiz(BaseModel):
         THREE     = 3,  "3 attempts"
         UNLIMITED = 0,  "Unlimited"
 
+    class QuizType(models.TextChoices):
+        LESSON_CHECK = "lesson_check", "Lesson check (practice)"
+        MODULE_QUIZ  = "module_quiz",  "Module quiz"
+        FINAL_EXAM   = "final_exam",   "Final exam"
+
+    class AnswerVisibility(models.TextChoices):
+        AFTER_SUBMIT   = "after_submit",   "After submission"
+        AFTER_DEADLINE = "after_deadline", "After deadline has passed"
+        WHEN_RELEASED  = "when_released",  "When teacher releases"
+        NEVER          = "never",          "Never"
+
+    class GradingPolicy(models.TextChoices):
+        BEST    = "best",    "Best attempt counts"
+        LATEST  = "latest",  "Latest attempt counts"
+        AVERAGE = "average", "Average of all attempts counts"
+
     lesson = models.OneToOneField(
         Lesson,
         on_delete=models.CASCADE,
         related_name="quiz",
     )
     title = models.CharField(max_length=200)
+    quiz_type = models.CharField(
+        max_length=20,
+        choices=QuizType.choices,
+        default=QuizType.LESSON_CHECK,
+        help_text="Quiz type determines default attempt limits and answer visibility.",
+    )
     instructions = models.TextField(
         blank=True,
         help_text="Optional instructions shown to students before they begin.",
@@ -1283,6 +1307,32 @@ class Quiz(BaseModel):
             "Turn off to hide correct answers (e.g. for formal assessments)."
         ),
     )
+    answer_visibility = models.CharField(
+        max_length=20,
+        choices=AnswerVisibility.choices,
+        default=AnswerVisibility.AFTER_SUBMIT,
+        help_text="When students can see correct answers and explanations.",
+    )
+    open_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Quiz opens at this date/time (Nairobi time).",
+    )
+    close_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Quiz closes at this date/time (Nairobi time).",
+    )
+    grading_policy = models.CharField(
+        max_length=10,
+        choices=GradingPolicy.choices,
+        default=GradingPolicy.BEST,
+        help_text="Which attempt score counts towards progress/grades.",
+    )
+    answers_released = models.BooleanField(
+        default=False,
+        help_text="True if teacher manually released answers for this quiz.",
+    )
     is_published = models.BooleanField(
         default=False,
         help_text="Draft quizzes are invisible to students.",
@@ -1293,6 +1343,10 @@ class Quiz(BaseModel):
             "Reserved for future gradebook integration. "
             "Has no effect until the gradebook connection is approved."
         ),
+    )
+    release_auto_marks_first = models.BooleanField(
+        default=False,
+        help_text="If True, students see auto-marked results immediately while subjective questions await teacher review.",
     )
 
     class Meta:
@@ -1310,6 +1364,36 @@ class Quiz(BaseModel):
     def question_count(self) -> int:
         return self.questions.count()
 
+    @property
+    def total_points(self) -> int:
+        return sum(q.points for q in self.questions.all())
+
+    @property
+    def is_open_now(self) -> bool:
+        from django.utils import timezone
+        now = timezone.now()
+        if self.open_date and now < self.open_date:
+            return False
+        if self.close_date and now > self.close_date:
+            return False
+        return True
+
+    @property
+    def can_view_answers_now(self) -> bool:
+        """Whether answers and explanations are currently visible to students who submitted."""
+        if self.answer_visibility == self.AnswerVisibility.NEVER:
+            return False
+        if self.answer_visibility == self.AnswerVisibility.AFTER_SUBMIT:
+            return self.show_correct_after
+        if self.answer_visibility == self.AnswerVisibility.AFTER_DEADLINE:
+            if not self.close_date:
+                return self.show_correct_after
+            from django.utils import timezone
+            return timezone.now() > self.close_date
+        if self.answer_visibility == self.AnswerVisibility.WHEN_RELEASED:
+            return self.answers_released
+        return False
+
 
 class QuizQuestion(BaseModel):
     """
@@ -1317,20 +1401,18 @@ class QuizQuestion(BaseModel):
 
     ``question_type`` determines which fields are meaningful:
       multiple_choice  — choices provided, exactly one is_correct
-      true_false       — two choices generated automatically ("True", "False")
-
-    Future types (not built yet, fields already accommodate them):
-      select_all       — multiple choices, multiple is_correct
-      short_answer     — no choices; answer_text on QuizAttemptAnswer used
-
-    ``body`` supports the same plain/Markdown format as lesson notes and is
-    sanitised with the same bleach pipeline before display.
-    ``explanation`` is shown after submission (if show_correct_after=True).
+      true_false       — two choices ("True", "False"), exactly one is_correct
+      select_all       — choices provided, one or more is_correct (all-or-nothing or partial)
+      fill_blank       — accepted_answers matched case-insensitively with typo tolerance
+      short_answer     — open-ended paragraph, marked manually by teacher
     """
 
     class QuestionType(models.TextChoices):
-        MULTIPLE_CHOICE = "mc",   "Multiple choice"
-        TRUE_FALSE      = "tf",   "True / False"
+        MULTIPLE_CHOICE = "mc",           "Multiple choice"
+        TRUE_FALSE      = "tf",           "True / False"
+        SELECT_ALL      = "select_all",   "Select all that apply"
+        FILL_BLANK      = "fill_blank",   "Fill in the blank / short exact answer"
+        SHORT_ANSWER    = "short_answer", "Short answer / paragraph"
 
     quiz = models.ForeignKey(
         Quiz,
@@ -1341,9 +1423,32 @@ class QuizQuestion(BaseModel):
         help_text="Question text. Markdown is supported.",
     )
     question_type = models.CharField(
-        max_length=10,
+        max_length=15,
         choices=QuestionType.choices,
         default=QuestionType.MULTIPLE_CHOICE,
+    )
+    points = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Points value for this question (default 1).",
+    )
+    image = models.ImageField(
+        upload_to="learning/quizzes/questions/",
+        blank=True,
+        null=True,
+        help_text="Optional diagram or question image.",
+    )
+    partial_credit = models.BooleanField(
+        default=False,
+        help_text="Allow partial credit for select-all-that-apply questions.",
+    )
+    accepted_answers = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of accepted text answers for fill-in-the-blank questions.",
+    )
+    allow_minor_typos = models.BooleanField(
+        default=False,
+        help_text="Forgive 1-character spelling slips for answers with 4+ letters.",
     )
     explanation = models.TextField(
         blank=True,
@@ -1395,8 +1500,7 @@ class QuizAttempt(BaseModel):
     One student's attempt at a quiz.
 
     Only one in-progress attempt may exist at a time (enforced by services).
-    Submitted attempts are immutable — the service sets submitted_at and
-    score_pct in one transaction and never touches them again.
+    Submitted attempts are scored server-side.
 
     ``answers_auto_submitted`` is True when the server auto-submitted because
     the time limit expired, so the teacher can see how the attempt ended.
@@ -1423,6 +1527,17 @@ class QuizAttempt(BaseModel):
         blank=True,
         help_text="Percentage score (0–100). Set on submission.",
     )
+    score_points = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Points earned on this attempt.",
+    )
+    total_possible_points = models.PositiveIntegerField(
+        default=0,
+        help_text="Total possible points across all questions at time of attempt.",
+    )
     passed = models.BooleanField(
         null=True,
         blank=True,
@@ -1438,6 +1553,31 @@ class QuizAttempt(BaseModel):
         blank=True,
         help_text="Ordered list of question PKs for this attempt (shuffle seed).",
     )
+    regraded_at = models.DateTimeField(null=True, blank=True)
+    regraded_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="regraded_quiz_attempts",
+    )
+    regrade_reason = models.TextField(blank=True)
+    needs_manual_marking = models.BooleanField(
+        default=False,
+        help_text="True if this attempt contains short-answer questions waiting for teacher marking.",
+    )
+    manual_marking_completed = models.BooleanField(
+        default=False,
+        help_text="True when teacher has completed marking all subjective questions.",
+    )
+    manual_marked_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="manually_marked_quiz_attempts",
+    )
+    manual_marked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "learning_quiz_attempt"
@@ -1453,6 +1593,10 @@ class QuizAttempt(BaseModel):
     @property
     def is_submitted(self) -> bool:
         return self.submitted_at is not None
+
+    @property
+    def is_manual_marking_pending(self) -> bool:
+        return bool(self.submitted_at and self.needs_manual_marking and not self.manual_marking_completed)
 
     @property
     def time_remaining_seconds(self) -> int | None:
@@ -1474,15 +1618,8 @@ class QuizAttemptAnswer(BaseModel):
     """
     The student's answer to one question in one attempt.
 
-    Saved as the student clicks each answer (via AJAX) so a dropped connection
+    Saved as the student answers each question so a dropped connection
     or closed browser loses nothing.
-
-    Future-proofing:
-    - ``selected_choice``  — FK for single-answer (MC / TF)
-    - ``selected_choices`` — M2M for "select all that apply" (empty now)
-    - ``answer_text``      — plain text for short-answer (blank now)
-
-    Exactly one row per (attempt, question).
     """
 
     attempt = models.ForeignKey(
@@ -1503,23 +1640,51 @@ class QuizAttemptAnswer(BaseModel):
         related_name="selected_by",
         help_text="The choice the student selected (single-answer questions).",
     )
-    # M2M for future "select all that apply" — empty for now
     selected_choices = models.ManyToManyField(
         QuizChoice,
         blank=True,
         related_name="multi_selected_by",
-        help_text="Reserved for future 'select all that apply' questions.",
+        help_text="Selected choices for select-all-that-apply questions.",
     )
-    # TextField for future short-answer — blank for now
     answer_text = models.TextField(
         blank=True,
-        help_text="Reserved for future short-answer questions.",
+        help_text="Student's text answer for fill-in-the-blank or short-answer questions.",
     )
-    # Marked server-side on submission — never sent to the browser before then
+    points_awarded = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        help_text="Points awarded for this answer.",
+    )
+    accepted_answer_matched = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="The accepted answer string that matched the student's text.",
+    )
     is_correct = models.BooleanField(
         null=True,
         blank=True,
         help_text="Set by the server when the attempt is submitted. Never sent to browser before submission.",
+    )
+    is_override = models.BooleanField(
+        default=False,
+        help_text="True if teacher manually adjusted the mark.",
+    )
+    override_reason = models.TextField(blank=True)
+    is_flagged = models.BooleanField(
+        default=False,
+        help_text="True if student flagged this question for review during attempt.",
+    )
+    teacher_comment = models.TextField(
+        blank=True,
+        help_text="Teacher's remark or feedback on this answer.",
+    )
+    manual_mark = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Points awarded by teacher during manual marking.",
     )
 
     class Meta:
@@ -1529,6 +1694,36 @@ class QuizAttemptAnswer(BaseModel):
 
     def __str__(self) -> str:
         return f"Attempt#{self.attempt_id} Q#{self.question_id}"
+
+
+class QuizAuditLog(BaseModel):
+    """
+    Audit trail for quiz answer key corrections, regrades, and administrative actions.
+    """
+
+    quiz = models.ForeignKey(
+        Quiz,
+        on_delete=models.CASCADE,
+        related_name="audit_logs",
+    )
+    actor = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="quiz_audit_logs",
+    )
+    action = models.CharField(max_length=50)
+    details = models.JSONField(default=dict, blank=True)
+    reason = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "learning_quiz_audit_log"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.action} on {self.quiz.title} by {self.actor}"
+
 
 
 # ---------------------------------------------------------------------------

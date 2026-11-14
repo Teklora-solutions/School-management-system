@@ -21,15 +21,16 @@
      style="background:rgba(245,158,11,0.1);border-color:var(--color-warning);color:var(--color-warning);"
      role="alert">
   <i class="bi bi-lock-fill fs-5 flex-shrink-0 mt-1" aria-hidden="true"></i>
-  <div>
-    <strong>Quiz is locked.</strong>
-    Students have already submitted attempts — questions and answers cannot be changed.
-    <a href="{% url 'learning:teacher_quiz_action' school_class.pk subject.pk module.pk lesson.pk 'duplicate' %}"
-       class="btn btn-sm ms-2"
-       style="background:rgba(245,158,11,0.15);border:1px solid var(--color-warning);color:var(--color-warning);">
-      <i class="bi bi-copy me-1" aria-hidden="true"></i>Duplicate quiz
-    </a>
+  <div class="flex-grow-1">
+    <strong>Quiz is locked for structural changes.</strong>
+    Students have already submitted attempts. To protect existing attempt histories, you cannot add or delete questions.
+    If you discovered an incorrect answer key, use the <strong>Fix key & regrade</strong> button on that question below to safely correct it and recalculate scores.
   </div>
+  <a href="{% url 'learning:teacher_quiz_action' school_class.pk subject.pk module.pk lesson.pk 'duplicate' %}"
+     class="btn btn-sm flex-shrink-0"
+     style="background:rgba(245,158,11,0.15);border:1px solid var(--color-warning);color:var(--color-warning);">
+    <i class="bi bi-copy me-1" aria-hidden="true"></i>Duplicate quiz
+  </a>
 </div>
 {% endif %}
 
@@ -54,11 +55,18 @@
   <span class="badge {% if quiz.is_published %}bg-success{% else %}bg-secondary{% endif %} px-3 py-2">
     {% if quiz.is_published %}Published{% else %}Draft{% endif %}
   </span>
-  <span class="text-muted-sm">{{ quiz.question_count }} question{{ quiz.question_count|pluralize }}</span>
+  <span class="badge" style="background:var(--color-surface-2);color:var(--accent-light);border:1px solid var(--color-border);">
+    {{ quiz.get_quiz_type_display }}
+  </span>
+  <span class="text-muted-sm">{{ quiz.question_count }} question{{ quiz.question_count|pluralize }} ({{ quiz.total_points }} pt{{ quiz.total_points|pluralize }})</span>
   {% if quiz.pass_mark %}<span class="text-muted-sm">· Pass: {{ quiz.pass_mark }}%</span>{% endif %}
   {% if quiz.time_limit_minutes %}<span class="text-muted-sm">· {{ quiz.time_limit_minutes }} min</span>{% endif %}
 
   <div class="ms-auto d-flex gap-2 flex-wrap">
+    <a href="{% url 'learning:teacher_quiz_preview' school_class.pk subject.pk module.pk lesson.pk %}"
+       class="btn btn-sm btn-outline-info" title="Preview exactly what students see without saving attempts">
+      <i class="bi bi-eye me-1" aria-hidden="true"></i>Preview as student
+    </a>
     <a href="{% url 'learning:teacher_quiz_settings' school_class.pk subject.pk module.pk lesson.pk %}"
        class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-gear me-1" aria-hidden="true"></i>Settings
@@ -67,6 +75,16 @@
        class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-bar-chart me-1" aria-hidden="true"></i>Results
     </a>
+
+    {% if quiz.answer_visibility == 'when_released' and not quiz.answers_released %}
+    <form method="post" action="{% url 'learning:teacher_quiz_action' school_class.pk subject.pk module.pk lesson.pk 'release_answers' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Release answers and explanations to students now?');">
+        <i class="bi bi-unlock me-1" aria-hidden="true"></i>Release answers
+      </button>
+    </form>
+    {% endif %}
+
     {% if quiz.is_published %}
     <form method="post" action="{% url 'learning:teacher_quiz_action' school_class.pk subject.pk module.pk lesson.pk 'unpublish' %}">
       {% csrf_token %}
@@ -85,14 +103,25 @@
   </div>
 </div>
 
-{# ── Question list ── #}
-<div class="d-flex align-items-center justify-content-between mb-3">
-  <h2 style="font-size:1rem;font-weight:700;color:#fff;margin:0;">Questions</h2>
+{# ── Question list Header & Bulk Actions ── #}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h2 style="font-size:1rem;font-weight:700;color:#fff;margin:0;">
+    Questions ({{ questions|length }})
+  </h2>
   {% if not is_locked %}
-  <a href="{% url 'learning:teacher_add_question' school_class.pk subject.pk module.pk lesson.pk %}"
-     class="btn btn-primary btn-sm">
-    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add question
-  </a>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'learning:teacher_quiz_fast_entry' school_class.pk subject.pk module.pk lesson.pk %}"
+       class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-list-task me-1" aria-hidden="true"></i>Paste many questions
+    </a>
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#csvImportModal">
+      <i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>Import CSV
+    </button>
+    <a href="{% url 'learning:teacher_add_question' school_class.pk subject.pk module.pk lesson.pk %}"
+       class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add question
+    </a>
+  </div>
   {% endif %}
 </div>
 
@@ -100,16 +129,16 @@
 <div class="card">
   <div class="card-body text-center py-4 text-muted-sm">
     <i class="bi bi-chat-square-dots fs-1 d-block mb-2" aria-hidden="true"></i>
-    No questions yet. Click "Add question" to start building the quiz.
+    No questions yet. Click "Add question" or "Paste many questions" to start building.
   </div>
 </div>
 {% else %}
-<div class="d-flex flex-column gap-2">
+<div class="d-flex flex-column gap-3">
 {% for qwc in questions %}
 {% with q=qwc.question %}
 <div class="card">
   <div class="card-header d-flex align-items-center gap-2">
-    {# Reorder #}
+    {# Move up/down (works without JS) #}
     {% if not is_locked %}
     <div class="d-flex flex-column gap-1 flex-shrink-0">
       <form method="post" action="{% url 'learning:teacher_move_question' school_class.pk subject.pk module.pk lesson.pk q.pk 'up' %}">
@@ -124,12 +153,32 @@
     {% endif %}
 
     <div class="flex-grow-1">
-      <div class="fw-600" style="font-size:0.875rem;">Q{{ forloop.counter }}. {{ q.body|truncatechars:100 }}</div>
-      <div class="text-muted-sm" style="font-size:0.75rem;">{{ q.get_question_type_display }}</div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="fw-600" style="font-size:0.875rem;">Q{{ forloop.counter }}. {{ q.body|truncatechars:100 }}</span>
+        <span class="badge" style="background:var(--color-surface-2);color:var(--color-muted);font-size:0.7rem;font-weight:400;">
+          {{ q.get_question_type_display }} · {{ q.points }} pt{{ q.points|pluralize }}
+        </span>
+        {% if q.partial_credit %}
+        <span class="badge bg-info text-dark" style="font-size:0.68rem;">Partial credit</span>
+        {% endif %}
+        {% if q.allow_minor_typos %}
+        <span class="badge bg-secondary" style="font-size:0.68rem;">Typo tolerant</span>
+        {% endif %}
+      </div>
     </div>
 
-    {% if not is_locked %}
+    {# Question card actions #}
     <div class="d-flex gap-1 flex-shrink-0">
+      {% if is_locked %}
+      <a href="{% url 'learning:teacher_quiz_regrade' school_class.pk subject.pk module.pk lesson.pk q.pk %}"
+         class="btn btn-sm btn-outline-warning" title="Fix answer key and regrade all submissions">
+        <i class="bi bi-magic me-1"></i>Fix key & regrade
+      </a>
+      {% else %}
+      <form method="post" action="{% url 'learning:teacher_duplicate_question' school_class.pk subject.pk module.pk lesson.pk q.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm cb-btn-icon" title="Duplicate question"><i class="bi bi-copy" aria-hidden="true"></i></button>
+      </form>
       <a href="{% url 'learning:teacher_edit_question' school_class.pk subject.pk module.pk lesson.pk q.pk %}"
          class="btn btn-sm cb-btn-icon" title="Edit question"><i class="bi bi-pencil" aria-hidden="true"></i></a>
       <form method="post" action="{% url 'learning:teacher_delete_question' school_class.pk subject.pk module.pk lesson.pk q.pk %}"
@@ -137,23 +186,47 @@
         {% csrf_token %}
         <button type="submit" class="btn btn-sm cb-btn-danger" title="Delete"><i class="bi bi-trash3" aria-hidden="true"></i></button>
       </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card-body py-2">
+    {% if q.image %}
+    <div class="mb-2">
+      <img src="{{ q.image.url }}" alt="Question diagram" style="max-height:120px;border-radius:4px;border:1px solid var(--color-border);">
     </div>
     {% endif %}
-  </div>
-  <div class="card-body py-2">
-    {% for c in qwc.choices %}
-    <div class="d-flex align-items-center gap-2 py-1">
-      {% if c.is_correct %}
-      <i class="bi bi-check-circle-fill" style="color:var(--color-success);" aria-label="Correct answer"></i>
-      {% else %}
-      <i class="bi bi-circle" style="color:var(--color-muted);" aria-label="Wrong answer"></i>
-      {% endif %}
-      <span style="font-size:0.875rem;">{{ c.text }}</span>
-    </div>
-    {% endfor %}
+
+    {# Choices or accepted answers #}
+    {% if q.question_type == 'fill_blank' %}
+      <div class="text-muted-sm" style="font-size:0.82rem;">
+        <strong>Accepted answers:</strong>
+        {% for a in q.accepted_answers %}
+          <span class="badge bg-success-subtle text-success me-1">{{ a }}</span>
+        {% empty %}
+          <span class="text-danger">None specified</span>
+        {% endfor %}
+      </div>
+    {% elif q.question_type == 'short_answer' %}
+      <div class="text-muted-sm" style="font-size:0.82rem;font-style:italic;">
+        Open-ended student response. Marked manually by teacher.
+      </div>
+    {% else %}
+      {% for c in qwc.choices %}
+      <div class="d-flex align-items-center gap-2 py-1">
+        {% if c.is_correct %}
+        <i class="bi bi-check-circle-fill" style="color:var(--color-success);" aria-label="Correct answer"></i>
+        {% else %}
+        <i class="bi bi-circle" style="color:var(--color-muted);" aria-label="Wrong answer"></i>
+        {% endif %}
+        <span style="font-size:0.875rem;{% if c.is_correct %}color:var(--color-success);font-weight:600;{% endif %}">{{ c.text }}</span>
+      </div>
+      {% endfor %}
+    {% endif %}
+
     {% if q.explanation %}
-    <div class="text-muted-sm mt-2" style="font-size:0.78rem;">
-      <i class="bi bi-info-circle me-1" aria-hidden="true"></i>{{ q.explanation|truncatechars:80 }}
+    <div class="text-muted-sm mt-2 p-2 rounded" style="background:var(--color-surface-2);font-size:0.78rem;">
+      <i class="bi bi-info-circle me-1" style="color:var(--accent-light);" aria-hidden="true"></i>{{ q.explanation }}
     </div>
     {% endif %}
   </div>
@@ -163,5 +236,40 @@
 </div>
 {% endif %}
 
+{# ── CSV Import Modal ── #}
+<div class="modal fade" id="csvImportModal" tabindex="-1" aria-labelledby="csvModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" style="background:var(--color-surface);color:var(--color-text);border:1px solid var(--color-border);">
+      <div class="modal-header">
+        <h5 class="modal-title" id="csvModalLabel">Import Questions from CSV</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'learning:teacher_quiz_csv_import' school_class.pk subject.pk module.pk lesson.pk %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+          <p class="text-muted-sm" style="font-size:0.85rem;">
+            Upload a CSV file containing your questions. You can download our formatted template below:
+          </p>
+          <div class="mb-3">
+            <a href="{% url 'learning:teacher_quiz_csv_template' school_class.pk subject.pk module.pk lesson.pk %}"
+               class="btn btn-sm btn-outline-info">
+              <i class="bi bi-download me-1"></i>Download CSV Template
+            </a>
+          </div>
+          <div class="mb-3">
+            <label for="id_csv_file" class="form-label fw-600">Select CSV file</label>
+            <input type="file" class="form-control" id="id_csv_file" name="csv_file" accept=".csv" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-upload me-1"></i>Upload & Import</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% endif %}
 {% endblock %}
+

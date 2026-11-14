@@ -265,11 +265,6 @@ urlpatterns = [
         name="teacher_quiz_settings",
     ),
     path(
-        "teaching/<int:class_id>/<int:subject_id>/modules/<int:module_id>/lessons/<int:lesson_id>/quiz/<str:action>/",
-        views.TeacherQuizPublishView.as_view(),
-        name="teacher_quiz_action",
-    ),
-    path(
         "teaching/<int:class_id>/<int:subject_id>/modules/<int:module_id>/lessons/<int:lesson_id>/quiz/questions/add/",
         views.TeacherAddQuestionView.as_view(),
         name="teacher_add_question",
@@ -290,9 +285,44 @@ urlpatterns = [
         name="teacher_move_question",
     ),
     path(
+        "teaching/<int:class_id>/<int:subject_id>/modules/<int:module_id>/lessons/<int:lesson_id>/quiz/questions/<int:question_id>/duplicate/",
+        views.TeacherDuplicateQuestionView.as_view(),
+        name="teacher_duplicate_question",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/modules/<int:module_id>/lessons/<int:lesson_id>/quiz/questions/<int:question_id>/regrade/",
+        views.TeacherQuizRegradeView.as_view(),
+        name="teacher_quiz_regrade",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/modules/<int:module_id>/lessons/<int:lesson_id>/quiz/fast-entry/",
+        views.TeacherQuizFastEntryView.as_view(),
+        name="teacher_quiz_fast_entry",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/modules/<int:module_id>/lessons/<int:lesson_id>/quiz/csv-template/",
+        views.TeacherQuizCsvTemplateView.as_view(),
+        name="teacher_quiz_csv_template",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/modules/<int:module_id>/lessons/<int:lesson_id>/quiz/csv-import/",
+        views.TeacherQuizCsvImportView.as_view(),
+        name="teacher_quiz_csv_import",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/modules/<int:module_id>/lessons/<int:lesson_id>/quiz/preview/",
+        views.TeacherQuizPreviewView.as_view(),
+        name="teacher_quiz_preview",
+    ),
+    path(
         "teaching/<int:class_id>/<int:subject_id>/modules/<int:module_id>/lessons/<int:lesson_id>/quiz/results/",
         views.TeacherQuizResultsView.as_view(),
         name="teacher_quiz_results",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/modules/<int:module_id>/lessons/<int:lesson_id>/quiz/<str:action>/",
+        views.TeacherQuizPublishView.as_view(),
+        name="teacher_quiz_action",
     ),
 
     # Student quiz

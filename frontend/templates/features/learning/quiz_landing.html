@@ -24,10 +24,26 @@
     <p style="font-size:0.9rem;line-height:1.7;margin-bottom:1rem;">{{ quiz.instructions }}</p>
     <hr style="border-color:var(--color-border);">
     {% endif %}
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="badge" style="background:var(--color-surface-2);color:var(--accent-light);border:1px solid var(--color-border);">
+        {{ quiz.get_quiz_type_display }}
+      </span>
+      {% if not quiz.is_open_now %}
+      <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Closed</span>
+      {% endif %}
+    </div>
+
+    {% if quiz.open_date or quiz.close_date %}
+    <div class="p-2 mb-3 rounded text-muted-sm" style="background:var(--color-surface-2);font-size:0.8rem;border:1px solid var(--color-border);">
+      {% if quiz.open_date %}<div><i class="bi bi-calendar-event me-1"></i>Opens: {{ quiz.open_date|date:"D, d M Y H:i" }}</div>{% endif %}
+      {% if quiz.close_date %}<div><i class="bi bi-calendar-x me-1"></i>Closes: {{ quiz.close_date|date:"D, d M Y H:i" }}</div>{% endif %}
+    </div>
+    {% endif %}
+
     <div class="row g-2 text-center mb-3">
       <div class="col-4">
         <div class="fw-600" style="font-size:1.25rem;color:#fff;">{{ quiz.question_count }}</div>
-        <div class="text-muted-sm">Question{{ quiz.question_count|pluralize }}</div>
+        <div class="text-muted-sm">{{ quiz.total_points }} pt{{ quiz.total_points|pluralize }}</div>
       </div>
       <div class="col-4">
         <div class="fw-600" style="font-size:1.25rem;color:#fff;">{{ quiz.pass_mark }}%</div>

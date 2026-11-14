@@ -1,0 +1,105 @@
+{% extends base_template %}
+{% block title %}Fix Answer Key & Regrade · Q{{ question.position|add:1 }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-magic me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Fix Answer Key & Regrade
+    </h1>
+    <p class="page-subtitle">{{ quiz.title }} · {{ lesson.title }}</p>
+  </div>
+  <a href="{% url 'learning:teacher_quiz' school_class.pk subject.pk module.pk lesson.pk %}"
+     class="btn btn-outline-secondary btn-sm mt-1">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to quiz builder
+  </a>
+</div>
+
+<div class="alert alert-warning mb-4" role="alert">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  <strong>Important:</strong> There are <strong>{{ submitted_count }}</strong> submitted student attempt{{ submitted_count|pluralize }} for this quiz.
+  Saving a corrected answer key will immediately recalculate all student scores server-side and update their pass/fail status.
+  This action is recorded in the permanent audit trail.
+</div>
+
+<div class="card" style="max-width:680px;">
+  <div class="card-header">
+    <span class="badge" style="background:var(--color-surface-2);color:var(--accent-light);float:right;">
+      {{ question.get_question_type_display }} · {{ question.points }} pt{{ question.points|pluralize }}
+    </span>
+    <h2 class="card-title" style="font-size:1rem;margin:0;">
+      Question {{ question.position|add:1 }}: {{ question.body }}
+    </h2>
+  </div>
+  <div class="card-body">
+    <form method="post" id="regrade-form">
+      {% csrf_token %}
+
+      {# ── Correct answer selection ── #}
+      {% if question.question_type == 'mc' or question.question_type == 'tf' %}
+      <div class="mb-3">
+        <label class="form-label fw-600">Select the correct choice</label>
+        {% for c in choices %}
+        <div class="form-check p-2 rounded mb-2" style="border:1px solid var(--color-border);background:var(--color-surface-2);">
+          <input class="form-check-input ms-0 me-2" type="radio" name="correct_choice_pk"
+                 id="choice-{{ c.pk }}" value="{{ c.pk }}"
+                 {% if c.is_correct %}checked{% endif %} required>
+          <label class="form-check-label fw-600" for="choice-{{ c.pk }}">
+            {{ c.text }}
+            {% if c.is_correct %}<span class="badge bg-success ms-2">Currently marked correct</span>{% endif %}
+          </label>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% elif question.question_type == 'select_all' %}
+      <div class="mb-3">
+        <label class="form-label fw-600">Check all correct choices</label>
+        {% for c in choices %}
+        <div class="form-check p-2 rounded mb-2" style="border:1px solid var(--color-border);background:var(--color-surface-2);">
+          <input class="form-check-input ms-0 me-2" type="checkbox" name="correct_choice_pks"
+                 id="choice-{{ c.pk }}" value="{{ c.pk }}"
+                 {% if c.is_correct %}checked{% endif %}>
+          <label class="form-check-label fw-600" for="choice-{{ c.pk }}">
+            {{ c.text }}
+            {% if c.is_correct %}<span class="badge bg-success ms-2">Currently marked correct</span>{% endif %}
+          </label>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% elif question.question_type == 'fill_blank' %}
+      <div class="mb-3">
+        <label for="id_accepted" class="form-label fw-600">Accepted text answers (one per line)</label>
+        <textarea class="form-control" id="id_accepted" name="accepted_answers" rows="4" required>{{ accepted_answers_str }}</textarea>
+        <div class="text-muted-sm mt-1" style="font-size:0.78rem;">
+          Any student whose answer matches one of these strings will now be awarded full points.
+        </div>
+      </div>
+      {% endif %}
+
+      {# ── Mandatory Reason for Audit Log ── #}
+      <div class="mb-4">
+        <label for="id_reason" class="form-label fw-600">
+          Reason for regrade <span style="color:var(--color-danger);">*</span>
+        </label>
+        <textarea class="form-control" id="id_reason" name="reason" rows="2" required
+                  placeholder="e.g. Choice B was mistakenly marked as correct instead of Choice A in the original key."></textarea>
+        <div class="text-muted-sm mt-1" style="font-size:0.78rem;">
+          This reason will be recorded with your user name and timestamp in the quiz audit log.
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-warning"
+                onclick="return confirm('Regrade all student attempts with this updated answer key?');">
+          <i class="bi bi-arrow-repeat me-1"></i>Apply Key & Regrade Attempts
+        </button>
+        <a href="{% url 'learning:teacher_quiz' school_class.pk subject.pk module.pk lesson.pk %}"
+           class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

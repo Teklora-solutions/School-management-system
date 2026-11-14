@@ -7,13 +7,31 @@
     <i class="bi bi-sliders me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
     {% if quiz %}Edit Quiz Settings{% else %}Create Quiz{% endif %}
   </h1>
-  <p class="page-subtitle">{{ lesson.title }} · {{ school_class.name }}</p>
+  <p class="page-subtitle">{{ lesson.title }} · {{ school_class.name }} · Africa/Nairobi time</p>
 </div>
 
-<div class="card" style="max-width:600px;">
+<div class="card" style="max-width:680px;">
   <div class="card-body">
-    <form method="post" novalidate>
+    <form method="post" novalidate id="quiz-settings-form">
       {% csrf_token %}
+
+      {# ── Quiz Type ── #}
+      <div class="mb-3">
+        <label for="id_quiz_type" class="form-label fw-600">Quiz Type</label>
+        <select class="form-select" id="id_quiz_type" name="quiz_type"
+                style="background:var(--color-surface-2);color:var(--color-text);border-color:var(--color-border);">
+          {% for val, label in quiz_types %}
+          <option value="{{ val }}" {% if quiz and quiz.quiz_type == val %}{% elif not quiz and val == 'lesson_check' %}selected{% elif quiz and quiz.quiz_type == val %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+        <div class="text-muted-sm mt-1" style="font-size:0.78rem;">
+          <strong>Lesson check:</strong> practice, unlimited attempts, answers shown immediately.<br>
+          <strong>Module quiz:</strong> 3 attempts, 60% pass mark.<br>
+          <strong>Final exam:</strong> 1 attempt, answers hidden until teacher releases them, 70% pass mark.
+        </div>
+      </div>
 
       <div class="mb-3">
         <label for="id_title" class="form-label fw-600">Quiz title <span style="color:var(--color-danger);">*</span></label>
@@ -24,7 +42,7 @@
       <div class="mb-3">
         <label for="id_instructions" class="form-label fw-600">Instructions <span class="text-muted-sm">(optional)</span></label>
         <textarea class="form-control" id="id_instructions" name="instructions" rows="2"
-                  placeholder="e.g. Read each question carefully. You have 10 minutes.">{{ quiz.instructions|default:'' }}</textarea>
+                  placeholder="e.g. Read each question carefully.">{{ quiz.instructions|default:'' }}</textarea>
       </div>
 
       <div class="row g-3 mb-3">
@@ -38,7 +56,7 @@
           <select class="form-select" id="id_attempts" name="attempts_allowed"
                   style="background:var(--color-surface-2);color:var(--color-text);border-color:var(--color-border);">
             {% for val, label in attempt_choices %}
-            <option value="{{ val }}" {% if quiz and quiz.attempts_allowed == val %}selected{% elif not quiz and val == 1 %}selected{% endif %}>
+            <option value="{{ val }}" {% if quiz and quiz.attempts_allowed == val %}selected{% elif not quiz and val == 0 %}selected{% endif %}>
               {{ label }}
             </option>
             {% endfor %}
@@ -46,19 +64,58 @@
         </div>
       </div>
 
-      <div class="mb-3">
-        <label for="id_time_limit" class="form-label fw-600">Time limit (minutes) <span class="text-muted-sm">— leave blank for no limit</span></label>
-        <input type="number" class="form-control" id="id_time_limit" name="time_limit_minutes"
-               min="1" max="300" style="max-width:140px;"
-               value="{{ quiz.time_limit_minutes|default:'' }}" placeholder="e.g. 20">
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+          <label for="id_time_limit" class="form-label fw-600">Time limit (minutes) <span class="text-muted-sm">— leave blank for none</span></label>
+          <input type="number" class="form-control" id="id_time_limit" name="time_limit_minutes"
+                 min="1" max="300"
+                 value="{{ quiz.time_limit_minutes|default:'' }}" placeholder="e.g. 20">
+        </div>
+        <div class="col-sm-6">
+          <label for="id_grading_policy" class="form-label fw-600">Which attempt counts?</label>
+          <select class="form-select" id="id_grading_policy" name="grading_policy"
+                  style="background:var(--color-surface-2);color:var(--color-text);border-color:var(--color-border);">
+            {% for val, label in policy_choices %}
+            <option value="{{ val }}" {% if quiz and quiz.grading_policy == val %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
 
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+          <label for="id_open_date" class="form-label fw-600">Open Date & Time <span class="text-muted-sm">(Nairobi)</span></label>
+          <input type="datetime-local" class="form-control" id="id_open_date" name="open_date"
+                 value="{{ quiz.open_date|date:'Y-m-d\TH:i'|default:'' }}">
+        </div>
+        <div class="col-sm-6">
+          <label for="id_close_date" class="form-label fw-600">Close Date & Time <span class="text-muted-sm">(Nairobi)</span></label>
+          <input type="datetime-local" class="form-control" id="id_close_date" name="close_date"
+                 value="{{ quiz.close_date|date:'Y-m-d\TH:i'|default:'' }}">
+        </div>
+      </div>
+
+      {# ── Visibility & Shuffling ── #}
       <div class="mb-3 p-3 rounded" style="background:var(--color-surface-2);border:1px solid var(--color-border);">
+        <div class="mb-3">
+          <label for="id_visibility" class="form-label fw-600">When do students see correct answers & explanations?</label>
+          <select class="form-select" id="id_visibility" name="answer_visibility"
+                  style="background:var(--color-surface);color:var(--color-text);border-color:var(--color-border);">
+            {% for val, label in visibility_choices %}
+            <option value="{{ val }}" {% if quiz and quiz.answer_visibility == val %}selected{% elif not quiz and val == 'after_submit' %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" role="switch"
                  id="id_shuffle_q" name="shuffle_questions" value="1"
                  {% if quiz and quiz.shuffle_questions %}checked{% endif %}>
-          <label class="form-check-label" for="id_shuffle_q">Shuffle question order</label>
+          <label class="form-check-label" for="id_shuffle_q">Shuffle questions for each attempt</label>
         </div>
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" role="switch"
@@ -71,20 +128,29 @@
                  id="id_show_correct" name="show_correct_after" value="1"
                  {% if not quiz or quiz.show_correct_after %}checked{% endif %}>
           <label class="form-check-label" for="id_show_correct">
-            Show correct answers after submission
+            Allow answer review after submission (toggle master switch)
           </label>
         </div>
-        <div class="text-muted-sm" style="font-size:0.78rem;">
-          Turn this off for formal assessments where you don't want students to see answers.
+
+        {% if quiz and quiz.answer_visibility == 'when_released' %}
+        <div class="form-check form-switch mb-2 mt-3 p-2 rounded" style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);">
+          <input class="form-check-input ms-0 me-2" type="checkbox" role="switch"
+                 id="id_answers_released" name="answers_released" value="1"
+                 {% if quiz.answers_released %}checked{% endif %}>
+          <label class="form-check-label fw-600" for="id_answers_released">
+            Release answers now (students can view their reviews)
+          </label>
         </div>
+        {% endif %}
+
         {% if quiz %}
-        <div class="form-check form-switch mt-2">
+        <div class="form-check form-switch mt-3">
           <input class="form-check-input" type="checkbox" role="switch"
                  id="id_gradebook" name="counts_for_gradebook" value="1"
                  {% if quiz.counts_for_gradebook %}checked{% endif %}>
           <label class="form-check-label" for="id_gradebook">
             Count for gradebook
-            <span class="text-muted-sm">(best attempt feeds the class average)</span>
+            <span class="text-muted-sm">(feeds the student's academic report)</span>
           </label>
         </div>
         {% endif %}
@@ -102,3 +168,41 @@
   </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  {% if not quiz %}
+  // Auto-apply defaults when changing quiz type on creation
+  var typeSelect = document.getElementById('id_quiz_type');
+  var attempts = document.getElementById('id_attempts');
+  var passMark = document.getElementById('id_pass_mark');
+  var visibility = document.getElementById('id_visibility');
+  var showCorrect = document.getElementById('id_show_correct');
+
+  if (typeSelect) {
+    typeSelect.addEventListener('change', function() {
+      var val = this.value;
+      if (val === 'final_exam') {
+        if (attempts) attempts.value = '1';
+        if (passMark) passMark.value = '70';
+        if (visibility) visibility.value = 'when_released';
+        if (showCorrect) showCorrect.checked = false;
+      } else if (val === 'module_quiz') {
+        if (attempts) attempts.value = '3';
+        if (passMark) passMark.value = '60';
+        if (visibility) visibility.value = 'after_submit';
+        if (showCorrect) showCorrect.checked = true;
+      } else { // lesson_check
+        if (attempts) attempts.value = '0'; // unlimited
+        if (passMark) passMark.value = '50';
+        if (visibility) visibility.value = 'after_submit';
+        if (showCorrect) showCorrect.checked = true;
+      }
+    });
+  }
+  {% endif %}
+})();
+</script>
+{% endblock %}
+
