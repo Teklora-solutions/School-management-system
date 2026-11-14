@@ -1,10 +1,31 @@
 """Template helpers shared across app templates."""
 
+import os
+
 from django import template
+from django.contrib.staticfiles import finders
+from django.templatetags.static import static
 
 from apps.core.money import format_money, to_money
 
 register = template.Library()
+
+
+@register.simple_tag
+def static_v(path):
+    """
+    Static URL carrying the file's modification time as ``?v=``.
+
+    Dev serves stylesheets and scripts from unhashed URLs, so a browser may hold
+    an old copy for hours after an edit. The mtime changes with every save,
+    which retires that cache entry. It is harmless once URLs are hashed, and a
+    missing file falls back to the plain URL.
+    """
+    url = static(path)
+    absolute = finders.find(path)
+    if not absolute:
+        return url
+    return f"{url}?v={int(os.path.getmtime(absolute))}"
 
 
 @register.filter

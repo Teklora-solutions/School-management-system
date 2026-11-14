@@ -1,4 +1,4 @@
-{% load static %}
+{% load static core_extras %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -8,7 +8,7 @@
   <title>{{ portal.heading }} Sign In | {{ SCHOOL_NAME }}</title>
   <link rel="stylesheet" href="{% static 'vendor/bootstrap/5.3.3/bootstrap.min.css' %}">
   <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">
-  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <link rel="stylesheet" href="{% static_v 'css/base.css' %}">
 </head>
 {# data-role drives the accent colours in css/base.css, so each portal is its own colour #}
 <body data-role="{{ portal.slug }}">
@@ -91,7 +91,7 @@
 </div>
 
 <script src="{% static 'vendor/bootstrap/5.3.3/bootstrap.bundle.min.js' %}"></script>
-<script src="{% static 'js/base.js' %}"></script>
+<script src="{% static_v 'js/base.js' %}"></script>
 <script>
   const toggleBtn = document.getElementById('toggle-password');
   const pwField = document.getElementById('id_login_password');
