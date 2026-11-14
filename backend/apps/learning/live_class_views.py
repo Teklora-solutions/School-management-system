@@ -21,7 +21,7 @@ from apps.academics.models import SchoolClass, Subject
 from apps.core.features import feature_disabled_message, feature_enabled
 from apps.core.mixins import RoleRequiredMixin, TeacherRequiredMixin
 from apps.learning import calendar_selectors, live_class_selectors, live_class_services
-from apps.learning.live_class_forms import LiveClassSessionForm
+from apps.learning.live_class_forms import LiveClassRecordingForm, LiveClassSessionForm
 from apps.learning.models import LiveClassSession
 from apps.learning.views import LearningEnabledMixin, StudentOrParentMixin, _resolve_student
 
@@ -238,6 +238,89 @@ class TeacherLiveClassActionView(TeacherRequiredMixin, LiveClassesEnabledMixin, 
         return redirect("learning:live_session_detail", session_id=session.pk)
 
 
+class TeacherLiveClassRecordingView(TeacherRequiredMixin, LiveClassesEnabledMixin, View):
+    """Attach a recording link to a finished (or running) session."""
+
+    template_name = "features/learning/live_recording_form.html"
+
+    def _get_session(self, request, class_id, subject_id, session_id):
+        session = live_class_selectors.get_live_session(session_id)
+        if session.school_class_id != class_id or session.subject_id != subject_id:
+            raise PermissionDenied("Session does not belong to this classroom.")
+        if not live_class_services.teacher_can_access_classroom(
+            request.user, session.school_class, session.subject
+        ):
+            raise PermissionDenied("You are not assigned to this classroom.")
+        return session
+
+    def get(self, request, class_id: int, subject_id: int, session_id: int):
+        session = self._get_session(request, class_id, subject_id, session_id)
+        form = LiveClassRecordingForm(
+            instance=session,
+            school_class=session.school_class,
+            subject=session.subject,
+        )
+        return render(
+            request,
+            self.template_name,
+            {"session": session, "form": form},
+        )
+
+    def post(self, request, class_id: int, subject_id: int, session_id: int):
+        session = self._get_session(request, class_id, subject_id, session_id)
+        form = LiveClassRecordingForm(
+            request.POST,
+            instance=session,
+            school_class=session.school_class,
+            subject=session.subject,
+        )
+        if form.is_valid():
+            try:
+                live_class_services.attach_recording(
+                    session=session,
+                    recording_url=form.cleaned_data["recording_url"],
+                    lesson=form.cleaned_data["recording_lesson"],
+                    notice_given=form.cleaned_data["notice_given"],
+                    actor=request.user,
+                    request=request,
+                )
+                messages.success(
+                    request,
+                    "Recording link saved. The class can now watch it"
+                    + (
+                        f", and it also appears on '{session.recording_lesson.title}'."
+                        if session.recording_lesson_id
+                        else "."
+                    ),
+                )
+                return redirect("learning:live_session_detail", session_id=session.pk)
+            except ValidationError as exc:
+                form.add_error(None, exc)
+        return render(
+            request,
+            self.template_name,
+            {"session": session, "form": form},
+        )
+
+
+class TeacherLiveClassRecordingRemoveView(TeacherRequiredMixin, LiveClassesEnabledMixin, View):
+    """Remove a session's recording link."""
+
+    def post(self, request, class_id: int, subject_id: int, session_id: int):
+        session = live_class_selectors.get_live_session(session_id)
+        if session.school_class_id != class_id or session.subject_id != subject_id:
+            raise PermissionDenied("Session does not belong to this classroom.")
+        if not live_class_services.teacher_can_access_classroom(
+            request.user, session.school_class, session.subject
+        ):
+            raise PermissionDenied("You are not assigned to this classroom.")
+        live_class_services.remove_recording(
+            session=session, actor=request.user, request=request
+        )
+        messages.info(request, "Recording link removed.")
+        return redirect("learning:live_session_detail", session_id=session.pk)
+
+
 # ── Shared detail view ────────────────────────────────────────────────────
 
 
@@ -257,6 +340,16 @@ class LiveClassDetailView(RoleRequiredMixin, LiveClassesEnabledMixin, View):
         if request.user.role == "student":
             student = _resolve_student(request)
             has_joined = live_class_selectors.has_student_joined(session, student)
+        recording_visible = bool(session.recording_url) and (
+            is_teacher
+            or session.status != LiveClassSession.Status.CANCELLED
+        )
+        can_add_recording = (
+            is_teacher
+            and not session.recording_url
+            and session.status != LiveClassSession.Status.CANCELLED
+            and timezone.now() >= session.scheduled_start
+        )
         return render(
             request,
             self.template_name,
@@ -265,6 +358,8 @@ class LiveClassDetailView(RoleRequiredMixin, LiveClassesEnabledMixin, View):
                 "attendances": attendances,
                 "is_teacher": is_teacher,
                 "has_joined": has_joined,
+                "recording_visible": recording_visible,
+                "can_add_recording": can_add_recording,
             },
         )
 

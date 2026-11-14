@@ -116,6 +116,45 @@
         </div>
         {% endif %}
 
+        {% if recording_visible %}
+        <div class="p-3 mb-4 rounded" style="background:var(--color-surface-2);border:1px solid var(--color-border);">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div>
+              <div class="text-muted-sm small">Session recording</div>
+              <div class="fw-bold text-white">
+                <i class="bi bi-play-circle me-1" aria-hidden="true"></i>Watch the recorded lesson
+              </div>
+              {% if session.recording_lesson %}
+              <div class="text-muted-sm small">Also on the lesson: {{ session.recording_lesson.title }}</div>
+              {% endif %}
+              {% if is_teacher and session.recording_added_at %}
+              <div class="text-muted-sm small">
+                Added {{ session.recording_added_at|date:"j M Y, g:i A" }}{% if session.recording_added_by %} by {{ session.recording_added_by.get_full_name|default:session.recording_added_by.username }}{% endif %}
+              </div>
+              {% endif %}
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <a href="{{ session.recording_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">
+                <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Watch recording
+              </a>
+              {% if is_teacher %}
+              <a href="{% url 'learning:teacher_live_recording' session.school_class.pk session.subject.pk session.pk %}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
+              </a>
+              <form method="post" action="{% url 'learning:teacher_live_recording_remove' session.school_class.pk session.subject.pk session.pk %}"
+                    onsubmit="return confirm('Remove the recording link from this session?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-trash me-1" aria-hidden="true"></i>Remove
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+          {% include "features/learning/_recording_notice.html" with compact=True %}
+        </div>
+        {% endif %}
+
         {# Teacher controls #}
         {% if is_teacher and session.status != 'cancelled' and session.status != 'completed' %}
         <hr class="border-secondary-subtle my-4">
@@ -139,6 +178,11 @@
             <a href="{% url 'learning:teacher_live_edit' session.school_class.pk session.subject.pk session.pk %}" class="btn btn-sm btn-outline-secondary">
               <i class="bi bi-pencil me-1"></i>Edit
             </a>
+            {% if can_add_recording %}
+            <a href="{% url 'learning:teacher_live_recording' session.school_class.pk session.subject.pk session.pk %}" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-record-circle me-1"></i>Add recording
+            </a>
+            {% endif %}
           </div>
 
           <form method="post" action="{% url 'learning:teacher_live_cancel' session.school_class.pk session.subject.pk session.pk %}"
@@ -149,6 +193,9 @@
             </button>
           </form>
         </div>
+        {% if not session.recording_url and not can_add_recording %}
+        <p class="text-muted-sm small mt-3 mb-0">You can add a recording link once the session has started.</p>
+        {% endif %}
         {% endif %}
 
       </div>

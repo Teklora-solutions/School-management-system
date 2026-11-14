@@ -93,6 +93,17 @@ def get_upcoming_sessions_for_teacher(
     return list(qs[:limit])
 
 
+def recordings_for_lesson(lesson) -> QuerySet[LiveClassSession]:
+    """Recordings attached to a lesson that its class may watch."""
+    return (
+        LiveClassSession.objects.filter(recording_lesson=lesson)
+        .exclude(recording_url="")
+        .exclude(status=LiveClassSession.Status.CANCELLED)
+        .select_related("subject")
+        .order_by("-scheduled_start")
+    )
+
+
 def get_session_attendances(session_id: int) -> QuerySet[LiveClassAttendance]:
     """Students who joined this live session."""
     return LiveClassAttendance.objects.filter(

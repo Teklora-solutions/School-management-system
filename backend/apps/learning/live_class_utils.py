@@ -31,6 +31,37 @@ def normalize_meeting_url(url: str) -> str:
     return "https://" + url
 
 
+def validate_recording_url(url: str) -> tuple[bool, str]:
+    """
+    Validate a session recording link.
+
+    Recordings are hosted elsewhere (Drive, YouTube, the meeting provider), so
+    any public host is accepted; only the scheme and the host itself are
+    constrained.
+    """
+    norm_url = normalize_meeting_url(url)
+    if not norm_url:
+        return False, "Paste the recording link."
+
+    try:
+        parsed = urlparse(norm_url)
+    except Exception:
+        return False, "Invalid URL structure."
+
+    if parsed.scheme not in ("http", "https"):
+        return False, "Recording link must use HTTP or HTTPS."
+
+    hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        return False, "Invalid host in recording URL."
+    if hostname in ("localhost", "127.0.0.1", "0.0.0.0", "::1"):
+        return False, "Recording link cannot be a local address."
+    if parsed.username or parsed.password:
+        return False, "Recording link must not contain a username or password."
+
+    return True, ""
+
+
 def validate_meeting_url(url: str, platform: str = "google_meet") -> tuple[bool, str]:
     """
     Validate that the given URL is safe and corresponds to the declared platform.

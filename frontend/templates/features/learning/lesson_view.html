@@ -59,11 +59,7 @@
   {% endif %}
 </div>
 
-{# ══════════════════════════════════════════════════════════════════
-   VIDEO — click-to-load. No video data downloads until student taps.
-   Uses youtube-nocookie.com for privacy. Thumbnail from img.youtube.com
-   (static image CDN, no cookies). That is the only external request.
-═══════════════════════════════════════════════════════════════════ #}
+{# Video — click-to-load, youtube-nocookie for privacy #}
 {% if lesson.video_url %}
 <div class="card lv-video-card mb-4" id="video-section">
 
@@ -132,9 +128,7 @@
 </div>
 {% endif %}
 
-{# ══════════════════════════════════════════════════════════════════
-   NOTES — safe HTML from markdown_utils.render_notes()
-═══════════════════════════════════════════════════════════════════ #}
+{# Notes — safe HTML from markdown_utils.render_notes() #}
 {% if rendered_notes %}
 <div class="card mb-4">
   <div class="card-header">
@@ -149,9 +143,7 @@
 </div>
 {% endif %}
 
-{# ══════════════════════════════════════════════════════════════════
-   ATTACHMENTS
-═══════════════════════════════════════════════════════════════════ #}
+{# Attachments #}
 {% if attachments %}
 <div class="card mb-4">
   <div class="card-header">
@@ -180,9 +172,34 @@
 </div>
 {% endif %}
 
-{# ══════════════════════════════════════════════════════════════════
-   MARK COMPLETE + NEXT/PREV
-═══════════════════════════════════════════════════════════════════ #}
+{# Recordings of live sessions the teacher attached to this lesson #}
+{% if recordings %}
+<div class="card mb-4">
+  <div class="card-header">
+    <h2 class="card-title mb-0" style="font-size:0.9375rem;">
+      <i class="bi bi-camera-video me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Session recordings ({{ recordings|length }})
+    </h2>
+  </div>
+  <div class="card-body">
+    {% include "features/learning/_recording_notice.html" with compact=True %}
+    {% for rec in recordings %}
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 {% if not forloop.last %}mb-3 pb-3{% endif %}"
+         {% if not forloop.last %}style="border-bottom:1px solid var(--color-border);"{% endif %}>
+      <div>
+        <div class="fw-600">{{ rec.title }}</div>
+        <div class="text-muted-sm small">{{ rec.scheduled_start|date:"D, j M Y" }} · {{ rec.subject.name }}</div>
+      </div>
+      <a href="{{ rec.recording_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">
+        <i class="bi bi-play-circle me-1" aria-hidden="true"></i>Watch recording
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# Mark complete + prev/next #}
 {% if not is_preview %}
 <div class="lv-nav-block">
 
@@ -238,12 +255,7 @@
 </div>
 {% endif %}
 
-{# ══════════════════════════════════════════════════════════════════
-   STUDENT PRIVATE NOTES
-   Parents see the section header but can't write. Students get a
-   textarea with autosave (saves on blur, XHR). No teacher ever sees
-   these notes.
-═══════════════════════════════════════════════════════════════════ #}
+{# Private notes — students write, parents read only, teachers never see #}
 {% if not is_preview %}
 <div class="card mt-4" id="my-notes-section">
   <div class="card-header d-flex align-items-center justify-content-between">

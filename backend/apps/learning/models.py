@@ -1358,6 +1358,31 @@ class LiveClassSession(BaseModel):
     passcode = models.CharField(
         max_length=100, blank=True, help_text="Optional meeting password/passcode."
     )
+    recording_url = models.URLField(
+        max_length=500,
+        blank=True,
+        help_text="Link to a recording of this session, shared with the class.",
+    )
+    recording_lesson = models.ForeignKey(
+        "learning.Lesson",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="live_recordings",
+        help_text="Optional lesson page where this recording also appears.",
+    )
+    recording_added_at = models.DateTimeField(null=True, blank=True)
+    recording_added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    recording_notice_acknowledged = models.BooleanField(
+        default=False,
+        help_text="The teacher confirmed the recording notice was given to the class.",
+    )
     scheduled_start = models.DateTimeField(db_index=True)
     duration_minutes = models.PositiveSmallIntegerField(
         default=45,

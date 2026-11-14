@@ -322,6 +322,17 @@ urlpatterns = [
         live_class_views.TeacherLiveClassCancelView.as_view(),
         name="teacher_live_cancel",
     ),
+    # Registered before <str:action> so "/recording/" is not read as an action.
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/live/<int:session_id>/recording/",
+        live_class_views.TeacherLiveClassRecordingView.as_view(),
+        name="teacher_live_recording",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/live/<int:session_id>/recording/remove/",
+        live_class_views.TeacherLiveClassRecordingRemoveView.as_view(),
+        name="teacher_live_recording_remove",
+    ),
     path(
         "teaching/<int:class_id>/<int:subject_id>/live/<int:session_id>/<str:action>/",
         live_class_views.TeacherLiveClassActionView.as_view(),

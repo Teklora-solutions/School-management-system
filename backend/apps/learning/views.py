@@ -144,6 +144,7 @@ class TeacherClassroomDetailView(
                 "published_lessons": published_lessons,
                 "all_terms": all_terms,
                 "selected_term": term,
+                "quizzes_enabled": feature_enabled("quizzes", request=self.request),
             }
         )
         return ctx
@@ -219,6 +220,7 @@ class StudentClassroomDetailView(
                 "total_completed": total_completed,
                 "overall_pct": overall_pct,
                 "next_lesson": next_lesson,
+                "quizzes_enabled": feature_enabled("quizzes", request=self.request),
             }
         )
         return ctx
@@ -1840,6 +1842,7 @@ class LessonPreviewView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView
         rendered_notes = render_notes(lesson.notes, notes_format=lesson.notes_format)
         from .video_utils import parse_video_url
         video_info = parse_video_url(lesson.video_url)
+        from . import live_class_selectors
         return self.render_to_response({
             "lesson": lesson,
             "module": module,
@@ -1850,6 +1853,7 @@ class LessonPreviewView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView
             "completed": False,
             "rendered_notes": rendered_notes,
             "video_info": video_info,
+            "recordings": live_class_selectors.recordings_for_lesson(lesson),
             "next_lp": None,
             "prev_lp": None,
             "student_note": None,
@@ -1976,6 +1980,9 @@ class StudentLessonView(StudentOrParentMixin, LearningEnabledMixin, TemplateView
         from .video_utils import parse_video_url
         video_info = parse_video_url(lesson.video_url)
 
+        from . import live_class_selectors
+        recordings = live_class_selectors.recordings_for_lesson(lesson)
+
         ctx.update({
             "lesson": lesson,
             "module": lesson.module,
@@ -1990,6 +1997,7 @@ class StudentLessonView(StudentOrParentMixin, LearningEnabledMixin, TemplateView
             "student_note": student_note,
             "rendered_notes": rendered_notes,
             "video_info": video_info,
+            "recordings": recordings,
         })
         return ctx
 

@@ -1,0 +1,87 @@
+{% extends base_template %}
+{% block title %}Recording | {{ session.title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-record-circle me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+        Session Recording
+      </h1>
+      <p class="page-subtitle">{{ session.title }} · {{ session.school_class.name }} · {{ session.subject.name }}</p>
+    </div>
+    <a href="{% url 'learning:live_session_detail' session.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to session
+    </a>
+  </div>
+</div>
+
+<div class="card" style="max-width:760px;">
+  <div class="card-body p-4">
+    {% include "features/learning/_recording_notice.html" %}
+
+    <p class="text-muted-sm small mt-3">
+      The video is recorded in Google Meet, Zoom or Teams; this page only stores the link that the class can watch.
+    </p>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for error in form.non_field_errors %}
+        <div><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ error }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label for="{{ form.recording_url.id_for_label }}" class="form-label fw-600">
+          Recording link <span class="text-danger">*</span>
+        </label>
+        {{ form.recording_url }}
+        {% if form.recording_url.errors %}<div class="text-danger small mt-1">{{ form.recording_url.errors.0 }}</div>{% endif %}
+        <div class="form-text text-muted-sm small">
+          Paste the link you copied from the meeting provider, Google Drive, YouTube or Vimeo.
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="{{ form.recording_lesson.id_for_label }}" class="form-label fw-600">
+          Also show on a lesson (optional)
+        </label>
+        {{ form.recording_lesson }}
+        {% if form.recording_lesson.errors %}<div class="text-danger small mt-1">{{ form.recording_lesson.errors.0 }}</div>{% endif %}
+        <div class="form-text text-muted-sm small">
+          Pick the lesson this session covered, so pupils also find the recording on that lesson page.
+        </div>
+      </div>
+
+      <div class="mb-4 form-check">
+        {{ form.notice_given }}
+        <label class="form-check-label" for="{{ form.notice_given.id_for_label }}">
+          {{ form.notice_given.label }}
+        </label>
+        {% if form.notice_given.errors %}<div class="text-danger small mt-1">{{ form.notice_given.errors.0 }}</div>{% endif %}
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+        <a href="{% url 'learning:live_session_detail' session.pk %}" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary px-4">Save recording link</button>
+      </div>
+    </form>
+
+    {% if session.recording_url %}
+    <hr class="border-secondary-subtle my-4">
+    <form method="post" action="{% url 'learning:teacher_live_recording_remove' session.school_class.pk session.subject.pk session.pk %}"
+          onsubmit="return confirm('Remove the recording link from this session?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-trash me-1" aria-hidden="true"></i>Remove recording link
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

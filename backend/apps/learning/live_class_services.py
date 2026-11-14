@@ -13,7 +13,11 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.core.audit_log import log_action
-from apps.learning.live_class_utils import normalize_meeting_url, validate_meeting_url
+from apps.learning.live_class_utils import (
+    normalize_meeting_url,
+    validate_meeting_url,
+    validate_recording_url,
+)
 from apps.learning.models import LiveClassAttendance, LiveClassSession
 
 if TYPE_CHECKING:
@@ -297,6 +301,122 @@ def end_live_session(
         content_type="learning.LiveClassSession",
         object_id=session.pk,
         change_summary={"title": session.title, "status": "completed"},
+        request=request,
+    )
+    return session
+
+
+RECORDING_NOTICE_REQUIRED = (
+    "Tick the box to confirm you told the class the lesson is being recorded."
+)
+RECORDING_TOO_EARLY = (
+    "You can add a recording once the session has started."
+)
+RECORDING_CANCELLED = "A cancelled session cannot have a recording."
+RECORDING_LESSON_MISMATCH = (
+    "Choose a lesson from this class and subject."
+)
+
+
+@transaction.atomic
+def attach_recording(
+    *,
+    session: LiveClassSession,
+    recording_url: str,
+    lesson=None,
+    notice_given: bool = False,
+    actor: User | None = None,
+    request: HttpRequest | None = None,
+) -> LiveClassSession:
+    """
+    Attach a recording link to a session, optionally so it also shows on a
+    lesson page.
+
+    The app never records the video; the teacher records in Meet/Zoom and
+    pastes the link here, after the session has started and after telling the
+    class (``notice_given``).
+    """
+    if session.status == LiveClassSession.Status.CANCELLED:
+        raise ValidationError(RECORDING_CANCELLED)
+    if timezone.now() < session.scheduled_start:
+        raise ValidationError(RECORDING_TOO_EARLY)
+    if not notice_given:
+        raise ValidationError(RECORDING_NOTICE_REQUIRED)
+
+    norm_url = normalize_meeting_url(recording_url)
+    valid, err_msg = validate_recording_url(norm_url)
+    if not valid:
+        raise ValidationError({"recording_url": err_msg})
+
+    if lesson is not None and (
+        lesson.module.school_class_id != session.school_class_id
+        or lesson.module.subject_id != session.subject_id
+    ):
+        raise ValidationError({"recording_lesson": RECORDING_LESSON_MISMATCH})
+
+    session.recording_url = norm_url
+    session.recording_lesson = lesson
+    session.recording_added_at = timezone.now()
+    session.recording_added_by = actor
+    session.recording_notice_acknowledged = True
+    session.save(
+        update_fields=[
+            "recording_url",
+            "recording_lesson",
+            "recording_added_at",
+            "recording_added_by",
+            "recording_notice_acknowledged",
+            "updated_at",
+        ]
+    )
+
+    log_action(
+        actor=actor,
+        action="live_class.recording_added",
+        content_type="learning.LiveClassSession",
+        object_id=session.pk,
+        change_summary={
+            "title": session.title,
+            "lesson": lesson.title if lesson is not None else "",
+        },
+        request=request,
+    )
+    return session
+
+
+@transaction.atomic
+def remove_recording(
+    *,
+    session: LiveClassSession,
+    actor: User | None = None,
+    request: HttpRequest | None = None,
+) -> LiveClassSession:
+    """Clear a session's recording link."""
+    if not session.recording_url:
+        return session
+
+    session.recording_url = ""
+    session.recording_lesson = None
+    session.recording_added_at = None
+    session.recording_added_by = None
+    session.recording_notice_acknowledged = False
+    session.save(
+        update_fields=[
+            "recording_url",
+            "recording_lesson",
+            "recording_added_at",
+            "recording_added_by",
+            "recording_notice_acknowledged",
+            "updated_at",
+        ]
+    )
+
+    log_action(
+        actor=actor,
+        action="live_class.recording_removed",
+        content_type="learning.LiveClassSession",
+        object_id=session.pk,
+        change_summary={"title": session.title},
         request=request,
     )
     return session
