@@ -247,30 +247,70 @@ class PromotionPreviewForm(forms.Form):
     repeat_students = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
-        label="Students to repeat (admission numbers)",
-        help_text="Comma-separated admission numbers of students who must repeat their current level.",
+        label="Also mark these admission numbers to repeat",
+        help_text=(
+            "Optional. Comma-separated admission numbers. The preview also "
+            "suggests a repeat when a published subject average is below the "
+            "year's pass mark — uncheck a row before committing to promote them anyway."
+        ),
     )
 
     def clean(self):
         cleaned = super().clean()
         from_y = cleaned.get("from_year")
         to_y = cleaned.get("to_year")
+        term = cleaned.get("term")
         if from_y and to_y and from_y.pk == to_y.pk:
             raise forms.ValidationError("From-year and To-year must be different.")
+        if from_y and term and term.academic_year_id != from_y.pk:
+            self.add_error(
+                "term",
+                "Choose a term that belongs to the source academic year.",
+            )
         return cleaned
 
 
 class PromotionCommitForm(forms.Form):
-    """Commit a promotion (carries repeat list + override flag)."""
+    """Commit a promotion (carries the override flag and a typed confirmation)."""
 
     from_year = forms.IntegerField(widget=forms.HiddenInput)
     to_year = forms.IntegerField(widget=forms.HiddenInput)
     term = forms.IntegerField(widget=forms.HiddenInput)
-    repeat_students = forms.CharField(
-        required=False, widget=forms.HiddenInput
-    )  # comma-separated admission numbers
     override_unpublished = forms.BooleanField(required=False)
     override_reason = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
     )
+    confirmation = forms.CharField(
+        label="Type COMMIT to confirm",
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "autocomplete": "off", "placeholder": "COMMIT"}
+        ),
+    )
+
+    def clean_confirmation(self):
+        value = self.cleaned_data["confirmation"].strip().upper()
+        if value != "COMMIT":
+            raise forms.ValidationError("Type COMMIT to confirm this promotion.")
+        return value
+
+
+class PromotionReverseForm(forms.Form):
+    """Undo a committed batch. The admin types UNDO and gives a reason."""
+
+    reason = forms.CharField(
+        label="Reason for undoing this promotion",
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+    )
+    confirmation = forms.CharField(
+        label="Type UNDO to confirm",
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "autocomplete": "off", "placeholder": "UNDO"}
+        ),
+    )
+
+    def clean_confirmation(self):
+        value = self.cleaned_data["confirmation"].strip().upper()
+        if value != "UNDO":
+            raise forms.ValidationError("Type UNDO to reverse this promotion.")
+        return value

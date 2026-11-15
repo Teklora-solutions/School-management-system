@@ -105,6 +105,11 @@ class TeacherClassroomDetailView(
 
     template_name = "features/learning/teacher_classroom_detail.html"
 
+    def get_template_names(self):
+        if self.request.GET.get("student_id"):
+            return ["features/learning/classroom_detail.html"]
+        return super().get_template_names()
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         assignment = selectors.teacher_classroom(
@@ -124,6 +129,39 @@ class TeacherClassroomDetailView(
         all_terms = _get_all_terms_for_class(assignment.school_class)
 
         from . import course_selectors
+        if self.request.GET.get("student_id"):
+            students = _students_for_targeting(assignment.school_class)
+            student = next(
+                (s for s in students if str(s.pk) == self.request.GET["student_id"]), None,
+            )
+            if student is None:
+                raise Http404("Student not found in this class.")
+            modules = course_selectors.course_for_student(
+                school_class=assignment.school_class, subject=assignment.subject,
+                term=term, student=student,
+            )
+            groups, untopic = course_selectors.topics_for_student(
+                school_class=assignment.school_class, subject=assignment.subject,
+                term=term, student=student, modules=modules,
+            )
+            total = sum(m.total_lessons for m in modules)
+            done = sum(m.completed_lessons for m in modules)
+            ctx.update({
+                "classroom": selectors.Classroom(
+                    school_class=assignment.school_class, subject=assignment.subject,
+                    term=term, stream=assignment.stream,
+                    teacher_name=assignment.teacher.user.full_name,
+                    student_count=roster.count(),
+                ),
+                "student": student, "is_preview": True,
+                "preview_students": students,
+                "modules": modules, "total_lessons": total,
+                "total_completed": done, "overall_pct": round(done * 100 / total) if total else 0,
+                "topic_groups": [g for g in groups if g.lessons],
+                "untopic_lessons": untopic,
+                "quizzes_enabled": feature_enabled("quizzes", request=self.request),
+            })
+            return ctx
         modules = course_selectors.course_for_teacher(
             school_class=assignment.school_class,
             subject=assignment.subject,
@@ -131,6 +169,33 @@ class TeacherClassroomDetailView(
         ) if term else []
         total_lessons = sum(m.total_lessons for m in modules)
         published_lessons = sum(m.published_lessons for m in modules)
+
+        # Topics: each with every lesson grouped under it (drafts included),
+        # ordered by topic_position — the teacher's organiser view.
+        from .models import Topic as _Topic
+        topics = list(
+            _Topic.objects.filter(
+                school_class=assignment.school_class,
+                subject=assignment.subject,
+                term=term,
+            ).order_by("position", "id")
+        ) if term else []
+        lessons_by_topic = {t.pk: [] for t in topics}
+        for mwl in modules:
+            for lp in mwl.lessons:
+                if lp.lesson.topic_id in lessons_by_topic:
+                    lessons_by_topic[lp.lesson.topic_id].append(lp)
+        topic_groups = [
+            {
+                "topic": t,
+                "lessons": sorted(
+                    lessons_by_topic[t.pk],
+                    key=lambda lp: (lp.lesson.topic_position, lp.lesson.pk),
+                ),
+            }
+            for t in topics
+        ]
+        from . import comment_services as _comment_services
 
         ctx.update(
             {
@@ -150,6 +215,11 @@ class TeacherClassroomDetailView(
                 "all_terms": all_terms,
                 "selected_term": term,
                 "quizzes_enabled": feature_enabled("quizzes", request=self.request),
+                "topic_groups": topic_groups,
+                "lesson_comments_enabled": _comment_services.comments_enabled(
+                    assignment.school_class
+                ),
+                "preview_students": _students_for_targeting(assignment.school_class),
             }
         )
         return ctx
@@ -190,6 +260,7 @@ class StudentClassroomDetailView(
         modules = []
         total_lessons = 0
         total_completed = 0
+        topic_groups, untopic_lessons = [], []
         if classroom.term:
             modules = course_selectors.course_for_student(
                 school_class=classroom.school_class,
@@ -199,21 +270,25 @@ class StudentClassroomDetailView(
             )
             total_lessons = sum(m.published_lessons for m in modules)
             total_completed = sum(m.completed_lessons for m in modules)
+            topic_groups, untopic_lessons = course_selectors.topics_for_student(
+                school_class=classroom.school_class,
+                subject=classroom.subject,
+                term=classroom.term,
+                student=student,
+                modules=modules,
+            )
+            # Topics with nothing released for this student are not shown.
+            topic_groups = [g for g in topic_groups if g.lessons]
 
         overall_pct = (
             round(total_completed * 100 / total_lessons)
             if total_lessons > 0 else 0
         )
 
-        # Find the next uncompleted lesson for the Continue button
-        next_lesson = None
-        for mwl in modules:
-            for lp in mwl.lessons:
-                if not lp.completed:
-                    next_lesson = lp
-                    break
-            if next_lesson:
-                break
+        next_lesson = next(
+            (lp for lp in course_selectors.ordered_course_lessons(modules) if not lp.completed),
+            None,
+        )
 
         ctx.update(
             {
@@ -226,6 +301,8 @@ class StudentClassroomDetailView(
                 "overall_pct": overall_pct,
                 "next_lesson": next_lesson,
                 "quizzes_enabled": feature_enabled("quizzes", request=self.request),
+                "topic_groups": topic_groups,
+                "untopic_lessons": untopic_lessons,
             }
         )
         return ctx
@@ -362,11 +439,13 @@ class MarkLessonCompleteView(StudentOrParentMixin, LearningEnabledMixin, Templat
     def post(self, request, *args, **kwargs):
         from .models import Lesson
 
+        if request.user.role == "parent":
+            raise PermissionDenied("Parents cannot mark lessons complete.")
         student = _resolve_student(request)
-        lesson = get_object_or_404(Lesson, pk=self.kwargs["lesson_id"], is_published=True)
-
-        # Guard: lesson must belong to the student's class
-        if lesson.module.school_class_id != student.current_class_id:
+        lesson = course_selectors.lesson_detail_for_student(
+            lesson_id=self.kwargs["lesson_id"], student=student,
+        )
+        if lesson is None:
             raise Http404
 
         record_lesson_completion(student=student, lesson=lesson)
@@ -547,31 +626,43 @@ def _nairobi_datetime(raw: str):
     return value
 
 
-def _feed_link_lessons(school_class):
+def _feed_viewer_student(request):
+    return _resolve_student(request) if request.user.role in ("student", "parent") else None
+
+
+def _feed_link_lessons(school_class, student=None):
     from .models import Lesson
 
-    return list(
+    lessons = list(
         Lesson.objects.filter(
             module__school_class=school_class,
             module__is_published=True,
             is_published=True,
         )
         .select_related("module__subject")
+        .prefetch_related("assigned_students")
         .order_by("title")[:200]
     )
+    if student is not None:
+        lessons = [l for l in lessons if course_selectors.lesson_visible_to_student(l, student)]
+    return lessons
 
 
-def _feed_link_quizzes(school_class):
+def _feed_link_quizzes(school_class, student=None):
     from .models import Quiz
 
-    return list(
+    quizzes = list(
         Quiz.objects.filter(
             lesson__module__school_class=school_class,
             is_published=True,
         )
         .select_related("lesson__module__subject")
+        .prefetch_related("assigned_students", "lesson__assigned_students")
         .order_by("title")[:200]
     )
+    if student is not None:
+        quizzes = [q for q in quizzes if course_selectors.quiz_visible_to_student(q, student)]
+    return quizzes
 
 
 class FeedHomeView(RoleRequiredMixin, LearningEnabledMixin, TemplateView):
@@ -697,6 +788,7 @@ class ClassFeedView(_FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, Te
                 viewer=self.request.user,
                 filter_key=filter_key,
                 search=search,
+                student=_feed_viewer_student(self.request),
             )
             ctx.update(
                 {
@@ -705,14 +797,15 @@ class ClassFeedView(_FeedClassMixin, RoleRequiredMixin, LearningEnabledMixin, Te
                     "has_more": page.has_more,
                     "next_before_id": page.next_before_id,
                     "latest_visible_id": page.latest_visible_id,
-                    "link_lessons": _feed_link_lessons(school_class),
-                    "link_quizzes": _feed_link_quizzes(school_class),
+                    "link_lessons": _feed_link_lessons(school_class, _feed_viewer_student(self.request)),
+                    "link_quizzes": _feed_link_quizzes(school_class, _feed_viewer_student(self.request)),
                 }
             )
             ctx.update(self._copy_draft(school_class, ctx["can_post"]))
         else:
             ctx["posts"] = feed_selectors.feed_for_classroom(
-                school_class=school_class, viewer=self.request.user
+                school_class=school_class, viewer=self.request.user,
+                student=_feed_viewer_student(self.request),
             )
         return ctx
 
@@ -993,6 +1086,7 @@ class ClassFeedItemsView(
             filter_key=self.request.GET.get("filter", "all"),
             before_id=before_id,
             search=search,
+            student=_feed_viewer_student(self.request),
         )
         ctx.update(
             {
@@ -1169,7 +1263,8 @@ class ClassFeedThreadView(
         ctx = super().get_context_data(**kwargs)
         school_class = self._resolve_class(self.request, self.kwargs["class_id"])
         thread = feed_selectors.post_thread(
-            post_id=self.kwargs["post_id"], viewer=self.request.user
+            post_id=self.kwargs["post_id"], viewer=self.request.user,
+            student=_feed_viewer_student(self.request),
         )
         if thread is None:
             raise Http404
@@ -1738,11 +1833,95 @@ import mimetypes as _mimetypes
 from django.core.exceptions import ValidationError as _ValidationError
 from django.http import FileResponse as _FileResponse
 
-from . import course_selectors, course_services
+from . import comment_services, course_selectors, course_services, release, topic_services
 from .models import (
-    CourseModule, Lesson, LessonAttachment,
+    CourseModule, Lesson, LessonAttachment, LessonComment, Topic,
     LESSON_ATTACHMENT_ALLOWED_EXTENSIONS,
 )
+
+
+def _students_for_targeting(school_class) -> list:
+    """Pupils of a class, for the assign-to-chosen-students pickers."""
+    return list(
+        Student.objects.filter(current_class=school_class)
+        .select_related("user", "current_stream")
+        .order_by("user__last_name", "user__first_name", "pk")
+    )
+
+
+def _assert_quiz_reachable_for_student(*, quiz, student) -> None:
+    """
+    A student may only open a quiz that is published, inside its publish/hide
+    window (checked on read — worker independent), and targeted at them; the
+    same must hold for the quiz's lesson and module.  Anything else is a 404,
+    so unassigned students cannot reach it by typing the address.
+    """
+    if not course_selectors.quiz_visible_to_student(quiz, student):
+        raise Http404
+
+
+def _course_topics(module: CourseModule) -> list:
+    """Topics for the lesson form's grouping dropdown."""
+    return list(
+        Topic.objects.filter(
+            school_class=module.school_class,
+            subject=module.subject,
+            term=module.term,
+        ).order_by("position", "id")
+    )
+
+
+def _schedule_from_post(request):
+    publish_raw = request.POST.get("publish_at", "").strip()
+    hide_raw = request.POST.get("hide_at", "").strip()
+    publish_at = _parse_nairobi_dt(publish_raw)
+    hide_at = _parse_nairobi_dt(hide_raw)
+    if (publish_raw and publish_at is None) or (hide_raw and hide_at is None):
+        raise _ValidationError("Please enter valid release dates in Nairobi time.")
+    if publish_at and hide_at and hide_at <= publish_at:
+        raise _ValidationError("'Hide on' must be after 'Publish on'.")
+    return publish_at, hide_at
+
+
+def _student_ids_from_post(request) -> list[int]:
+    return [int(v) for v in request.POST.getlist("assigned_students") if v.isdigit()]
+
+
+def _apply_lesson_release_and_targeting(request, lesson: Lesson) -> None:
+    if "publish_at" in request.POST or "hide_at" in request.POST:
+        lesson.publish_at, lesson.hide_at = _schedule_from_post(request)
+        lesson.save(update_fields=["publish_at", "hide_at", "updated_at"])
+    if "assign_all" in request.POST:
+        topic_services.set_lesson_targets(
+            lesson=lesson,
+            assign_all=request.POST.get("assign_all") != "0",
+            student_ids=_student_ids_from_post(request),
+            actor=request.user,
+        )
+    if "topic_id" in request.POST:
+        topic_id = request.POST.get("topic_id", "").strip()
+        topic = None
+        if topic_id:
+            topic = next(
+                (t for t in _course_topics(lesson.module) if str(t.pk) == topic_id),
+                None,
+            )
+        if topic is None or topic.pk != lesson.topic_id:
+            topic_services.set_lesson_topic(lesson=lesson, topic=topic, actor=request.user)
+
+
+def _apply_quiz_release_and_targeting(request, quiz) -> None:
+    """Apply publish-on / hide-on and the assign-to-students choice (quiz form)."""
+    if "publish_at" in request.POST or "hide_at" in request.POST:
+        quiz.publish_at, quiz.hide_at = _schedule_from_post(request)
+        quiz.save(update_fields=["publish_at", "hide_at", "updated_at"])
+    if "assign_all" in request.POST:
+        topic_services.set_quiz_targets(
+            quiz=quiz,
+            assign_all=request.POST.get("assign_all") != "0",
+            student_ids=_student_ids_from_post(request),
+            actor=request.user,
+        )
 
 
 def _get_teacher_assignment(request, class_id: int, subject_id: int):
@@ -1810,10 +1989,21 @@ class ModuleCreateView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView)
         term = _get_term(request)
         title = request.POST.get("title", "").strip()
         try:
-            course_services.create_module(
+            _schedule_from_post(request)
+            module = course_services.create_module(
                 school_class=sc, subject=subj, term=term,
                 title=title, actor=request.user,
             )
+            if "publish_at" in request.POST or "hide_at" in request.POST:
+                course_services.update_module(
+                    module=module, title=title,
+                    is_published=request.POST.get("is_published") == "1", actor=request.user,
+                )
+                publish_at, hide_at = _schedule_from_post(request)
+                topic_services.set_module_schedule(
+                    module=module, publish_at=publish_at, hide_at=hide_at,
+                    actor=request.user,
+                )
             messages.success(request, f'Module "{title}" added.')
         except _ValidationError as exc:
             messages.error(request, exc.message)
@@ -1847,10 +2037,19 @@ class ModuleEditView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
         title = request.POST.get("title", "").strip()
         is_published = request.POST.get("is_published") == "1"
         try:
+            _schedule_from_post(request)
             course_services.update_module(
                 module=module, title=title,
                 is_published=is_published, actor=request.user,
             )
+            if "publish_at" in request.POST or "hide_at" in request.POST:
+                publish_at, hide_at = _schedule_from_post(request)
+                topic_services.set_module_schedule(
+                    module=module,
+                    publish_at=publish_at,
+                    hide_at=hide_at,
+                    actor=request.user,
+                )
             messages.success(request, "Module updated.")
         except _ValidationError as exc:
             messages.error(request, exc.message)
@@ -1920,13 +2119,16 @@ class LessonCreateView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView)
         return self.render_to_response(
             {"school_class": sc, "subject": subj, "module": module,
              "lesson": None, "action": "Add",
-             "allowed_ext": ", ".join(sorted(LESSON_ATTACHMENT_ALLOWED_EXTENSIONS))}
+             "allowed_ext": ", ".join(sorted(LESSON_ATTACHMENT_ALLOWED_EXTENSIONS)),
+             "topics": _course_topics(module),
+             "students": _students_for_targeting(sc)}
         )
 
     def post(self, request, class_id, subject_id, module_id, *args, **kwargs):
         from django.shortcuts import redirect
         sc, subj, module = self._get_module(request, class_id, subject_id, module_id)
         try:
+            _schedule_from_post(request)
             lesson = course_services.create_lesson(
                 module=module,
                 title=request.POST.get("title", ""),
@@ -1947,6 +2149,7 @@ class LessonCreateView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView)
                     errors.append(exc.message)
             if errors:
                 messages.warning(request, " ".join(errors))
+            _apply_lesson_release_and_targeting(request, lesson)
             messages.success(request, f'Lesson "{lesson.title}" added.')
             return redirect(
                 "learning:lesson_edit",
@@ -1981,7 +2184,10 @@ class LessonEditView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
             {"school_class": sc, "subject": subj, "module": module,
              "lesson": lesson, "attachments": attachments,
              "action": "Edit",
-             "allowed_ext": ", ".join(sorted(LESSON_ATTACHMENT_ALLOWED_EXTENSIONS))}
+             "allowed_ext": ", ".join(sorted(LESSON_ATTACHMENT_ALLOWED_EXTENSIONS)),
+             "topics": _course_topics(module),
+             "students": _students_for_targeting(sc),
+             "assigned_student_ids": list(lesson.assigned_students.values_list("pk", flat=True))}
         )
 
     def post(self, request, class_id, subject_id, module_id, lesson_id, *args, **kwargs):
@@ -1990,6 +2196,7 @@ class LessonEditView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
             request, class_id, subject_id, module_id, lesson_id
         )
         try:
+            _schedule_from_post(request)
             course_services.update_lesson(
                 lesson=lesson,
                 title=request.POST.get("title", ""),
@@ -2008,6 +2215,7 @@ class LessonEditView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
                     )
                 except _ValidationError as exc:
                     upload_errors.append(exc.message)
+            _apply_lesson_release_and_targeting(request, lesson)
             if upload_errors:
                 messages.warning(request, " ".join(upload_errors))
             else:
@@ -2110,6 +2318,260 @@ class ModuleDuplicateView(TeacherRequiredMixin, LearningEnabledMixin, TemplateVi
         raise Http404
 
 
+# ── Topic views (organise lessons under named topics) ────────────────────────
+
+class TopicCreateView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
+    """POST-only: add a named topic to this course."""
+
+    def post(self, request, class_id, subject_id, *args, **kwargs):
+        from django.shortcuts import redirect
+        sc, subj = _get_teacher_assignment(request, class_id, subject_id)
+        term = _get_term(request)
+        title = request.POST.get("title", "")
+        try:
+            topic_services.create_topic(
+                school_class=sc, subject=subj, term=term,
+                title=title, actor=request.user,
+            )
+            messages.success(request, f'Topic "{title.strip()}" added.')
+        except _ValidationError as exc:
+            messages.error(request, exc.message)
+        return _term_redirect(sc, subj, term)
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+class TopicEditView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
+    """POST-only: rename a topic."""
+
+    def _get_topic(self, request, class_id, subject_id, topic_id):
+        sc, subj = _get_teacher_assignment(request, class_id, subject_id)
+        term = _get_term(request)
+        topic = get_object_or_404(
+            Topic, pk=topic_id, school_class=sc, subject=subj, term=term
+        )
+        return sc, subj, term, topic
+
+    def post(self, request, class_id, subject_id, topic_id, *args, **kwargs):
+        from django.shortcuts import redirect
+        sc, subj, term, topic = self._get_topic(
+            request, class_id, subject_id, topic_id
+        )
+        title = request.POST.get("title", "")
+        try:
+            topic_services.rename_topic(
+                topic=topic, title=title, actor=request.user
+            )
+            messages.success(request, "Topic renamed.")
+        except _ValidationError as exc:
+            messages.error(request, exc.message)
+        return _term_redirect(sc, subj, term)
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+class TopicDeleteView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
+    """POST-only: delete a topic.  Its lessons are kept, just ungrouped."""
+
+    def post(self, request, class_id, subject_id, topic_id, *args, **kwargs):
+        from django.shortcuts import redirect
+        sc, subj = _get_teacher_assignment(request, class_id, subject_id)
+        term = _get_term(request)
+        topic = get_object_or_404(
+            Topic, pk=topic_id, school_class=sc, subject=subj, term=term
+        )
+        title = topic.title
+        topic_services.delete_topic(topic=topic, actor=request.user)
+        messages.success(
+            request, f'Topic "{title}" deleted. Its lessons are still in the course.'
+        )
+        return _term_redirect(sc, subj, term)
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+class TopicMoveView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
+    """POST-only: move a topic up or down (no JavaScript needed)."""
+
+    def post(self, request, class_id, subject_id, topic_id, direction, *args, **kwargs):
+        from django.shortcuts import redirect
+        sc, subj = _get_teacher_assignment(request, class_id, subject_id)
+        term = _get_term(request)
+        topic = get_object_or_404(
+            Topic, pk=topic_id, school_class=sc, subject=subj, term=term
+        )
+        if direction not in ("up", "down"):
+            raise Http404
+        topic_services.move_topic(topic=topic, direction=direction, actor=request.user)
+        return _term_redirect(sc, subj, term)
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+class LessonTopicMoveView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
+    """POST-only: move a lesson up or down inside its topic."""
+
+    def post(self, request, class_id, subject_id, lesson_id, direction, *args, **kwargs):
+        from django.shortcuts import redirect
+        sc, subj = _get_teacher_assignment(request, class_id, subject_id)
+        lesson = get_object_or_404(
+            Lesson, pk=lesson_id, module__school_class=sc, module__subject=subj
+        )
+        if direction not in ("up", "down"):
+            raise Http404
+        topic_services.move_lesson_in_topic(
+            lesson=lesson, direction=direction, actor=request.user
+        )
+        term = _get_term(request)
+        return _term_redirect(sc, subj, term)
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+def _term_redirect(sc, subj, term):
+    """Redirect to the teacher classroom, preserving a non-current ?term_id=."""
+    from django.shortcuts import redirect as _redirect
+    from django.urls import reverse
+
+    url = reverse(
+        "learning:teacher_classroom",
+        kwargs={"class_id": sc.pk, "subject_id": subj.pk},
+    )
+    current = None
+    from apps.academics.selectors import get_current_term
+    try:
+        current = get_current_term()
+    except Exception:  # noqa: BLE001
+        current = None
+    if term and current and term.pk != current.pk:
+        url += f"?term_id={term.pk}"
+    return _redirect(url)
+
+
+# ── Lesson comments (student questions, teacher moderation) ──────────────────
+
+class LessonCommentsToggleView(TeacherRequiredMixin, LearningEnabledMixin, View):
+    """POST-only: switch lesson comments on/off for one class (default off)."""
+
+    def post(self, request, class_id, subject_id, *args, **kwargs):
+        sc, subj = _get_teacher_assignment(request, class_id, subject_id)
+        eng, _ = ClassEngagementSettings.objects.get_or_create(
+            school_class=sc, defaults={"is_active": False},
+        )
+        eng.lesson_comments_enabled = request.POST.get("enabled") == "1"
+        eng.save(update_fields=["lesson_comments_enabled", "updated_at"])
+        comment_services._audit(
+            actor=request.user,
+            action=(
+                "lesson.comments.enabled"
+                if eng.lesson_comments_enabled else "lesson.comments.disabled"
+            ),
+            obj=eng,
+            summary={"school_class": sc.name},
+            request=request,
+        )
+        messages.success(
+            request,
+            f"Lesson questions are now {'on' if eng.lesson_comments_enabled else 'off'} "
+            f"for {sc.name}.",
+        )
+        return _term_redirect(sc, subj, _get_term(request))
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+class LessonCommentCreateView(StudentOrParentMixin, LearningEnabledMixin, View):
+    """POST-only: a student asks a question under a lesson."""
+
+    def post(self, request, class_id, subject_id, lesson_id, *args, **kwargs):
+        from django.shortcuts import redirect
+        if request.user.role == "parent":
+            raise PermissionDenied("Parents cannot write lesson comments.")
+        student = _resolve_student(request)
+        lesson = course_selectors.lesson_detail_for_student(
+            lesson_id=lesson_id, student=student
+        )
+        if lesson is None or (
+            lesson.module.school_class_id != class_id
+            or lesson.module.subject_id != subject_id
+        ):
+            raise Http404
+        try:
+            comment_services.add_comment(
+                lesson=lesson, student=student,
+                body=request.POST.get("body", ""),
+                request=request,
+            )
+            messages.success(request, "Your question was posted.")
+        except PermissionDenied:
+            raise
+        except _ValidationError as exc:
+            messages.error(request, exc.message)
+        return redirect(
+            "learning:lesson_view",
+            class_id=class_id, subject_id=subject_id, lesson_id=lesson_id,
+        )
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+class LessonCommentRemoveView(TeacherRequiredMixin, LearningEnabledMixin, View):
+    """POST-only: teacher moderates a lesson comment (soft delete, audited)."""
+
+    def post(self, request, class_id, subject_id, lesson_id, comment_id, *args, **kwargs):
+        from django.shortcuts import redirect
+        sc, subj = _get_teacher_assignment(request, class_id, subject_id)
+        comment = get_object_or_404(
+            LessonComment.objects.select_related("lesson__module"),
+            pk=comment_id,
+            lesson_id=lesson_id,
+            lesson__module__school_class=sc,
+            lesson__module__subject=subj,
+        )
+        comment_services.remove_comment(comment=comment, actor=request.user, request=request)
+        messages.success(request, "Comment removed.")
+        return redirect(
+            "learning:lesson_preview",
+            class_id=sc.pk, subject_id=subj.pk,
+            module_id=comment.lesson.module_id, lesson_id=lesson_id,
+        )
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
+class LessonCommentRestoreView(TeacherRequiredMixin, LearningEnabledMixin, View):
+    """POST-only: undo a removal."""
+
+    def post(self, request, class_id, subject_id, lesson_id, comment_id, *args, **kwargs):
+        from django.shortcuts import redirect
+        sc, subj = _get_teacher_assignment(request, class_id, subject_id)
+        comment = get_object_or_404(
+            LessonComment.objects.select_related("lesson__module"),
+            pk=comment_id,
+            lesson_id=lesson_id,
+            lesson__module__school_class=sc,
+            lesson__module__subject=subj,
+        )
+        comment_services.restore_comment(comment=comment, actor=request.user, request=request)
+        messages.success(request, "Comment restored.")
+        return redirect(
+            "learning:lesson_preview",
+            class_id=sc.pk, subject_id=subj.pk,
+            module_id=comment.lesson.module_id, lesson_id=lesson_id,
+        )
+
+    def get(self, request, *args, **kwargs):
+        raise Http404
+
+
 # ── Attachment views ──────────────────────────────────────────────────────────
 
 class AttachmentDeleteView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
@@ -2202,26 +2664,55 @@ class LessonPreviewView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView
             CourseModule, pk=module_id, school_class=sc, subject=subj
         )
         lesson = get_object_or_404(Lesson, pk=lesson_id, module=module)
-        attachments = list(lesson.lesson_attachments.all())
+        students = list(_students_for_targeting(sc))
+        selected_id = request.GET.get("student_id")
+        preview_student = next(
+            (s for s in students if str(s.pk) == selected_id), None,
+        )
+        if selected_id and preview_student is None:
+            raise Http404("Student not found in this class.")
+        visible = not selected_id or bool(
+            preview_student
+            and course_selectors.lesson_detail_for_student(
+                lesson_id=lesson.pk, student=preview_student,
+            )
+        )
+        if selected_id and not visible:
+            raise Http404("This lesson is not available to the selected student.")
         from .markdown_utils import render_notes
-        rendered_notes = render_notes(lesson.notes, notes_format=lesson.notes_format)
         from .video_utils import parse_video_url
-        video_info = parse_video_url(lesson.video_url)
         from . import live_class_selectors
         return self.render_to_response({
             "lesson": lesson,
+            "preview_students": students,
+            "preview_student": preview_student,
+            "preview_visible": visible,
             "module": module,
             "school_class": sc,
             "subject": subj,
-            "attachments": attachments,
+            "attachments": list(lesson.lesson_attachments.all()) if visible else [],
             "is_preview": True,
             "completed": False,
-            "rendered_notes": rendered_notes,
-            "video_info": video_info,
-            "recordings": live_class_selectors.recordings_for_lesson(lesson),
+            "rendered_notes": render_notes(lesson.notes, notes_format=lesson.notes_format) if visible else "",
+            "video_info": parse_video_url(lesson.video_url) if visible else None,
+            "recordings": live_class_selectors.recordings_for_lesson(lesson) if visible else [],
             "next_lp": None,
             "prev_lp": None,
             "student_note": None,
+            # Release state and targeting, so the preview banner can warn the
+            # teacher about what students will (not) see right now.
+            "preview_lesson_status": release.status_label(lesson),
+            "preview_module_status": release.status_label(module),
+            "preview_assign_summary": (
+                "Whole class"
+                if lesson.assign_all
+                else f"{lesson.assigned_students.count()} chosen student(s)"
+            ),
+            "comments_enabled": comment_services.comments_enabled(sc),
+            "comments": list(
+                lesson.comments.select_related("student__user").order_by("created_at", "id")
+            ) if visible else [],
+            "can_moderate": True,
         })
 
 
@@ -2348,6 +2839,16 @@ class StudentLessonView(StudentOrParentMixin, LearningEnabledMixin, TemplateView
         from . import live_class_selectors
         recordings = live_class_selectors.recordings_for_lesson(lesson)
 
+        # Lesson comments (class-level switch, default off).  Parents read,
+        # students write; removed comments never render.
+        comments_enabled = comment_services.comments_enabled(
+            lesson.module.school_class
+        )
+        comments = (
+            comment_services.visible_comments(lesson=lesson)
+            if comments_enabled else []
+        )
+
         ctx.update({
             "lesson": lesson,
             "module": lesson.module,
@@ -2363,6 +2864,9 @@ class StudentLessonView(StudentOrParentMixin, LearningEnabledMixin, TemplateView
             "rendered_notes": rendered_notes,
             "video_info": video_info,
             "recordings": recordings,
+            "comments_enabled": comments_enabled,
+            "comments": comments,
+            "can_comment": self.request.user.role == "student",
         })
         return ctx
 
@@ -2548,6 +3052,7 @@ class TeacherQuizCreateView(
             "quiz_types": Quiz.QuizType.choices,
             "visibility_choices": Quiz.AnswerVisibility.choices,
             "policy_choices": Quiz.GradingPolicy.choices,
+            "students": _students_for_targeting(sc),
         })
 
     def post(self, request, class_id, subject_id, module_id, lesson_id, *args, **kwargs):
@@ -2556,6 +3061,7 @@ class TeacherQuizCreateView(
             request, class_id, subject_id, module_id, lesson_id
         )
         try:
+            _schedule_from_post(request)
             quiz_type = request.POST.get("quiz_type", Quiz.QuizType.LESSON_CHECK)
             open_dt = _parse_nairobi_dt(request.POST.get("open_date", ""))
             close_dt = _parse_nairobi_dt(request.POST.get("close_date", ""))
@@ -2580,6 +3086,7 @@ class TeacherQuizCreateView(
                 grading_policy=request.POST.get("grading_policy", Quiz.GradingPolicy.BEST),
                 actor=request.user,
             )
+            _apply_quiz_release_and_targeting(request, quiz)
             messages.success(request, f'Quiz "{quiz.title}" created.')
         except (_ValidationError, Exception) as exc:
             messages.error(request, str(exc))
@@ -2615,6 +3122,8 @@ class TeacherQuizSettingsView(
             "quiz_types": Quiz.QuizType.choices,
             "visibility_choices": Quiz.AnswerVisibility.choices,
             "policy_choices": Quiz.GradingPolicy.choices,
+            "students": _students_for_targeting(sc),
+            "assigned_student_ids": list(quiz.assigned_students.values_list("pk", flat=True)),
         })
 
     def post(self, request, class_id, subject_id, module_id, lesson_id, *args, **kwargs):
@@ -2623,6 +3132,7 @@ class TeacherQuizSettingsView(
             request, class_id, subject_id, module_id, lesson_id
         )
         try:
+            _schedule_from_post(request)
             open_dt = _parse_nairobi_dt(request.POST.get("open_date", ""))
             close_dt = _parse_nairobi_dt(request.POST.get("close_date", ""))
 
@@ -2645,6 +3155,7 @@ class TeacherQuizSettingsView(
                 counts_for_gradebook=request.POST.get("counts_for_gradebook") == "1",
                 actor=request.user,
             )
+            _apply_quiz_release_and_targeting(request, quiz)
             messages.success(request, "Quiz settings saved.")
         except (_ValidationError, Exception) as exc:
             messages.error(request, str(exc))
@@ -3125,6 +3636,13 @@ class TeacherQuizPreviewView(
         module = get_object_or_404(CourseModule, pk=module_id, school_class=sc, subject=subj)
         lesson = get_object_or_404(Lesson, pk=lesson_id, module=module)
         quiz = get_object_or_404(Quiz, lesson=lesson)
+        if request.GET.get("student_id"):
+            preview_student = next(
+                (stu for stu in _students_for_targeting(sc)
+                 if str(stu.pk) == request.GET["student_id"]), None,
+            )
+            if preview_student is None or not course_selectors.quiz_visible_to_student(quiz, preview_student):
+                raise Http404("This quiz is not available to this student.")
 
         teacher_questions = quiz_selectors.quiz_questions_for_teacher(quiz=quiz)
         questions = []
@@ -3209,6 +3727,7 @@ class StudentQuizLandingView(
         if lesson.module.school_class_id != student.current_class_id:
             raise Http404
         quiz = get_object_or_404(Quiz, lesson=lesson, is_published=True)
+        _assert_quiz_reachable_for_student(quiz=quiz, student=student)
         summary = quiz_selectors.student_attempt_summary(quiz=quiz, student=student)
         ctx.update({
             "school_class": sc, "subject": subj,
@@ -3239,6 +3758,7 @@ class StudentTakeQuizView(
         if lesson.module.school_class_id != student.current_class_id:
             raise Http404
         quiz = get_object_or_404(Quiz, lesson=lesson, is_published=True)
+        _assert_quiz_reachable_for_student(quiz=quiz, student=student)
         return student, sc, subj, lesson, quiz
 
     def get(self, request, class_id, subject_id, lesson_id, *args, **kwargs):
@@ -3331,6 +3851,7 @@ class SaveQuizAnswerView(StudentOrParentMixin, LearningEnabledMixin, QuizEnabled
         if lesson.module.school_class_id != student.current_class_id:
             return JsonResponse({"ok": False, "error": "Not your class."}, status=403)
         quiz = get_object_or_404(Quiz, lesson=lesson, is_published=True)
+        _assert_quiz_reachable_for_student(quiz=quiz, student=student)
         attempt = QuizAttempt.objects.filter(
             quiz=quiz, student=student, submitted_at__isnull=True
         ).first()
@@ -3380,6 +3901,8 @@ class StudentQuizResultsView(
         if lesson.module.school_class_id != student.current_class_id:
             raise Http404
         quiz = get_object_or_404(Quiz, lesson=lesson)
+        if not course_selectors.quiz_visible_to_student(quiz, student):
+            raise Http404
         attempt = get_object_or_404(
             QuizAttempt, pk=self.kwargs["attempt_id"],
             quiz=quiz, student=student,

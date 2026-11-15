@@ -27,7 +27,7 @@ from apps.academics.models import AcademicYear, ClassSubject, SchoolClass, Subje
 from apps.accounts.models import ParentProfile, User
 from apps.public.models import ContactMessage, GalleryPhoto
 from apps.results.models import ResultSheet
-from apps.students.models import Student, StudentGuardian
+from apps.students.models import PromotionBatch, Student, StudentGuardian
 from apps.teachers.models import TeacherAssignment, TeacherProfile
 
 
@@ -125,6 +125,7 @@ URL_ROLE_MATRIX = [
     ("students:bulk_import_template", {}, {"admin"}, "Module 1"),
     ("students:promote", {}, {"admin"}, "Module 1"),
     ("students:promotion_history", {}, {"admin"}, "Module 1"),
+    ("students:promotion_detail", {"pk": "__promotion__"}, {"admin"}, "Module 1"),
     # ── Results governance + grading ─────────────────────────────────────
     ("results:student_results", {}, {"student", "parent"}, "student/parent only"),
     ("results:broadsheet", {}, {"admin"}, "R1 class broadsheet"),
@@ -290,6 +291,14 @@ class MatrixFixtures:
             email="asiedu@example.test",
             message="We would like to visit the school.",
         )
+        cls.promotion_batch = PromotionBatch.objects.create(
+            from_year=cls.year,
+            to_year=cls.year,
+            term=cls.term,
+            committed_by=cls.users["admin"],
+            is_committed=True,
+            idempotency_key="matrix-promotion",
+        )
 
         cls.placeholders = {
             "__staff__": cls.users["finance"].pk,
@@ -303,6 +312,7 @@ class MatrixFixtures:
             "__sheet__": cls.sheet.pk,
             "__photo__": cls.photo.pk,
             "__enquiry__": cls.enquiry.pk,
+            "__promotion__": cls.promotion_batch.pk,
         }
 
     def _resolve_kwargs(self, kwargs: dict) -> dict:

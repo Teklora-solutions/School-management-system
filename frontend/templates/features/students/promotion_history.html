@@ -9,7 +9,7 @@
       <i class="bi bi-clock-history me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
       Promotion History
     </h1>
-    <p class="page-subtitle">Every committed promotion batch and what happened to each student.</p>
+    <p class="page-subtitle">Every promotion batch. Open a batch for the movement list, a printable copy, or to undo it.</p>
   </div>
   <a href="{% url 'students:promote' %}" class="btn btn-primary">
     <i class="bi bi-arrow-up-circle me-1"></i>New Promotion
@@ -27,6 +27,7 @@
             <th scope="col">Years</th>
             <th scope="col">Term</th>
             <th scope="col">Counts</th>
+            <th scope="col">Pupils</th>
             <th scope="col">Override</th>
             <th scope="col">Committed</th>
             <th scope="col" class="text-end">Details</th>
@@ -34,7 +35,7 @@
         </thead>
         <tbody>
           {% for batch in batches %}
-          <tr {% if not batch.is_committed %}class="table-warning"{% endif %}>
+          <tr {% if batch.is_reversed %}class="table-warning"{% endif %}>
             <td class="fw-600">#{{ batch.pk }}</td>
             <td class="text-muted-sm">{{ batch.from_year.name }} → {{ batch.to_year.name }}</td>
             <td class="text-muted-sm">{{ batch.term.name|title }}</td>
@@ -47,46 +48,25 @@
               {% else %}—{% endif %}
               {% endwith %}
             </td>
+            <td class="text-muted-sm">{{ batch.record_count }}</td>
             <td>
               {% if batch.override_unpublished %}
-                <span class="badge" style="background:var(--color-danger);color:#fff;" title="{{ batch.override_reason }}">Yes — see reason</span>
+                <span class="badge" style="background:var(--color-danger);color:#fff;" title="{{ batch.override_reason }}">Yes</span>
               {% else %}
                 <span class="text-muted-sm">No</span>
               {% endif %}
             </td>
             <td class="text-muted-sm">
-              {% if batch.is_committed %}
+              {% if batch.is_reversed %}
+                Reversed {{ batch.reversed_at|date:"d M Y H:i" }}
+              {% elif batch.is_committed %}
                 {{ batch.committed_at|date:"d M Y H:i" }} by {{ batch.committed_by.full_name|default:"—" }}
               {% else %}
                 <span class="badge" style="background:var(--color-warning);color:#000;">Not committed</span>
               {% endif %}
             </td>
             <td class="text-end">
-              {% if batch.records.all %}
-              <details>
-                <summary class="btn btn-sm btn-outline-primary">Records ({{ batch.records.all|length }})</summary>
-                <div class="table-responsive mt-2">
-                  <table class="table table-sm mb-0">
-                    <thead>
-                      <tr><th>Admission #</th><th>Student</th><th>Action</th><th>From</th><th>To</th></tr>
-                    </thead>
-                    <tbody>
-                      {% for r in batch.records.all %}
-                      <tr>
-                        <td class="text-muted-sm">{{ r.student.admission_number }}</td>
-                        <td>{{ r.student.user.full_name }}</td>
-                        <td class="text-muted-sm">{{ r.get_action_display }}</td>
-                        <td class="text-muted-sm">{{ r.from_class.name|default:"—" }}</td>
-                        <td class="text-muted-sm">{{ r.to_class.name|default:"—" }}</td>
-                      </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </details>
-              {% else %}
-              <span class="text-muted-sm">—</span>
-              {% endif %}
+              <a href="{% url 'students:promotion_detail' batch.pk %}" class="btn btn-sm btn-outline-primary">Open</a>
             </td>
           </tr>
           {% endfor %}

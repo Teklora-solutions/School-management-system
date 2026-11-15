@@ -3,6 +3,20 @@
 
 {% block content %}
 
+{% if is_preview %}
+<div class="alert alert-info" role="note">
+  Previewing {{ student.user.full_name }}'s classroom. Only currently released, assigned items appear. No progress or attempts are saved.
+  <a href="{% url 'learning:teacher_classroom' classroom.school_class.pk classroom.subject.pk %}?term_id={{ classroom.term.pk }}">Back to organiser</a>
+  <form method="get" class="d-flex flex-wrap gap-2 mt-2">
+    <input type="hidden" name="term_id" value="{{ classroom.term.pk }}">
+    <label for="preview-class-pupil" class="visually-hidden">Preview student</label>
+    <select id="preview-class-pupil" name="student_id" class="form-select" style="flex:1 1 220px;">
+      {% for pupil in preview_students %}<option value="{{ pupil.pk }}" {% if pupil.pk == student.pk %}selected{% endif %}>{{ pupil.user.full_name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-outline-secondary" type="submit">Change student</button>
+  </form>
+</div>
+{% endif %}
 {# ── Page header ── #}
 <div class="page-header">
   <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
@@ -17,6 +31,7 @@
         {% if classroom.teacher_name %} · <i class="bi bi-person-fill" aria-hidden="true"></i> {{ classroom.teacher_name }}{% endif %}
       </p>
     </div>
+    {% if not is_preview %}
     <div class="d-flex align-items-center gap-2 mt-1">
       <details class="classroom-menu">
         <summary class="btn btn-primary btn-sm">
@@ -54,6 +69,7 @@
         <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All Subjects
       </a>
     </div>
+    {% endif %}
   </div>
 </div>
 
@@ -118,9 +134,69 @@
 </div>
 {% endif %}
 
-{# Course outline #}
+{# Released topic groups are supplied by the student selector. #}
+{% if topic_groups %}
+<div class="course-outline" aria-label="Course topics">
+  {% for group in topic_groups %}
+  <details class="co-module mb-3">
+    <summary class="co-module__header">
+      <span class="co-module__title">{{ group.topic.title }}</span>
+      <span class="text-muted-sm ms-2">{{ group.lessons|length }} lesson{{ group.lessons|length|pluralize }} · Expand</span>
+    </summary>
+    <ul class="list-unstyled mb-0">
+      {% for lp in group.lessons %}
+      {% with l=lp.lesson %}
+      <li class="co-lesson {% if lp.completed %}co-lesson--done{% endif %} {% if not forloop.last %}co-lesson--bordered{% endif %}">
+        <div class="flex-grow-1 min-w-0">
+          <div class="co-lesson__title">{{ l.title }}</div>
+          <div class="text-muted-sm small mt-1">
+            {% if lp.completed %}Completed{% else %}Not completed{% endif %}
+            {% if l.video_url %} · Video{% endif %}{% if l.notes %} · Notes{% endif %}
+            {% if lp.attachments %} · {{ lp.attachments|length }} file{{ lp.attachments|length|pluralize }}{% endif %}
+          </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          {% if quizzes_enabled and lp.quiz %}
+          <a href="{% if is_preview %}{% url 'learning:teacher_quiz_preview' classroom.school_class.pk classroom.subject.pk l.module_id l.pk %}?student_id={{ student.pk }}{% else %}{% url 'learning:quiz_landing' classroom.school_class.pk classroom.subject.pk l.pk %}{% endif %}" class="btn btn-sm btn-outline-secondary" aria-label="Quiz for {{ l.title }}">Quiz</a>
+          {% endif %}
+          <a href="{% if is_preview %}{% url 'learning:lesson_preview' classroom.school_class.pk classroom.subject.pk l.module_id l.pk %}?student_id={{ student.pk }}{% else %}{% url 'learning:lesson_view' classroom.school_class.pk classroom.subject.pk l.pk %}{% endif %}" class="btn btn-sm {% if lp.completed or is_parent %}co-btn-review{% else %}btn-primary{% endif %}" aria-label="View lesson {{ l.title }}">
+            {% if is_parent %}View{% elif lp.completed %}Review{% else %}Open{% endif %}
+          </a>
+        </div>
+      </li>
+      {% endwith %}
+      {% endfor %}
+    </ul>
+  </details>
+  {% endfor %}
 
-{% if not modules %}
+  {% if untopic_lessons %}
+  <div class="co-module mb-3">
+    <div class="co-module__header"><h2 class="co-module__title">Other lessons</h2></div>
+    <ul class="list-unstyled mb-0">
+      {% for lp in untopic_lessons %}
+      {% with l=lp.lesson %}
+      <li class="co-lesson {% if not forloop.last %}co-lesson--bordered{% endif %}">
+        <div class="flex-grow-1 min-w-0">
+          <div class="co-lesson__title">{{ l.title }}</div>
+          <div class="text-muted-sm small mt-1">{% if lp.completed %}Completed{% else %}Not completed{% endif %}</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          {% if quizzes_enabled and lp.quiz %}
+          <a href="{% if is_preview %}{% url 'learning:teacher_quiz_preview' classroom.school_class.pk classroom.subject.pk l.module_id l.pk %}?student_id={{ student.pk }}{% else %}{% url 'learning:quiz_landing' classroom.school_class.pk classroom.subject.pk l.pk %}{% endif %}" class="btn btn-sm btn-outline-secondary" aria-label="Quiz for {{ l.title }}">Quiz</a>
+          {% endif %}
+          <a href="{% if is_preview %}{% url 'learning:lesson_preview' classroom.school_class.pk classroom.subject.pk l.module_id l.pk %}?student_id={{ student.pk }}{% else %}{% url 'learning:lesson_view' classroom.school_class.pk classroom.subject.pk l.pk %}{% endif %}" class="btn btn-sm {% if lp.completed or is_parent %}co-btn-review{% else %}btn-primary{% endif %}" aria-label="View lesson {{ l.title }}">
+            {% if is_parent %}View{% elif lp.completed %}Review{% else %}Open{% endif %}
+          </a>
+        </div>
+      </li>
+      {% endwith %}
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% elif not modules %}
 <div class="card" style="border:2px dashed var(--color-border);background:transparent;">
   <div class="card-body text-center py-5 px-3">
     <i class="bi bi-hourglass-split fs-1 d-block mb-3" style="color:var(--color-muted);" aria-hidden="true"></i>
@@ -199,7 +275,7 @@
 
       {# Quiz #}
       {% if quizzes_enabled and lp.quiz %}
-      <a href="{% url 'learning:quiz_landing' classroom.school_class.pk classroom.subject.pk l.pk %}"
+      <a href="{% if is_preview %}{% url 'learning:teacher_quiz_preview' classroom.school_class.pk classroom.subject.pk l.module_id l.pk %}?student_id={{ student.pk }}{% else %}{% url 'learning:quiz_landing' classroom.school_class.pk classroom.subject.pk l.pk %}{% endif %}"
          class="btn btn-sm btn-outline-secondary flex-shrink-0"
          aria-label="Quiz for {{ l.title }}">
         <i class="bi bi-patch-question" aria-hidden="true"></i>
@@ -207,18 +283,17 @@
       </a>
       {% endif %}
 
-      {# Open / Review button #}
-      {% if not is_parent %}
-      <a href="{% url 'learning:lesson_view' classroom.school_class.pk classroom.subject.pk l.pk %}"
-         class="btn btn-sm flex-shrink-0 {% if lp.completed %}co-btn-review{% else %}btn-primary{% endif %}"
-         aria-label="{% if lp.completed %}Review {{ l.title }}{% else %}Open {{ l.title }}{% endif %}">
-        {% if lp.completed %}
+      {# Parents may open the read-only lesson too. #}
+      <a href="{% if is_preview %}{% url 'learning:lesson_preview' classroom.school_class.pk classroom.subject.pk l.module_id l.pk %}?student_id={{ student.pk }}{% else %}{% url 'learning:lesson_view' classroom.school_class.pk classroom.subject.pk l.pk %}{% endif %}"
+         class="btn btn-sm flex-shrink-0 {% if lp.completed or is_parent %}co-btn-review{% else %}btn-primary{% endif %}"
+         aria-label="View lesson {{ l.title }}">
+        {% if is_parent %}View
+        {% elif lp.completed %}
         <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Review
         {% else %}
         <i class="bi bi-play-fill me-1" aria-hidden="true"></i>Open
         {% endif %}
       </a>
-      {% endif %}
 
     </div>
     {% endwith %}
@@ -289,10 +364,13 @@
 }
 .co-btn-review:hover { border-color: var(--accent); color: var(--accent-light); }
 
+details.co-module > summary { cursor: pointer; min-height: 44px; }
+.co-lesson .min-w-0 { min-width: 0; overflow-wrap: anywhere; }
 /* Mobile tap targets */
 @media (max-width: 576px) {
-  .co-lesson { padding: 0.9rem 0.875rem; gap: 0.75rem; }
-  .co-lesson .btn { min-height: 36px; }
+  .co-lesson { padding: 0.9rem 0.875rem; gap: 0.75rem; flex-wrap: wrap; }
+  .co-lesson > .flex-grow-1 { flex-basis: calc(100% - 44px); }
+  .co-lesson .btn { min-height: 44px; }
 }
 </style>
 {% endblock %}

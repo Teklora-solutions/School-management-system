@@ -26,6 +26,7 @@ def get_class_calendar_data(
     school_class_id: int,
     year: int | None = None,
     month: int | None = None,
+    *, student=None,
 ) -> dict[str, Any]:
     """
     Build monthly calendar matrix and agenda for a given school class.
@@ -123,7 +124,11 @@ def get_class_calendar_data(
         )
         .select_related("lesson__module__subject")
     )
+    from .course_selectors import quiz_visible_to_student
+
     for q in quizzes:
+        if student is not None and not quiz_visible_to_student(q, student):
+            continue
         q_date = timezone.localtime(q.created_at).date()
         subject = q.lesson.module.subject
         events.append(

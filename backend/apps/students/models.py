@@ -172,7 +172,18 @@ class PromotionBatch(BaseModel):
     preview_snapshot = models.JSONField(default=dict, blank=True)
     is_committed = models.BooleanField(default=False)
     committed_at = models.DateTimeField(null=True, blank=True)
-    # Idempotency key: one committed batch per (from_year, to_year)
+    is_reversed = models.BooleanField(default=False)
+    reversed_at = models.DateTimeField(null=True, blank=True)
+    reverse_reason = models.TextField(blank=True)
+    reversed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="promotion_reversals",
+    )
+    # One active committed batch per (from_year, to_year). A reversal renames
+    # this key so a later run of the same year pair can commit again.
     idempotency_key = models.CharField(max_length=64, unique=True)
 
     class Meta:
@@ -180,7 +191,12 @@ class PromotionBatch(BaseModel):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        state = "committed" if self.is_committed else "draft"
+        if self.is_reversed:
+            state = "reversed"
+        elif self.is_committed:
+            state = "committed"
+        else:
+            state = "draft"
         return f"Promotion {self.from_year} ? {self.to_year} ({state})"
 
 
@@ -205,6 +221,21 @@ class PromotionRecord(BaseModel):
     )
     to_class = models.ForeignKey(
         "academics.SchoolClass",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    previous_status = models.CharField(max_length=20, blank=True)
+    previous_stream = models.ForeignKey(
+        "academics.Stream",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    to_stream = models.ForeignKey(
+        "academics.Stream",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,

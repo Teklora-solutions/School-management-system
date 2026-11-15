@@ -38,9 +38,9 @@ from openpyxl import Workbook, load_workbook
 
 from apps.academics.models import AcademicYear, SchoolClass, Stream, Subject, Term
 from apps.accounts.models import ParentProfile, User
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, Notification
 from apps.finance.models import FeeDiscountRule, FeeStructure, Invoice
-from apps.results.models import ResultSheet
+from apps.results.models import GradingConfig, ResultSheet, ScoreEntry
 from apps.students.models import (
     BulkImportJob,
     PromotionBatch,
@@ -56,6 +56,7 @@ from apps.students.services import (
     create_student_with_guardian,
     delete_student,
     preview_promotion,
+    reverse_promotion,
     set_student_login_active,
     student_delete_forecast,
     update_student,
@@ -638,6 +639,7 @@ class PromotionTests(TestCase):
             actor=self.admin,
         )
         self.assertEqual(again.pk, batch.pk)
+        self.assertTrue(again.replayed)
         self.assertEqual(PromotionBatch.objects.count(), 1)
         self.assertEqual(PromotionRecord.objects.count(), 1)
         student.refresh_from_db()
@@ -668,6 +670,232 @@ class PromotionTests(TestCase):
         self.assertEqual(repeat_student.status, Student.Status.REPEATING)
         self.assertIsNone(graduate.current_class)
         self.assertEqual(graduate.status, Student.Status.GRADUATED)
+
+    def test_unknown_admission_number_blocks_the_preview(self):
+        self._student("P5-001", self.from_grade5)
+        with self.assertRaises(ValidationError) as ctx:
+            preview_promotion(
+                from_year=self.from_year,
+                to_year=self.to_year,
+                term=self.term,
+                repeat_admission_numbers={"NO-SUCH"},
+            )
+        self.assertIn("NO-SUCH", str(ctx.exception))
+
+    def test_term_must_belong_to_the_source_year(self):
+        other = Term.objects.create(
+            academic_year=self.to_year,
+            name="term_1",
+            start_date=datetime.date(2026, 9, 1),
+            end_date=datetime.date(2026, 12, 15),
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            preview_promotion(
+                from_year=self.from_year, to_year=self.to_year, term=other
+            )
+        self.assertIn("belongs to", str(ctx.exception))
+
+    def test_duplicate_level_and_missing_next_class_block_the_preview(self):
+        SchoolClass.objects.create(
+            academic_year=self.from_year, name="Grade 5B", level_order=5
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            preview_promotion(
+                from_year=self.from_year, to_year=self.to_year, term=self.term
+            )
+        self.assertIn("more than one class", str(ctx.exception))
+
+        gap_from = AcademicYear.objects.create(
+            name="2024/2025",
+            start_date=datetime.date(2024, 9, 1),
+            end_date=datetime.date(2025, 7, 31),
+        )
+        gap_to = AcademicYear.objects.create(
+            name="2027/2028",
+            start_date=datetime.date(2027, 9, 1),
+            end_date=datetime.date(2028, 7, 31),
+        )
+        gap_term = Term.objects.create(
+            academic_year=gap_from,
+            name="term_3",
+            start_date=datetime.date(2025, 5, 1),
+            end_date=datetime.date(2025, 7, 31),
+        )
+        grade4 = SchoolClass.objects.create(
+            academic_year=gap_from, name="Grade 4", level_order=4
+        )
+        SchoolClass.objects.create(
+            academic_year=gap_to, name="Grade 4", level_order=4
+        )
+        self._student("GAP-001", grade4)
+        with self.assertRaises(ValidationError) as ctx:
+            preview_promotion(from_year=gap_from, to_year=gap_to, term=gap_term)
+        self.assertIn("no class at level 5", str(ctx.exception))
+
+    def test_stream_moves_with_the_pupil_and_a_mismatch_blocks(self):
+        blue_from = Stream.objects.create(school_class=self.from_grade5, name="Blue")
+        blue_to = Stream.objects.create(school_class=self.to_grade6, name="Blue")
+        student = self._student("P5-001", self.from_grade5)
+        student.current_stream = blue_from
+        student.save(update_fields=["current_stream"])
+        self._publish_results()
+
+        preview = preview_promotion(
+            from_year=self.from_year, to_year=self.to_year, term=self.term
+        )
+        move = preview["moves"][0]
+        self.assertEqual(move["to_stream_id"], blue_to.pk)
+        self.assertEqual(move["outstanding"], "0.00")
+
+        batch = commit_promotion(
+            from_year=self.from_year,
+            to_year=self.to_year,
+            term=self.term,
+            actor=self.admin,
+        )
+        student.refresh_from_db()
+        self.assertEqual(student.current_stream, blue_to)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=student.user, category="promotion"
+            ).exists()
+        )
+
+        reverse_promotion(batch=batch, reason="Placed in the wrong year", actor=self.admin)
+        student.refresh_from_db()
+        self.assertEqual(student.current_class, self.from_grade5)
+        self.assertEqual(student.current_stream, blue_from)
+        self.assertEqual(student.status, Student.Status.ACTIVE)
+        batch.refresh_from_db()
+        self.assertTrue(batch.is_reversed)
+        self.assertTrue(
+            AuditLog.objects.filter(action="student.promotion_reversed").exists()
+        )
+
+        Stream.objects.create(school_class=self.to_grade6, name="Gold")
+        blue_to.delete()
+        with self.assertRaises(ValidationError) as ctx:
+            preview_promotion(
+                from_year=self.from_year, to_year=self.to_year, term=self.term
+            )
+        self.assertIn("no stream with that name", str(ctx.exception))
+
+    def test_published_failure_is_suggested_and_can_be_overridden(self):
+        GradingConfig.objects.create(
+            academic_year=self.from_year, pass_mark=Decimal("50")
+        )
+        self._publish_results()
+        sheet = ResultSheet.objects.get(school_class=self.from_grade5, term=self.term)
+        weak = self._student("W5-001", self.from_grade5)
+        strong = self._student("S5-001", self.from_grade5)
+        ScoreEntry.objects.create(
+            result_sheet=sheet, student=weak, raw_score=Decimal("40"), total=Decimal("40")
+        )
+        ScoreEntry.objects.create(
+            result_sheet=sheet, student=strong, raw_score=Decimal("80"), total=Decimal("80")
+        )
+
+        preview = preview_promotion(
+            from_year=self.from_year,
+            to_year=self.to_year,
+            term=self.term,
+            include_suggested_repeats=True,
+        )
+        actions = {move["admission_number"]: move for move in preview["moves"]}
+        self.assertEqual(actions["W5-001"]["action"], PromotionRecord.Action.REPEAT)
+        self.assertTrue(actions["W5-001"]["suggested_repeat"])
+        self.assertEqual(actions["S5-001"]["action"], PromotionRecord.Action.PROMOTE)
+
+        plain = preview_promotion(
+            from_year=self.from_year, to_year=self.to_year, term=self.term
+        )
+        plain_actions = {move["admission_number"]: move for move in plain["moves"]}
+        self.assertEqual(plain_actions["W5-001"]["action"], PromotionRecord.Action.PROMOTE)
+        self.assertTrue(plain_actions["W5-001"]["suggested_repeat"])
+
+    def test_a_later_admission_opens_a_new_batch(self):
+        self._publish_results()
+        self._student("P5-001", self.from_grade5)
+        first = commit_promotion(
+            from_year=self.from_year,
+            to_year=self.to_year,
+            term=self.term,
+            actor=self.admin,
+        )
+        late = self._student("P5-002", self.from_grade5)
+        second = commit_promotion(
+            from_year=self.from_year,
+            to_year=self.to_year,
+            term=self.term,
+            actor=self.admin,
+        )
+        self.assertNotEqual(second.pk, first.pk)
+        late.refresh_from_db()
+        self.assertEqual(late.current_class, self.to_grade6)
+
+        with self.assertRaises(ValidationError):
+            reverse_promotion(batch=first, reason="Too late", actor=self.admin)
+
+        replay = commit_promotion(
+            from_year=self.from_year,
+            to_year=self.to_year,
+            term=self.term,
+            actor=self.admin,
+        )
+        self.assertTrue(replay.replayed)
+        self.assertEqual(replay.pk, second.pk)
+
+    def test_commit_page_requires_the_word_commit(self):
+        self._publish_results()
+        self._student("P5-001", self.from_grade5)
+        self.client.force_login(self.admin)
+        preview = self.client.post(
+            reverse("students:promote"),
+            {
+                "action": "preview",
+                "from_year": self.from_year.pk,
+                "to_year": self.to_year.pk,
+                "term": self.term.pk,
+            },
+        )
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(preview, "P5-001")
+        self.assertContains(preview, "Type COMMIT")
+
+        blocked = self.client.post(
+            reverse("students:promote"),
+            {
+                "action": "commit",
+                "from_year": self.from_year.pk,
+                "to_year": self.to_year.pk,
+                "term": self.term.pk,
+                "confirmation": "nope",
+            },
+        )
+        self.assertEqual(blocked.status_code, 200)
+        self.assertEqual(PromotionBatch.objects.count(), 0)
+
+        done = self.client.post(
+            reverse("students:promote"),
+            {
+                "action": "commit",
+                "from_year": self.from_year.pk,
+                "to_year": self.to_year.pk,
+                "term": self.term.pk,
+                "confirmation": "commit",
+            },
+        )
+        self.assertEqual(done.status_code, 302)
+        self.assertEqual(
+            Student.objects.get(admission_number="P5-001").current_class,
+            self.to_grade6,
+        )
+        history = self.client.get(reverse("students:promotion_history"))
+        self.assertContains(history, "Open")
+        detail = self.client.get(done["Location"])
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, "Print movement list")
+        self.assertContains(detail, "P5-001")
 
 
 class StudentViewSmokeTests(TestCase):

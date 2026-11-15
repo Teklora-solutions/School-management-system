@@ -126,7 +126,9 @@
               {% if row.last_active_date %}{{ row.last_active_date|date:"d M" }}{% else %}—{% endif %}
             </td>
             <td class="text-center">
-              {% if row.not_started %}
+              {% if row.nothing_assigned %}
+              <span class="badge" style="background:var(--color-surface-2);color:var(--color-muted);">Nothing open yet</span>
+              {% elif row.not_started %}
               <span class="badge" style="background:var(--color-surface-2);color:var(--color-muted);">Not started</span>
               {% elif row.is_behind %}
               <span class="badge" style="background:rgba(245,158,11,0.15);color:var(--color-warning);">Encourage</span>

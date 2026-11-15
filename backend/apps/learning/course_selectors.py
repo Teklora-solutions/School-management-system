@@ -30,7 +30,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .models import CourseModule, Lesson, LessonAttachment, LessonProgress, Quiz
+from .models import CourseModule, Lesson, LessonAttachment, LessonProgress, Quiz, Topic
+from .release import is_released_at
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +71,54 @@ class ModuleWithLessons:
         if pub == 0:
             return 0
         return round(self.completed_lessons * 100 / pub)
+
+
+@dataclass
+class TopicWithLessons:
+    """A named topic and the released lessons grouped under it (student view)."""
+    topic: Topic
+    lessons: list[LessonWithProgress] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Targeting helpers (assign to whole class vs chosen students)
+# ---------------------------------------------------------------------------
+
+
+def _targets(obj, student) -> bool:
+    if obj.assign_all:
+        return True
+    cache = getattr(obj, "_prefetched_objects_cache", {})
+    if "assigned_students" in cache:
+        return any(s.pk == student.pk for s in cache["assigned_students"])
+    return obj.assigned_students.filter(pk=student.pk).exists()
+
+
+def lesson_visible_to_student(lesson: Lesson, student) -> bool:
+    return (
+        lesson.module.school_class_id == student.current_class_id
+        and is_released_at(lesson.module)
+        and is_released_at(lesson)
+        and lesson_targets_student(lesson, student)
+    )
+
+
+def quiz_visible_to_student(quiz: Quiz, student) -> bool:
+    return (
+        lesson_visible_to_student(quiz.lesson, student)
+        and is_released_at(quiz)
+        and quiz_targets_student(quiz, student)
+    )
+
+
+def lesson_targets_student(lesson: Lesson, student) -> bool:
+    """True when *student* may see this lesson (assign-all or explicitly listed)."""
+    return _targets(lesson, student)
+
+
+def quiz_targets_student(quiz: Quiz, student) -> bool:
+    """True when *student* may see this quiz (assign-all or explicitly listed)."""
+    return _targets(quiz, student)
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +169,12 @@ def course_for_student(
     """
     Published modules and lessons only, annotated with the student's
     completion status.  One DB query for progress after the initial fetch.
+
+    Read-time release: a module or lesson only appears when it is *currently
+    released* (published and inside its publish/hide window) — checked on
+    every call, so a scheduled item appears at the right instant even with no
+    background worker running.  Lessons and quizzes targeted at chosen
+    students only (``assign_all`` off) are hidden from everyone else.
     """
     modules = list(
         CourseModule.objects.filter(
@@ -128,18 +183,21 @@ def course_for_student(
             term=term,
             is_published=True,
         )
-        .prefetch_related("lessons__lesson_attachments")
+        .prefetch_related("lessons__lesson_attachments", "lessons__assigned_students")
         .order_by("position", "id")
     )
+    modules = [m for m in modules if is_released_at(m)]
     if not modules:
         return []
 
-    # Collect published lesson PKs
+    # Collect released, targeted lesson PKs
     all_lesson_ids = [
         l.pk
         for mod in modules
         for l in mod.lessons.all()
         if l.is_published
+        and is_released_at(l)
+        and lesson_targets_student(l, student)
     ]
 
     # Bulk-fetch completions
@@ -151,12 +209,13 @@ def course_for_student(
         ).values_list("lesson_id", flat=True)
     )
 
-    # Only a published quiz is offered to a pupil; drafts stay teacher-only.
+    # Only a published, released, targeted quiz is offered to a pupil.
     quiz_by_lesson = {
         quiz.lesson_id: quiz
         for quiz in Quiz.objects.filter(
             lesson_id__in=all_lesson_ids, is_published=True
-        )
+        ).prefetch_related("assigned_students")
+        if is_released_at(quiz) and quiz_targets_student(quiz, student)
     }
 
     result = []
@@ -170,9 +229,49 @@ def course_for_student(
             )
             for l in sorted(mod.lessons.all(), key=lambda l: (l.position, l.pk))
             if l.is_published
+            and is_released_at(l)
+            and lesson_targets_student(l, student)
         ]
         result.append(ModuleWithLessons(module=mod, lessons=lessons))
     return result
+
+
+def topics_for_student(
+    *, school_class, subject, term, student, modules=None
+) -> tuple[list[TopicWithLessons], list[LessonWithProgress]]:
+    """
+    Released lessons grouped under named topics, plus the lessons with no
+    topic.  Returns (topics_with_lessons, untopic_lessons).  Both are in
+    display order; lessons inside a topic are ordered by ``topic_position``.
+
+    Courses with no topics return ([], []) — callers then render the normal
+    module-by-module outline so legacy courses look exactly as before.
+    """
+    topics = list(
+        Topic.objects.filter(
+            school_class=school_class, subject=subject, term=term
+        ).order_by("position", "id")
+    )
+    if modules is None:
+        modules = course_for_student(
+            school_class=school_class, subject=subject, term=term, student=student
+        )
+    by_topic: dict[int, list[LessonWithProgress]] = {t.pk: [] for t in topics}
+    untopic: list[LessonWithProgress] = []
+    for mwl in modules:
+        for lp in mwl.lessons:
+            if lp.lesson.topic_id and lp.lesson.topic_id in by_topic:
+                by_topic[lp.lesson.topic_id].append(lp)
+            else:
+                untopic.append(lp)
+    topics_with_lessons = [
+        TopicWithLessons(
+            topic=t,
+            lessons=sorted(by_topic[t.pk], key=lambda lp: (lp.lesson.topic_position, lp.lesson.pk)),
+        )
+        for t in topics
+    ]
+    return topics_with_lessons, untopic
 
 
 def lesson_detail_for_teacher(
@@ -225,7 +324,7 @@ def lesson_detail_for_student(
     try:
         lesson = (
             Lesson.objects.select_related("module__school_class", "module__subject")
-            .prefetch_related("lesson_attachments")
+            .prefetch_related("lesson_attachments", "assigned_students")
             .get(pk=lesson_id, is_published=True)
         )
     except Lesson.DoesNotExist:
@@ -235,6 +334,14 @@ def lesson_detail_for_student(
     if not lesson.module.is_published:
         return None
     if lesson.module.school_class_id != student.current_class_id:
+        return None
+    # Read-time release and per-student targeting (scheduled / hidden /
+    # not-assigned lessons are unreachable by address bar too)
+    if not is_released_at(lesson):
+        return None
+    if not is_released_at(lesson.module):
+        return None
+    if not lesson_targets_student(lesson, student):
         return None
     return lesson
 
@@ -267,12 +374,17 @@ def available_classes_for_copy(*, academic_year, exclude_class):
 # ---------------------------------------------------------------------------
 
 
-def _flat_published_lessons(modules: list[ModuleWithLessons]) -> list[LessonWithProgress]:
-    """Flat ordered list of all published LessonWithProgress objects."""
-    result = []
-    for mwl in modules:
-        result.extend(mwl.lessons)
-    return result
+def ordered_course_lessons(modules: list[ModuleWithLessons]) -> list[LessonWithProgress]:
+    if not modules:
+        return []
+    module = modules[0].module
+    groups, other = topics_for_student(
+        school_class=module.school_class_id, subject=module.subject_id,
+        term=module.term_id, student=None, modules=modules,
+    )
+    if any(group.lessons for group in groups):
+        return [lp for group in groups for lp in group.lessons] + other
+    return [lp for mwl in modules for lp in mwl.lessons]
 
 
 def next_lesson_for_student(
@@ -285,7 +397,7 @@ def next_lesson_for_student(
     modules = course_for_student(
         school_class=school_class, subject=subject, term=term, student=student
     )
-    flat = _flat_published_lessons(modules)
+    flat = ordered_course_lessons(modules)
     for i, lp in enumerate(flat):
         if lp.lesson.pk == lesson_id and i + 1 < len(flat):
             return flat[i + 1]
@@ -301,7 +413,7 @@ def prev_lesson_for_student(
     modules = course_for_student(
         school_class=school_class, subject=subject, term=term, student=student
     )
-    flat = _flat_published_lessons(modules)
+    flat = ordered_course_lessons(modules)
     for i, lp in enumerate(flat):
         if lp.lesson.pk == lesson_id and i > 0:
             return flat[i - 1]

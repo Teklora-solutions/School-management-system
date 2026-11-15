@@ -329,12 +329,20 @@ def teacher_quiz_results(*, quiz: Quiz, school_class) -> TeacherResultsData:
     Full results for the teacher screen.
     """
     from apps.students.models import Student
+    from .release import is_released_at
 
     students = list(
         Student.objects.filter(
             current_class=school_class, status=Student.Status.ACTIVE
         ).select_related("user")
     )
+    targeted = {s.pk for s in students}
+    if not quiz.assign_all:
+        targeted &= set(quiz.assigned_students.values_list("pk", flat=True))
+    if not quiz.lesson.assign_all:
+        targeted &= set(quiz.lesson.assigned_students.values_list("pk", flat=True))
+    if not all(is_released_at(obj) for obj in (quiz, quiz.lesson, quiz.lesson.module)):
+        targeted.clear()
     all_attempts = list(
         QuizAttempt.objects.filter(
             quiz=quiz, submitted_at__isnull=False
@@ -351,7 +359,9 @@ def teacher_quiz_results(*, quiz: Quiz, school_class) -> TeacherResultsData:
     for stu in students:
         attempts = by_student.get(stu.pk, [])
         if not attempts:
-            not_attempted.append(stu)
+            # Pupils the quiz (or its lesson) isn't assigned to aren't "missing".
+            if stu.pk in targeted:
+                not_attempted.append(stu)
             continue
         best = max(attempts, key=lambda a: a.score_pct or 0)
         scores.append(best.score_pct or 0)

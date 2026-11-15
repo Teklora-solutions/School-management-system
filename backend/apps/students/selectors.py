@@ -4,7 +4,7 @@ apps/students/selectors.py
 
 from __future__ import annotations
 
-from django.db.models import Q, QuerySet
+from django.db.models import Count, Q, QuerySet
 
 from .models import BulkImportJob, PromotionBatch, Student
 
@@ -79,16 +79,25 @@ def bulk_import_rows(job: BulkImportJob) -> dict[str, list[dict]]:
 
 
 def promotion_batch_list() -> QuerySet:
-    return PromotionBatch.objects.select_related(
-        "from_year", "to_year", "term", "committed_by"
-    ).prefetch_related("records")
+    return (
+        PromotionBatch.objects.select_related(
+            "from_year", "to_year", "term", "committed_by", "reversed_by"
+        )
+        .annotate(record_count=Count("records"))
+    )
 
 
 def get_promotion_batch(pk: int) -> PromotionBatch:
     return (
-        PromotionBatch.objects.select_related("from_year", "to_year", "term")
+        PromotionBatch.objects.select_related(
+            "from_year", "to_year", "term", "committed_by", "reversed_by"
+        )
         .prefetch_related(
-            "records__student__user", "records__from_class", "records__to_class"
+            "records__student__user",
+            "records__from_class",
+            "records__to_class",
+            "records__previous_stream",
+            "records__to_stream",
         )
         .get(pk=pk)
     )

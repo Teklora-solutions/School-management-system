@@ -82,6 +82,14 @@ FEATURES: dict[str, dict[str, str]] = {
             "Available once the Gradebook module is activated."
         ),
     },
+    "community": {
+        "label": "School community",
+        "field": "community_enabled",
+        "disabled_message": (
+            "The school community page is not active yet. "
+            "An admin can switch it on in School Settings."
+        ),
+    },
 }
 
 

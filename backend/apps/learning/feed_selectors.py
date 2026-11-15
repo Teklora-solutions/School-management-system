@@ -497,15 +497,18 @@ def _annotate_post_stats(qs):
     )
 
 
-def _lesson_link(post, viewer) -> Optional[dict]:
+def _lesson_link(post, viewer, student=None) -> Optional[dict]:
     lesson = getattr(post, "lesson", None)
     if lesson is None:
         return None
     module = lesson.module
     if module.school_class_id != post.school_class_id:
         return None
-    if not is_moderator(viewer) and not (module.is_published and lesson.is_published):
-        return None
+    if not is_moderator(viewer):
+        from .course_selectors import lesson_visible_to_student
+        student = student or getattr(viewer, "student_profile", None)
+        if student is None or not lesson_visible_to_student(lesson, student):
+            return None
     try:
         url = reverse(
             "learning:lesson_view",
@@ -550,7 +553,7 @@ def _link_card(post, viewer) -> Optional[dict]:
     return {"url": url, "domain": host}
 
 
-def _quiz_link(post, viewer) -> Optional[dict]:
+def _quiz_link(post, viewer, student=None) -> Optional[dict]:
     quiz = getattr(post, "quiz", None)
     if quiz is None:
         return None
@@ -558,8 +561,11 @@ def _quiz_link(post, viewer) -> Optional[dict]:
     module = lesson.module
     if module.school_class_id != post.school_class_id:
         return None
-    if not is_moderator(viewer) and not quiz.is_published:
-        return None
+    if not is_moderator(viewer):
+        from .course_selectors import quiz_visible_to_student
+        student = student or getattr(viewer, "student_profile", None)
+        if student is None or not quiz_visible_to_student(quiz, student):
+            return None
     try:
         url = reverse(
             "learning:quiz_landing",
@@ -648,7 +654,7 @@ def _bundle_attachments(posts: list, viewer) -> dict[int, dict]:
     return grouped
 
 
-def _bundle(posts: list, viewer) -> list[PostWithReactions]:
+def _bundle(posts: list, viewer, student=None) -> list[PostWithReactions]:
     """Attach reaction summaries, reply stats and poll data to posts."""
     if not posts:
         return []
@@ -698,8 +704,8 @@ def _bundle(posts: list, viewer) -> list[PostWithReactions]:
                     and post.author_id == getattr(viewer, "pk", None)
                     and not post.is_removed
                 ),
-                lesson_link=_lesson_link(post, viewer),
-                quiz_link=_quiz_link(post, viewer),
+                lesson_link=_lesson_link(post, viewer, student),
+                quiz_link=_quiz_link(post, viewer, student),
                 link_card=_link_card(post, viewer),
                 poll=(
                     build_poll_summary(polls[post.pk], viewer)
@@ -721,7 +727,7 @@ def _bundle(posts: list, viewer) -> list[PostWithReactions]:
 # ---------------------------------------------------------------------------
 
 
-def feed_for_classroom(*, school_class, viewer) -> list[PostWithReactions]:
+def feed_for_classroom(*, school_class, viewer, student=None) -> list[PostWithReactions]:
     """
     Ordered list of posts for *school_class* — the original notice board.
 
@@ -738,7 +744,7 @@ def feed_for_classroom(*, school_class, viewer) -> list[PostWithReactions]:
         if not polls_visible_to(viewer, school_class):
             qs = qs.exclude(post_type=ClassPost.PostType.POLL)
 
-    return _bundle(list(qs), viewer)
+    return _bundle(list(qs), viewer, student)
 
 
 def _apply_filter(qs, filter_key: str, viewer):
@@ -774,6 +780,7 @@ def feed_page(
     before_id: Optional[int] = None,
     limit: int = PAGE_SIZE,
     search: str = "",
+    student=None,
 ) -> FeedPage:
     """
     One page of the community feed.
@@ -805,7 +812,7 @@ def feed_page(
         pinned_qs = _annotate_post_stats(
             base.filter(is_pinned=True).order_by("-id")
         )[:PINNED_LIMIT]
-        pinned = _bundle(list(pinned_qs), viewer)
+        pinned = _bundle(list(pinned_qs), viewer, student)
         stream_base = base.filter(is_pinned=False)
 
     qs = _annotate_post_stats(stream_base).order_by("-id")
@@ -818,7 +825,7 @@ def feed_page(
     next_before_id = rows[-1].pk if rows and has_more else None
 
     return FeedPage(
-        posts=_bundle(rows, viewer),
+        posts=_bundle(rows, viewer, student),
         pinned=pinned,
         has_more=has_more,
         next_before_id=next_before_id,
@@ -829,7 +836,7 @@ def feed_page(
     )
 
 
-def post_detail(*, post_id: int, viewer) -> Optional[PostWithReactions]:
+def post_detail(*, post_id: int, viewer, student=None) -> Optional[PostWithReactions]:
     """Single post with reactions.  Returns None if not found or not visible."""
     role = getattr(viewer, "role", "")
     try:
@@ -851,12 +858,12 @@ def post_detail(*, post_id: int, viewer) -> Optional[PostWithReactions]:
     ):
         return None
 
-    return _bundle([post], viewer)[0]
+    return _bundle([post], viewer, student)[0]
 
 
-def post_thread(*, post_id: int, viewer) -> Optional[PostThread]:
+def post_thread(*, post_id: int, viewer, student=None) -> Optional[PostThread]:
     """One post, its visible replies, and the derived question state."""
-    bundled = post_detail(post_id=post_id, viewer=viewer)
+    bundled = post_detail(post_id=post_id, viewer=viewer, student=student)
     if bundled is None:
         return None
 

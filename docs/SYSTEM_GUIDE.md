@@ -358,22 +358,27 @@ Deletion is structurally blocked anyway: invoices, payments and adjustments `PRO
 ### 7.4 Promote a class ✅ (admin)
 
 `/students/promote/` → preview, then commit
-([backend/apps/students/views.py:251](backend/apps/students/views.py#L251),
-[backend/apps/students/services.py:485](backend/apps/students/services.py#L485)).
+([backend/apps/students/views.py](backend/apps/students/views.py),
+[backend/apps/students/services.py](backend/apps/students/services.py)).
 
-1. Pick `from_year`, `to_year`, and the term used to check results. They must differ.
-2. Preview returns, per class (ordered by `level_order`), rows of `PROMOTE` (to `level_order + 1`),
-   `REPEAT` (pupils you list by admission number, or any pupil whose next class does not exist) and
-   `GRADUATE` (max level with no next class), plus `results_published`.
-3. **The gate:** commit refuses unless that term's results are published for every class, unless you tick
-   "override" and type a reason ([backend/apps/students/services.py:618](backend/apps/students/services.py#L618)).
-4. Commit writes one `PromotionRecord` per pupil, moves `current_class`, sets `status`, and **clears
-   `current_stream`** ([backend/apps/students/services.py:670](backend/apps/students/services.py#L670)).
-   It is idempotent: a second commit of the same `"{from}->{to}"` key is a no-op
-   ([backend/apps/students/services.py:604](backend/apps/students/services.py#L604)).
-5. It does **not** touch invoices, fee structures, results or guardians — a promoted pupil's existing debt
-   simply follows them (class figures are computed from the pupil's *current* class).
-6. History: `/students/promote/history/`.
+1. Pick `from_year`, `to_year`, and a results term that belongs to the source year. The years must differ.
+2. Preview walks classes by `level_order`. `PROMOTE` goes to `level_order + 1`. `GRADUATE` is the highest
+   level when the next level does not exist. A missing class anywhere else, two classes sharing a
+   `level_order`, or an admission number that is not in the source year **blocks** the preview.
+3. Repeat is a checkbox on each row. The preview pre-ticks a pupil whose published subject average is
+   below the source year's pass mark (50 when the year has no grading config). Untick the row to promote
+   them anyway. A stream is kept when the destination class has a stream of the same name; a name that
+   does not match blocks the run. Each row shows what the pupil currently owes.
+4. **The gate:** commit refuses unless that term's result sheets are all published, unless you tick
+   "override", type a reason, and type `COMMIT`. The override is audit-logged.
+5. Commit writes one `PromotionRecord` per pupil (previous class, stream and status included), moves
+   `current_class` / `current_stream`, and sets `status`. Pupils and their guardians get an in-app notice.
+   A second commit of the same years does nothing for pupils already moved, and opens a new batch for
+   anyone admitted since. Reverse a batch from its history page (`UNDO` plus a reason) to change a decision;
+   a later batch has to be reversed first.
+6. It does **not** touch invoices, fee structures, results or guardians — a promoted pupil's existing debt
+   simply follows them. The preview shows the balance; the commit writes it to the audit log.
+7. History: `/students/promote/history/`, with a printable movement list at `/students/promote/history/<id>/`.
 
 ### 7.5 Admission form PDF
 

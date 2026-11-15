@@ -1,4 +1,5 @@
 {% extends base_template %}
+{% load tz feed_tags %}
 {% block title %}{{ classroom.school_class.name }} · {{ classroom.subject.name }} | {{ SCHOOL_NAME }}{% endblock %}
 
 {% block content %}
@@ -126,11 +127,125 @@
   </div>
 </div>
 
-{# Course outline #}
+{# Class-wide questions are opt-in and work without JavaScript. #}
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="post" action="{% url 'learning:lesson_comments_toggle' classroom.school_class.pk classroom.subject.pk %}">
+      {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+      <fieldset aria-describedby="lesson-comments-help">
+        <legend class="form-label fw-600">Lesson questions — {% if lesson_comments_enabled %}ON{% else %}OFF{% endif %}</legend>
+        <p class="text-muted-sm" id="lesson-comments-help">Default OFF. Enable student questions under lessons for this whole class, across subjects. Parents can read only; you can remove or restore questions in lesson preview.</p>
+        <div class="d-flex gap-3 flex-wrap mb-3">
+          <div class="form-check">
+            <input type="radio" class="form-check-input" name="enabled" id="comments-off" value="0" {% if not lesson_comments_enabled %}checked{% endif %}>
+            <label class="form-check-label" for="comments-off">Off</label>
+          </div>
+          <div class="form-check">
+            <input type="radio" class="form-check-input" name="enabled" id="comments-on" value="1" {% if lesson_comments_enabled %}checked{% endif %}>
+            <label class="form-check-label" for="comments-on">On</label>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-sm btn-outline-secondary">Save question setting</button>
+      </fieldset>
+    </form>
+  </div>
+</div>
+
+<section aria-labelledby="topics-heading" class="mb-4">
+  <h2 id="topics-heading" class="h5">Organise topics</h2>
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-end mb-3">
+    <input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+    <div class="flex-grow-1">
+      <label for="classroom-preview-student" class="form-label">Preview as student</label>
+      <select id="classroom-preview-student" name="student_id" required class="form-select">
+        <option value="">Choose a student</option>
+        {% for pupil in preview_students %}<option value="{{ pupil.pk }}">{{ pupil.user.full_name }}</option>{% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-outline-secondary">Preview classroom</button>
+  </form>
+  <p class="text-muted-sm">Topics group lessons for students in this class, subject and selected term. Use Up and Down to change their order. Release and targeting settings still apply to each lesson and its module.</p>
+  <form method="post" action="{% url 'learning:topic_create' classroom.school_class.pk classroom.subject.pk %}" class="card mb-3">
+    {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+    <div class="card-body">
+      <label for="new-topic-title" class="form-label fw-600">New topic title</label>
+      <div class="d-flex gap-2 flex-wrap">
+        <input type="text" name="title" id="new-topic-title" maxlength="200" required class="form-control flex-grow-1" style="flex-basis:240px;" placeholder="e.g. Fractions">
+        <button type="submit" class="btn btn-primary btn-sm">Add topic</button>
+      </div>
+    </div>
+  </form>
+
+  {% for group in topic_groups %}
+  {% with topic=group.topic %}
+  <div class="cb-module mb-3">
+    <div class="cb-module__header d-flex align-items-start flex-wrap gap-2">
+      <div class="flex-grow-1 min-w-0">
+        <h3 class="h6 mb-1">{{ topic.title }}</h3>
+        <span class="text-muted-sm">{{ group.lessons|length }} lesson{{ group.lessons|length|pluralize }}</span>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <form method="post" action="{% url 'learning:topic_move' classroom.school_class.pk classroom.subject.pk topic.pk 'up' %}">
+          {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+          <button type="submit" class="btn btn-sm btn-outline-secondary" aria-label="Move topic {{ topic.title }} up" {% if forloop.first %}disabled{% endif %}>Up</button>
+        </form>
+        <form method="post" action="{% url 'learning:topic_move' classroom.school_class.pk classroom.subject.pk topic.pk 'down' %}">
+          {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+          <button type="submit" class="btn btn-sm btn-outline-secondary" aria-label="Move topic {{ topic.title }} down" {% if forloop.last %}disabled{% endif %}>Down</button>
+        </form>
+      </div>
+    </div>
+    <div class="p-3">
+      <details class="mb-3">
+        <summary class="text-muted-sm">Rename or delete this topic</summary>
+        <form method="post" action="{% url 'learning:topic_edit' classroom.school_class.pk classroom.subject.pk topic.pk %}" class="mt-3">
+          {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+          <label for="topic-title-{{ topic.pk }}" class="form-label">Topic title</label>
+          <div class="d-flex gap-2 flex-wrap">
+            <input type="text" name="title" id="topic-title-{{ topic.pk }}" value="{{ topic.title }}" maxlength="200" required class="form-control" style="flex:1 1 220px;">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Save title</button>
+          </div>
+        </form>
+        <form method="post" action="{% url 'learning:topic_delete' classroom.school_class.pk classroom.subject.pk topic.pk %}" class="mt-3">
+          {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+          <p class="text-muted-sm" id="topic-delete-help-{{ topic.pk }}">Deleting this topic keeps its lessons, without a topic.</p>
+          <button type="submit" class="btn btn-sm btn-outline-danger" aria-describedby="topic-delete-help-{{ topic.pk }}" aria-label="Delete topic {{ topic.title }}">Delete topic</button>
+        </form>
+      </details>
+      {% for lp in group.lessons %}
+      {% with l=lp.lesson %}
+      <div class="d-flex align-items-start flex-wrap gap-2 py-3 border-top">
+        <div class="flex-grow-1 min-w-0">
+          <div class="fw-600">{{ l.title }} <span class="cb-badge cb-badge--draft">{{ l|release_label }}</span></div>
+          <div class="text-muted-sm mt-1">{{ l.module.title }} · Module: {{ l.module|release_label }} · {% if l.assign_all %}Whole class{% else %}{{ l.assigned_students.count }} selected student{{ l.assigned_students.count|pluralize }}{% endif %}</div>
+          {% if quizzes_enabled and lp.quiz %}<div class="text-muted-sm mt-1">Quiz: {{ lp.quiz.title }} · {{ lp.quiz|release_label }} · {% if lp.quiz.assign_all %}Whole class{% else %}{{ lp.quiz.assigned_students.count }} selected student{{ lp.quiz.assigned_students.count|pluralize }}{% endif %}</div>{% endif %}
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <form method="post" action="{% url 'learning:lesson_topic_move' classroom.school_class.pk classroom.subject.pk l.pk 'up' %}">
+            {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary" aria-label="Move {{ l.title }} up in {{ topic.title }}" {% if forloop.first %}disabled{% endif %}>Up</button>
+          </form>
+          <form method="post" action="{% url 'learning:lesson_topic_move' classroom.school_class.pk classroom.subject.pk l.pk 'down' %}">
+            {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary" aria-label="Move {{ l.title }} down in {{ topic.title }}" {% if forloop.last %}disabled{% endif %}>Down</button>
+          </form>
+          <a href="{% url 'learning:lesson_preview' classroom.school_class.pk classroom.subject.pk l.module_id l.pk %}?term_id={{ selected_term.pk }}" class="btn btn-sm btn-outline-secondary" aria-label="Preview {{ l.title }}">Preview</a>
+          <a href="{% url 'learning:lesson_edit' classroom.school_class.pk classroom.subject.pk l.module_id l.pk %}?term_id={{ selected_term.pk }}" class="btn btn-sm btn-outline-secondary" aria-label="Edit {{ l.title }}">Edit</a>
+        </div>
+      </div>
+      {% endwith %}
+      {% empty %}<p class="text-muted-sm mb-0">No lessons in this topic. Choose this topic when adding or editing a lesson below.</p>{% endfor %}
+    </div>
+  </div>
+  {% endwith %}
+  {% empty %}<p class="text-muted-sm">No topics yet. Students will continue to see the module outline until topics have released lessons.</p>{% endfor %}
+</section>
+
+{# Keep the existing module builder and actions. #}
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
   <h2 style="font-size:1.05rem;font-weight:700;color:#fff;margin:0;">
     <i class="bi bi-collection me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
-    Course outline
+    Modules and lessons
     <span class="text-muted-sm" style="font-size:0.8rem;font-weight:400;">
       — {{ selected_term.academic_year.name }} · {{ selected_term.get_name_display }}
     </span>
@@ -192,23 +307,21 @@
     <div class="flex-grow-1 min-w-0">
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="fw-600" style="font-size:0.9375rem;color:#fff;">{{ mod.title }}</span>
-        {% if not mod.is_published %}
-        <span class="cb-badge cb-badge--draft">Draft — hidden from students</span>
-        {% endif %}
+        <span class="cb-badge cb-badge--draft">{{ mod|release_label }}</span>
       </div>
       <div class="text-muted-sm mt-1" style="font-size:0.78rem;">
-        {{ mwl.published_lessons }} published · {{ mwl.total_lessons }} total lesson{{ mwl.total_lessons|pluralize }}
+        {{ mwl.total_lessons }} total lesson{{ mwl.total_lessons|pluralize }}
       </div>
     </div>
 
     {# Module action buttons #}
     <div class="d-flex gap-1 flex-shrink-0 flex-wrap">
-      <a href="{% url 'learning:lesson_create' classroom.school_class.pk classroom.subject.pk mod.pk %}"
+      <a href="{% url 'learning:lesson_create' classroom.school_class.pk classroom.subject.pk mod.pk %}?term_id={{ selected_term.pk }}"
          class="btn btn-primary btn-sm">
         <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
         <span class="d-none d-sm-inline">Add lesson</span>
       </a>
-      <a href="{% url 'learning:module_edit' classroom.school_class.pk classroom.subject.pk mod.pk %}"
+      <a href="{% url 'learning:module_edit' classroom.school_class.pk classroom.subject.pk mod.pk %}?term_id={{ selected_term.pk }}"
          class="btn btn-sm cb-btn-icon" title="Edit module" aria-label="Edit module">
         <i class="bi bi-pencil" aria-hidden="true"></i>
       </a>
@@ -238,7 +351,7 @@
       <div class="cb-reorder cb-reorder--sm d-flex flex-column gap-1 flex-shrink-0">
         <form method="post"
               action="{% url 'learning:lesson_move' classroom.school_class.pk classroom.subject.pk mod.pk l.pk 'up' %}">
-          {% csrf_token %}
+          {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
           <button type="submit" class="cb-reorder__btn cb-reorder__btn--sm"
                   title="Move lesson up" aria-label="Move '{{ l.title }}' up">
             <i class="bi bi-chevron-up" style="font-size:0.6rem;" aria-hidden="true"></i>
@@ -246,7 +359,7 @@
         </form>
         <form method="post"
               action="{% url 'learning:lesson_move' classroom.school_class.pk classroom.subject.pk mod.pk l.pk 'down' %}">
-          {% csrf_token %}
+          {% csrf_token %}<input type="hidden" name="term_id" value="{{ selected_term.pk }}">
           <button type="submit" class="cb-reorder__btn cb-reorder__btn--sm"
                   title="Move lesson down" aria-label="Move '{{ l.title }}' down">
             <i class="bi bi-chevron-down" style="font-size:0.6rem;" aria-hidden="true"></i>
@@ -262,10 +375,10 @@
       <div class="flex-grow-1 min-w-0">
         <div class="fw-600" style="font-size:0.875rem;color:{% if l.is_published %}#fff{% else %}var(--color-muted){% endif %};">
           {{ l.title }}
-          {% if not l.is_published %}
-          <span class="cb-badge cb-badge--draft ms-1">Draft</span>
-          {% endif %}
+          <span class="cb-badge cb-badge--draft ms-1">{{ l|release_label }}</span>
         </div>
+        <div class="text-muted-sm mt-1">Topic: {{ l.topic.title|default:"No topic" }} · {% if l.assign_all %}Whole class{% else %}{{ l.assigned_students.count }} selected student{{ l.assigned_students.count|pluralize }}{% endif %}</div>
+        {% if quizzes_enabled and lp.quiz %}<div class="text-muted-sm mt-1">Quiz: {{ lp.quiz|release_label }} · {% if lp.quiz.assign_all %}Whole class{% else %}{{ lp.quiz.assigned_students.count }} selected student{{ lp.quiz.assigned_students.count|pluralize }}{% endif %}</div>{% endif %}
         <div class="d-flex flex-wrap gap-2 mt-1" style="font-size:0.75rem;color:var(--color-muted);">
           {% if l.video_url %}<span><i class="bi bi-play-circle" aria-hidden="true"></i> Video</span>{% endif %}
           {% if l.notes %}<span><i class="bi bi-file-text" aria-hidden="true"></i> Notes</span>{% endif %}
@@ -290,7 +403,7 @@
           <i class="bi bi-patch-question" aria-hidden="true"></i>
         </a>
         {% endif %}
-        <a href="{% url 'learning:lesson_edit' classroom.school_class.pk classroom.subject.pk mod.pk l.pk %}"
+        <a href="{% url 'learning:lesson_edit' classroom.school_class.pk classroom.subject.pk mod.pk l.pk %}?term_id={{ selected_term.pk }}"
            class="btn btn-sm cb-btn-icon" title="Edit lesson" aria-label="Edit lesson">
           <i class="bi bi-pencil" aria-hidden="true"></i>
         </a>
@@ -309,7 +422,7 @@
     <div class="cb-lesson-empty">
       <i class="bi bi-journal-x" aria-hidden="true"></i>
       No lessons yet.
-      <a href="{% url 'learning:lesson_create' classroom.school_class.pk classroom.subject.pk mod.pk %}"
+      <a href="{% url 'learning:lesson_create' classroom.school_class.pk classroom.subject.pk mod.pk %}?term_id={{ selected_term.pk }}"
          style="color:var(--accent-light);">Add the first lesson →</a>
     </div>
     {% endif %}
@@ -487,5 +600,12 @@
 .cb-summary::-webkit-details-marker { display: none; }
 details[open] .cb-summary__chevron { transform: rotate(180deg); }
 .cb-summary__chevron { transition: transform 0.2s; }
+.cb-module .min-w-0 { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 576px) {
+  .cb-module__header, .cb-lesson { flex-wrap: wrap; }
+  .cb-module button, .cb-module .btn, #topics-heading ~ form .btn { min-height: 44px; }
+  .cb-reorder__btn, .cb-btn-icon, .cb-btn-danger { min-width: 44px; min-height: 44px; }
+  .cb-lesson > .flex-grow-1 { flex-basis: calc(100% - 80px); }
+}
 </style>
 {% endblock %}

@@ -1,4 +1,5 @@
 {% extends base_template %}
+{% load tz feed_tags %}
 {% block title %}Quiz Settings · {{ lesson.title }} | {{ SCHOOL_NAME }}{% endblock %}
 
 {% block content %}
@@ -14,6 +15,7 @@
   <div class="card-body">
     <form method="post" novalidate id="quiz-settings-form">
       {% csrf_token %}
+      <input type="hidden" name="term_id" value="{{ module.term_id }}">
 
       {# ── Quiz Type ── #}
       <div class="mb-3">
@@ -84,18 +86,74 @@
         </div>
       </div>
 
-      <div class="row g-3 mb-3">
-        <div class="col-sm-6">
-          <label for="id_open_date" class="form-label fw-600">Open Date & Time <span class="text-muted-sm">(Nairobi)</span></label>
-          <input type="datetime-local" class="form-control" id="id_open_date" name="open_date"
-                 value="{{ quiz.open_date|date:'Y-m-d\TH:i'|default:'' }}">
+      {% timezone "Africa/Nairobi" %}
+      <fieldset class="mb-4">
+        <legend class="form-label fw-600">Release schedule</legend>
+        <p class="text-muted-sm" id="quiz-release-help">
+          Current status: <strong>{% if quiz %}{{ quiz|release_label }}{% else %}Draft{% endif %}</strong>.
+          Publish or unpublish from the quiz builder after saving. A future Publish on date means Scheduled;
+          after Hide on the quiz is Hidden. The module and lesson must also be released and assigned.
+        </p>
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label for="id_publish_at" class="form-label">Publish on (Nairobi)</label>
+            <input type="datetime-local" class="form-control" id="id_publish_at" name="publish_at"
+                   value="{{ quiz.publish_at|date:'Y-m-d\TH:i' }}" aria-describedby="quiz-release-help quiz-schedule-help">
+          </div>
+          <div class="col-sm-6">
+            <label for="id_hide_at" class="form-label">Hide on (Nairobi)</label>
+            <input type="datetime-local" class="form-control" id="id_hide_at" name="hide_at"
+                   value="{{ quiz.hide_at|date:'Y-m-d\TH:i' }}" aria-describedby="quiz-schedule-help">
+          </div>
         </div>
-        <div class="col-sm-6">
-          <label for="id_close_date" class="form-label fw-600">Close Date & Time <span class="text-muted-sm">(Nairobi)</span></label>
-          <input type="datetime-local" class="form-control" id="id_close_date" name="close_date"
-                 value="{{ quiz.close_date|date:'Y-m-d\TH:i'|default:'' }}">
+        <p class="text-muted-sm mt-2" id="quiz-schedule-help">Optional, Africa/Nairobi time. Leave blank for no schedule. Hide on must be after Publish on.</p>
+      </fieldset>
+      <fieldset class="mb-4">
+        <legend class="form-label fw-600">Attempt window</legend>
+        <p class="text-muted-sm" id="quiz-window-help">Separate from release: these dates control when students may start an attempt.</p>
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label for="id_open_date" class="form-label fw-600">Open Date &amp; Time (Nairobi)</label>
+            <input type="datetime-local" class="form-control" id="id_open_date" name="open_date"
+                   value="{{ quiz.open_date|date:'Y-m-d\TH:i' }}" aria-describedby="quiz-window-help">
+          </div>
+          <div class="col-sm-6">
+            <label for="id_close_date" class="form-label fw-600">Close Date &amp; Time (Nairobi)</label>
+            <input type="datetime-local" class="form-control" id="id_close_date" name="close_date"
+                   value="{{ quiz.close_date|date:'Y-m-d\TH:i' }}" aria-describedby="quiz-window-help">
+          </div>
         </div>
-      </div>
+      </fieldset>
+      {% endtimezone %}
+
+      <fieldset class="mb-4" aria-describedby="quiz-targeting-help">
+        <legend class="form-label fw-600">Assign to</legend>
+        <div class="form-check mb-2">
+          <input type="radio" class="form-check-input" name="assign_all" id="id_assign_all" value="1"
+                 {% if not quiz or quiz.assign_all %}checked{% endif %}>
+          <label class="form-check-label" for="id_assign_all">Whole class</label>
+        </div>
+        <div class="form-check mb-2">
+          <input type="radio" class="form-check-input" name="assign_all" id="id_assign_selected" value="0"
+                 {% if quiz and not quiz.assign_all %}checked{% endif %}>
+          <label class="form-check-label" for="id_assign_selected">Selected students</label>
+        </div>
+        <p class="text-muted-sm" id="quiz-targeting-help">
+          Choose Selected students to use the checked names below. No selection means no students can see this quiz.
+          Students must also be assigned to its lesson.
+        </p>
+        <div class="border rounded p-3" style="max-height:16rem;overflow-y:auto;">
+          {% for pupil in students %}
+          <div class="form-check mb-2">
+            <input type="checkbox" class="form-check-input" name="assigned_students" value="{{ pupil.pk }}"
+                   id="id_assigned_student_{{ pupil.pk }}" {% if pupil.pk in assigned_student_ids %}checked{% endif %}>
+            <label class="form-check-label" for="id_assigned_student_{{ pupil.pk }}">
+              {{ pupil.user.full_name }} <span class="text-muted-sm">({{ pupil.admission_number }})</span>
+            </label>
+          </div>
+          {% empty %}<p class="text-muted-sm mb-0">No students are enrolled in this class.</p>{% endfor %}
+        </div>
+      </fieldset>
 
       {# ── Visibility & Shuffling ── #}
       <div class="mb-3 p-3 rounded" style="background:var(--color-surface-2);border:1px solid var(--color-border);">
@@ -156,7 +214,7 @@
         {% endif %}
       </div>
 
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 flex-wrap">
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-check-lg me-1" aria-hidden="true"></i>
           {% if quiz %}Save settings{% else %}Create quiz{% endif %}

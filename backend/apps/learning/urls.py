@@ -21,6 +21,43 @@ urlpatterns = [
         name="classroom",
     ),
 
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/topics/add/",
+        views.TopicCreateView.as_view(), name="topic_create",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/topics/<int:topic_id>/edit/",
+        views.TopicEditView.as_view(), name="topic_edit",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/topics/<int:topic_id>/delete/",
+        views.TopicDeleteView.as_view(), name="topic_delete",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/topics/<int:topic_id>/move/<str:direction>/",
+        views.TopicMoveView.as_view(), name="topic_move",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/lessons/<int:lesson_id>/topic/move/<str:direction>/",
+        views.LessonTopicMoveView.as_view(), name="lesson_topic_move",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/lesson-comments/",
+        views.LessonCommentsToggleView.as_view(), name="lesson_comments_toggle",
+    ),
+    path(
+        "<int:class_id>/<int:subject_id>/lesson/<int:lesson_id>/comments/add/",
+        views.LessonCommentCreateView.as_view(), name="lesson_comment_create",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/lessons/<int:lesson_id>/comments/<int:comment_id>/remove/",
+        views.LessonCommentRemoveView.as_view(), name="lesson_comment_remove",
+    ),
+    path(
+        "teaching/<int:class_id>/<int:subject_id>/lessons/<int:lesson_id>/comments/<int:comment_id>/restore/",
+        views.LessonCommentRestoreView.as_view(), name="lesson_comment_restore",
+    ),
+
     # ── Piece 1: progress and streaks ──────────────────────────────────────
     path(
         "progress/",
