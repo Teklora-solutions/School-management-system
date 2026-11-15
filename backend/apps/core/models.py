@@ -302,6 +302,39 @@ class SchoolSettings(BaseModel):
             "Off by default: late work is accepted and marked with no deduction."
         ),
     )
+    community_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Turn on the school-wide public community page at /community/. "
+            "Visitors can read Public posts without an account. Members post "
+            "and reply after signing in. Default off — nothing appears until "
+            "you switch this on."
+        ),
+    )
+    community_paused = models.BooleanField(
+        default=False,
+        help_text=(
+            "Pause the community temporarily. The page shows a friendly "
+            "'back soon' message to everyone, including signed-in members. "
+            "Use this for maintenance without fully disabling the feature."
+        ),
+    )
+    community_index = models.BooleanField(
+        default=False,
+        help_text=(
+            "Allow search engines to index the community pages. Off by default: "
+            "every community page sends 'noindex, nofollow' until you turn this on. "
+            "Turn on only after the community has real content."
+        ),
+    )
+    community_student_moderation = models.BooleanField(
+        default=True,
+        help_text=(
+            "Hold student posts in Public categories for admin approval before "
+            "they appear publicly. On by default to protect students. Turn off "
+            "only if you have another safeguarding process in place."
+        ),
+    )
 
     # ── Public-site content ───────────────────────────────────────────────
     # These six feed the school's own website (apps/public). They are blankable

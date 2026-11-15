@@ -81,3 +81,11 @@ def feed_schedule_label(value) -> str:
     if delta <= timedelta(hours=24):
         return f"Scheduled for {date_format(local, 'g:i a')}"
     return f"Scheduled for {date_format(local, 'j M, g:i a')}"
+
+
+@register.filter
+def release_label(value) -> str:
+    """Use the shared read-time release state on teacher course screens."""
+    from apps.learning.release import status_label
+
+    return status_label(value)

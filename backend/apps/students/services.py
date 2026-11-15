@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Prefetch
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
@@ -792,110 +793,385 @@ def generate_error_report_response(job: BulkImportJob, *, actor=None):
 # ─── Promotion ────────────────────────────────────────────────────────────────
 
 
+def _promotion_counts(moves: list[dict]) -> dict[str, int]:
+    return {
+        "promote": sum(1 for m in moves if m["action"] == PromotionRecord.Action.PROMOTE),
+        "repeat": sum(1 for m in moves if m["action"] == PromotionRecord.Action.REPEAT),
+        "graduate": sum(
+            1 for m in moves if m["action"] == PromotionRecord.Action.GRADUATE
+        ),
+    }
+
+
+def _duplicate_level_blockers(year, classes) -> list[str]:
+    grouped: dict[int, list] = {}
+    for school_class in classes:
+        grouped.setdefault(school_class.level_order, []).append(school_class)
+    blockers = []
+    for level, rows in sorted(grouped.items()):
+        if len(rows) < 2:
+            continue
+        names = ", ".join(sorted(row.name for row in rows))
+        blockers.append(
+            f"{year.name} has more than one class at level {level}: {names}. "
+            "Give each grade its own level order before promoting."
+        )
+    return blockers
+
+
+def _pass_mark_for(year):
+    from decimal import Decimal
+
+    from apps.results.models import GradingConfig
+
+    config = GradingConfig.objects.filter(academic_year=year).only("pass_mark").first()
+    if config is None:
+        return Decimal("50")
+    return config.pass_mark
+
+
+def _failing_subjects(term, student_ids: list[int], pass_mark) -> dict[int, list[str]]:
+    """Published subject averages below the year's pass mark."""
+    from decimal import Decimal
+
+    from django.db.models import Avg
+
+    from apps.results.models import ResultSheet, ScoreEntry
+
+    if not student_ids:
+        return {}
+    rows = (
+        ScoreEntry.objects.filter(
+            student_id__in=student_ids,
+            result_sheet__term=term,
+            result_sheet__status=ResultSheet.Status.PUBLISHED,
+            total__isnull=False,
+        )
+        .values("student_id", "result_sheet__subject__name")
+        .annotate(mean=Avg("total"))
+    )
+    failed: dict[int, list[str]] = {}
+    for row in rows:
+        mean = row["mean"]
+        if mean is None:
+            continue
+        score = Decimal(str(mean))
+        if score < pass_mark:
+            failed.setdefault(row["student_id"], []).append(
+                f"{row['result_sheet__subject__name']} {score:.2f}"
+            )
+    for subjects in failed.values():
+        subjects.sort()
+    return failed
+
+
+def _outstanding_by_student(student_ids: list[int]) -> tuple[dict[int, str], str]:
+    if not student_ids:
+        return {}, ""
+    try:
+        from apps.finance.selectors import arrears_rows
+
+        rows = arrears_rows(student_ids=student_ids)
+    except Exception as exc:  # noqa: BLE001 - a preview is not a finance outage
+        return {}, str(exc)
+    return {row["student_id"]: f"{row['outstanding']:.2f}" for row in rows}, ""
+
+
+def _notify_promotion(moves: list[dict], *, to_year_name: str, undone: bool = False) -> int:
+    """Tell each pupil and their guardians what the move did. Never raises."""
+    from django.urls import reverse
+
+    from apps.core.notifications import notify
+
+    if not moves:
+        return 0
+    try:
+        link = reverse("accounts:dashboard_redirect")
+    except Exception:  # noqa: BLE001
+        link = ""
+    students = {
+        student.pk: student
+        for student in Student.objects.filter(
+            pk__in=[move["student_id"] for move in moves]
+        )
+        .select_related("user")
+        .prefetch_related("guardian_links__parent__user")
+    }
+    sent = 0
+    for move in moves:
+        student = students.get(move["student_id"])
+        if student is None:
+            continue
+        name = student.user.full_name
+        if undone:
+            place = move.get("from_class") or "their previous class"
+            title = "Class move undone"
+            message = f"The class move for {name} was undone. They are back in {place}."
+        elif move["action"] == PromotionRecord.Action.GRADUATE:
+            title = "Class placement"
+            message = f"{name} has graduated."
+        elif move["action"] == PromotionRecord.Action.REPEAT:
+            title = "Class placement"
+            message = (
+                f"{name} will repeat {move.get('to_class') or 'the same class'} "
+                f"in {to_year_name}."
+            )
+        else:
+            title = "Class placement"
+            message = (
+                f"{name} has been promoted to "
+                f"{move.get('to_class') or 'the next class'} for {to_year_name}."
+            )
+        recipients = [student.user]
+        seen = {student.user_id}
+        for link_row in student.guardian_links.all():
+            parent_user = link_row.parent.user
+            if parent_user.pk not in seen:
+                recipients.append(parent_user)
+                seen.add(parent_user.pk)
+        for user in recipients:
+            try:
+                notify(
+                    recipient=user,
+                    title=title,
+                    message=message,
+                    link=link,
+                    category="promotion",
+                )
+                sent += 1
+            except Exception:  # noqa: BLE001 - notice failure must not undo the move
+                continue
+    return sent
+
+
+def _active_promotion_batches(from_year, to_year):
+    return PromotionBatch.objects.filter(
+        from_year=from_year,
+        to_year=to_year,
+        is_committed=True,
+        is_reversed=False,
+    )
+
+
+def _next_idempotency_key(from_year, to_year) -> str:
+    base = f"{from_year.pk}->{to_year.pk}"
+    taken = set(
+        PromotionBatch.objects.filter(
+            from_year=from_year, to_year=to_year
+        ).values_list("idempotency_key", flat=True)
+    )
+    if base not in taken:
+        return base
+    n = 2
+    while f"{base}#{n}" in taken:
+        n += 1
+    return f"{base}#{n}"
+
+
+def _matching_stream(student, dest_class):
+    """
+    Return ``(stream, note)``.
+
+    ``note is None`` means the destination has streams and none share the
+    pupil's stream name — the caller must block the preview.
+    """
+    current = student.current_stream
+    if dest_class is None or current is None:
+        return None, ""
+    streams = list(dest_class.streams.all())
+    if not streams:
+        return None, "Destination class has no streams; stream was cleared"
+    wanted = current.name.strip().casefold()
+    for stream in streams:
+        if stream.name.strip().casefold() == wanted:
+            return stream, ""
+    return None, None
+
+
 def preview_promotion(
     *,
     from_year: AcademicYear,
     to_year: AcademicYear,
     term: Term,
     repeat_admission_numbers: set[str] | None = None,
+    include_suggested_repeats: bool = False,
 ) -> dict:
     """
     Dry-run: who moves where, who repeats, who graduates.
-    Graduation = students in the highest level_order class with no matching
-    next class in to_year.
+
+    Promotion follows ``level_order`` (current + 1). The highest level with no
+    class above it graduates. A missing class anywhere else blocks the run.
+    Repeats are the admission numbers passed in, plus — when asked — pupils
+    whose published subject average is below the source year's pass mark.
+    Pupils already in a committed batch for this year pair are left out so a
+    later run can pick up admissions that arrived afterwards.
     """
-    repeat_admission_numbers = {a.upper() for a in (repeat_admission_numbers or set())}
+    if from_year.pk == to_year.pk:
+        raise ValidationError("From-year and To-year must be different.")
+    if term.academic_year_id != from_year.pk:
+        raise ValidationError(
+            f"Results term {term} belongs to {term.academic_year}, "
+            f"not {from_year.name}."
+        )
+
+    repeat_admission_numbers = {
+        a.strip().upper() for a in (repeat_admission_numbers or set()) if a and a.strip()
+    }
     from_classes = list(
-        from_year.classes.order_by("level_order").prefetch_related("students")
+        from_year.classes.order_by("level_order", "name").prefetch_related(
+            "streams",
+            Prefetch(
+                "students",
+                queryset=Student.objects.filter(
+                    status__in=[Student.Status.ACTIVE, Student.Status.REPEATING]
+                ).select_related("user", "current_stream"),
+            ),
+        )
     )
-    to_by_level = {c.level_order: c for c in to_year.classes.all()}
-    max_level = max((c.level_order for c in from_classes), default=0)
+    to_classes = list(
+        to_year.classes.order_by("level_order", "name").prefetch_related("streams")
+    )
+
+    blockers = []
+    blockers.extend(_duplicate_level_blockers(from_year, from_classes))
+    blockers.extend(_duplicate_level_blockers(to_year, to_classes))
+
+    known: set[str] = set()
+    eligible: list[tuple] = []
+    for school_class in from_classes:
+        for student in school_class.students.all():
+            known.add(student.admission_number.strip().upper())
+            eligible.append((school_class, student))
+
+    # Pupils already moved no longer sit in the source year, so their
+    # admission numbers are read off the committed records.
+    already_rows = PromotionRecord.objects.filter(
+        batch__from_year=from_year,
+        batch__to_year=to_year,
+        batch__is_committed=True,
+        batch__is_reversed=False,
+    ).values_list("student_id", "student__admission_number")
+    already_ids = {student_id for student_id, _adm in already_rows}
+    already_admissions = sorted({adm for _student_id, adm in already_rows})
+    already_keys = {adm.strip().upper() for adm in already_admissions}
+    unknown = sorted(repeat_admission_numbers - known - already_keys)
+    if unknown:
+        blockers.append(
+            "Unknown admission numbers (not active or repeating in "
+            f"{from_year.name}): {', '.join(unknown)}."
+        )
+    if blockers:
+        raise ValidationError(blockers)
+
+    to_by_level = {school_class.level_order: school_class for school_class in to_classes}
+    max_level = max((school_class.level_order for school_class in from_classes), default=0)
+    pending = [
+        (school_class, student)
+        for school_class, student in eligible
+        if student.pk not in already_ids
+    ]
+
+    pass_mark = _pass_mark_for(from_year)
+    failing = _failing_subjects(term, [student.pk for _, student in pending], pass_mark)
+    if include_suggested_repeats:
+        for _, student in pending:
+            if student.pk in failing:
+                repeat_admission_numbers.add(student.admission_number.strip().upper())
 
     moves: list[dict] = []
-    for cls in from_classes:
-        next_level = cls.level_order + 1
-        next_class = to_by_level.get(next_level)
-        for student in cls.students.filter(
-            status__in=[Student.Status.ACTIVE, Student.Status.REPEATING]
-        ):
-            adm = student.admission_number
-            if adm in repeat_admission_numbers:
-                # Place into same level in to_year if exists, else stay concept
-                dest = to_by_level.get(cls.level_order)
-                moves.append(
-                    {
-                        "student_id": student.pk,
-                        "admission_number": adm,
-                        "name": student.user.full_name,
-                        "action": PromotionRecord.Action.REPEAT,
-                        "from_class_id": cls.pk,
-                        "from_class": cls.name,
-                        "to_class_id": dest.pk if dest else None,
-                        "to_class": dest.name if dest else None,
-                    }
+    for school_class, student in pending:
+        adm = student.admission_number
+        adm_key = adm.strip().upper()
+        next_class = to_by_level.get(school_class.level_order + 1)
+        same_class = to_by_level.get(school_class.level_order)
+        is_final = school_class.level_order >= max_level and next_class is None
+        failed = failing.get(student.pk) or []
+        notes: list[str] = []
+        if failed:
+            notes.append("Below pass mark: " + ", ".join(failed))
+
+        if adm_key in repeat_admission_numbers:
+            action = PromotionRecord.Action.REPEAT
+            dest = same_class
+            if dest is None:
+                blockers.append(
+                    f"{adm} is set to repeat {school_class.name}, but {to_year.name} "
+                    f"has no class at level {school_class.level_order}."
                 )
-            elif cls.level_order >= max_level and next_class is None:
-                moves.append(
-                    {
-                        "student_id": student.pk,
-                        "admission_number": adm,
-                        "name": student.user.full_name,
-                        "action": PromotionRecord.Action.GRADUATE,
-                        "from_class_id": cls.pk,
-                        "from_class": cls.name,
-                        "to_class_id": None,
-                        "to_class": None,
-                    }
-                )
-            elif next_class is None:
-                moves.append(
-                    {
-                        "student_id": student.pk,
-                        "admission_number": adm,
-                        "name": student.user.full_name,
-                        "action": PromotionRecord.Action.REPEAT,
-                        "from_class_id": cls.pk,
-                        "from_class": cls.name,
-                        "to_class_id": (
-                            to_by_level.get(cls.level_order).pk
-                            if to_by_level.get(cls.level_order)
-                            else None
-                        ),
-                        "to_class": (
-                            to_by_level.get(cls.level_order).name
-                            if to_by_level.get(cls.level_order)
-                            else None
-                        ),
-                        "notes": "No next class in target year",
-                    }
-                )
-            else:
-                moves.append(
-                    {
-                        "student_id": student.pk,
-                        "admission_number": adm,
-                        "name": student.user.full_name,
-                        "action": PromotionRecord.Action.PROMOTE,
-                        "from_class_id": cls.pk,
-                        "from_class": cls.name,
-                        "to_class_id": next_class.pk,
-                        "to_class": next_class.name,
-                    }
-                )
+                continue
+            if not failed:
+                notes.append("Marked to repeat")
+        elif is_final:
+            action = PromotionRecord.Action.GRADUATE
+            dest = None
+        elif next_class is None:
+            blockers.append(
+                f"{school_class.name} has no class at level "
+                f"{school_class.level_order + 1} in {to_year.name}, "
+                f"so {adm} cannot be promoted."
+            )
+            continue
+        else:
+            action = PromotionRecord.Action.PROMOTE
+            dest = next_class
+
+        to_stream, stream_note = _matching_stream(student, dest)
+        if stream_note is None and dest is not None:
+            blockers.append(
+                f"{adm} is in stream {student.current_stream.name}, and "
+                f"{dest.name} ({to_year.name}) has no stream with that name."
+            )
+            continue
+        if stream_note:
+            notes.append(stream_note)
+
+        moves.append(
+            {
+                "student_id": student.pk,
+                "admission_number": adm,
+                "name": student.user.full_name,
+                "action": action,
+                "from_class_id": school_class.pk,
+                "from_class": school_class.name,
+                "to_class_id": dest.pk if dest else None,
+                "to_class": dest.name if dest else None,
+                "from_stream": (
+                    student.current_stream.name if student.current_stream_id else ""
+                ),
+                "to_stream_id": to_stream.pk if to_stream else None,
+                "to_stream": to_stream.name if to_stream else "",
+                "previous_status": student.status,
+                "suggested_repeat": bool(failed),
+                "failing_subjects": failed,
+                "notes": "; ".join(notes)[:255],
+            }
+        )
+
+    if blockers:
+        raise ValidationError(blockers)
+
+    outstanding, finance_error = _outstanding_by_student(
+        [move["student_id"] for move in moves]
+    )
+    for move in moves:
+        move["outstanding"] = outstanding.get(move["student_id"], "0.00")
 
     from apps.results.selectors import term_all_classes_published
 
     return {
         "from_year": from_year.name,
+        "from_year_id": from_year.pk,
         "to_year": to_year.name,
+        "to_year_id": to_year.pk,
         "term": str(term),
+        "term_id": term.pk,
         "results_published": term_all_classes_published(term.pk),
+        "pass_mark": f"{pass_mark:.2f}",
         "moves": moves,
-        "counts": {
-            "promote": sum(1 for m in moves if m["action"] == "promote"),
-            "repeat": sum(1 for m in moves if m["action"] == "repeat"),
-            "graduate": sum(1 for m in moves if m["action"] == "graduate"),
-        },
+        "counts": _promotion_counts(moves),
+        "classes": sorted({move["from_class"] for move in moves if move["from_class"]}),
+        "already_promoted": already_admissions,
+        "finance_error": finance_error,
     }
 
 
@@ -911,19 +1187,28 @@ def commit_promotion(
     actor: UserType | None = None,
     request: HttpRequest | None = None,
 ) -> PromotionBatch:
-    idempotency_key = f"{from_year.pk}->{to_year.pk}"
-    existing = PromotionBatch.objects.filter(
-        idempotency_key=idempotency_key, is_committed=True
-    ).first()
-    if existing:
-        return existing  # idempotent no-op
+    """
+    Move every pupil in the preview.
 
+    A second commit of the same years, with nobody new to move, returns the
+    latest committed batch and sets ``replayed`` on it. Pupils admitted after
+    that batch are written to a new batch. Decisions for pupils already in a
+    committed batch are not changed here — reverse that batch first.
+    """
     preview = preview_promotion(
         from_year=from_year,
         to_year=to_year,
         term=term,
         repeat_admission_numbers=repeat_admission_numbers,
+        include_suggested_repeats=False,
     )
+    active = list(_active_promotion_batches(from_year, to_year).order_by("-committed_at", "-pk"))
+    if not preview["moves"]:
+        if active:
+            batch = active[0]
+            batch.replayed = True
+            return batch
+        raise ValidationError("No students to transition between these years.")
 
     if not preview["results_published"]:
         if not override_unpublished:
@@ -938,57 +1223,48 @@ def commit_promotion(
                 }
             )
 
-    batch, _ = PromotionBatch.objects.get_or_create(
-        idempotency_key=idempotency_key,
-        defaults={
-            "from_year": from_year,
-            "to_year": to_year,
-            "term": term,
-            "committed_by": actor,
-            "override_unpublished": override_unpublished,
-            "override_reason": override_reason,
-            "preview_snapshot": preview,
-        },
+    batch = PromotionBatch.objects.create(
+        from_year=from_year,
+        to_year=to_year,
+        term=term,
+        committed_by=actor,
+        override_unpublished=override_unpublished,
+        override_reason=override_reason,
+        preview_snapshot=preview,
+        idempotency_key=_next_idempotency_key(from_year, to_year),
     )
-    if batch.is_committed:
-        return batch
 
-    batch.preview_snapshot = preview
-    batch.override_unpublished = override_unpublished
-    batch.override_reason = override_reason
-    batch.committed_by = actor
-
+    students = {
+        student.pk: student
+        for student in Student.objects.select_related("user", "current_stream").filter(
+            pk__in=[move["student_id"] for move in preview["moves"]]
+        )
+    }
     for move in preview["moves"]:
-        student = Student.objects.select_related("user").get(pk=move["student_id"])
-        to_class = None
-        if move["to_class_id"]:
-            from apps.academics.models import SchoolClass
-
-            to_class = SchoolClass.objects.get(pk=move["to_class_id"])
-
-        PromotionRecord.objects.update_or_create(
+        student = students[move["student_id"]]
+        PromotionRecord.objects.create(
             batch=batch,
             student=student,
-            defaults={
-                "action": move["action"],
-                "from_class_id": move["from_class_id"],
-                "to_class": to_class,
-                "notes": move.get("notes", ""),
-            },
+            action=move["action"],
+            from_class_id=move["from_class_id"],
+            to_class_id=move["to_class_id"],
+            previous_status=student.status,
+            previous_stream_id=student.current_stream_id,
+            to_stream_id=move.get("to_stream_id"),
+            notes=(move.get("notes") or "")[:255],
         )
-
         if move["action"] == PromotionRecord.Action.GRADUATE:
             student.status = Student.Status.GRADUATED
-            student.current_class = None
-            student.current_stream = None
+            student.current_class_id = None
+            student.current_stream_id = None
         elif move["action"] == PromotionRecord.Action.REPEAT:
             student.status = Student.Status.REPEATING
-            student.current_class = to_class
-            student.current_stream = None
+            student.current_class_id = move["to_class_id"]
+            student.current_stream_id = move.get("to_stream_id")
         else:
             student.status = Student.Status.ACTIVE
-            student.current_class = to_class
-            student.current_stream = None
+            student.current_class_id = move["to_class_id"]
+            student.current_stream_id = move.get("to_stream_id")
         student.save()
 
     batch.is_committed = True
@@ -1006,6 +1282,7 @@ def commit_promotion(
             "counts": preview["counts"],
             "override": override_unpublished,
             "override_reason": override_reason,
+            "already_promoted": preview["already_promoted"],
         },
         request=request,
     )
@@ -1037,4 +1314,83 @@ def commit_promotion(
         },
         request=request,
     )
+    batch.replayed = False
+    batch.notified = _notify_promotion(preview["moves"], to_year_name=to_year.name)
+    return batch
+
+
+@transaction.atomic
+def reverse_promotion(
+    *,
+    batch: PromotionBatch,
+    reason: str,
+    actor: UserType | None = None,
+    request: HttpRequest | None = None,
+) -> PromotionBatch:
+    """Put every pupil in the batch back in the class, stream and status they left."""
+    if not batch.is_committed or batch.is_reversed:
+        raise ValidationError("Only a committed promotion can be reversed.")
+    if not reason.strip():
+        raise ValidationError({"reason": "A reason is required to undo a promotion."})
+
+    from django.db.models import Q
+
+    student_ids = list(batch.records.values_list("student_id", flat=True))
+    later = (
+        PromotionRecord.objects.filter(
+            student_id__in=student_ids,
+            batch__is_committed=True,
+            batch__is_reversed=False,
+        )
+        .exclude(batch=batch)
+        .filter(
+            Q(batch__committed_at__gt=batch.committed_at)
+            | Q(batch__committed_at=batch.committed_at, batch_id__gt=batch.pk)
+        )
+    )
+    if later.exists():
+        raise ValidationError(
+            "A later promotion moved some of these pupils. Reverse that batch first."
+        )
+
+    records = list(
+        batch.records.select_related("student", "from_class", "previous_stream", "to_class")
+    )
+    moves = []
+    for record in records:
+        student = record.student
+        student.status = record.previous_status or Student.Status.ACTIVE
+        student.current_class = record.from_class
+        student.current_stream = record.previous_stream
+        student.save()
+        moves.append(
+            {
+                "student_id": student.pk,
+                "action": record.action,
+                "from_class": record.from_class.name if record.from_class_id else "",
+                "to_class": record.to_class.name if record.to_class_id else "",
+            }
+        )
+
+    batch.is_reversed = True
+    batch.reversed_at = timezone.now()
+    batch.reversed_by = actor
+    batch.reverse_reason = reason.strip()
+    batch.idempotency_key = f"reversed-{batch.pk}"
+    batch.save()
+
+    log_action(
+        actor=actor,
+        action="student.promotion_reversed",
+        content_type="students.PromotionBatch",
+        object_id=batch.pk,
+        change_summary={
+            "from_year": batch.from_year.name,
+            "to_year": batch.to_year.name,
+            "pupils": len(records),
+            "reason": batch.reverse_reason,
+        },
+        request=request,
+    )
+    _notify_promotion(moves, to_year_name=batch.to_year.name, undone=True)
     return batch

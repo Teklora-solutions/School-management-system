@@ -46,4 +46,9 @@ urlpatterns = [
         views.PromotionBatchListView.as_view(),
         name="promotion_history",
     ),
+    path(
+        "promote/history/<int:pk>/",
+        views.PromotionBatchDetailView.as_view(),
+        name="promotion_detail",
+    ),
 ]

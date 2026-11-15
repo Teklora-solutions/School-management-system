@@ -30,12 +30,15 @@ from __future__ import annotations
 import datetime
 import logging
 
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils import timezone
 
 from apps.core.features import feature_enabled
 
+from .course_selectors import lesson_targets_student
 from .models import ClassEngagementSettings, LearningStreak, LessonProgress
+from .release import is_released_at
 from .streak_utils import streak_is_alive
 
 logger = logging.getLogger(__name__)
@@ -56,8 +59,16 @@ def record_lesson_completion(*, student, lesson) -> bool:
     is updated either way — engagement being off never affects whether a
     lesson is recorded as completed.
     """
-    # 1. Update (or create) the LessonProgress row — this always happens.
     now = timezone.now()
+    if (
+        student.current_class_id != lesson.module.school_class_id
+        or not is_released_at(lesson.module, now=now)
+        or not is_released_at(lesson, now=now)
+        or not lesson_targets_student(lesson, student)
+    ):
+        raise PermissionDenied("This lesson is not available to you.")
+
+    # 1. Update (or create) the LessonProgress row — this always happens.
     progress, _ = LessonProgress.objects.get_or_create(
         student=student,
         lesson=lesson,

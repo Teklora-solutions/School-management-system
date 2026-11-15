@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -23,10 +24,11 @@ from .forms import (
     BulkImportForm,
     PromotionCommitForm,
     PromotionPreviewForm,
+    PromotionReverseForm,
     StudentCreateForm,
     StudentUpdateForm,
 )
-from .models import BulkImportJob, Student
+from .models import BulkImportJob, PromotionBatch, Student
 
 
 def _safe_next(request, include_post: bool = False) -> str:
@@ -453,98 +455,154 @@ class BulkImportErrorReportView(AdminRequiredMixin, View):
 # ── Promotion ──────────────────────────────────────────────────────────────
 
 
+def _repeat_numbers(values) -> set[str]:
+    numbers = set()
+    for value in values:
+        numbers.update(part.strip() for part in value.split(",") if part.strip())
+    return numbers
+
+
 class PromotionView(AdminRequiredMixin, View):
     template_name = "features/students/promote.html"
 
     def get(self, request):
-        form = PromotionPreviewForm()
-        return render(request, self.template_name, {"form": form, "preview": None})
+        return render(
+            request,
+            self.template_name,
+            {"form": PromotionPreviewForm(), "preview": None},
+        )
 
     def post(self, request):
         action = request.POST.get("action", "preview")
+        if action == "commit":
+            return self._commit(request)
+        return self._preview(request)
 
-        if action == "preview":
-            form = PromotionPreviewForm(request.POST)
-            if form.is_valid():
-                repeat_raw = form.cleaned_data.get("repeat_students", "")
-                repeat_set = {x.strip() for x in repeat_raw.split(",") if x.strip()}
-                try:
-                    preview = services.preview_promotion(
-                        from_year=form.cleaned_data["from_year"],
-                        to_year=form.cleaned_data["to_year"],
-                        term=form.cleaned_data["term"],
-                        repeat_admission_numbers=repeat_set,
-                    )
-                    commit_form = PromotionCommitForm(
-                        initial={
-                            "from_year": form.cleaned_data["from_year"].pk,
-                            "to_year": form.cleaned_data["to_year"].pk,
-                            "term": form.cleaned_data["term"].pk,
-                            "repeat_students": repeat_raw,
-                        }
-                    )
-                    return render(
+    def _preview(self, request):
+        form = PromotionPreviewForm(request.POST)
+        if form.is_valid():
+            repeat_set = _repeat_numbers([form.cleaned_data.get("repeat_students", "")])
+            try:
+                preview = services.preview_promotion(
+                    from_year=form.cleaned_data["from_year"],
+                    to_year=form.cleaned_data["to_year"],
+                    term=form.cleaned_data["term"],
+                    repeat_admission_numbers=repeat_set,
+                    include_suggested_repeats=True,
+                )
+                commit_form = PromotionCommitForm(
+                    initial={
+                        "from_year": form.cleaned_data["from_year"].pk,
+                        "to_year": form.cleaned_data["to_year"].pk,
+                        "term": form.cleaned_data["term"].pk,
+                    }
+                )
+                return render(
+                    request,
+                    self.template_name,
+                    {
+                        "form": form,
+                        "preview": preview,
+                        "commit_form": commit_form,
+                    },
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+        return render(request, self.template_name, {"form": form, "preview": None})
+
+    def _commit(self, request):
+        commit_form = PromotionCommitForm(request.POST)
+        repeat_set = _repeat_numbers(request.POST.getlist("repeat"))
+        if commit_form.is_valid():
+            cd = commit_form.cleaned_data
+            try:
+                from_year = AcademicYear.objects.get(pk=cd["from_year"])
+                to_year = AcademicYear.objects.get(pk=cd["to_year"])
+                term = Term.objects.get(pk=cd["term"])
+                batch = services.commit_promotion(
+                    from_year=from_year,
+                    to_year=to_year,
+                    term=term,
+                    repeat_admission_numbers=repeat_set,
+                    override_unpublished=cd.get("override_unpublished", False),
+                    override_reason=cd.get("override_reason", ""),
+                    actor=request.user,
+                    request=request,
+                )
+            except (AcademicYear.DoesNotExist, Term.DoesNotExist):
+                messages.error(request, "That academic year or term no longer exists.")
+                return redirect("students:promote")
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+                return self._render_commit_failure(request, commit_form, cd)
+
+            if getattr(batch, "replayed", False):
+                counts = (batch.preview_snapshot or {}).get("counts") or {}
+                messages.info(
+                    request,
+                    "These years were already promoted "
+                    f"(batch #{batch.pk}: {counts.get('promote', 0)} promote, "
+                    f"{counts.get('repeat', 0)} repeat, "
+                    f"{counts.get('graduate', 0)} graduate). "
+                    "Reverse that batch before changing who repeats.",
+                )
+            else:
+                messages.success(request, f"Promotion committed. Batch #{batch.pk}.")
+                skipped = (batch.preview_snapshot or {}).get("already_promoted") or []
+                if skipped:
+                    messages.info(
                         request,
-                        self.template_name,
-                        {
-                            "form": form,
-                            "preview": preview,
-                            "commit_form": commit_form,
-                        },
+                        f"{len(skipped)} pupils were already in an earlier batch "
+                        "and were left as they are.",
                     )
-                except ValidationError as exc:
-                    form.add_error(None, exc)
-            return render(request, self.template_name, {"form": form, "preview": None})
-
-        elif action == "commit":
-            commit_form = PromotionCommitForm(request.POST)
-            if commit_form.is_valid():
-                cd = commit_form.cleaned_data
-                repeat_raw = cd.get("repeat_students", "")
-                repeat_set = {x.strip() for x in repeat_raw.split(",") if x.strip()}
-                try:
-                    from_year = AcademicYear.objects.get(pk=cd["from_year"])
-                    to_year = AcademicYear.objects.get(pk=cd["to_year"])
-                    term = Term.objects.get(pk=cd["term"])
-                    batch = services.commit_promotion(
-                        from_year=from_year,
-                        to_year=to_year,
-                        term=term,
-                        repeat_admission_numbers=repeat_set,
-                        override_unpublished=cd.get("override_unpublished", False),
-                        override_reason=cd.get("override_reason", ""),
-                        actor=request.user,
-                        request=request,
-                    )
-                    if batch.is_committed:
-                        messages.success(
-                            request, f"Promotion committed. Batch #{batch.pk}."
-                        )
-                    else:
-                        messages.info(
-                            request, "Promotion already committed (idempotent)."
-                        )
-                    return redirect("students:promote")
-                except ValidationError as exc:
-                    messages.error(request, "; ".join(exc.messages))
-                    form = PromotionPreviewForm(
-                        initial={
-                            "from_year": cd["from_year"],
-                            "to_year": cd["to_year"],
-                            "term": cd["term"],
-                        }
-                    )
-                    return render(
+                notified = getattr(batch, "notified", 0)
+                if notified:
+                    messages.success(
                         request,
-                        self.template_name,
-                        {
-                            "form": form,
-                            "preview": None,
-                            "commit_form": commit_form,
-                        },
+                        f"Notified {notified} pupils and guardians.",
                     )
+            return redirect("students:promotion_detail", pk=batch.pk)
 
-        return redirect("students:promote")
+        messages.error(request, "Type COMMIT to confirm this promotion.")
+        cd = {
+            "from_year": request.POST.get("from_year"),
+            "to_year": request.POST.get("to_year"),
+            "term": request.POST.get("term"),
+        }
+        return self._render_commit_failure(request, commit_form, cd)
+
+    def _render_commit_failure(self, request, commit_form, cd):
+        form = PromotionPreviewForm(
+            initial={
+                "from_year": cd.get("from_year"),
+                "to_year": cd.get("to_year"),
+                "term": cd.get("term"),
+            }
+        )
+        preview = None
+        try:
+            from_year = AcademicYear.objects.get(pk=cd.get("from_year"))
+            to_year = AcademicYear.objects.get(pk=cd.get("to_year"))
+            term = Term.objects.get(pk=cd.get("term"))
+            preview = services.preview_promotion(
+                from_year=from_year,
+                to_year=to_year,
+                term=term,
+                repeat_admission_numbers=_repeat_numbers(request.POST.getlist("repeat")),
+            )
+        except (
+            AcademicYear.DoesNotExist,
+            Term.DoesNotExist,
+            ValidationError,
+            ValueError,
+            TypeError,
+        ):
+            preview = None
+        return render(
+            request,
+            self.template_name,
+            {"form": form, "preview": preview, "commit_form": commit_form},
+        )
 
 
 class PromotionBatchListView(AdminRequiredMixin, ListView):
@@ -554,3 +612,46 @@ class PromotionBatchListView(AdminRequiredMixin, ListView):
 
     def get_queryset(self):
         return selectors.promotion_batch_list()
+
+
+class PromotionBatchDetailView(AdminRequiredMixin, View):
+    template_name = "features/students/promotion_detail.html"
+
+    def _batch(self, pk):
+        try:
+            return selectors.get_promotion_batch(pk)
+        except PromotionBatch.DoesNotExist:
+            raise Http404("Promotion batch not found.") from None
+
+    def get(self, request, pk):
+        return render(
+            request,
+            self.template_name,
+            {"batch": self._batch(pk), "reverse_form": PromotionReverseForm()},
+        )
+
+    def post(self, request, pk):
+        batch = self._batch(pk)
+        form = PromotionReverseForm(request.POST)
+        if form.is_valid():
+            try:
+                services.reverse_promotion(
+                    batch=batch,
+                    reason=form.cleaned_data["reason"],
+                    actor=request.user,
+                    request=request,
+                )
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+            else:
+                messages.success(
+                    request,
+                    f"Batch #{batch.pk} was reversed. Those pupils are back "
+                    "in the class they left.",
+                )
+                return redirect("students:promotion_detail", pk=batch.pk)
+        return render(
+            request,
+            self.template_name,
+            {"batch": batch, "reverse_form": form},
+        )

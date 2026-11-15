@@ -1,4 +1,5 @@
 {% extends base_template %}
+{% load tz feed_tags %}
 {% block title %}{% if lesson %}Edit Lesson{% else %}Add Lesson{% endif %} | {{ SCHOOL_NAME }}{% endblock %}
 
 {% block content %}
@@ -20,6 +21,7 @@
 
 <form method="post" enctype="multipart/form-data" novalidate id="lesson-form">
 {% csrf_token %}
+<input type="hidden" name="term_id" value="{{ module.term_id }}">
 
 <div class="row g-4">
 
@@ -167,17 +169,70 @@ Plain text works well too — line breaks are preserved exactly as you type them
           <input class="form-check-input" type="checkbox" role="switch"
                  id="id_is_published" name="is_published" value="1"
                  {% if not lesson or lesson.is_published %}checked{% endif %}>
-          <label class="form-check-label fw-600" for="id_is_published">Published</label>
+          <label class="form-check-label fw-600" for="id_is_published">Enable publication</label>
         </div>
-        <div class="text-muted-sm">
-          Unpublished lessons are visible only to you. Publish when you are ready for students to see this.
+        {% if lesson %}<p class="text-muted-sm">Current status: <strong>{{ lesson|release_label }}</strong></p>{% endif %}
+        <p class="text-muted-sm" id="lesson-release-help">
+          Off means Draft. When enabled, the lesson is Published immediately unless scheduled for later.
+          Its module must also be released. Only assigned students can see it.
+        </p>
+        {% timezone "Africa/Nairobi" %}
+        <div class="mb-3">
+          <label for="id_publish_at" class="form-label">Publish on (Nairobi)</label>
+          <input type="datetime-local" class="form-control" id="id_publish_at" name="publish_at"
+                 value="{{ lesson.publish_at|date:'Y-m-d\TH:i' }}" aria-describedby="lesson-release-help">
         </div>
+        <div class="mb-3">
+          <label for="id_hide_at" class="form-label">Hide on (Nairobi)</label>
+          <input type="datetime-local" class="form-control" id="id_hide_at" name="hide_at"
+                 value="{{ lesson.hide_at|date:'Y-m-d\TH:i' }}" aria-describedby="lesson-schedule-help">
+          <p class="text-muted-sm mt-2" id="lesson-schedule-help">
+            Optional, Africa/Nairobi time. Leave blank for no schedule. Hide on must be after Publish on;
+            once Hide on passes, the status is Hidden.
+          </p>
+        </div>
+        {% endtimezone %}
+        <div class="mb-3">
+          <label for="id_topic_id" class="form-label fw-600">Topic</label>
+          <select name="topic_id" id="id_topic_id" class="form-select" aria-describedby="lesson-topic-help">
+            <option value="">No topic</option>
+            {% for topic in topics %}
+            <option value="{{ topic.pk }}" {% if lesson.topic_id == topic.pk %}selected{% endif %}>{{ topic.title }}</option>
+            {% endfor %}
+          </select>
+          <p class="text-muted-sm mt-1" id="lesson-topic-help">Topics group lessons in this class, subject and term. Create topics in the classroom organiser.</p>
+        </div>
+        <fieldset class="mb-3" aria-describedby="lesson-targeting-help">
+          <legend class="form-label fw-600">Assign to</legend>
+          <div class="form-check mb-2">
+            <input type="radio" class="form-check-input" name="assign_all" id="id_assign_all" value="1"
+                   {% if not lesson or lesson.assign_all %}checked{% endif %}>
+            <label class="form-check-label" for="id_assign_all">Whole class</label>
+          </div>
+          <div class="form-check mb-2">
+            <input type="radio" class="form-check-input" name="assign_all" id="id_assign_selected" value="0"
+                   {% if lesson and not lesson.assign_all %}checked{% endif %}>
+            <label class="form-check-label" for="id_assign_selected">Selected students</label>
+          </div>
+          <p class="text-muted-sm" id="lesson-targeting-help">Choose Selected students to use the checked names below. No selection means no students can see this lesson.</p>
+          <div class="border rounded p-2" style="max-height:16rem;overflow-y:auto;">
+            {% for pupil in students %}
+            <div class="form-check mb-2">
+              <input type="checkbox" class="form-check-input" name="assigned_students" value="{{ pupil.pk }}"
+                     id="id_assigned_student_{{ pupil.pk }}" {% if pupil.pk in assigned_student_ids %}checked{% endif %}>
+              <label class="form-check-label" for="id_assigned_student_{{ pupil.pk }}">
+                {{ pupil.user.full_name }} <span class="text-muted-sm">({{ pupil.admission_number }})</span>
+              </label>
+            </div>
+            {% empty %}<p class="text-muted-sm mb-0">No students are enrolled in this class.</p>{% endfor %}
+          </div>
+        </fieldset>
         <hr style="border-color:var(--color-border);">
         <button type="submit" class="btn btn-primary w-100">
           <i class="bi bi-check-lg me-1" aria-hidden="true"></i>
           {% if lesson %}Save changes{% else %}Add lesson{% endif %}
         </button>
-        <a href="{% url 'learning:teacher_classroom' school_class.pk subject.pk %}"
+        <a href="{% url 'learning:teacher_classroom' school_class.pk subject.pk %}?term_id={{ module.term_id }}"
            class="btn btn-outline-secondary w-100 mt-2">Discard</a>
       </div>
     </div>
@@ -202,19 +257,12 @@ Plain text works well too — line breaks are preserved exactly as you type them
             </div>
             <div class="text-muted-sm" style="font-size:0.75rem;">{{ att.size_kb }} KB</div>
           </div>
-          <form method="post"
-                action="{% url 'learning:attachment_delete' school_class.pk subject.pk module.pk lesson.pk att.pk %}"
-                style="flex-shrink:0;">
-            {% csrf_token %}
-            <button type="submit"
-                    class="btn btn-sm"
-                    style="background:transparent;border:none;color:var(--color-danger);padding:2px 6px;"
-                    title="Remove this file"
-                    onclick="return confirm('Remove {{ att.original_name }}?');"
-                    aria-label="Remove {{ att.original_name }}">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
-            </button>
-          </form>
+          <button type="submit" form="remove-attachment-{{ att.pk }}"
+                  class="btn btn-sm flex-shrink-0"
+                  style="background:transparent;border:none;color:var(--color-danger);min-width:44px;min-height:44px;"
+                  title="Remove this file" aria-label="Remove {{ att.original_name }}">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </button>
         </div>
         {% endfor %}
       </div>
@@ -245,6 +293,14 @@ Plain text works well too — line breaks are preserved exactly as you type them
   </div>
 </div>
 </form>
+
+{# Separate forms keep attachment removal valid HTML and usable without JavaScript. #}
+{% for att in attachments %}
+<form method="post" id="remove-attachment-{{ att.pk }}"
+      action="{% url 'learning:attachment_delete' school_class.pk subject.pk module.pk lesson.pk att.pk %}">
+  {% csrf_token %}<input type="hidden" name="term_id" value="{{ module.term_id }}">
+</form>
+{% endfor %}
 
 {% if lesson %}
 <div class="mt-3 d-flex gap-2 flex-wrap">

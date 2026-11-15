@@ -28,7 +28,7 @@ import datetime
 from dataclasses import dataclass, field
 from typing import Optional
 
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.utils import timezone
 
 from apps.academics.models import SchoolClass, Term
@@ -41,7 +41,18 @@ from .models import (
     LearningStreak,
     LessonProgress,
 )
+from .course_selectors import lesson_targets_student
+from .release import is_released_at
 from .streak_utils import days_since_last_active
+
+
+def _counts_for(lesson, student) -> bool:
+    """A lesson counts toward a pupil's progress only when they can open it now."""
+    return (
+        lesson.is_published
+        and is_released_at(lesson)
+        and lesson_targets_student(lesson, student)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -116,8 +127,12 @@ class StudentClassRow:
         return round(self.completed * 100 / self.total)
 
     @property
+    def nothing_assigned(self) -> bool:
+        return self.total == 0
+
+    @property
     def not_started(self) -> bool:
-        return self.completed == 0
+        return self.total > 0 and self.completed == 0
 
     @property
     def is_behind(self) -> bool:
@@ -138,7 +153,7 @@ class ClassProgressData:
 
     @property
     def started_count(self) -> int:
-        return sum(1 for r in self.rows if not r.not_started)
+        return sum(1 for r in self.rows if r.completed > 0)
 
     @property
     def not_started_count(self) -> int:
@@ -150,9 +165,10 @@ class ClassProgressData:
 
     @property
     def avg_pct(self) -> int:
-        if not self.rows:
+        assigned_rows = [r for r in self.rows if r.total > 0]
+        if not assigned_rows:
             return 0
-        return round(sum(r.pct for r in self.rows) / len(self.rows))
+        return round(sum(r.pct for r in assigned_rows) / len(assigned_rows))
 
 
 @dataclass
@@ -219,9 +235,10 @@ def student_progress(*, student, term: Optional[Term] = None) -> StudentProgress
             school_class=school_class,
             term=term,
         )
-        .prefetch_related("lessons")
+        .prefetch_related("lessons__assigned_students")
         .order_by("position", "id")
     )
+    modules = [m for m in modules if is_released_at(m)]
 
     if not modules:
         return data
@@ -231,7 +248,7 @@ def student_progress(*, student, term: Optional[Term] = None) -> StudentProgress
         lesson.pk
         for mod in modules
         for lesson in mod.lessons.all()
-        if lesson.is_published
+        if _counts_for(lesson, student)
     ]
     data.total_lessons = len(all_lesson_ids)
 
@@ -246,7 +263,7 @@ def student_progress(*, student, term: Optional[Term] = None) -> StudentProgress
 
     # Per-module breakdown
     for mod in modules:
-        published = [l for l in mod.lessons.all() if l.is_published]
+        published = [l for l in mod.lessons.all() if _counts_for(l, student)]
         done = sum(1 for l in published if l.pk in completed_ids)
         data.modules.append(
             ModuleProgressData(
@@ -257,16 +274,16 @@ def student_progress(*, student, term: Optional[Term] = None) -> StudentProgress
         )
 
     # Next-up lesson: first published lesson not yet completed, in order
-    data.next_lesson = _find_next_lesson(modules, completed_ids)
+    data.next_lesson = _find_next_lesson(modules, completed_ids, student)
 
     return data
 
 
-def _find_next_lesson(modules, completed_ids: set):
-    """First published, incomplete lesson across all modules in order."""
+def _find_next_lesson(modules, completed_ids: set, student):
+    """First released, assigned, incomplete lesson across all modules in order."""
     for mod in modules:
         for lesson in sorted(mod.lessons.all(), key=lambda l: (l.position, l.pk)):
-            if lesson.is_published and lesson.pk not in completed_ids:
+            if lesson.pk not in completed_ids and _counts_for(lesson, student):
                 return lesson
     return None
 
@@ -301,15 +318,17 @@ def class_progress_overview(
             school_class=school_class,
             subject_id=subject_id,
             term=term,
-        ).prefetch_related("lessons")
+        ).prefetch_related("lessons__assigned_students")
     )
+    modules = [m for m in modules if is_released_at(m)]
 
-    lesson_ids = [
-        l.pk
+    released_lessons = [
+        l
         for mod in modules
         for l in mod.lessons.all()
-        if l.is_published
+        if l.is_published and is_released_at(l)
     ]
+    lesson_ids = [l.pk for l in released_lessons]
     data.total_lessons = len(lesson_ids)
 
     # Try to get subject name from first module
@@ -355,7 +374,9 @@ def class_progress_overview(
 
     # Streak data (already prefetched via select_related above)
     for stu in students:
-        done = len(completions.get(stu.pk, set()))
+        # Lessons assigned to chosen pupils only count for those pupils.
+        mine = {l.pk for l in released_lessons if lesson_targets_student(l, stu)}
+        done = len(completions.get(stu.pk, set()) & mine)
         try:
             streak = stu.learning_streak
             last_active = streak.last_active_date
@@ -368,7 +389,7 @@ def class_progress_overview(
             StudentClassRow(
                 student=stu,
                 completed=done,
-                total=data.total_lessons,
+                total=len(mine),
                 last_active_date=last_active,
                 current_streak=current_streak,
             )
@@ -382,7 +403,7 @@ def class_progress_overview(
 def director_engagement_overview(*, academic_year) -> list[DirectorClassRow]:
     """
     One row per class in *academic_year* for the director's overview panel.
-    Cheap: two queries total regardless of class count.
+    Lessons, targeting and completions are fetched in bulk per enabled class.
     """
     from apps.students.models import Student
 
@@ -415,37 +436,47 @@ def director_engagement_overview(*, academic_year) -> list[DirectorClassRow]:
         active_students = 0
 
         if term and eng and eng.is_active:
-            lesson_ids = list(
-                Lesson.objects.filter(
+            now = timezone.now()
+            released_lessons = [
+                lesson
+                for lesson in Lesson.objects.filter(
                     module__school_class=cls,
                     module__term=term,
                     is_published=True,
-                ).values_list("pk", flat=True)
-            )
+                    module__is_published=True,
+                ).select_related("module").prefetch_related("assigned_students")
+                if is_released_at(lesson.module, now=now)
+                and is_released_at(lesson, now=now)
+            ]
+            lesson_ids = [lesson.pk for lesson in released_lessons]
             total_lessons = len(lesson_ids)
 
             if lesson_ids:
-                # Students who completed at least one lesson
-                active_set = set(
-                    LessonProgress.objects.filter(
-                        lesson_id__in=lesson_ids,
-                        student__current_class=cls,
-                        completed=True,
-                    ).values_list("student_id", flat=True).distinct()
-                )
-                active_students = len(active_set)
+                students = list(Student.objects.filter(
+                    current_class=cls,
+                    status=Student.Status.ACTIVE,
+                ))
+                completions: dict[int, set[int]] = {stu.pk: set() for stu in students}
+                for student_id, lesson_id in LessonProgress.objects.filter(
+                    student_id__in=completions,
+                    lesson_id__in=lesson_ids,
+                    completed=True,
+                ).values_list("student_id", "lesson_id"):
+                    completions[student_id].add(lesson_id)
 
-                # Average completion across all active students in class
-                n_students = student_counts.get(cls.pk, 0)
-                if n_students > 0:
-                    total_completions = LessonProgress.objects.filter(
-                        lesson_id__in=lesson_ids,
-                        student__current_class=cls,
-                        completed=True,
-                    ).count()
-                    avg_pct = round(
-                        total_completions * 100 / (n_students * total_lessons)
-                    )
+                percentages = []
+                for stu in students:
+                    assigned_ids = {
+                        lesson.pk for lesson in released_lessons
+                        if lesson_targets_student(lesson, stu)
+                    }
+                    if not assigned_ids:
+                        continue
+                    completed = len(completions[stu.pk] & assigned_ids)
+                    active_students += int(completed > 0)
+                    percentages.append(completed * 100 / len(assigned_ids))
+                if percentages:
+                    avg_pct = round(sum(percentages) / len(percentages))
 
         rows.append(
             DirectorClassRow(

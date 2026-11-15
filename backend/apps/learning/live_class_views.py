@@ -447,6 +447,7 @@ class ClassCalendarView(RoleRequiredMixin, LiveClassesEnabledMixin, View):
             school_class_id=class_id,
             year=year_int,
             month=month_int,
+            student=student if request.user.role in ("student", "parent") else None,
         )
 
         return render(

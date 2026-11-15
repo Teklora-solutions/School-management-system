@@ -1,0 +1,143 @@
+{% extends base_template %}
+
+{% block title %}Promotion Batch #{{ batch.pk }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  @media print {
+    @page { size: A4 landscape; margin: 12mm; }
+    body, .app-wrapper, .app-main { background: #fff !important; color: #111 !important; }
+    .app-navbar, .app-sidebar, .sidebar-overlay, .app-footer, .no-print { display: none !important; }
+    .app-wrapper { display: block !important; }
+    .app-main { padding: 0 !important; margin: 0 !important; }
+    .print-sheet { border: 0 !important; }
+    .print-sheet table { color: #111; }
+    .print-sheet thead { display: table-header-group; }
+    .print-sheet tr { page-break-inside: avoid; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2 no-print">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-clock-history me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Promotion Batch #{{ batch.pk }}
+    </h1>
+    <p class="page-subtitle">
+      {{ batch.from_year.name }} → {{ batch.to_year.name }} · {{ batch.term }}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+      <i class="bi bi-printer me-1"></i>Print movement list
+    </button>
+    <a href="{% url 'students:promotion_history' %}" class="btn btn-outline-primary">Back to history</a>
+  </div>
+</div>
+
+<div class="print-sheet card mb-3">
+  <div class="card-body">
+    <div class="d-none d-print-block mb-3">
+      <h1 class="h4 mb-1">{{ SCHOOL_NAME }} — Class movement list</h1>
+      <p class="mb-0">Batch #{{ batch.pk }} · {{ batch.from_year.name }} → {{ batch.to_year.name }} · {{ batch.term }}</p>
+    </div>
+
+    <div class="row g-3 mb-3 no-print">
+      <div class="col-md-3">
+        <div class="text-muted-sm">Status</div>
+        <div class="fw-600">
+          {% if batch.is_reversed %}Reversed{% elif batch.is_committed %}Committed{% else %}Draft{% endif %}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted-sm">Committed</div>
+        <div class="fw-600">
+          {% if batch.committed_at %}{{ batch.committed_at|date:"d M Y H:i" }} by {{ batch.committed_by.full_name|default:"—" }}{% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted-sm">Override</div>
+        <div class="fw-600">{% if batch.override_unpublished %}Yes — {{ batch.override_reason }}{% else %}No{% endif %}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted-sm">Pupils</div>
+        <div class="fw-600">{{ batch.records.all|length }}</div>
+      </div>
+    </div>
+
+    {% if batch.is_reversed %}
+    <div class="alert alert-warning no-print" role="alert">
+      Reversed {{ batch.reversed_at|date:"d M Y H:i" }} by {{ batch.reversed_by.full_name|default:"—" }}.
+      {{ batch.reverse_reason }}
+    </div>
+    {% endif %}
+
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Admission #</th>
+            <th scope="col">Student</th>
+            <th scope="col">Action</th>
+            <th scope="col">From class</th>
+            <th scope="col">To class</th>
+            <th scope="col">Stream</th>
+            <th scope="col">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in batch.records.all %}
+          <tr>
+            <td>{{ record.student.admission_number }}</td>
+            <td>{{ record.student.user.full_name }}</td>
+            <td>{{ record.get_action_display }}</td>
+            <td>{{ record.from_class.name|default:"—" }}</td>
+            <td>{{ record.to_class.name|default:"—" }}</td>
+            <td>
+              {% if record.previous_stream %}{{ record.previous_stream.name }}{% else %}—{% endif %}
+              {% if record.to_stream %} → {{ record.to_stream.name }}{% endif %}
+            </td>
+            <td>{{ record.notes|default:"" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-center text-muted-sm">No pupils in this batch.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if batch.is_committed and not batch.is_reversed %}
+<div class="card no-print">
+  <div class="card-header"><h2 class="card-title">Undo this promotion</h2></div>
+  <div class="card-body">
+    <p class="text-muted-sm">
+      Pupils go back to the class, stream and status they had before this batch.
+      If a later batch moved any of them, reverse that batch first.
+    </p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if reverse_form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for err in reverse_form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+      </div>
+      {% endif %}
+      <div class="mb-3">
+        <label for="{{ reverse_form.reason.id_for_label }}" class="form-label fw-600">{{ reverse_form.reason.label }}</label>
+        {{ reverse_form.reason }}
+        {% if reverse_form.reason.errors %}<div class="invalid-feedback d-block">{{ reverse_form.reason.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="mb-3">
+        <label for="{{ reverse_form.confirmation.id_for_label }}" class="form-label fw-600">{{ reverse_form.confirmation.label }}</label>
+        {{ reverse_form.confirmation }}
+        {% if reverse_form.confirmation.errors %}<div class="invalid-feedback d-block">{{ reverse_form.confirmation.errors.0 }}</div>{% endif %}
+      </div>
+      <button type="submit" class="btn btn-outline-danger">Undo promotion</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

@@ -68,9 +68,64 @@ class CourseModule(BaseModel):
             "students. Teachers can still see and edit it."
         ),
     )
+    publish_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional. The module becomes visible to students at this date/time "
+            "(Nairobi time) even if already published. Blank = visible as soon "
+            "as published. Checked on every read, so no background worker needed."
+        ),
+    )
+    hide_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional. The module stops being visible to students at this "
+            "date/time (Nairobi time). Blank = stays visible until unpublished."
+        ),
+    )
 
     class Meta:
         db_table = "learning_coursemodule"
+        ordering = ["position", "id"]
+        indexes = [
+            models.Index(fields=["school_class", "subject", "term"]),
+        ]
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class Topic(BaseModel):
+    """
+    A named group of lessons inside a course, for teachers who want to
+    organise "Week 1", "Revision", "Exam prep" etc. across one module or
+    several.  Topics never replace modules — a lesson still lives in exactly
+    one module; ``topic`` and ``topic_position`` only control how the
+    student's course outline groups and orders it.
+    """
+
+    school_class = models.ForeignKey(
+        "academics.SchoolClass",
+        on_delete=models.CASCADE,
+        related_name="course_topics",
+    )
+    subject = models.ForeignKey(
+        "academics.Subject",
+        on_delete=models.CASCADE,
+        related_name="course_topics",
+    )
+    term = models.ForeignKey(
+        "academics.Term",
+        on_delete=models.CASCADE,
+        related_name="course_topics",
+    )
+    title = models.CharField(max_length=200)
+    position = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "learning_topic"
         ordering = ["position", "id"]
         indexes = [
             models.Index(fields=["school_class", "subject", "term"]),
@@ -112,6 +167,46 @@ class Lesson(BaseModel):
     attachment_name = models.CharField(max_length=255, blank=True)
     position = models.PositiveIntegerField(default=0)
     is_published = models.BooleanField(default=True)
+    topic = models.ForeignKey(
+        Topic,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lessons",
+        help_text="Optional named group shown to students (e.g. Week 1).",
+    )
+    topic_position = models.PositiveIntegerField(
+        default=0,
+        help_text="Order of this lesson inside its topic (0 = first).",
+    )
+    publish_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional. The lesson becomes visible to students at this "
+            "date/time (Nairobi time) even if already published. Blank = "
+            "visible as soon as published. Checked on every read, so no "
+            "background worker is needed."
+        ),
+    )
+    hide_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional. The lesson stops being visible to students at this "
+            "date/time (Nairobi time). Blank = stays visible until unpublished."
+        ),
+    )
+    assign_all = models.BooleanField(
+        default=True,
+        help_text="When on, every student in the class can see this lesson.",
+    )
+    assigned_students = models.ManyToManyField(
+        "students.Student",
+        blank=True,
+        related_name="assigned_lessons",
+        help_text="Students who may see this lesson when 'assign all' is off.",
+    )
 
     class Meta:
         db_table = "learning_lesson"
@@ -160,6 +255,50 @@ class LessonProgress(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.student} → {self.lesson.title}"
+
+
+class LessonComment(BaseModel):
+    """
+    A student's question or note under a lesson, visible to the whole class
+    and its teacher.  Same moderation model as the class feed: the teacher
+    (or an admin) can remove a comment; removal is a soft delete recorded via
+    ``removed_by``/``removed_at`` and audit-logged.  Student text is stored
+    plain (sanitised on write) — no HTML is ever rendered from it.
+
+    Only available when the class's ``ClassEngagementSettings.lesson_comments_enabled``
+    switch is on (default off).
+    """
+
+    lesson = models.ForeignKey(
+        Lesson,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    student = models.ForeignKey(
+        "students.Student",
+        on_delete=models.CASCADE,
+        related_name="lesson_comments",
+    )
+    body = models.TextField(max_length=2000)
+    removed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="removed_lesson_comments",
+    )
+    removed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "learning_lessoncomment"
+        ordering = ["created_at", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.student} on {self.lesson.title}"
+
+    @property
+    def is_removed(self) -> bool:
+        return self.removed_at is not None
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +491,13 @@ class ClassEngagementSettings(BaseModel):
     show_streak = models.BooleanField(
         default=True,
         help_text="Show the daily lesson streak counter to students.",
+    )
+    lesson_comments_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Let students ask questions under lessons. Teacher can remove "
+            "comments; removals are audit-logged. Default off."
+        ),
     )
 
     class Meta:
@@ -1336,6 +1482,33 @@ class Quiz(BaseModel):
     is_published = models.BooleanField(
         default=False,
         help_text="Draft quizzes are invisible to students.",
+    )
+    publish_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional. The quiz becomes visible to students at this date/time "
+            "(Nairobi time) even if already published. Blank = visible as soon "
+            "as published. Checked on every read, so no background worker needed."
+        ),
+    )
+    hide_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional. The quiz stops being visible to students at this "
+            "date/time (Nairobi time). Blank = stays visible until unpublished."
+        ),
+    )
+    assign_all = models.BooleanField(
+        default=True,
+        help_text="When on, every student in the class can see this quiz.",
+    )
+    assigned_students = models.ManyToManyField(
+        "students.Student",
+        blank=True,
+        related_name="assigned_quizzes",
+        help_text="Students who may see this quiz when 'assign all' is off.",
     )
     counts_for_gradebook = models.BooleanField(
         default=False,

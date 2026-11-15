@@ -1,4 +1,5 @@
 {% extends base_template %}
+{% load tz feed_tags %}
 {% block title %}{% if module %}Edit Module{% else %}Add Module{% endif %} | {{ SCHOOL_NAME }}{% endblock %}
 
 {% block content %}
@@ -40,6 +41,7 @@
           </div>
           {% else %}
           {# Editing: show the term but don't allow changing it #}
+          <input type="hidden" name="term_id" value="{{ module.term_id }}">
           <div class="mb-4">
             <div class="form-label fw-600 text-muted-sm mb-1">Term</div>
             <div class="p-2 rounded" style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.875rem;color:#fff;">
@@ -64,23 +66,37 @@
             </div>
           </div>
 
-          {# ── Published toggle (edit only) ── #}
-          {% if module %}
-          <div class="mb-4 p-3 rounded" style="background:var(--color-surface-2);border:1px solid var(--color-border);">
-            <div class="form-check form-switch mb-1">
+          {# Release settings apply to both new and existing modules. #}
+          <fieldset class="mb-4 p-3 rounded" style="background:var(--color-surface-2);border:1px solid var(--color-border);">
+            <legend class="form-label fw-600">Release settings</legend>
+            {% if module %}<p class="text-muted-sm">Current status: <strong>{{ module|release_label }}</strong></p>{% endif %}
+            <div class="form-check form-switch mb-2">
               <input class="form-check-input" type="checkbox" role="switch"
                      id="id_is_published" name="is_published" value="1"
-                     {% if module.is_published %}checked{% endif %}>
-              <label class="form-check-label fw-600" for="id_is_published">
-                Published
-              </label>
+                     {% if not module or module.is_published %}checked{% endif %}>
+              <label class="form-check-label fw-600" for="id_is_published">Enable publication</label>
             </div>
-            <div class="text-muted-sm" style="font-size:0.8rem;">
-              When <strong>off</strong>, this entire module and all its lessons are hidden
-              from students. You can build ahead in draft and publish when ready.
+            <p class="text-muted-sm" id="module-release-help">
+              Off means Draft. When enabled, the module is Published immediately unless scheduled for later.
+              All its lessons also need to be released and assigned to the student.
+            </p>
+            {% timezone "Africa/Nairobi" %}
+            <div class="mb-3">
+              <label for="id_publish_at" class="form-label">Publish on (Nairobi)</label>
+              <input type="datetime-local" class="form-control" id="id_publish_at" name="publish_at"
+                     value="{{ module.publish_at|date:'Y-m-d\TH:i' }}" aria-describedby="module-release-help">
             </div>
-          </div>
-          {% endif %}
+            <div>
+              <label for="id_hide_at" class="form-label">Hide on (Nairobi)</label>
+              <input type="datetime-local" class="form-control" id="id_hide_at" name="hide_at"
+                     value="{{ module.hide_at|date:'Y-m-d\TH:i' }}" aria-describedby="module-schedule-help">
+            </div>
+            {% endtimezone %}
+            <p class="text-muted-sm mt-2 mb-0" id="module-schedule-help">
+              Optional, Africa/Nairobi time. Leave blank for no schedule. Hide on must be after Publish on;
+              once Hide on passes, the status is Hidden.
+            </p>
+          </fieldset>
 
           <div class="d-flex gap-2 flex-wrap">
             <button type="submit" class="btn btn-primary">
