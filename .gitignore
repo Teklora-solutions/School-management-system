@@ -81,6 +81,16 @@ npm-debug.log*
 *.dump
 db.sqlite3.bak-*
 db.*-try.sqlite3
+db.sqlite3.backup_*
+db_backup_*
+*.pg_dump
+# No SQLite database or copy of one may ever be tracked
+*.sqlite3
+*.sqlite3.*
+*.sqlite3-*
+
+# Screenshots and page dumps from manual audits (real-looking data)
+_audit_feed/
 
 # WeasyPrint / xhtml2pdf temp
 tmp/
