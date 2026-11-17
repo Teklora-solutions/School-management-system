@@ -204,6 +204,50 @@ NAVIGATION: dict[str, list[dict]] = {
                 },
             ],
         },
+        {
+            "label": "Community",
+            "icon": "bi-people-fill",
+            "url_name": "community:home",
+            "feature": "community",
+            "children": [
+                {
+                    "label": "Community Feed",
+                    "icon": "bi-chat-square-text",
+                    "url_name": "community:home",
+                    "feature": "community",
+                },
+                {
+                    "label": "Mod Queue",
+                    "icon": "bi-shield-check",
+                    "url_name": "community:admin_queue",
+                    "feature": "community",
+                },
+                {
+                    "label": "Categories",
+                    "icon": "bi-tags",
+                    "url_name": "community:admin_categories",
+                    "feature": "community",
+                },
+                {
+                    "label": "Word Filter",
+                    "icon": "bi-funnel",
+                    "url_name": "community:admin_word_filter",
+                    "feature": "community",
+                },
+                {
+                    "label": "Moderators",
+                    "icon": "bi-person-badge",
+                    "url_name": "community:admin_delegation",
+                    "feature": "community",
+                },
+                {
+                    "label": "Insights",
+                    "icon": "bi-graph-up",
+                    "url_name": "community:admin_insights",
+                    "feature": "community",
+                },
+            ],
+        },
     ],
     "director": [
         {
@@ -324,6 +368,26 @@ NAVIGATION: dict[str, list[dict]] = {
             "icon": "bi-person-badge-fill",
             "url_name": "teachers:list",
         },
+        {
+            "label": "Community",
+            "icon": "bi-people-fill",
+            "url_name": "community:home",
+            "feature": "community",
+            "children": [
+                {
+                    "label": "Community Feed",
+                    "icon": "bi-chat-square-text",
+                    "url_name": "community:home",
+                    "feature": "community",
+                },
+                {
+                    "label": "Insights",
+                    "icon": "bi-graph-up",
+                    "url_name": "community:admin_insights",
+                    "feature": "community",
+                },
+            ],
+        },
     ],
     "teacher": [
         {
@@ -384,6 +448,12 @@ NAVIGATION: dict[str, list[dict]] = {
             "label": "Announcements",
             "icon": "bi-megaphone",
             "url_name": "communications:list",
+        },
+        {
+            "label": "Community",
+            "icon": "bi-people-fill",
+            "url_name": "community:home",
+            "feature": "community",
         },
     ],
     "student": [
@@ -475,6 +545,12 @@ NAVIGATION: dict[str, list[dict]] = {
             "url_name": "communications:list",
         },
         {"label": "Profile", "icon": "bi-person", "url_name": "accounts:profile"},
+        {
+            "label": "Community",
+            "icon": "bi-people-fill",
+            "url_name": "community:home",
+            "feature": "community",
+        },
     ],
     "finance": [
         {
@@ -650,5 +726,11 @@ NAVIGATION: dict[str, list[dict]] = {
             "url_name": "communications:list",
         },
         {"label": "Profile", "icon": "bi-person", "url_name": "accounts:profile"},
+        {
+            "label": "Community",
+            "icon": "bi-people-fill",
+            "url_name": "community:home",
+            "feature": "community",
+        },
     ],
 }

@@ -1,0 +1,35 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}Search — {{ identity.name|default:"School" }} Community{% endblock %}
+
+{% block community_content %}
+<h2 class="cmty-section-label">
+  <i class="bi bi-search" aria-hidden="true"></i>
+  {% if q %}Results for "{{ q }}"{% else %}Search the community{% endif %}
+</h2>
+
+{% if q %}
+  {% if results %}
+  <p class="cmty-search-count" role="status">{{ results|length }} post{{ results|length|pluralize }} found</p>
+  <div class="cmty-feed">
+    {% for post in results %}
+    {% include "community/includes/post_card.html" %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="cmty-empty">
+    <div class="cmty-empty__icon" aria-hidden="true"><i class="bi bi-search"></i></div>
+    <h3 class="cmty-empty__title">No results for "{{ q }}"</h3>
+    <p class="cmty-empty__text">Try different words, or browse a category from the community home.</p>
+    <a href="{% url 'community:home' %}" class="pub-btn pub-btn--outline" style="margin-top:1rem">
+      Browse community
+    </a>
+  </div>
+  {% endif %}
+{% else %}
+<div class="cmty-empty cmty-empty--sm">
+  <p class="cmty-empty__text">Type a word or phrase in the search box above to find posts.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}Members — {{ identity.name|default:"School" }} Community{% endblock %}
+
+{% block community_content %}
+<div class="cmty-members-head">
+  <h2 class="cmty-section-label">
+    <i class="bi bi-people" aria-hidden="true"></i> Members
+  </h2>
+
+  {# Stats summary (always shown) #}
+  <div class="cmty-stats cmty-stats--inline">
+    <div class="cmty-stat">
+      <span class="cmty-stat__num">{{ stats.total_members }}</span>
+      <span class="cmty-stat__label">Total members</span>
+    </div>
+    <div class="cmty-stat">
+      <span class="cmty-stat__num">{{ stats.online_now }}</span>
+      <span class="cmty-stat__label">Online now</span>
+    </div>
+  </div>
+</div>
+
+{% if not request.user.is_authenticated %}
+{# Visitor: show counts but no directory #}
+<div class="cmty-members-gate">
+  <div class="cmty-empty">
+    <div class="cmty-empty__icon" aria-hidden="true"><i class="bi bi-person-lock"></i></div>
+    <h3 class="cmty-empty__title">Members directory</h3>
+    <p class="cmty-empty__text">
+      Sign in to see the full members directory and connect with other community members.
+    </p>
+    <a href="{% url 'accounts:login' %}?next={{ request.path }}"
+       class="pub-btn pub-btn--primary" style="margin-top:1rem">
+      <i class="bi bi-person" aria-hidden="true"></i> Sign in to view
+    </a>
+  </div>
+</div>
+{% else %}
+{# Signed-in: show search + directory (students excluded) #}
+<form class="cmty-members-search" method="get" role="search">
+  <label for="memberSearch" class="sr-only">Search members</label>
+  <span class="cmty-search__icon" aria-hidden="true"><i class="bi bi-search"></i></span>
+  <input id="memberSearch" class="cmty-search__input" type="search" name="q"
+         value="{{ q|default:'' }}" placeholder="Search by name…" autocomplete="off" maxlength="80">
+  <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">Search</button>
+</form>
+
+{% if members %}
+<ul class="cmty-member-list" aria-label="Community members">
+  {% for member in members %}
+  <li class="cmty-member-row">
+    {% if member.avatar %}
+    <img src="{{ member.avatar.url }}" alt="{{ member.get_full_name }}"
+         class="cmty-avatar cmty-avatar--md">
+    {% else %}
+    <span class="cmty-avatar cmty-avatar--md cmty-avatar--initials" aria-hidden="true">
+      {{ member.first_name|first|upper }}{{ member.last_name|first|upper }}
+    </span>
+    {% endif %}
+    <div class="cmty-member-row__info">
+      <span class="cmty-member-row__name">{{ member.get_full_name|default:member.username }}</span>
+      <span class="cmty-role-badge cmty-role-badge--{{ member.role }}">{{ member.get_role_display }}</span>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="cmty-empty cmty-empty--sm">
+  <p class="cmty-empty__text">
+    {% if q %}No members match "{{ q }}".{% else %}No members to show yet.{% endif %}
+  </p>
+</div>
+{% endif %}
+{% endif %}
+
+{% endblock %}

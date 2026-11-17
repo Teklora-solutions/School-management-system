@@ -1,0 +1,256 @@
+{% comment %}
+Write-something composer row.
+M2: Signed-in users with consent see the full expandable composer.
+    Signed-in users without consent see a "join" prompt.
+    Visitors see the sign-in gate.
+{% endcomment %}
+<div class="cmty-composer" role="complementary" aria-label="Write a post" id="cmtyComposer">
+  <div class="cmty-composer__inner">
+
+    {% if request.user.is_authenticated %}
+
+      {# Avatar #}
+      {% if request.user.avatar and request.user.role != 'student' %}
+      <img src="{{ request.user.avatar.url }}" alt="{{ request.user.full_name }}"
+           class="cmty-avatar cmty-avatar--md" aria-hidden="true">
+      {% else %}
+      <span class="cmty-avatar cmty-avatar--md cmty-avatar--initials" aria-hidden="true">
+        {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+      </span>
+      {% endif %}
+
+      {# Consent not yet given → invite to join #}
+      {% if not request.user.community_profile.has_consented %}
+      <a href="{% url 'community:consent' %}?next={{ request.path }}"
+         class="cmty-composer__placeholder">
+        <i class="bi bi-person-plus" aria-hidden="true"></i>
+        Accept the community rules to start posting
+      </a>
+
+      {% else %}
+      {# Full composer — collapsed by default, expands on click #}
+      <button class="cmty-composer__placeholder" id="cmtyComposerToggle"
+              aria-expanded="false" aria-controls="cmtyComposerForm">
+        {% if draft and draft.title %}
+          <i class="bi bi-pencil-square" aria-hidden="true"></i>
+          Continue your draft: "{{ draft.title|truncatechars:40 }}"
+        {% else %}
+          <i class="bi bi-pencil" aria-hidden="true"></i>
+          Write something…
+        {% endif %}
+      </button>
+      {% endif %}
+
+    {% else %}
+    {# Visitor gate #}
+    <span class="cmty-avatar cmty-avatar--md cmty-avatar--initials cmty-avatar--guest" aria-hidden="true">
+      <i class="bi bi-person"></i>
+    </span>
+    <a href="{% url 'accounts:login' %}?next={{ request.path }}"
+       class="cmty-composer__placeholder cmty-composer__placeholder--visitor">
+      <i class="bi bi-lock" aria-hidden="true"></i>
+      Sign in to join the conversation
+    </a>
+    {% endif %}
+
+  </div>
+
+  {% if request.user.is_authenticated and request.user.community_profile.has_consented %}
+  {# Expanded composer form #}
+  <div class="cmty-composer__form" id="cmtyComposerForm"
+       aria-hidden="true" hidden>
+    <form method="post" action="{% url 'community:post_create' %}" id="cmtyPostForm" novalidate>
+      {% csrf_token %}
+
+      <div class="cmty-composer__field">
+        <label for="cmtyPostTitle" class="cmty-composer__label">Title</label>
+        <input id="cmtyPostTitle" name="title" type="text" maxlength="200"
+               class="cmty-composer__input" placeholder="Give your post a clear title…"
+               autocomplete="off" value="{{ draft.title|default:'' }}"
+               aria-required="true">
+        <span class="cmty-composer__error" id="cmtyTitleError" role="alert" hidden></span>
+      </div>
+
+      <div class="cmty-composer__field">
+        <label for="cmtyPostBody" class="cmty-composer__label">Body</label>
+        <div class="cmty-toolbar" role="toolbar" aria-label="Text formatting">
+          <button type="button" class="cmty-toolbar__btn" data-cmd="bold"
+                  aria-label="Bold" title="Bold"><i class="bi bi-type-bold"></i></button>
+          <button type="button" class="cmty-toolbar__btn" data-cmd="italic"
+                  aria-label="Italic" title="Italic"><i class="bi bi-type-italic"></i></button>
+          <button type="button" class="cmty-toolbar__btn" data-cmd="insertUnorderedList"
+                  aria-label="Bullet list" title="List"><i class="bi bi-list-ul"></i></button>
+          <button type="button" class="cmty-toolbar__btn" data-cmd="createLink"
+                  aria-label="Insert link" title="Link"><i class="bi bi-link-45deg"></i></button>
+        </div>
+        <div id="cmtyPostBody" class="cmty-composer__richtext"
+             contenteditable="true" role="textbox" aria-multiline="true"
+             aria-label="Post body" data-placeholder="Share your idea, question or update…"
+             aria-required="true">{{ draft.body|default:''|safe }}</div>
+        <textarea name="body" id="cmtyPostBodyHidden" hidden
+                  aria-hidden="true">{{ draft.body|default:'' }}</textarea>
+        <span class="cmty-composer__error" id="cmtyBodyError" role="alert" hidden></span>
+      </div>
+
+      <div class="cmty-composer__field">
+        <label for="cmtyPostCategory" class="cmty-composer__label">Category</label>
+        <select id="cmtyPostCategory" name="category" class="cmty-composer__select"
+                aria-required="true">
+          <option value="">Choose a category…</option>
+          {% for cat in postable_categories %}
+          <option value="{{ cat.slug }}"
+                  {% if draft and draft.category_id == cat.pk %}selected{% endif %}>
+            {{ cat.name }}
+          </option>
+          {% endfor %}
+        </select>
+        <span class="cmty-composer__error" id="cmtyCategoryError" role="alert" hidden></span>
+      </div>
+
+      <div class="cmty-composer__actions">
+        <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm"
+                id="cmtyPostSubmit" aria-busy="false">
+          <i class="bi bi-send" aria-hidden="true"></i>
+          <span>Post</span>
+        </button>
+        <button type="button" class="pub-btn pub-btn--outline pub-btn--sm"
+                id="cmtyComposerCancel">
+          Cancel
+        </button>
+        <span class="cmty-composer__autosave" id="cmtyAutosaveStatus"
+              aria-live="polite" aria-atomic="true"></span>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var toggle = document.getElementById('cmtyComposerToggle');
+  var form   = document.getElementById('cmtyComposerForm');
+  var cancel = document.getElementById('cmtyComposerCancel');
+  var postForm = document.getElementById('cmtyPostForm');
+  var bodyDiv  = document.getElementById('cmtyPostBody');
+  var bodyHidden = document.getElementById('cmtyPostBodyHidden');
+  var status = document.getElementById('cmtyAutosaveStatus');
+
+  function openComposer(){
+    if(!form) return;
+    form.hidden = false;
+    form.setAttribute('aria-hidden','false');
+    if(toggle) toggle.setAttribute('aria-expanded','true');
+    var input = document.getElementById('cmtyPostTitle');
+    if(input) setTimeout(function(){ input.focus(); }, 60);
+  }
+
+  function closeComposer(){
+    if(!form) return;
+    form.hidden = true;
+    form.setAttribute('aria-hidden','true');
+    if(toggle) toggle.setAttribute('aria-expanded','false');
+  }
+
+  if(toggle) toggle.addEventListener('click', openComposer);
+  if(cancel) cancel.addEventListener('click', closeComposer);
+
+  /* ── Toolbar (execCommand, works for basic formatting) ── */
+  document.querySelectorAll('.cmty-toolbar__btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var cmd = btn.dataset.cmd;
+      if(cmd === 'createLink'){
+        var url = prompt('Enter a URL (must start with https://)');
+        if(url && /^https?:\/\//.test(url)){
+          document.execCommand('createLink', false, url);
+        }
+      } else {
+        document.execCommand(cmd, false, null);
+      }
+      if(bodyDiv) bodyDiv.focus();
+    });
+  });
+
+  /* ── Sync rich-text → hidden textarea on input ── */
+  if(bodyDiv && bodyHidden){
+    bodyDiv.addEventListener('input', function(){
+      bodyHidden.value = bodyDiv.innerHTML;
+      scheduleDraftSave();
+    });
+  }
+
+  /* ── Autosave draft ── */
+  var saveTimer;
+  var DRAFT_URL = '{% url "community:draft_save" %}';
+  function scheduleDraftSave(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDraft, 1800);
+  }
+  function saveDraft(){
+    var title    = (document.getElementById('cmtyPostTitle') || {}).value || '';
+    var body     = bodyHidden ? bodyHidden.value : '';
+    var catEl    = document.getElementById('cmtyPostCategory');
+    var catId    = catEl ? catEl.options[catEl.selectedIndex] && catEl.value : null;
+    if(!title && !body) return;
+    var csrf = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+    fetch(DRAFT_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':csrf,'X-Requested-With':'XMLHttpRequest'},
+      body: JSON.stringify({title:title, body:body, category_id:catId||null}),
+    }).then(function(r){ return r.json(); })
+      .then(function(d){
+        if(status && d.ok){
+          status.textContent = 'Draft saved';
+          setTimeout(function(){ status.textContent = ''; }, 2000);
+        }
+      }).catch(function(){});
+  }
+
+  document.getElementById('cmtyPostTitle') && document.getElementById('cmtyPostTitle')
+    .addEventListener('input', scheduleDraftSave);
+  document.getElementById('cmtyPostCategory') && document.getElementById('cmtyPostCategory')
+    .addEventListener('change', scheduleDraftSave);
+
+  /* ── Form submit via fetch ── */
+  if(postForm){
+    postForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      /* Sync rich-text → hidden */
+      if(bodyDiv && bodyHidden) bodyHidden.value = bodyDiv.innerHTML;
+      /* Basic validation */
+      var title = (document.getElementById('cmtyPostTitle') || {}).value || '';
+      var body  = bodyHidden ? bodyHidden.value.replace(/<[^>]*>/g,'').trim() : '';
+      var cat   = (document.getElementById('cmtyPostCategory') || {}).value || '';
+      var ok = true;
+      function showErr(id, msg){ var el = document.getElementById(id); if(el){ el.textContent=msg; el.hidden=false; } ok=false; }
+      function clearErr(id){ var el = document.getElementById(id); if(el){ el.textContent=''; el.hidden=true; } }
+      clearErr('cmtyTitleError'); clearErr('cmtyBodyError'); clearErr('cmtyCategoryError');
+      if(!title.trim()) showErr('cmtyTitleError','Please give your post a title.');
+      if(!body) showErr('cmtyBodyError','Please write something in the body.');
+      if(!cat) showErr('cmtyCategoryError','Please choose a category.');
+      if(!ok) return;
+      var btn = document.getElementById('cmtyPostSubmit');
+      if(btn){ btn.disabled=true; btn.setAttribute('aria-busy','true'); btn.querySelector('span').textContent='Posting…'; }
+      fetch(postForm.action, {
+        method:'POST',
+        body: new FormData(postForm),
+        headers:{'X-Requested-With':'XMLHttpRequest'},
+        credentials:'same-origin',
+      }).then(function(r){ return r.json(); })
+        .then(function(d){
+          if(d.ok){
+            if(d.redirect) window.location.href = d.redirect;
+          } else {
+            if(btn){ btn.disabled=false; btn.setAttribute('aria-busy','false'); btn.querySelector('span').textContent='Post'; }
+            showErr('cmtyBodyError', d.error || 'Something went wrong. Please try again.');
+          }
+        }).catch(function(){
+          if(btn){ btn.disabled=false; btn.setAttribute('aria-busy','false'); btn.querySelector('span').textContent='Post'; }
+          showErr('cmtyBodyError','Could not connect. Please check your connection and try again.');
+        });
+    });
+  }
+})();
+</script>

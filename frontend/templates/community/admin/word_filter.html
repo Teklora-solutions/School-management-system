@@ -1,0 +1,79 @@
+{% extends "community/admin/base_admin.html" %}
+
+{% block title %}Word Filter — Community{% endblock %}
+
+{% block admin_content %}
+<h1 class="cmty-admin-h1">Word Filter</h1>
+<p style="color:var(--pub-text-muted);font-size:.875rem;margin-bottom:1.25rem;max-width:60ch">
+  Posts and replies containing these words are held for review rather than published immediately.
+  They are never silently blocked. You can toggle each word on or off without deleting it.
+</p>
+
+{# Add a word #}
+<div class="cmty-about-card" style="margin-bottom:1rem">
+  <h2 style="font-family:var(--pub-font-h);font-size:.9rem;font-weight:700;margin-bottom:.6rem">Add a word</h2>
+  <form method="post" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="add">
+    <div>
+      <label class="cmty-composer__label" for="newWord">Word or phrase</label>
+      <input id="newWord" type="text" name="word" class="cmty-composer__input"
+             placeholder="e.g. bad word" maxlength="100" required autocomplete="off">
+    </div>
+    <div>
+      <label class="cmty-composer__label" for="newNote">Internal note</label>
+      <input id="newNote" type="text" name="note" class="cmty-composer__input"
+             placeholder="Why is this on the list?" maxlength="200">
+    </div>
+    <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">Add</button>
+  </form>
+</div>
+
+{# Word list #}
+<div class="cmty-about-card">
+  <table class="cmty-admin-table" aria-label="Blocked words">
+    <thead>
+      <tr>
+        <th>Word / phrase</th>
+        <th>Note</th>
+        <th>Status</th>
+        <th aria-label="Actions"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for word in words %}
+      <tr class="{% if not word.is_active %}cmty-admin-table__row--dim{% endif %}">
+        <td><code>{{ word.word }}</code></td>
+        <td style="font-size:.8rem;color:var(--pub-text-muted)">{{ word.note|default:"—" }}</td>
+        <td>
+          <span class="cmty-role-badge {% if word.is_active %}cmty-role-badge--teacher{% else %}cmty-role-badge--member{% endif %}">
+            {% if word.is_active %}Active{% else %}Inactive{% endif %}
+          </span>
+        </td>
+        <td>
+          <form method="post" style="display:inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="toggle">
+            <input type="hidden" name="word_pk" value="{{ word.pk }}">
+            <button type="submit" class="cmty-share-btn">
+              {% if word.is_active %}Deactivate{% else %}Activate{% endif %}
+            </button>
+          </form>
+          <form method="post" style="display:inline"
+                onsubmit="return confirm('Remove \'{{ word.word }}\' from the filter?')">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="word_pk" value="{{ word.pk }}">
+            <button type="submit" class="cmty-share-btn" style="color:#f87171">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" style="text-align:center;color:var(--pub-text-muted);padding:1rem">
+        No words in the filter yet.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

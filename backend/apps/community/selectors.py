@@ -186,10 +186,10 @@ def _attach_recent_commenters(posts: list[Post]) -> None:
     post_map = {p.pk: p for p in posts}
     for pk, commenters in seen.items():
         if pk in post_map:
-            post_map[pk]._recent_commenters = commenters
+            post_map[pk].recent_commenters = commenters
     for p in posts:
-        if not hasattr(p, "_recent_commenters"):
-            p._recent_commenters = []
+        if not hasattr(p, "recent_commenters"):
+            p.recent_commenters = []
 
 
 # ─── Post detail ─────────────────────────────────────────────────────────────
@@ -351,4 +351,257 @@ def search_posts(query: str, user) -> list[Post]:
         )
         .order_by("-created_at")[:30]
     )
+    _attach_recent_commenters(posts)
     return posts
+
+
+# ─── Postable categories (for composer dropdown) ──────────────────────────────
+
+def postable_categories(user) -> list[Category]:
+    """
+    Categories the user may post in (can see + not staff_post_only unless staff).
+    """
+    role = getattr(user, "role", "")
+    is_staff = role in ("teacher", "director", "admin")
+    result = []
+    for cat in Category.objects.filter(is_active=True).order_by("display_order", "id"):
+        if not cat.is_visible_to(user):
+            continue
+        if cat.staff_post_only and not is_staff:
+            continue
+        result.append(cat)
+    return result
+
+
+# ─── Open reports / pending appeals ─────────────────────────────────────────
+
+def open_reports():
+    from .models import Report
+    return list(
+        Report.objects.filter(status=Report.Status.OPEN)
+        .select_related("reporter", "post", "comment")
+        .annotate(report_count=Count("id"))
+        .order_by("-created_at")
+    )
+
+
+def pending_appeals():
+    from .models import Appeal
+    return list(
+        Appeal.objects.filter(status=Appeal.Status.PENDING)
+        .select_related("appellant", "warning")
+        .order_by("created_at")
+    )
+
+
+# ─── User's own posts ─────────────────────────────────────────────────────────
+
+def user_posts(user) -> list[Post]:
+    return list(
+        Post.objects.filter(author=user)
+        .select_related("category")
+        .order_by("-created_at")[:30]
+    )
+
+
+# ─── Dashboard card selectors ─────────────────────────────────────────────────
+
+def student_community_insights(user) -> dict:
+    from .models import Comment, Reaction, Warning
+    my_posts = Post.objects.filter(author=user, status=Post.Status.PUBLISHED)
+    reply_count = Comment.objects.filter(post__in=my_posts, is_removed=False).count()
+    reaction_count = Reaction.objects.filter(post__in=my_posts).count()
+    latest = (
+        Comment.objects.filter(post__in=my_posts, is_removed=False)
+        .select_related("post")
+        .order_by("-created_at")[:3]
+    )
+    warnings = Warning.objects.filter(
+        recipient=user, status=Warning.Status.ACTIVE
+    ).count()
+    return {
+        "my_post_count": my_posts.count(),
+        "my_reply_count": reply_count,
+        "my_reaction_count": reaction_count,
+        "latest_replies": list(latest),
+        "active_warning_count": warnings,
+    }
+
+
+def parent_community_insights(user) -> dict:
+    from datetime import timedelta
+    from .models import Category
+    # Latest public announcements
+    announcements_cat = Category.objects.filter(
+        slug="announcements", is_active=True
+    ).first()
+    latest_announcements = []
+    if announcements_cat:
+        latest_announcements = list(
+            Post.objects.filter(
+                category=announcements_cat, status=Post.Status.PUBLISHED
+            ).order_by("-created_at")[:5]
+        )
+    # Events in the next 30 days (from public selectors)
+    from apps.public.selectors import active_event_items
+    upcoming_events = active_event_items()[:3]
+    # My own posts
+    my_posts = Post.objects.filter(author=user, status=Post.Status.PUBLISHED)
+    return {
+        "latest_announcements": latest_announcements,
+        "upcoming_events": upcoming_events,
+        "my_post_count": my_posts.count(),
+    }
+
+
+def teacher_community_insights(user) -> dict:
+    from datetime import timedelta
+    from .models import Category
+    from django.utils import timezone
+
+    my_posts = Post.objects.filter(author=user, status=Post.Status.PUBLISHED)
+    total_reactions = sum(
+        Post.objects.filter(pk__in=my_posts.values("pk"))
+        .annotate(rc=Count("reactions"))
+        .values_list("rc", flat=True)
+    )
+    # Unanswered questions: posts with 0 comments older than 2 days
+    two_days_ago = timezone.now() - timedelta(days=2)
+    visible_cat_ids = _visible_category_ids(user)
+    unanswered = list(
+        Post.objects.filter(
+            status=Post.Status.PUBLISHED,
+            category_id__in=visible_cat_ids,
+            created_at__lte=two_days_ago,
+        )
+        .annotate(reply_count=Count("comments", filter=Q(comments__is_removed=False)))
+        .filter(reply_count=0)
+        .order_by("created_at")[:5]
+    )
+    return {
+        "my_post_count": my_posts.count(),
+        "my_total_reactions": total_reactions,
+        "unanswered_questions": unanswered,
+    }
+
+
+def admin_community_summary() -> dict:
+    from .models import Report, Warning, Post, Comment
+    from datetime import timedelta
+    from django.utils import timezone
+
+    pending = Post.objects.filter(status=Post.Status.PENDING).count()
+    open_rep = Report.objects.filter(status=Report.Status.OPEN).count() if hasattr(Report, 'Status') else 0
+    active_warnings = Warning.objects.filter(status=Warning.Status.ACTIVE).count()
+
+    week_ago = timezone.now() - timedelta(days=7)
+    new_posts_week = Post.objects.filter(
+        status=Post.Status.PUBLISHED, created_at__gte=week_ago
+    ).count()
+    new_comments_week = Comment.objects.filter(
+        is_removed=False, created_at__gte=week_ago
+    ).count()
+    return {
+        "pending_count": pending,
+        "open_report_count": open_rep,
+        "active_warning_count": active_warnings,
+        "new_posts_week": new_posts_week,
+        "new_comments_week": new_comments_week,
+    }
+
+
+def community_insights() -> dict:
+    """Full insights for the admin insights page."""
+    from .models import CommunityProfile, Post, Comment, Warning, Report
+    from apps.accounts.models import User
+    from datetime import timedelta
+    from django.utils import timezone
+    from django.db.models import Count
+
+    now = timezone.now()
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+
+    # Activity over time (last 7 days, by day)
+    daily_posts = []
+    for i in range(6, -1, -1):
+        day_start = (now - timedelta(days=i)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        day_end = day_start + timedelta(days=1)
+        daily_posts.append({
+            "label": day_start.strftime("%d %b").lstrip("0") or "1 Jan",
+            "posts": Post.objects.filter(
+                created_at__gte=day_start, created_at__lt=day_end,
+                status=Post.Status.PUBLISHED
+            ).count(),
+            "comments": Comment.objects.filter(
+                created_at__gte=day_start, created_at__lt=day_end,
+                is_removed=False
+            ).count(),
+        })
+
+    # Top categories by post count
+    top_categories = list(
+        Post.objects.filter(status=Post.Status.PUBLISHED)
+        .values("category__name")
+        .annotate(post_count=Count("id"))
+        .order_by("-post_count")[:5]
+    )
+
+    # Unanswered questions > 2 days old
+    two_days_ago = now - timedelta(days=2)
+    unanswered = list(
+        Post.objects.filter(
+            status=Post.Status.PUBLISHED,
+            created_at__lte=two_days_ago,
+        )
+        .annotate(reply_count=Count("comments", filter=Q(comments__is_removed=False)))
+        .filter(reply_count=0)
+        .select_related("category", "author")
+        .order_by("created_at")[:10]
+    )
+
+    # Most active members (by post + comment count in last 30 days)
+    from django.db.models import Q as DQ
+    most_active_post = list(
+        Post.objects.filter(created_at__gte=month_ago, status=Post.Status.PUBLISHED)
+        .values("author__first_name", "author__last_name", "author__role")
+        .annotate(post_count=Count("id"))
+        .order_by("-post_count")[:5]
+    )
+
+    # Growth by role (new community profiles in last 30 days)
+    growth_by_role = list(
+        CommunityProfile.objects.filter(created_at__gte=month_ago)
+        .values("user__role")
+        .annotate(new_members=Count("id"))
+        .order_by("-new_members")
+    )
+
+    # Pending / warnings / removals summary
+    pending_posts_count = Post.objects.filter(status=Post.Status.PENDING).count()
+    removed_posts_month = Post.objects.filter(
+        status=Post.Status.REMOVED, removed_at__gte=month_ago
+    ).count()
+    warnings_month = Warning.objects.filter(created_at__gte=month_ago).count()
+    open_reports_count = Report.objects.filter(status=Report.Status.OPEN).count()
+
+    # Health: community storage (approximate)
+    total_posts = Post.objects.count()
+    total_comments = Comment.objects.count()
+
+    return {
+        "daily_activity": daily_posts,
+        "top_categories": top_categories,
+        "unanswered_questions": unanswered,
+        "most_active_members": most_active_post,
+        "growth_by_role": growth_by_role,
+        "pending_posts_count": pending_posts_count,
+        "removed_posts_month": removed_posts_month,
+        "warnings_month": warnings_month,
+        "open_reports_count": open_reports_count,
+        "total_posts": total_posts,
+        "total_comments": total_comments,
+        "total_members": User.objects.filter(is_active=True).count(),
+    }

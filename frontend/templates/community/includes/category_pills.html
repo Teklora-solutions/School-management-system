@@ -1,0 +1,23 @@
+{% comment %}
+Category pill row. Expects:
+  categories      — list of Category objects the user can see
+  active_category_slug — currently selected slug, or "all"
+  sort            — current sort value
+{% endcomment %}
+<div class="cmty-pills-wrap">
+  <nav class="cmty-pills" id="cmtyCategoryPills" aria-label="Filter by category" tabindex="0">
+    <a href="{% url 'community:home' %}?sort={{ sort|default:'new' }}"
+       class="cmty-pill {% if active_category_slug == 'all' or not active_category_slug %}is-active{% endif %}"
+       {% if active_category_slug == 'all' or not active_category_slug %}aria-current="true"{% endif %}>
+      <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> All
+    </a>
+    {% for cat in categories %}
+    <a href="{% url 'community:category_feed' cat.slug %}?sort={{ sort|default:'new' }}"
+       class="cmty-pill {% if active_category_slug == cat.slug %}is-active{% endif %}"
+       {% if active_category_slug == cat.slug %}aria-current="true"{% endif %}>
+      {% if cat.icon %}<i class="bi {{ cat.icon }}" aria-hidden="true"></i> {% endif %}
+      {{ cat.name }}
+    </a>
+    {% endfor %}
+  </nav>
+</div>

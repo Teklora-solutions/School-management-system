@@ -1,0 +1,83 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}Community — {{ identity.name|default:"School" }}{% endblock %}
+
+{% block community_content %}
+
+{# ── Composer ── #}
+{% include "community/includes/composer.html" %}
+
+{# ── Category pills ── #}
+{% include "community/includes/category_pills.html" with categories=categories active_category_slug=active_category_slug sort=sort %}
+
+{# ── Pinned posts (top of first page, all-category view only) ── #}
+{% if pinned_posts %}
+<section class="cmty-pinned-section" aria-label="Pinned posts">
+  <h2 class="cmty-section-label">
+    <i class="bi bi-pin-fill" aria-hidden="true"></i> Pinned
+  </h2>
+  {% for post in pinned_posts %}
+  {% include "community/includes/post_card.html" %}
+  {% endfor %}
+</section>
+{% endif %}
+
+{# ── Sort bar ── #}
+{% include "community/includes/sort_bar.html" with sort=sort active_category_slug=active_category_slug %}
+
+{# ── Category banner (when filtered) ── #}
+{% if current_category %}
+<div class="cmty-cat-banner">
+  {% if current_category.icon %}<i class="bi {{ current_category.icon }}" aria-hidden="true"></i>{% endif %}
+  <div>
+    <h2 class="cmty-cat-banner__name">{{ current_category.name }}</h2>
+    {% if current_category.description %}
+    <p class="cmty-cat-banner__desc">{{ current_category.description }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Post feed ── #}
+<div class="cmty-feed" id="cmtyFeed" aria-live="polite" aria-label="Community posts">
+  {% if posts %}
+  {% for post in posts %}
+  {% include "community/includes/post_card.html" %}
+  {% endfor %}
+  {% else %}
+  <div class="cmty-empty">
+    <div class="cmty-empty__icon" aria-hidden="true"><i class="bi bi-chat-square-heart"></i></div>
+    <h3 class="cmty-empty__title">Nothing here yet</h3>
+    <p class="cmty-empty__text">
+      {% if current_category %}
+        Be the first to post in <strong>{{ current_category.name }}</strong>. Great conversations start with one idea.
+      {% else %}
+        Be the first to start a conversation. This is your space to share, ask and celebrate.
+      {% endif %}
+    </p>
+    {% if not request.user.is_authenticated %}
+    <a href="{% url 'accounts:login' %}?next={{ request.path }}"
+       class="pub-btn pub-btn--primary" style="margin-top:1rem">
+      <i class="bi bi-person-plus" aria-hidden="true"></i> Sign in to post
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{# ── Show more ── #}
+{% if has_more %}
+<div class="cmty-more-wrap">
+  <button id="cmtyMoreBtn"
+          class="pub-btn pub-btn--outline"
+          data-cursor="{{ next_cursor }}"
+          data-sort="{{ sort }}"
+          data-cat="{{ active_category_slug|default:'all' }}"
+          data-url="{% url 'community:home' %}">
+    <i class="bi bi-arrow-down-circle" aria-hidden="true"></i> Show more
+  </button>
+</div>
+{% endif %}
+
+{% endblock %}

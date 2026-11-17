@@ -57,6 +57,8 @@ urlpatterns = [
     # public.urls owns the root path so "/" serves the home page directly -
     # no redirect for unauthenticated visitors.
     path("", include("apps.public.urls", namespace="public")),
+    # School-wide public community (read-only for visitors; post/reply requires login).
+    path("community/", include("apps.community.urls", namespace="community")),
     # ...and the school's own screens for editing it, behind their own prefix so
     # a visitor's /gallery/ and an admin's /website/gallery/ never compete.
     path("website/", include("apps.public.urls_admin", namespace="public_admin")),

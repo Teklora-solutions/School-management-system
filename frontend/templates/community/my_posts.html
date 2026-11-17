@@ -1,0 +1,71 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}My Posts — {{ identity.name|default:"School" }} Community{% endblock %}
+
+{% block community_content %}
+<h2 class="cmty-section-label">
+  <i class="bi bi-person-lines-fill" aria-hidden="true"></i> My Posts
+</h2>
+
+{% if my_warnings %}
+<div class="cmty-about-card" style="border-color:rgba(239,68,68,.3);background:color-mix(in srgb,var(--pub-surface) 95%,#ef4444)">
+  <h3 style="color:#f87171"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Notices from the moderator</h3>
+  {% for w in my_warnings %}
+  <div class="cmty-warning-row">
+    <span class="cmty-role-badge cmty-role-badge--{{ w.level }}">{{ w.get_level_display }}</span>
+    <span style="font-size:.85rem;color:var(--pub-text)">{{ w.user_message|truncatewords:20 }}</span>
+    <a href="{% url 'community:warning_detail' w.pk %}" class="cmty-share-btn">
+      View <i class="bi bi-arrow-right" aria-hidden="true"></i>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if my_posts %}
+<div class="cmty-feed">
+  {% for post in my_posts %}
+  <div class="cmty-post-card">
+    <div class="cmty-post-card__inner">
+      <div class="cmty-post-card__meta">
+        <span class="cmty-post-card__category">
+          {% if post.category.icon %}<i class="bi {{ post.category.icon }}" aria-hidden="true"></i>{% endif %}
+          {{ post.category.name }}
+        </span>
+        <span class="cmty-role-badge cmty-role-badge--{{ post.status }}">{{ post.get_status_display }}</span>
+        <time class="cmty-post-card__time" data-ts="{{ post.created_at|date:'U' }}"
+              datetime="{{ post.created_at|date:'c' }}">{{ post.created_at|timesince }} ago</time>
+      </div>
+      {% if post.status == 'published' %}
+      <a href="{% url 'community:post_detail' post.pk %}" class="cmty-post-card__link">
+        <h3 class="cmty-post-card__title">{{ post.title }}</h3>
+      </a>
+      {% else %}
+      <h3 class="cmty-post-card__title" style="color:var(--pub-text-muted)">{{ post.title }}</h3>
+      {% if post.status == 'pending' %}
+      <p style="font-size:.8rem;color:var(--pub-text-muted)">
+        <i class="bi bi-clock" aria-hidden="true"></i>
+        Waiting for a quick review — we'll publish it very soon.
+      </p>
+      {% elif post.status == 'removed' %}
+      <p style="font-size:.8rem;color:#f87171">
+        <i class="bi bi-x-circle" aria-hidden="true"></i>
+        This post was removed.
+        {% if post.removal_reason %} Reason: {{ post.removal_reason }}{% endif %}
+      </p>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="cmty-empty cmty-empty--sm">
+  <p class="cmty-empty__text">You haven't posted anything yet. Share something with the community!</p>
+  <a href="{% url 'community:home' %}" class="pub-btn pub-btn--primary" style="margin-top:.75rem">
+    Go to community
+  </a>
+</div>
+{% endif %}
+{% endblock %}

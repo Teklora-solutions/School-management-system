@@ -1,0 +1,123 @@
+{% extends "community/admin/base_admin.html" %}
+
+{% block title %}Community Insights{% endblock %}
+
+{% block admin_content %}
+<h1 class="cmty-admin-h1">Community Insights</h1>
+
+{# ── Summary cards ── #}
+<div class="cmty-insights-grid">
+  <div class="cmty-insights-card">
+    <span class="cmty-insights-card__num">{{ total_members }}</span>
+    <span class="cmty-insights-card__lbl">Total members</span>
+  </div>
+  <div class="cmty-insights-card">
+    <span class="cmty-insights-card__num">{{ total_posts }}</span>
+    <span class="cmty-insights-card__lbl">Total posts</span>
+  </div>
+  <div class="cmty-insights-card">
+    <span class="cmty-insights-card__num">{{ total_comments }}</span>
+    <span class="cmty-insights-card__lbl">Total replies</span>
+  </div>
+  <div class="cmty-insights-card {% if pending_posts_count %}cmty-insights-card--warn{% endif %}">
+    <span class="cmty-insights-card__num">{{ pending_posts_count }}</span>
+    <span class="cmty-insights-card__lbl">Pending approval</span>
+  </div>
+  <div class="cmty-insights-card {% if open_reports_count %}cmty-insights-card--warn{% endif %}">
+    <span class="cmty-insights-card__num">{{ open_reports_count }}</span>
+    <span class="cmty-insights-card__lbl">Open reports</span>
+  </div>
+  <div class="cmty-insights-card">
+    <span class="cmty-insights-card__num">{{ warnings_month }}</span>
+    <span class="cmty-insights-card__lbl">Warnings (30d)</span>
+  </div>
+  <div class="cmty-insights-card">
+    <span class="cmty-insights-card__num">{{ removed_posts_month }}</span>
+    <span class="cmty-insights-card__lbl">Removals (30d)</span>
+  </div>
+</div>
+
+{# ── 7-day activity bar chart (pure CSS/HTML, no library) ── #}
+<div class="cmty-about-card" style="margin-top:1.25rem">
+  <h2 class="cmty-section-label">Activity — last 7 days</h2>
+  <div class="cmty-bar-chart" role="img" aria-label="Posts and replies per day over the last 7 days">
+    {% for day in daily_activity %}
+    {% with max_val=20 %}
+    <div class="cmty-bar-chart__col">
+      <div class="cmty-bar-chart__bars">
+        <div class="cmty-bar-chart__bar cmty-bar-chart__bar--posts"
+             style="height:{% widthratio day.posts max_val 80 %}px"
+             title="{{ day.posts }} posts on {{ day.label }}"></div>
+        <div class="cmty-bar-chart__bar cmty-bar-chart__bar--comments"
+             style="height:{% widthratio day.comments max_val 80 %}px"
+             title="{{ day.comments }} replies on {{ day.label }}"></div>
+      </div>
+      <span class="cmty-bar-chart__label">{{ day.label }}</span>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+  <div class="cmty-bar-chart__legend">
+    <span><span class="cmty-bar-chart__dot cmty-bar-chart__dot--posts"></span> Posts</span>
+    <span><span class="cmty-bar-chart__dot cmty-bar-chart__dot--comments"></span> Replies</span>
+  </div>
+</div>
+
+{# ── Top categories ── #}
+{% if top_categories %}
+<div class="cmty-about-card" style="margin-top:.75rem">
+  <h2 class="cmty-section-label">Top categories</h2>
+  {% for cat in top_categories %}
+  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem">
+    <span style="font-size:.875rem;font-weight:600;min-width:120px">{{ cat.category__name }}</span>
+    <div style="flex:1;background:var(--pub-surface-2);border-radius:999px;height:8px;overflow:hidden">
+      <div style="height:100%;background:var(--pub-accent);border-radius:999px;
+                  width:{% widthratio cat.post_count top_categories.0.post_count 100 %}%"></div>
+    </div>
+    <span style="font-size:.8rem;color:var(--pub-text-muted);min-width:40px;text-align:right">
+      {{ cat.post_count }}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Unanswered questions ── #}
+{% if unanswered_questions %}
+<div class="cmty-about-card" style="margin-top:.75rem">
+  <h2 class="cmty-section-label">
+    <i class="bi bi-question-circle" aria-hidden="true"></i>
+    Unanswered questions (older than 2 days)
+  </h2>
+  <ul class="cmty-dash-card__list">
+    {% for post in unanswered_questions %}
+    <li>
+      <a href="{% url 'community:post_detail' post.pk %}">{{ post.title|truncatechars:70 }}</a>
+      <span style="color:var(--pub-text-muted);font-size:.75rem"> — {{ post.category.name }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{# ── Most active members ── #}
+{% if most_active_members %}
+<div class="cmty-about-card" style="margin-top:.75rem">
+  <h2 class="cmty-section-label">Most active (last 30 days)</h2>
+  <ul class="cmty-member-list">
+    {% for m in most_active_members %}
+    <li class="cmty-member-row">
+      <span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials" aria-hidden="true">
+        {{ m.author__first_name|first|upper }}{{ m.author__last_name|first|upper }}
+      </span>
+      <div class="cmty-member-row__info">
+        <span class="cmty-member-row__name">{{ m.author__first_name }} {{ m.author__last_name }}</span>
+        <span class="cmty-role-badge cmty-role-badge--{{ m.author__role }}">{{ m.author__role }}</span>
+        <span style="font-size:.75rem;color:var(--pub-text-muted)">{{ m.post_count }} post{{ m.post_count|pluralize }}</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

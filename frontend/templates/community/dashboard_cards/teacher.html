@@ -1,0 +1,38 @@
+{# Community dashboard card for teachers #}
+<div class="cmty-dash-card">
+  <div class="cmty-dash-card__head">
+    <span class="cmty-dash-card__title">
+      <i class="bi bi-people-fill" aria-hidden="true"></i> Community
+    </span>
+    <a href="{% url 'community:home' %}" class="cmty-dash-card__link">Go <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+  </div>
+
+  <div class="cmty-dash-card__stats">
+    <div class="cmty-dash-card__stat">
+      <span class="cmty-dash-card__num">{{ my_post_count|default:"0" }}</span>
+      <span class="cmty-dash-card__lbl">My posts</span>
+    </div>
+    <div class="cmty-dash-card__stat">
+      <span class="cmty-dash-card__num">{{ my_total_reactions|default:"0" }}</span>
+      <span class="cmty-dash-card__lbl">Reactions</span>
+    </div>
+  </div>
+
+  {% if unanswered_questions %}
+  <p class="cmty-dash-card__section-label">
+    <i class="bi bi-question-circle" aria-hidden="true"></i> Questions awaiting a reply
+  </p>
+  <ul class="cmty-dash-card__list">
+    {% for post in unanswered_questions %}
+    <li>
+      <a href="{% url 'community:post_detail' post.pk %}">{{ post.title|truncatechars:50 }}</a>
+      <span style="color:var(--pub-text-muted);font-size:.72rem">— {{ post.category.name }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <a href="{% url 'community:post_create' %}" class="pub-btn pub-btn--outline pub-btn--sm" style="margin-top:.6rem">
+    <i class="bi bi-pencil" aria-hidden="true"></i> Post something
+  </a>
+</div>

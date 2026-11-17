@@ -1,0 +1,17 @@
+{% comment %}Sort control bar. Expects: sort, active_category_slug{% endcomment %}
+<div class="cmty-sort-bar" role="group" aria-label="Sort posts">
+  {% with base_url=request.path %}
+  <a href="{{ base_url }}?sort=new&cat={{ active_category_slug|default:'all' }}"
+     class="cmty-sort-btn {% if sort == 'new' or not sort %}is-active{% endif %}">
+    <i class="bi bi-clock" aria-hidden="true"></i> New
+  </a>
+  <a href="{{ base_url }}?sort=top&cat={{ active_category_slug|default:'all' }}"
+     class="cmty-sort-btn {% if sort == 'top' %}is-active{% endif %}">
+    <i class="bi bi-fire" aria-hidden="true"></i> Top this week
+  </a>
+  <a href="{{ base_url }}?sort=pinned&cat={{ active_category_slug|default:'all' }}"
+     class="cmty-sort-btn {% if sort == 'pinned' %}is-active{% endif %}">
+    <i class="bi bi-pin" aria-hidden="true"></i> Pinned
+  </a>
+  {% endwith %}
+</div>

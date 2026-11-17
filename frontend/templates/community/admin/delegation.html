@@ -1,0 +1,72 @@
+{% extends "community/admin/base_admin.html" %}
+
+{% block title %}Moderators — Community{% endblock %}
+
+{% block admin_content %}
+<h1 class="cmty-admin-h1">Category Moderators</h1>
+<p style="color:var(--pub-text-muted);font-size:.875rem;margin-bottom:1.25rem;max-width:65ch">
+  Assign a trusted teacher to moderate a specific category. Moderators can approve or hide posts
+  and dismiss reports for their category only. They cannot issue warnings, mute or suspend anyone.
+</p>
+
+{% for cat in categories %}
+<div class="cmty-about-card" style="margin-bottom:.75rem">
+  <div style="display:flex;align-items:center;gap:.6rem;justify-content:space-between;flex-wrap:wrap">
+    <h2 style="font-family:var(--pub-font-h);font-size:.95rem;font-weight:700;color:var(--pub-heading)">
+      {% if cat.icon %}<i class="bi {{ cat.icon }}" aria-hidden="true"></i>{% endif %}
+      {{ cat.name }}
+    </h2>
+    <details class="cmty-remove-details">
+      <summary class="pub-btn pub-btn--outline pub-btn--sm">
+        <i class="bi bi-person-plus" aria-hidden="true"></i> Add moderator
+      </summary>
+      <form method="post" class="cmty-remove-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="assign">
+        <input type="hidden" name="category_pk" value="{{ cat.pk }}">
+        <select name="user_pk" class="cmty-composer__select" aria-label="Choose a moderator">
+          <option value="">Choose a staff member…</option>
+          {% for u in eligible_users %}
+          <option value="{{ u.pk }}">{{ u.get_full_name }} ({{ u.get_role_display }})</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">Assign</button>
+      </form>
+    </details>
+  </div>
+
+  {% with active_mods=cat.moderators.all %}
+  {% if active_mods %}
+  <ul style="margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.4rem">
+    {% for mod in active_mods %}
+    {% if mod.is_active %}
+    <li style="display:flex;align-items:center;gap:.4rem;background:var(--pub-bg-alt);
+               border:1px solid var(--pub-border);border-radius:var(--pub-radius-sm);
+               padding:.35rem .65rem;font-size:.8rem">
+      <span class="cmty-avatar cmty-avatar--xs cmty-avatar--initials" aria-hidden="true">
+        {{ mod.user.first_name|first|upper }}
+      </span>
+      {{ mod.user.get_full_name }}
+      <form method="post" style="display:inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="remove">
+        <input type="hidden" name="category_pk" value="{{ cat.pk }}">
+        <input type="hidden" name="mod_pk" value="{{ mod.pk }}">
+        <button type="submit" class="cmty-share-btn" style="color:#f87171;padding:0"
+                title="Remove moderator" aria-label="Remove {{ mod.user.get_full_name }}">
+          <i class="bi bi-x" aria-hidden="true"></i>
+        </button>
+      </form>
+    </li>
+    {% endif %}
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p style="font-size:.8rem;color:var(--pub-text-muted);margin-top:.4rem">No moderators assigned.</p>
+  {% endif %}
+  {% endwith %}
+</div>
+{% empty %}
+<div class="cmty-empty cmty-empty--sm"><p class="cmty-empty__text">No active categories.</p></div>
+{% endfor %}
+{% endblock %}

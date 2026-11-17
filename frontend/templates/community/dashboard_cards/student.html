@@ -1,0 +1,49 @@
+{# Community dashboard card for students #}
+<div class="cmty-dash-card">
+  <div class="cmty-dash-card__head">
+    <span class="cmty-dash-card__title">
+      <i class="bi bi-people-fill" aria-hidden="true"></i> Community
+    </span>
+    <a href="{% url 'community:home' %}" class="cmty-dash-card__link">Go <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+  </div>
+
+  {% if active_warning_count %}
+  <div class="cmty-dash-card__alert">
+    <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+    You have {{ active_warning_count }} notice{{ active_warning_count|pluralize }} from a moderator.
+    <a href="{% url 'community:my_posts' %}">View</a>
+  </div>
+  {% endif %}
+
+  <div class="cmty-dash-card__stats">
+    <div class="cmty-dash-card__stat">
+      <span class="cmty-dash-card__num">{{ my_post_count|default:"0" }}</span>
+      <span class="cmty-dash-card__lbl">Posts</span>
+    </div>
+    <div class="cmty-dash-card__stat">
+      <span class="cmty-dash-card__num">{{ my_reply_count|default:"0" }}</span>
+      <span class="cmty-dash-card__lbl">Replies to me</span>
+    </div>
+    <div class="cmty-dash-card__stat">
+      <span class="cmty-dash-card__num">{{ my_reaction_count|default:"0" }}</span>
+      <span class="cmty-dash-card__lbl">Reactions</span>
+    </div>
+  </div>
+
+  {% if latest_replies %}
+  <ul class="cmty-dash-card__list">
+    {% for comment in latest_replies %}
+    <li>
+      <a href="{% url 'community:post_detail' comment.post.pk %}#comments">
+        <i class="bi bi-chat" aria-hidden="true"></i>
+        {{ comment.author_display_name }} replied to "{{ comment.post.title|truncatechars:35 }}"
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <a href="{% url 'community:post_create' %}" class="pub-btn pub-btn--primary pub-btn--sm pub-btn--block" style="margin-top:.6rem">
+    <i class="bi bi-pencil" aria-hidden="true"></i> Write something
+  </a>
+</div>

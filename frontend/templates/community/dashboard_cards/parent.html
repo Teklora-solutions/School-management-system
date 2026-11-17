@@ -1,0 +1,42 @@
+{# Community dashboard card for parents #}
+<div class="cmty-dash-card">
+  <div class="cmty-dash-card__head">
+    <span class="cmty-dash-card__title">
+      <i class="bi bi-people-fill" aria-hidden="true"></i> Community
+    </span>
+    <a href="{% url 'community:home' %}" class="cmty-dash-card__link">View all <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+  </div>
+
+  {% if latest_announcements %}
+  <p class="cmty-dash-card__section-label">Latest Announcements</p>
+  <ul class="cmty-dash-card__list">
+    {% for post in latest_announcements %}
+    <li>
+      <a href="{% url 'community:post_detail' post.pk %}">
+        <i class="bi bi-megaphone" aria-hidden="true"></i>
+        {{ post.title|truncatechars:50 }}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if upcoming_events %}
+  <p class="cmty-dash-card__section-label">Upcoming Events</p>
+  <ul class="cmty-dash-card__list">
+    {% for event in upcoming_events %}
+    <li>
+      <i class="bi bi-calendar-event" aria-hidden="true"></i>
+      {{ event.title }}
+      {% if event.date %}<span style="color:var(--pub-text-muted);font-size:.75rem">— {{ event.date|date:"j M" }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if not latest_announcements and not upcoming_events %}
+  <p style="font-size:.85rem;color:var(--pub-text-muted);margin:.5rem 0">
+    Nothing new today. Check the community for updates.
+  </p>
+  {% endif %}
+</div>

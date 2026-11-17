@@ -1,0 +1,253 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block meta_description %}{{ identity.name|default:"School" }} Community — join the conversation, share ideas and stay connected.{% endblock %}
+
+{% block extra_css %}
+{% if not cs.allow_index %}<meta name="robots" content="noindex, nofollow">{% endif %}
+<link rel="stylesheet" href="{% static 'css/community.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="cmty-wrap">
+
+  {# ── Community header bar ── #}
+  <div class="cmty-header pub-section--tight">
+    <div class="pub-container">
+      <div class="cmty-header__inner">
+        <div class="cmty-header__brand">
+          {% if identity.logo_url %}
+          <img src="{{ identity.logo_url }}" alt="{{ identity.name }} logo" class="cmty-header__logo">
+          {% else %}
+          <span class="cmty-header__dot" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
+          {% endif %}
+          <div>
+            <h1 class="cmty-header__name">{{ identity.name|default:"School" }} Community</h1>
+            {% if identity.motto %}<p class="cmty-header__motto">{{ identity.motto }}</p>{% endif %}
+          </div>
+        </div>
+
+        <div class="cmty-header__actions">
+          {# Search box #}
+          <form class="cmty-search" action="{% url 'community:search' %}" method="get" role="search">
+            <label for="cmtySearchInput" class="sr-only">Search community</label>
+            <span class="cmty-search__icon" aria-hidden="true"><i class="bi bi-search"></i></span>
+            <input id="cmtySearchInput" class="cmty-search__input" type="search" name="q"
+                   placeholder="Search posts…" value="{{ request.GET.q|default:'' }}"
+                   autocomplete="off" maxlength="100">
+          </form>
+
+          {# Sign-in / notification bell #}
+          {% if request.user.is_authenticated %}
+          <div class="cmty-header__user">
+            <a href="{% url 'core_notifications:list' %}" class="cmty-bell" aria-label="Notifications">
+              <i class="bi bi-bell"></i>
+              {% if unread_count %}<span class="cmty-bell__badge">{{ unread_count }}</span>{% endif %}
+            </a>
+            <a href="{{ request.user.get_dashboard_url }}" class="cmty-avatar-btn" aria-label="Go to dashboard">
+              {% if request.user.avatar %}
+              <img src="{{ request.user.avatar.url }}" alt="{{ request.user.full_name }}" class="cmty-avatar cmty-avatar--sm">
+              {% else %}
+              <span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials"
+                    aria-hidden="true">{{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}</span>
+              {% endif %}
+            </a>
+          </div>
+          {% else %}
+          <a href="{% url 'accounts:login' %}?next={{ request.path }}" class="pub-btn pub-btn--primary pub-btn--sm">
+            <i class="bi bi-person" aria-hidden="true"></i> Sign in
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      {# ── Tab row ── #}
+      <nav class="cmty-tabs" aria-label="Community sections">
+        <a href="{% url 'community:home' %}"
+           class="cmty-tab {% if active_tab == 'community' %}is-active{% endif %}"
+           {% if active_tab == 'community' %}aria-current="page"{% endif %}>
+          <i class="bi bi-chat-square-text" aria-hidden="true"></i> Community
+        </a>
+        <a href="{% url 'community:events' %}"
+           class="cmty-tab {% if active_tab == 'events' %}is-active{% endif %}"
+           {% if active_tab == 'events' %}aria-current="page"{% endif %}>
+          <i class="bi bi-calendar-event" aria-hidden="true"></i> Events
+        </a>
+        <a href="{% url 'community:members' %}"
+           class="cmty-tab {% if active_tab == 'members' %}is-active{% endif %}"
+           {% if active_tab == 'members' %}aria-current="page"{% endif %}>
+          <i class="bi bi-people" aria-hidden="true"></i> Members
+        </a>
+        <a href="{% url 'community:about' %}"
+           class="cmty-tab {% if active_tab == 'about' %}is-active{% endif %}"
+           {% if active_tab == 'about' %}aria-current="page"{% endif %}>
+          <i class="bi bi-info-circle" aria-hidden="true"></i> About
+        </a>
+      </nav>
+    </div>
+  </div>
+
+  {# ── Main layout: feed + sidebar ── #}
+  <div class="pub-container">
+    <div class="cmty-layout">
+
+      {# Left / main column #}
+      <div class="cmty-main">
+        {% block community_content %}{% endblock %}
+      </div>
+
+      {# Right sidebar — moves below pinned posts on mobile #}
+      <aside class="cmty-sidebar" aria-label="Community info">
+        {% block community_sidebar %}
+        <div class="cmty-sidebar-card">
+          {% if identity.logo_url %}
+          <img src="{{ identity.logo_url }}" alt="" class="cmty-sidebar-card__banner" aria-hidden="true">
+          {% else %}
+          <div class="cmty-sidebar-card__banner cmty-sidebar-card__banner--placeholder" aria-hidden="true">
+            <i class="bi bi-people-fill"></i>
+          </div>
+          {% endif %}
+          <div class="cmty-sidebar-card__body">
+            <h2 class="cmty-sidebar-card__title">{{ identity.name|default:"Our School" }} Community</h2>
+            {% if identity.about %}
+            <p class="cmty-sidebar-card__desc">{{ identity.about|truncatewords:25 }}</p>
+            {% endif %}
+
+            {# Stats row #}
+            <div class="cmty-stats">
+              <div class="cmty-stat">
+                <span class="cmty-stat__num">{{ stats.total_members }}</span>
+                <span class="cmty-stat__label">Members</span>
+              </div>
+              <div class="cmty-stat">
+                <span class="cmty-stat__num">{{ stats.online_now }}</span>
+                <span class="cmty-stat__label">Online now</span>
+              </div>
+              <div class="cmty-stat">
+                <span class="cmty-stat__num">{{ stats.admins }}</span>
+                <span class="cmty-stat__label">Admins</span>
+              </div>
+            </div>
+
+            {# Social links #}
+            {% if identity.facebook_url or identity.instagram_url or identity.youtube_url %}
+            <div class="cmty-sidebar-card__links">
+              {% if identity.facebook_url %}<a href="{{ identity.facebook_url }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="bi bi-facebook"></i></a>{% endif %}
+              {% if identity.instagram_url %}<a href="{{ identity.instagram_url }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="bi bi-instagram"></i></a>{% endif %}
+              {% if identity.youtube_url %}<a href="{{ identity.youtube_url }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="bi bi-youtube"></i></a>{% endif %}
+            </div>
+            {% endif %}
+
+            {# CTA for visitors #}
+            {% if not request.user.is_authenticated %}
+            <a href="{% url 'accounts:login' %}?next={% url 'community:home' %}" class="pub-btn pub-btn--primary pub-btn--block" style="margin-top:.75rem">
+              <i class="bi bi-person-plus" aria-hidden="true"></i> Join the conversation
+            </a>
+            {% endif %}
+          </div>
+        </div>
+        {% endblock %}
+      </aside>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  'use strict';
+  /* ── Category pill horizontal scroll with keyboard support ── */
+  var pillRow = document.getElementById('cmtyCategoryPills');
+  if(pillRow){
+    pillRow.addEventListener('keydown', function(e){
+      if(e.key === 'ArrowRight') pillRow.scrollLeft += 120;
+      if(e.key === 'ArrowLeft')  pillRow.scrollLeft -= 120;
+    });
+  }
+
+  /* ── "Show more" cursor paging ── */
+  var moreBtn = document.getElementById('cmtyMoreBtn');
+  if(moreBtn){
+    moreBtn.addEventListener('click', function(){
+      var cursor = moreBtn.dataset.cursor;
+      var sort   = moreBtn.dataset.sort || 'new';
+      var cat    = moreBtn.dataset.cat  || 'all';
+      var url    = moreBtn.dataset.url  || window.location.pathname;
+      var params = new URLSearchParams({cursor: cursor, sort: sort, cat: cat});
+      /* Skeleton while loading */
+      var feed = document.getElementById('cmtyFeed');
+      if(feed){
+        var sk = document.createElement('div');
+        sk.className = 'cmty-skeleton-block';
+        sk.setAttribute('aria-hidden','true');
+        sk.innerHTML = '<div class="cmty-skeleton"></div><div class="cmty-skeleton cmty-skeleton--sm"></div>';
+        feed.appendChild(sk);
+      }
+      moreBtn.disabled = true;
+      fetch(url + '?' + params.toString(), {headers:{'X-Requested-With':'XMLHttpRequest'}})
+        .then(function(r){ return r.text(); })
+        .then(function(html){
+          if(feed){
+            var tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            var newCards = tmp.querySelectorAll('.cmty-post-card');
+            var sk2 = feed.querySelector('.cmty-skeleton-block');
+            if(sk2) sk2.remove();
+            newCards.forEach(function(c){ feed.appendChild(c); });
+            var newMore = tmp.querySelector('#cmtyMoreBtn');
+            if(newMore){
+              moreBtn.dataset.cursor = newMore.dataset.cursor;
+            } else {
+              moreBtn.remove();
+            }
+          }
+        })
+        .catch(function(){ moreBtn.disabled = false; });
+    });
+  }
+
+  /* ── Share button: copy URL to clipboard ── */
+  document.querySelectorAll('.cmty-share-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var url = btn.dataset.url || window.location.href;
+      if(navigator.clipboard){
+        navigator.clipboard.writeText(url).then(function(){
+          btn.textContent = 'Link copied!';
+          setTimeout(function(){ btn.innerHTML = '<i class="bi bi-share" aria-hidden="true"></i> Share'; }, 2200);
+        });
+      }
+    });
+  });
+
+  /* ── Relative time labels (replace data-ts with "3d ago" etc.) ── */
+  function relTime(ts){
+    var diff = Math.floor((Date.now() - ts * 1000) / 1000);
+    if(diff < 60)  return 'Just now';
+    if(diff < 3600) return Math.floor(diff/60) + 'm ago';
+    if(diff < 86400) return Math.floor(diff/3600) + 'h ago';
+    if(diff < 604800) return Math.floor(diff/86400) + 'd ago';
+    return new Date(ts*1000).toLocaleDateString('en-KE',{day:'numeric',month:'short',year:'numeric'});
+  }
+  document.querySelectorAll('[data-ts]').forEach(function(el){
+    var ts = parseInt(el.dataset.ts, 10);
+    if(!isNaN(ts)){
+      el.textContent = relTime(ts);
+      /* Full date on tap/click for accessibility */
+      el.addEventListener('click', function(){
+        var full = new Date(ts*1000).toLocaleString('en-KE',{
+          timeZone:'Africa/Nairobi',
+          weekday:'long',day:'numeric',month:'long',year:'numeric',
+          hour:'2-digit',minute:'2-digit'
+        });
+        el.textContent = full;
+        el.dataset.ts = '';
+      });
+    }
+  });
+
+})();
+</script>
+{% endblock %}

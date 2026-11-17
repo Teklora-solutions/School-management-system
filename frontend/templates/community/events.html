@@ -1,0 +1,41 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}Events — {{ identity.name|default:"School" }} Community{% endblock %}
+
+{% block community_content %}
+<h2 class="cmty-section-label">
+  <i class="bi bi-calendar-event" aria-hidden="true"></i> Upcoming Events
+</h2>
+
+{% if event_items %}
+<div class="cmty-events-grid">
+  {% for event in event_items %}
+  <article class="cmty-event-card">
+    {% if event.image %}
+    <img src="{{ event.image.url }}" alt="{{ event.title }}" class="cmty-event-card__img">
+    {% endif %}
+    <div class="cmty-event-card__body">
+      {% if event.date %}
+      <time class="cmty-event-card__date" datetime="{{ event.date|date:'Y-m-d' }}">
+        <span class="cmty-event-card__day">{{ event.date|date:"j" }}</span>
+        <span class="cmty-event-card__month">{{ event.date|date:"M" }}</span>
+      </time>
+      {% endif %}
+      <div class="cmty-event-card__info">
+        <h3 class="cmty-event-card__title">{{ event.title }}</h3>
+        {% if event.description %}<p class="cmty-event-card__desc">{{ event.description|truncatewords:20 }}</p>{% endif %}
+        {% if event.location %}<p class="cmty-event-card__location"><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ event.location }}</p>{% endif %}
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="cmty-empty">
+  <div class="cmty-empty__icon" aria-hidden="true"><i class="bi bi-calendar-x"></i></div>
+  <h3 class="cmty-empty__title">No events yet</h3>
+  <p class="cmty-empty__text">Watch this space — upcoming events and dates will appear here.</p>
+</div>
+{% endif %}
+{% endblock %}

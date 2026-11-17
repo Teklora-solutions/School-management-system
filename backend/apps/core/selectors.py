@@ -209,8 +209,8 @@ def school_settings_values(request=None) -> dict:
     values["community_student_moderation"] = (
         row.community_student_moderation if row else True
     )
-    values["quiet_hours_start"] = row.quiet_hours_start if row else 20
-    values["quiet_hours_end"] = row.quiet_hours_end if row else 6
+    values["quiet_hours_start"] = getattr(row, "quiet_hours_start", 20) or 20
+    values["quiet_hours_end"] = getattr(row, "quiet_hours_end", 6) or 6
     if request is not None:
         request._school_settings_values = values
     return values

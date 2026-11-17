@@ -1,0 +1,188 @@
+{% extends "community/admin/base_admin.html" %}
+
+{% block title %}Moderation Queue — Community{% endblock %}
+
+{% block admin_content %}
+<h1 class="cmty-admin-h1">Moderation Queue</h1>
+
+{# ── Tab row ── #}
+<div class="cmty-admin-tabs" role="tablist">
+  <button class="cmty-admin-tab is-active" role="tab" id="tab-pending"
+          aria-controls="panel-pending" aria-selected="true">
+    Posts awaiting approval
+    {% if pending_posts %}<span class="cmty-admin-badge">{{ pending_posts|length }}</span>{% endif %}
+  </button>
+  <button class="cmty-admin-tab" role="tab" id="tab-reports"
+          aria-controls="panel-reports" aria-selected="false">
+    Reports
+    {% if open_reports %}<span class="cmty-admin-badge cmty-admin-badge--warn">{{ open_reports|length }}</span>{% endif %}
+  </button>
+  <button class="cmty-admin-tab" role="tab" id="tab-appeals"
+          aria-controls="panel-appeals" aria-selected="false">
+    Appeals
+    {% if active_appeals %}<span class="cmty-admin-badge">{{ active_appeals|length }}</span>{% endif %}
+  </button>
+</div>
+
+{# ── Pending posts ── #}
+<div class="cmty-admin-panel" id="panel-pending" role="tabpanel" aria-labelledby="tab-pending">
+  {% if pending_posts %}
+  {% for post in pending_posts %}
+  <div class="cmty-queue-row">
+    <div class="cmty-queue-row__meta">
+      <span class="cmty-role-badge cmty-role-badge--{{ post.author.role|default:'member' }}">
+        {{ post.author_role_display|default:"Member" }}
+      </span>
+      <strong style="font-size:.875rem">{{ post.author_display_name }}</strong>
+      <span class="cmty-post-card__category">
+        {% if post.category.icon %}<i class="bi {{ post.category.icon }}" aria-hidden="true"></i>{% endif %}
+        {{ post.category.name }}
+      </span>
+      <time class="cmty-post-card__time" data-ts="{{ post.created_at|date:'U' }}"
+            datetime="{{ post.created_at|date:'c' }}">{{ post.created_at|timesince }} ago</time>
+    </div>
+    <h3 class="cmty-queue-row__title">{{ post.title }}</h3>
+    <p class="cmty-queue-row__preview">{{ post.body|striptags|truncatewords:40 }}</p>
+    <div class="cmty-queue-row__actions">
+      <form method="post" action="{% url 'community:admin_post_approve' post.pk %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">
+          <i class="bi bi-check2" aria-hidden="true"></i> Approve
+        </button>
+      </form>
+      {# Remove inline — small modal via details/summary for phone compat #}
+      <details class="cmty-remove-details">
+        <summary class="pub-btn pub-btn--outline pub-btn--sm">
+          <i class="bi bi-x-circle" aria-hidden="true"></i> Remove
+        </summary>
+        <form method="post" action="{% url 'community:post_remove' post.pk %}" class="cmty-remove-form">
+          {% csrf_token %}
+          <select name="reason_code" class="cmty-composer__select" aria-label="Removal reason">
+            {% for code, label in removal_reasons %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="reason_note" placeholder="Optional note to author (not shown publicly)"
+                 class="cmty-composer__input" maxlength="300">
+          <input type="hidden" name="next" value="{% url 'community:admin_queue' %}">
+          <button type="submit" class="pub-btn pub-btn--outline pub-btn--sm">Confirm removal</button>
+        </form>
+      </details>
+      {# Issue warning — only shown for existing posts #}
+      <details class="cmty-remove-details">
+        <summary class="pub-btn pub-btn--outline pub-btn--sm">
+          <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Warn
+        </summary>
+        <form method="post" action="{% url 'community:admin_warn' %}" class="cmty-remove-form">
+          {% csrf_token %}
+          <input type="hidden" name="recipient_pk" value="{{ post.author.pk }}">
+          <input type="hidden" name="post_pk" value="{{ post.pk }}">
+          <input type="hidden" name="next" value="{% url 'community:admin_queue' %}">
+          <select name="level" class="cmty-composer__select" aria-label="Warning level">
+            <option value="reminder">Friendly reminder</option>
+            <option value="mute">Short posting pause (24h)</option>
+            <option value="suspension">Community suspension (7d)</option>
+            <option value="manual">Manual warning</option>
+          </select>
+          <textarea name="internal_reason" class="cmty-reply-textarea" rows="2"
+                    placeholder="Internal reason (not shown to member)" maxlength="500"></textarea>
+          <button type="submit" class="pub-btn pub-btn--outline pub-btn--sm">Issue warning</button>
+        </form>
+      </details>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="cmty-empty cmty-empty--sm">
+    <i class="bi bi-check2-all" style="font-size:1.5rem;color:var(--pub-success)" aria-hidden="true"></i>
+    <p class="cmty-empty__text">Nothing waiting for approval.</p>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Reports ── #}
+<div class="cmty-admin-panel" id="panel-reports" role="tabpanel"
+     aria-labelledby="tab-reports" hidden>
+  {% if open_reports %}
+  {% for report in open_reports %}
+  <div class="cmty-queue-row">
+    <div class="cmty-queue-row__meta">
+      <span class="cmty-role-badge">{{ report.get_reason_display }}</span>
+      <strong style="font-size:.875rem">Reported by {{ report.reporter.get_full_name|default:report.reporter.username }}</strong>
+      <time class="cmty-post-card__time" data-ts="{{ report.created_at|date:'U' }}"
+            datetime="{{ report.created_at|date:'c' }}">{{ report.created_at|timesince }} ago</time>
+    </div>
+    {% if report.post %}
+    <p class="cmty-queue-row__preview">
+      Post: <a href="{% url 'community:post_detail' report.post.pk %}" style="color:var(--pub-accent)">
+        {{ report.post.title|truncatechars:60 }}
+      </a>
+    </p>
+    {% elif report.comment %}
+    <p class="cmty-queue-row__preview">
+      Comment: "{{ report.comment.body|striptags|truncatewords:20 }}"
+    </p>
+    {% endif %}
+    {% if report.detail %}
+    <p style="font-size:.8rem;color:var(--pub-text-muted)">"{{ report.detail }}"</p>
+    {% endif %}
+    <div class="cmty-queue-row__actions">
+      <form method="post" action="{% url 'community:admin_report_resolve' report.pk %}" style="display:inline">
+        {% csrf_token %}
+        <input type="hidden" name="resolution" value="actioned">
+        <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">Actioned</button>
+      </form>
+      <form method="post" action="{% url 'community:admin_report_resolve' report.pk %}" style="display:inline">
+        {% csrf_token %}
+        <input type="hidden" name="resolution" value="dismissed">
+        <button type="submit" class="pub-btn pub-btn--outline pub-btn--sm">Dismiss</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="cmty-empty cmty-empty--sm">
+    <p class="cmty-empty__text">No open reports.</p>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Appeals ── #}
+<div class="cmty-admin-panel" id="panel-appeals" role="tabpanel"
+     aria-labelledby="tab-appeals" hidden>
+  {% if active_appeals %}
+  {% for appeal in active_appeals %}
+  <div class="cmty-queue-row">
+    <div class="cmty-queue-row__meta">
+      <strong style="font-size:.875rem">{{ appeal.appellant.get_full_name|default:appeal.appellant.username }}</strong>
+      <time class="cmty-post-card__time" data-ts="{{ appeal.created_at|date:'U' }}"
+            datetime="{{ appeal.created_at|date:'c' }}">{{ appeal.created_at|timesince }} ago</time>
+    </div>
+    <p class="cmty-queue-row__preview">{{ appeal.message|truncatewords:40 }}</p>
+    <a href="{% url 'community:admin_appeal' appeal.pk %}" class="pub-btn pub-btn--outline pub-btn--sm">
+      Review appeal <i class="bi bi-arrow-right" aria-hidden="true"></i>
+    </a>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="cmty-empty cmty-empty--sm">
+    <p class="cmty-empty__text">No pending appeals.</p>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+(function(){
+  var tabs = document.querySelectorAll('.cmty-admin-tab');
+  tabs.forEach(function(tab){
+    tab.addEventListener('click', function(){
+      tabs.forEach(function(t){ t.classList.remove('is-active'); t.setAttribute('aria-selected','false'); });
+      tab.classList.add('is-active'); tab.setAttribute('aria-selected','true');
+      document.querySelectorAll('.cmty-admin-panel').forEach(function(p){ p.hidden=true; });
+      var target = document.getElementById(tab.getAttribute('aria-controls'));
+      if(target) target.hidden=false;
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}About — {{ identity.name|default:"School" }} Community{% endblock %}
+
+{% block community_content %}
+<h2 class="cmty-section-label">
+  <i class="bi bi-info-circle" aria-hidden="true"></i> About this community
+</h2>
+
+<div class="cmty-about-card">
+  <h3>Welcome to the {{ identity.name|default:"School" }} Community</h3>
+  <p>
+    {% if identity.about %}
+      {{ identity.about }}
+    {% else %}
+      This is our school-wide community space — a place for students, parents, teachers and
+      staff to share ideas, ask questions, celebrate achievements and stay connected.
+    {% endif %}
+  </p>
+</div>
+
+{# Community rules #}
+<div class="cmty-about-card">
+  <h3><i class="bi bi-shield-check" aria-hidden="true"></i> Community rules</h3>
+  <ol class="cmty-rules-list">
+    <li><strong>Be kind and respectful.</strong> Treat everyone with the same courtesy you would expect in person.</li>
+    <li><strong>Keep it relevant.</strong> Post in the right category and stay on topic.</li>
+    <li><strong>Protect privacy.</strong> Never share another person's personal information.</li>
+    <li><strong>No spam or advertising.</strong> Promotional content not authorised by the school will be removed.</li>
+    <li><strong>Safeguarding first.</strong> Report any content that concerns you to the school admin immediately.</li>
+    <li><strong>What you post represents you.</strong> Posts are visible to the audience of their category — think before you post.</li>
+  </ol>
+</div>
+
+{# Categories and their visibility #}
+{% if all_categories %}
+<div class="cmty-about-card">
+  <h3><i class="bi bi-tags" aria-hidden="true"></i> Categories</h3>
+  <ul class="cmty-category-list">
+    {% for cat in all_categories %}
+    <li class="cmty-category-row">
+      <a href="{% url 'community:category_feed' cat.slug %}" class="cmty-category-row__link">
+        <span class="cmty-pill cmty-pill--sm">
+          {% if cat.icon %}<i class="bi {{ cat.icon }}" aria-hidden="true"></i> {% endif %}
+          {{ cat.name }}
+        </span>
+      </a>
+      <span class="cmty-category-row__vis">
+        {% if cat.visibility == 'public' %}
+        <i class="bi bi-globe" aria-hidden="true"></i> Public
+        {% elif cat.visibility == 'signed_in' %}
+        <i class="bi bi-person-check" aria-hidden="true"></i> Members only
+        {% else %}
+        <i class="bi bi-lock" aria-hidden="true"></i> Restricted
+        {% endif %}
+      </span>
+      {% if cat.description %}
+      <span class="cmty-category-row__desc">{{ cat.description }}</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% endblock %}

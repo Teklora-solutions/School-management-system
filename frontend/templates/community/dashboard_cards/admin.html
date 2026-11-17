@@ -1,0 +1,38 @@
+{# Community dashboard card for admin #}
+<div class="cmty-dash-card">
+  <div class="cmty-dash-card__head">
+    <span class="cmty-dash-card__title">
+      <i class="bi bi-people-fill" aria-hidden="true"></i> Community
+    </span>
+    <a href="{% url 'community:admin_queue' %}" class="cmty-dash-card__link">Queue <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+  </div>
+
+  <div class="cmty-dash-card__stats">
+    {% if pending_count %}
+    <div class="cmty-dash-card__stat cmty-dash-card__stat--warn">
+      <span class="cmty-dash-card__num">{{ pending_count }}</span>
+      <span class="cmty-dash-card__lbl">Pending</span>
+    </div>
+    {% endif %}
+    {% if open_report_count %}
+    <div class="cmty-dash-card__stat cmty-dash-card__stat--warn">
+      <span class="cmty-dash-card__num">{{ open_report_count }}</span>
+      <span class="cmty-dash-card__lbl">Reports</span>
+    </div>
+    {% endif %}
+    <div class="cmty-dash-card__stat">
+      <span class="cmty-dash-card__num">{{ new_posts_week|default:"0" }}</span>
+      <span class="cmty-dash-card__lbl">Posts this week</span>
+    </div>
+    <div class="cmty-dash-card__stat">
+      <span class="cmty-dash-card__num">{{ new_comments_week|default:"0" }}</span>
+      <span class="cmty-dash-card__lbl">Replies</span>
+    </div>
+  </div>
+
+  {% if active_warning_count %}
+  <p style="font-size:.8rem;color:var(--pub-text-muted);margin-top:.4rem">
+    {{ active_warning_count }} active warning{{ active_warning_count|pluralize }}
+  </p>
+  {% endif %}
+</div>

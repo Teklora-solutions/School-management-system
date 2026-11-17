@@ -131,7 +131,12 @@ def _whole_years(since: date | None, today: date) -> int | None:
 
 
 def nav_links(request) -> list[dict]:
-    """The public nav with the current page marked, for the shared navbar."""
+    """
+    The public nav with the current page marked, for the shared navbar.
+
+    Community is appended when the feature is on. It lives in its own namespace
+    so it cannot be in PUBLIC_NAV (which uses ``reverse("public:<name>")``).
+    """
     links = []
     for url_name, label in PUBLIC_NAV:
         url = reverse(f"public:{url_name}")
@@ -139,9 +144,27 @@ def nav_links(request) -> list[dict]:
             {
                 "label": label,
                 "url": url,
-                "is_active": request.path == url,
+                "is_active": request.path == url
+                or (url != "/" and request.path.startswith(url.rstrip("/") + "/")),
             }
         )
+
+    # Community — only shown when the feature is enabled.
+    try:
+        from apps.core.features import feature_enabled
+
+        if feature_enabled("community", request=request):
+            community_url = reverse("community:home")
+            links.append(
+                {
+                    "label": "Community",
+                    "url": community_url,
+                    "is_active": request.path.startswith(community_url),
+                }
+            )
+    except Exception:  # noqa: BLE001 — never break the navbar for a missing flag
+        pass
+
     return links
 
 

@@ -1,0 +1,298 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}{{ post.title }} — {{ identity.name|default:"School" }} Community{% endblock %}
+{% block meta_description %}{{ post.body|striptags|truncatewords:25 }}{% endblock %}
+
+{% block community_content %}
+
+{# ── Back link ── #}
+<a href="{% url 'community:home' %}" class="cmty-back-link">
+  <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to community
+</a>
+
+{# ── Post ── #}
+<article class="cmty-post-full {% if post.is_pinned %}cmty-post-full--pinned{% endif %}"
+         aria-label="{{ post.title }}">
+  {% if post.is_pinned %}
+  <div class="cmty-post-card__pin" aria-label="Pinned post">
+    <i class="bi bi-pin-fill" aria-hidden="true"></i> Pinned
+  </div>
+  {% endif %}
+
+  {# Author / meta row #}
+  <div class="cmty-post-full__meta">
+    <div class="cmty-post-card__author">
+      {% if post.author and post.author.avatar and post.author.role != 'student' %}
+      <img src="{{ post.author.avatar.url }}" alt="{{ post.author_display_name }}"
+           class="cmty-avatar cmty-avatar--md">
+      {% else %}
+      <span class="cmty-avatar cmty-avatar--md cmty-avatar--initials" aria-hidden="true">
+        {{ post.author_display_name|first|upper }}
+      </span>
+      {% endif %}
+      <div class="cmty-post-card__byline">
+        <span class="cmty-post-card__name">{{ post.author_display_name }}</span>
+        <span class="cmty-role-badge cmty-role-badge--{{ post.author.role|default:'member' }}">
+          {{ post.author_role_display|default:"Member" }}
+        </span>
+      </div>
+    </div>
+    <div class="cmty-post-card__right-meta">
+      <span class="cmty-post-card__category">
+        {% if post.category.icon %}<i class="bi {{ post.category.icon }}" aria-hidden="true"></i>{% endif %}
+        {{ post.category.name }}
+      </span>
+      <time data-ts="{{ post.created_at|date:'U' }}"
+            datetime="{{ post.created_at|date:'c' }}"
+            title="{{ post.created_at|date:'D d M Y H:i' }} EAT">
+        {{ post.created_at|timesince }} ago
+      </time>
+    </div>
+  </div>
+
+  {# Title + body #}
+  <h1 class="cmty-post-full__title">{{ post.title }}</h1>
+  <div class="cmty-post-full__body">{{ post.body|linebreaks }}</div>
+
+  {# Reactions row #}
+  <div class="cmty-reactions" aria-label="Post reactions">
+    {% for r in reactions %}
+    {% if request.user.is_authenticated %}
+    <form method="post" action="{% url 'community:reaction_toggle' post.pk %}"
+          class="cmty-reaction-form" data-emoji="{{ r.emoji }}">
+      {% csrf_token %}
+      <input type="hidden" name="emoji" value="{{ r.emoji }}">
+      <button type="submit"
+              class="cmty-reaction {% if r.reacted %}cmty-reaction--active{% endif %}"
+              title="{{ r.label }}" aria-pressed="{{ r.reacted|yesno:'true,false' }}"
+              aria-label="{{ r.label }}: {{ r.count }}">
+        <span aria-hidden="true">{{ r.emoji }}</span>
+        {% if r.count %}<span class="cmty-reaction__count">{{ r.count }}</span>{% endif %}
+      </button>
+    </form>
+    {% else %}
+    <div class="cmty-reaction" title="{{ r.label }}" aria-label="{{ r.label }}: {{ r.count }}">
+      <span aria-hidden="true">{{ r.emoji }}</span>
+      {% if r.count %}<span class="cmty-reaction__count">{{ r.count }}</span>{% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% if not request.user.is_authenticated %}
+    <a href="{% url 'accounts:login' %}?next={{ request.path }}"
+       class="cmty-reaction cmty-reaction--signin" title="Sign in to react">
+      <i class="bi bi-emoji-smile" aria-hidden="true"></i>
+      <span class="cmty-reaction__label">React</span>
+    </a>
+    {% endif %}
+  </div>
+
+  {# Share + counts footer #}
+  <div class="cmty-post-full__footer">
+    <div class="cmty-post-card__counts">
+      <span class="cmty-count" aria-label="{{ post.reaction_count }} reactions">
+        <i class="bi bi-heart" aria-hidden="true"></i> {{ post.reaction_count|default:"0" }}
+      </span>
+      <span class="cmty-count" aria-label="{{ post.comment_count }} replies">
+        <i class="bi bi-chat" aria-hidden="true"></i> {{ post.comment_count|default:"0" }}
+      </span>
+    </div>
+    <button class="cmty-share-btn" data-url="{{ share_url }}" aria-label="Copy link to this post">
+      <i class="bi bi-share" aria-hidden="true"></i> Share
+    </button>
+  </div>
+</article>
+
+{# ── Comments ── #}
+<section class="cmty-comments" id="comments" aria-label="Replies">
+  <h2 class="cmty-section-label">
+    <i class="bi bi-chat-dots" aria-hidden="true"></i>
+    {{ post.comment_count|default:"0" }} {% if post.comment_count == 1 %}reply{% else %}replies{% endif %}
+  </h2>
+
+  {% for comment in comments %}
+  <article class="cmty-comment {% if comment.is_removed %}cmty-comment--removed{% endif %}"
+           id="comment-{{ comment.pk }}">
+    {% if comment.is_removed %}
+    <p class="cmty-comment__removed"><i class="bi bi-slash-circle" aria-hidden="true"></i> This reply was removed.</p>
+    {% else %}
+    <div class="cmty-comment__meta">
+      {% if comment.author and comment.author.avatar and comment.author.role != 'student' %}
+      <img src="{{ comment.author.avatar.url }}" alt="{{ comment.author_display_name }}"
+           class="cmty-avatar cmty-avatar--sm">
+      {% else %}
+      <span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials" aria-hidden="true">
+        {{ comment.author_display_name|first|upper }}
+      </span>
+      {% endif %}
+      <div>
+        <span class="cmty-post-card__name">{{ comment.author_display_name }}</span>
+        <span class="cmty-role-badge cmty-role-badge--{{ comment.author.role|default:'member' }}">
+          {{ comment.author_role_display|default:"Member" }}
+        </span>
+        <time class="cmty-post-card__time"
+              data-ts="{{ comment.created_at|date:'U' }}"
+              datetime="{{ comment.created_at|date:'c' }}">
+          {{ comment.created_at|timesince }} ago
+        </time>
+      </div>
+    </div>
+    <div class="cmty-comment__body">{{ comment.body|linebreaks }}</div>
+    {% endif %}
+  </article>
+  {% empty %}
+  <div class="cmty-empty cmty-empty--sm">
+    <p class="cmty-empty__text">No replies yet. Be the first to respond.</p>
+  </div>
+  {% endfor %}
+
+  {# Reply gate / form #}
+  {% if not request.user.is_authenticated %}
+  <div class="cmty-reply-gate">
+    <i class="bi bi-lock" aria-hidden="true"></i>
+    <a href="{% url 'accounts:login' %}?next={{ request.path }}">Sign in</a> to reply to this post.
+  </div>
+  {% elif can_reply %}
+  <div class="cmty-reply-form" id="cmtyReplyForm">
+    <div class="cmty-post-card__author" style="margin-bottom:.6rem">
+      {% if request.user.avatar and request.user.role != 'student' %}
+      <img src="{{ request.user.avatar.url }}" alt="" class="cmty-avatar cmty-avatar--sm" aria-hidden="true">
+      {% else %}
+      <span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials" aria-hidden="true">
+        {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+      </span>
+      {% endif %}
+      <strong style="font-size:.875rem;color:var(--pub-heading)">Add a reply</strong>
+    </div>
+    <form method="post" action="{% url 'community:comment_create' post.pk %}" id="cmtyReplyFormEl" novalidate>
+      {% csrf_token %}
+      <textarea name="body" id="cmtyReplyBody" class="cmty-reply-textarea"
+                rows="3" maxlength="3000" placeholder="Write your reply…"
+                aria-label="Reply body" aria-required="true"></textarea>
+      <div style="display:flex;align-items:center;gap:.6rem;margin-top:.6rem;flex-wrap:wrap">
+        <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm"
+                id="cmtyReplySubmit" aria-busy="false">
+          <i class="bi bi-reply" aria-hidden="true"></i>
+          <span>Reply</span>
+        </button>
+        <span class="cmty-composer__error" id="cmtyReplyError" role="alert" hidden></span>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <div class="cmty-reply-gate {% if reply_blocked_reason %}cmty-reply-gate--blocked{% endif %}">
+    <i class="bi bi-{% if post.is_locked %}lock{% else %}slash-circle{% endif %}"
+       aria-hidden="true"></i>
+    {{ reply_blocked_reason|default:"Replies are not available here." }}
+    {% if reply_blocked_reason == "consent_required" %}
+      <a href="{% url 'community:consent' %}?next={{ request.path }}">Join the community</a> to reply.
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# Report link (bottom of comments section) #}
+  {% if request.user.is_authenticated %}
+  <div class="cmty-report-link" style="margin-top:1rem;text-align:right">
+    <button class="cmty-share-btn" id="cmtyReportToggle" aria-expanded="false"
+            aria-controls="cmtyReportForm">
+      <i class="bi bi-flag" aria-hidden="true"></i> Report this post
+    </button>
+    <div id="cmtyReportForm" hidden style="margin-top:.6rem;text-align:left">
+      <form method="post" action="{% url 'community:report' %}">
+        {% csrf_token %}
+        <input type="hidden" name="post_pk" value="{{ post.pk }}">
+        <select name="reason" class="cmty-composer__select" style="margin-bottom:.4rem"
+                aria-label="Report reason">
+          <option value="inappropriate">Inappropriate or offensive</option>
+          <option value="bullying">Bullying or harassment</option>
+          <option value="spam">Spam or advertising</option>
+          <option value="safety">Safety concern</option>
+          <option value="wrong_category">Wrong category</option>
+          <option value="other">Other</option>
+        </select>
+        <button type="submit" class="pub-btn pub-btn--outline pub-btn--sm">
+          Submit report
+        </button>
+        <button type="button" class="pub-btn pub-btn--outline pub-btn--sm"
+                id="cmtyReportCancel">Cancel</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  'use strict';
+
+  /* ── Reaction AJAX ── */
+  document.querySelectorAll('.cmty-reaction-form').forEach(function(form){
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var btn = form.querySelector('button[type="submit"]');
+      if(!btn) return;
+      btn.disabled = true;
+      fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        credentials: 'same-origin',
+      }).then(function(r){ return r.json(); })
+        .then(function(d){
+          if(d.ok){
+            var count = btn.querySelector('.cmty-reaction__count');
+            if(!count){ count = document.createElement('span'); count.className='cmty-reaction__count'; btn.appendChild(count); }
+            count.textContent = d.count > 0 ? d.count : '';
+            btn.classList.toggle('cmty-reaction--active', d.added);
+            btn.setAttribute('aria-pressed', d.added ? 'true' : 'false');
+          }
+          btn.disabled = false;
+        }).catch(function(){ btn.disabled = false; });
+    });
+  });
+
+  /* ── Reply form AJAX ── */
+  var replyForm = document.getElementById('cmtyReplyFormEl');
+  if(replyForm){
+    replyForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      var body = document.getElementById('cmtyReplyBody');
+      var err  = document.getElementById('cmtyReplyError');
+      var btn  = document.getElementById('cmtyReplySubmit');
+      if(err){ err.hidden=true; err.textContent=''; }
+      if(!body || !body.value.trim()){
+        if(err){ err.textContent='Please write something before replying.'; err.hidden=false; }
+        return;
+      }
+      if(btn){ btn.disabled=true; btn.setAttribute('aria-busy','true'); btn.querySelector('span').textContent='Posting…'; }
+      fetch(replyForm.action, {
+        method:'POST', body:new FormData(replyForm),
+        headers:{'X-Requested-With':'XMLHttpRequest'}, credentials:'same-origin',
+      }).then(function(r){ return r.json(); })
+        .then(function(d){
+          if(d.ok){ window.location.href = d.redirect || (window.location.pathname+'#comments'); }
+          else {
+            if(err){ err.textContent=d.error||'Something went wrong.'; err.hidden=false; }
+            if(btn){ btn.disabled=false; btn.setAttribute('aria-busy','false'); btn.querySelector('span').textContent='Reply'; }
+          }
+        }).catch(function(){
+          if(err){ err.textContent='Could not connect. Please try again.'; err.hidden=false; }
+          if(btn){ btn.disabled=false; btn.setAttribute('aria-busy','false'); btn.querySelector('span').textContent='Reply'; }
+        });
+    });
+  }
+
+  /* ── Report toggle ── */
+  var rt = document.getElementById('cmtyReportToggle');
+  var rf = document.getElementById('cmtyReportForm');
+  var rc = document.getElementById('cmtyReportCancel');
+  if(rt && rf){
+    rt.addEventListener('click', function(){ var open=!rf.hidden; rf.hidden=open; rt.setAttribute('aria-expanded',open?'false':'true'); });
+  }
+  if(rc && rf){ rc.addEventListener('click', function(){ rf.hidden=true; if(rt) rt.setAttribute('aria-expanded','false'); }); }
+})();
+</script>
+{% endblock %}

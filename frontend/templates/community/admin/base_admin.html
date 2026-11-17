@@ -1,0 +1,41 @@
+{% extends base_template %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/community.css' %}">
+<link rel="stylesheet" href="{% static 'css/community_admin.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="cmty-admin-wrap">
+
+  {# Sub-navigation #}
+  <nav class="cmty-admin-nav" aria-label="Community admin">
+    <a href="{% url 'community:admin_queue' %}"
+       class="cmty-admin-nav__link {% if request.resolver_match.url_name == 'admin_queue' %}is-active{% endif %}">
+      <i class="bi bi-shield-check" aria-hidden="true"></i> Queue
+    </a>
+    <a href="{% url 'community:admin_categories' %}"
+       class="cmty-admin-nav__link {% if 'admin_categor' in request.resolver_match.url_name %}is-active{% endif %}">
+      <i class="bi bi-tags" aria-hidden="true"></i> Categories
+    </a>
+    <a href="{% url 'community:admin_word_filter' %}"
+       class="cmty-admin-nav__link {% if request.resolver_match.url_name == 'admin_word_filter' %}is-active{% endif %}">
+      <i class="bi bi-funnel" aria-hidden="true"></i> Word filter
+    </a>
+    <a href="{% url 'community:admin_delegation' %}"
+       class="cmty-admin-nav__link {% if request.resolver_match.url_name == 'admin_delegation' %}is-active{% endif %}">
+      <i class="bi bi-person-badge" aria-hidden="true"></i> Moderators
+    </a>
+    <a href="{% url 'community:admin_insights' %}"
+       class="cmty-admin-nav__link {% if request.resolver_match.url_name == 'admin_insights' %}is-active{% endif %}">
+      <i class="bi bi-graph-up" aria-hidden="true"></i> Insights
+    </a>
+    <a href="{% url 'community:home' %}" class="cmty-admin-nav__link">
+      <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> View community
+    </a>
+  </nav>
+
+  {% block admin_content %}{% endblock %}
+</div>
+{% endblock %}

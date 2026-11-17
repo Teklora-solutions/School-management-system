@@ -1,0 +1,51 @@
+{% extends "community/admin/base_admin.html" %}
+
+{% block title %}Review Appeal — Community{% endblock %}
+
+{% block admin_content %}
+<h1 class="cmty-admin-h1">Review Appeal</h1>
+
+<div class="cmty-about-card">
+  <h2 style="font-family:var(--pub-font-h);font-size:1rem;font-weight:700;margin-bottom:.5rem">
+    Appeal from {{ appeal.appellant.get_full_name|default:appeal.appellant.username }}
+  </h2>
+  <p style="font-size:.8rem;color:var(--pub-text-muted);margin-bottom:.75rem">
+    Submitted {{ appeal.created_at|timesince }} ago
+  </p>
+  <p style="line-height:1.75;color:var(--pub-text)">{{ appeal.message }}</p>
+</div>
+
+<div class="cmty-about-card" style="margin-top:.75rem">
+  <h3 style="font-family:var(--pub-font-h);font-size:.95rem;font-weight:700;margin-bottom:.5rem">Original warning</h3>
+  <span class="cmty-role-badge">{{ appeal.warning.get_level_display }}</span>
+  <p style="margin-top:.5rem;font-size:.875rem;color:var(--pub-text)">{{ appeal.warning.internal_reason }}</p>
+  {% if appeal.warning.post %}
+  <p style="font-size:.8rem;color:var(--pub-text-muted);margin-top:.4rem">
+    Related to post: <a href="{% url 'community:post_detail' appeal.warning.post.pk %}"
+                        style="color:var(--pub-accent)">{{ appeal.warning.post.title }}</a>
+  </p>
+  {% endif %}
+</div>
+
+<form method="post" action="{% url 'community:admin_appeal' appeal.pk %}" style="margin-top:1rem">
+  {% csrf_token %}
+  <div class="cmty-about-card">
+    <h3 style="font-family:var(--pub-font-h);font-size:.95rem;font-weight:700;margin-bottom:.75rem">Your decision</h3>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.85rem">
+      <label style="display:flex;align-items:center;gap:.4rem;font-size:.875rem;cursor:pointer">
+        <input type="radio" name="decision" value="upheld" checked> Uphold warning
+      </label>
+      <label style="display:flex;align-items:center;gap:.4rem;font-size:.875rem;cursor:pointer">
+        <input type="radio" name="decision" value="lifted"> Lift warning
+      </label>
+    </div>
+    <label class="cmty-composer__label">Response to member (optional)</label>
+    <textarea name="admin_response" class="cmty-reply-textarea" rows="3" maxlength="1000"
+              placeholder="A brief, kind explanation of your decision…"></textarea>
+    <div style="display:flex;gap:.6rem;margin-top:.75rem">
+      <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">Submit decision</button>
+      <a href="{% url 'community:admin_queue' %}" class="pub-btn pub-btn--outline pub-btn--sm">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

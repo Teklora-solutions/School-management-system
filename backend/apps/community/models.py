@@ -79,6 +79,13 @@ class Category(BaseModel):
         db_index=True,
         help_text="Hidden categories are not shown to anyone.",
     )
+    staff_post_only = models.BooleanField(
+        default=False,
+        help_text=(
+            "When on, only teachers, directors and admins may post here. "
+            "Students and parents can read but not post."
+        ),
+    )
 
     class Meta:
         db_table = "community_category"
@@ -170,6 +177,14 @@ class Post(BaseModel):
         blank=True,
         related_name="community_posts_approved",
     )
+    # Thread lock (admin can stop new replies without removing content)
+    is_locked = models.BooleanField(
+        default=False,
+        help_text="Locked threads show content but accept no new replies.",
+    )
+    # Edit tracking
+    edited_at = models.DateTimeField(null=True, blank=True)
+    edit_count = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         db_table = "community_post"
@@ -243,6 +258,9 @@ class Comment(BaseModel):
         blank=True,
         related_name="community_comments_removed",
     )
+    # Edit tracking
+    edited_at = models.DateTimeField(null=True, blank=True)
+    edit_count = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         db_table = "community_comment"
@@ -346,6 +364,17 @@ class CommunityProfile(BaseModel):
     # Admin-set suspension
     is_suspended = models.BooleanField(default=False)
     suspended_reason = models.CharField(max_length=300, blank=True)
+    suspended_until = models.DateTimeField(null=True, blank=True)
+    # Admin-set mute (cannot post/reply, can still read)
+    is_muted = models.BooleanField(default=False)
+    muted_until = models.DateTimeField(null=True, blank=True)
+    muted_reason = models.CharField(max_length=300, blank=True)
+    # Strike counter (auto-incremented by moderation service)
+    strike_count = models.PositiveSmallIntegerField(default=0)
+    # Rate-limit: last post timestamp and daily count
+    last_post_at = models.DateTimeField(null=True, blank=True)
+    posts_today = models.PositiveSmallIntegerField(default=0)
+    posts_today_date = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = "community_profile"
@@ -362,7 +391,23 @@ class CommunityProfile(BaseModel):
         """Active in the last 5 minutes."""
         if self.last_seen_at is None:
             return False
-        return (timezone.now() - self.last_seen_at).seconds < 300
+        return (timezone.now() - self.last_seen_at).total_seconds() < 300
+
+    @property
+    def is_currently_muted(self) -> bool:
+        if not self.is_muted:
+            return False
+        if self.muted_until and timezone.now() >= self.muted_until:
+            return False
+        return True
+
+    @property
+    def is_currently_suspended(self) -> bool:
+        if not self.is_suspended:
+            return False
+        if self.suspended_until and timezone.now() >= self.suspended_until:
+            return False
+        return True
 
     @classmethod
     def touch(cls, user) -> "CommunityProfile":
@@ -371,3 +416,312 @@ class CommunityProfile(BaseModel):
         cls.objects.filter(pk=profile.pk).update(last_seen_at=timezone.now())
         profile.last_seen_at = timezone.now()
         return profile
+
+
+# ─── PostDraft ────────────────────────────────────────────────────────────────
+
+class PostDraft(BaseModel):
+    """
+    Per-user autosaved draft for the composer.
+
+    One row per user — overwritten on every autosave. Cleared when the post
+    is submitted or the user signs out. Stored server-side so it survives a
+    browser crash on a shared school phone.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="community_draft",
+    )
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    title = models.CharField(max_length=200, blank=True)
+    body = models.TextField(max_length=10_000, blank=True)
+
+    class Meta:
+        db_table = "community_post_draft"
+
+    def __str__(self) -> str:
+        return f"Draft by {self.user}"
+
+
+# ─── Warning ──────────────────────────────────────────────────────────────────
+
+class Warning(BaseModel):
+    """
+    A formal warning issued by admin to a community member.
+
+    Three levels, each carrying an increasingly clear message.
+    A warning is always attached to the original content that caused it
+    (post or comment), so it is never a surprise to the recipient.
+    """
+
+    class Level(models.TextChoices):
+        REMINDER = "reminder", "Friendly reminder"
+        MUTE = "mute", "Second warning (short posting pause)"
+        SUSPENSION = "suspension", "Third warning (community suspension)"
+        MANUAL = "manual", "Manual warning (admin discretion)"
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        APPEALED = "appealed", "Under appeal"
+        LIFTED = "lifted", "Lifted by admin"
+        EXPIRED = "expired", "Expired"
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="community_warnings",
+        db_index=True,
+    )
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="community_warnings_issued",
+    )
+    level = models.CharField(max_length=20, choices=Level.choices)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.ACTIVE, db_index=True
+    )
+    # The content that triggered the warning
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="warnings",
+    )
+    comment = models.ForeignKey(
+        "Comment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="warnings",
+    )
+    # What the admin writes
+    internal_reason = models.TextField(
+        max_length=1_000,
+        help_text="Internal note visible to admins only.",
+    )
+    # What the user sees (warm, plain language)
+    user_message = models.TextField(
+        max_length=1_000,
+        help_text="Message shown to the recipient on their notification page.",
+    )
+    lifted_at = models.DateTimeField(null=True, blank=True)
+    lifted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="community_warnings_lifted",
+    )
+    lift_reason = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        db_table = "community_warning"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["recipient", "status", "-created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Warning ({self.level}) → {self.recipient}"
+
+
+# ─── Report ───────────────────────────────────────────────────────────────────
+
+class Report(BaseModel):
+    """
+    A signed-in member's report of a post or comment.
+
+    One active report per (reporter, content) pair — a member who reports
+    the same post twice just updates the reason. Admin dismisses or acts.
+    """
+
+    class Reason(models.TextChoices):
+        INAPPROPRIATE = "inappropriate", "Inappropriate or offensive"
+        BULLYING = "bullying", "Bullying or harassment"
+        SPAM = "spam", "Spam or advertising"
+        SAFETY = "safety", "Safety concern"
+        WRONG_CATEGORY = "wrong_category", "Wrong category"
+        OTHER = "other", "Other"
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        ACTIONED = "actioned", "Actioned"
+        DISMISSED = "dismissed", "Dismissed"
+
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="community_reports_filed",
+        db_index=True,
+    )
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="reports",
+    )
+    comment = models.ForeignKey(
+        Comment,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="reports",
+    )
+    reason = models.CharField(max_length=30, choices=Reason.choices)
+    detail = models.CharField(max_length=500, blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.OPEN, db_index=True
+    )
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="community_reports_resolved",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolution_note = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        db_table = "community_report"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+        ]
+        # One active report per (reporter, post) or (reporter, comment)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["reporter", "post"],
+                condition=models.Q(post__isnull=False, status="open"),
+                name="unique_open_report_per_post",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        target = f"post {self.post_id}" if self.post_id else f"comment {self.comment_id}"
+        return f"Report on {target} by {self.reporter}"
+
+
+# ─── Appeal ───────────────────────────────────────────────────────────────────
+
+class Appeal(BaseModel):
+    """
+    A member's one-shot reply to a warning or removal.
+
+    One appeal per warning. After it is submitted the member cannot edit it.
+    Admin reads it and decides: uphold or lift.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Awaiting admin review"
+        UPHELD = "upheld", "Warning upheld"
+        LIFTED = "lifted", "Warning lifted following appeal"
+
+    warning = models.OneToOneField(
+        Warning,
+        on_delete=models.CASCADE,
+        related_name="appeal",
+    )
+    appellant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="community_appeals",
+    )
+    message = models.TextField(max_length=1_000)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="community_appeals_reviewed",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    admin_response = models.TextField(max_length=1_000, blank=True)
+
+    class Meta:
+        db_table = "community_appeal"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Appeal on warning {self.warning_id} by {self.appellant}"
+
+
+# ─── BlockedWord ──────────────────────────────────────────────────────────────
+
+class BlockedWord(BaseModel):
+    """
+    A word or phrase whose presence in a post or comment holds it for review.
+
+    Matching is case-insensitive and whole-word (so "bad" does not match
+    "badminton"). A match does not block the content outright — it sets the
+    post/comment status to PENDING so a human can read it.
+    """
+
+    word = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    note = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Internal note about why this word is on the list.",
+    )
+
+    class Meta:
+        db_table = "community_blocked_word"
+        ordering = ["word"]
+
+    def __str__(self) -> str:
+        return self.word
+
+
+# ─── CategoryModerator ────────────────────────────────────────────────────────
+
+class CategoryModerator(BaseModel):
+    """
+    Delegates limited moderation rights to a trusted teacher for one category.
+
+    A moderator can: approve/reject pending posts, hide content (queues for
+    admin review), and dismiss reports.
+    A moderator cannot: issue warnings, mute, suspend, edit categories, or
+    access content in other categories via this role.
+    """
+
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.CASCADE,
+        related_name="moderators",
+        db_index=True,
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="community_moderated_categories",
+        db_index=True,
+    )
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="community_moderator_assignments",
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "community_category_moderator"
+        unique_together = [("category", "user")]
+
+    def __str__(self) -> str:
+        return f"{self.user} moderates #{self.category}"

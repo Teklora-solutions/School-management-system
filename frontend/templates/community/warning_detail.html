@@ -1,0 +1,71 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}Notice — {{ identity.name|default:"School" }} Community{% endblock %}
+{% block extra_css %}<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="{% static 'css/community.css' %}">{% endblock %}
+
+{% block content %}
+<div class="pub-section pub-section--alt" style="min-height:60vh">
+  <div class="pub-container" style="max-width:580px;margin:0 auto">
+
+    <div class="cmty-about-card" style="margin-top:2rem;border-color:rgba(245,158,11,.3)">
+      <h1 style="font-family:var(--pub-font-h);font-size:1.2rem;font-weight:800;color:var(--pub-heading);margin-bottom:.6rem">
+        <i class="bi bi-exclamation-triangle" style="color:var(--pub-accent)" aria-hidden="true"></i>
+        Notice from the community moderator
+      </h1>
+      <p style="line-height:1.75;color:var(--pub-text);margin-bottom:1rem">{{ warning.user_message }}</p>
+
+      {% if warning.post %}
+      <p style="font-size:.8rem;color:var(--pub-text-muted)">
+        Related to your post:
+        <a href="{% url 'community:post_detail' warning.post.pk %}" style="color:var(--pub-accent)">
+          {{ warning.post.title|truncatechars:60 }}
+        </a>
+      </p>
+      {% endif %}
+
+      <p style="font-size:.75rem;color:var(--pub-text-muted);margin-top:.6rem">
+        Issued {{ warning.created_at|timesince }} ago
+        &nbsp;·&nbsp;
+        Status: {{ warning.get_status_display }}
+      </p>
+    </div>
+
+    {% if can_appeal %}
+    <div class="cmty-about-card" style="margin-top:.75rem">
+      <h2 style="font-family:var(--pub-font-h);font-size:.95rem;font-weight:700;color:var(--pub-heading);margin-bottom:.6rem">
+        <i class="bi bi-chat-square-quote" aria-hidden="true"></i> Disagree with this notice?
+      </h2>
+      <p style="font-size:.85rem;color:var(--pub-text-muted);margin-bottom:.85rem;line-height:1.65">
+        You can send a short message explaining why you think this notice was a mistake.
+        A moderator will review it. You can only appeal once.
+      </p>
+      <form method="post" action="{% url 'community:appeal' warning.pk %}">
+        {% csrf_token %}
+        <textarea name="message" rows="4" class="cmty-reply-textarea" maxlength="1000"
+                  placeholder="Explain your situation clearly and calmly…"
+                  aria-label="Appeal message" required></textarea>
+        <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm" style="margin-top:.6rem">
+          Submit appeal
+        </button>
+      </form>
+    </div>
+    {% elif warning.status == 'appealed' %}
+    <div class="cmty-about-card" style="margin-top:.75rem;background:var(--pub-bg-alt)">
+      <p style="font-size:.85rem;color:var(--pub-text-muted)">
+        <i class="bi bi-clock" aria-hidden="true"></i>
+        Your appeal is being reviewed. We'll be in touch through your notifications.
+      </p>
+    </div>
+    {% endif %}
+
+    <div style="margin-top:1.25rem">
+      <a href="{% url 'community:home' %}" class="pub-btn pub-btn--outline pub-btn--sm">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to community
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

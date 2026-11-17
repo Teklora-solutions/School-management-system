@@ -1,0 +1,96 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}Community Rules — {{ identity.name|default:"School" }}{% endblock %}
+{% block meta_description %}Read and accept our community rules before posting.{% endblock %}
+
+{% block extra_css %}
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="{% static 'css/community.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="pub-section pub-section--alt" style="min-height:70vh">
+  <div class="pub-container" style="max-width:600px;margin:0 auto">
+
+    <div class="cmty-about-card" style="margin-top:2rem">
+      <h1 style="font-family:var(--pub-font-h);font-size:1.4rem;font-weight:800;
+                 color:var(--pub-heading);margin-bottom:1rem">
+        Before you join the conversation
+      </h1>
+      <p style="color:var(--pub-text);line-height:1.75;margin-bottom:1.25rem">
+        This is <strong>{{ identity.name|default:"our school" }}'s</strong> community
+        space. When you post or reply here, your
+        {% if request.user.role == "student" %}
+          <strong>first name and last initial</strong> are
+        {% else %}
+          <strong>display name</strong> is
+        {% endif %}
+        visible to other community members.
+        Posts in public categories can be read by anyone who visits the school website.
+      </p>
+
+      <h2 style="font-family:var(--pub-font-h);font-size:.95rem;font-weight:700;
+                 color:var(--pub-heading);margin-bottom:.75rem">
+        Community rules
+      </h2>
+      <ol class="cmty-rules-list">
+        <li><strong>Be kind and respectful.</strong> Treat everyone with the same courtesy you would expect in person.</li>
+        <li><strong>Keep it relevant.</strong> Post in the right category and stay on topic.</li>
+        <li><strong>Protect privacy.</strong> Never share another person's personal information.</li>
+        <li><strong>No spam or advertising.</strong> Content not authorised by the school will be removed.</li>
+        <li><strong>Safeguarding first.</strong> Report anything that concerns you to the school admin.</li>
+        <li><strong>What you post represents you.</strong> Think before you post.</li>
+      </ol>
+
+      {% if request.user.role == "student" %}
+      <div class="cmty-about-card" style="background:var(--pub-bg-alt);margin-top:1rem;padding:.85rem 1rem">
+        <p style="font-size:.85rem;color:var(--pub-text-muted);line-height:1.65">
+          <i class="bi bi-shield-check" style="color:var(--pub-teal)" aria-hidden="true"></i>
+          <strong>For students:</strong> your parent or guardian consented to your use of
+          school digital services at enrolment. Your name appears only as first name and
+          last initial. No contact details or class information are ever shared publicly.
+        </p>
+      </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'community:consent' %}" style="margin-top:1.5rem">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        <input type="hidden" name="consent" value="yes">
+
+        <label class="cmty-consent-label">
+          <input type="checkbox" id="consentCheck" required class="cmty-consent-check"
+                 aria-required="true">
+          <span>I have read and agree to the community rules above.</span>
+        </label>
+
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1.25rem">
+          <button type="submit" class="pub-btn pub-btn--primary"
+                  id="consentSubmit" disabled aria-disabled="true">
+            <i class="bi bi-check2-circle" aria-hidden="true"></i>
+            Join the community
+          </button>
+          <a href="{{ next|default:'/' }}" class="pub-btn pub-btn--outline">
+            Not now
+          </a>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var cb = document.getElementById('consentCheck');
+  var btn = document.getElementById('consentSubmit');
+  if(cb && btn){
+    cb.addEventListener('change', function(){
+      btn.disabled = !cb.checked;
+      btn.setAttribute('aria-disabled', btn.disabled ? 'true' : 'false');
+    });
+  }
+})();
+</script>
+{% endblock %}

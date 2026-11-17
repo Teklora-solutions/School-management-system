@@ -1,0 +1,104 @@
+{% load static %}
+{# Renders a single post card. Expects `post` in context. #}
+<article class="cmty-post-card {% if post.is_pinned %}cmty-post-card--pinned{% endif %}"
+         id="post-{{ post.pk }}"
+         aria-label="{{ post.title }}">
+
+  {# Pinned ribbon #}
+  {% if post.is_pinned %}
+  <div class="cmty-post-card__pin" aria-label="Pinned post">
+    <i class="bi bi-pin-fill" aria-hidden="true"></i> Pinned
+  </div>
+  {% endif %}
+
+  <div class="cmty-post-card__inner">
+    {# Author row #}
+    <div class="cmty-post-card__meta">
+      <div class="cmty-post-card__author">
+        {# Avatar #}
+        {% if post.author and post.author.avatar and post.author.role != 'student' %}
+        <img src="{{ post.author.avatar.url }}" alt="{{ post.author_display_name }}"
+             class="cmty-avatar cmty-avatar--sm">
+        {% else %}
+        <span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials" aria-hidden="true">
+          {{ post.author_display_name|first|upper }}
+        </span>
+        {% endif %}
+        <div class="cmty-post-card__byline">
+          <span class="cmty-post-card__name">{{ post.author_display_name }}</span>
+          <span class="cmty-role-badge cmty-role-badge--{{ post.author.role|default:'member' }}">
+            {{ post.author_role_display|default:"Member" }}
+          </span>
+        </div>
+      </div>
+      <div class="cmty-post-card__right-meta">
+        <span class="cmty-post-card__category">
+          {% if post.category.icon %}<i class="bi {{ post.category.icon }}" aria-hidden="true"></i>{% endif %}
+          {{ post.category.name }}
+        </span>
+        <time class="cmty-post-card__time"
+              data-ts="{{ post.created_at|date:'U' }}"
+              datetime="{{ post.created_at|date:'c' }}"
+              title="{{ post.created_at|date:'D d M Y H:i' }} EAT">
+          {{ post.created_at|timesince }} ago
+        </time>
+      </div>
+    </div>
+
+    {# Title + preview #}
+    <a href="{% url 'community:post_detail' post.pk %}" class="cmty-post-card__link">
+      <h3 class="cmty-post-card__title">{{ post.title }}</h3>
+      <p class="cmty-post-card__preview">{{ post.body|striptags|truncatewords:28 }}</p>
+    </a>
+
+    {# Footer: reactions, comments, commenter avatars, latest comment #}
+    <div class="cmty-post-card__footer">
+      <div class="cmty-post-card__counts">
+        <span class="cmty-count" aria-label="{{ post.reaction_count }} reactions">
+          <i class="bi bi-heart" aria-hidden="true"></i>
+          {{ post.reaction_count|default:"0" }}
+        </span>
+        <a href="{% url 'community:post_detail' post.pk %}#comments"
+           class="cmty-count" aria-label="{{ post.comment_count }} replies">
+          <i class="bi bi-chat" aria-hidden="true"></i>
+          {{ post.comment_count|default:"0" }}
+        </a>
+      </div>
+
+      {# Up to 3 recent commenter avatars #}
+      {% if post.recent_commenters %}
+      <div class="cmty-commenter-avatars" aria-label="Recent commenters">
+        {% for commenter in post.recent_commenters %}
+        {% if commenter.avatar and commenter.role != 'student' %}
+        <img src="{{ commenter.avatar.url }}" alt="{{ commenter.get_full_name }}"
+             class="cmty-avatar cmty-avatar--xs">
+        {% else %}
+        <span class="cmty-avatar cmty-avatar--xs cmty-avatar--initials" aria-hidden="true">
+          {{ commenter.first_name|first|upper }}
+        </span>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# "New comment Xh ago" line #}
+      {% if post.latest_comment_at %}
+      <span class="cmty-post-card__latest">
+        <i class="bi bi-chat-dots" aria-hidden="true"></i>
+        New comment
+        <time data-ts="{{ post.latest_comment_at|date:'U' }}"
+              datetime="{{ post.latest_comment_at|date:'c' }}">
+          {{ post.latest_comment_at|timesince }} ago
+        </time>
+      </span>
+      {% endif %}
+
+      {# Share link #}
+      <button class="cmty-share-btn"
+              data-url="{{ request.build_absolute_uri }}{% url 'community:post_detail' post.pk %}"
+              aria-label="Copy link to this post">
+        <i class="bi bi-share" aria-hidden="true"></i> Share
+      </button>
+    </div>
+  </div>
+</article>

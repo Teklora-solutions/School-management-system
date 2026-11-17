@@ -1,0 +1,67 @@
+{% extends "community/admin/base_admin.html" %}
+
+{% block title %}{% if category %}Edit{% else %}New{% endif %} Category — Community{% endblock %}
+
+{% block admin_content %}
+<h1 class="cmty-admin-h1">{% if category %}Edit "{{ category.name }}"{% else %}New Category{% endif %}</h1>
+
+<div class="cmty-about-card">
+  <form method="post">
+    {% csrf_token %}
+    <div class="cmty-composer__field">
+      <label class="cmty-composer__label" for="catName">Name</label>
+      <input id="catName" name="name" type="text" class="cmty-composer__input"
+             value="{{ category.name|default:'' }}" maxlength="80" required>
+    </div>
+    <div class="cmty-composer__field">
+      <label class="cmty-composer__label" for="catIcon">Icon (Bootstrap Icons class)</label>
+      <input id="catIcon" name="icon" type="text" class="cmty-composer__input"
+             value="{{ category.icon|default:'' }}" maxlength="10" placeholder="e.g. bi-chat-dots">
+    </div>
+    <div class="cmty-composer__field">
+      <label class="cmty-composer__label" for="catDesc">Description</label>
+      <input id="catDesc" name="description" type="text" class="cmty-composer__input"
+             value="{{ category.description|default:'' }}" maxlength="300">
+    </div>
+    <div class="cmty-composer__field">
+      <label class="cmty-composer__label" for="catVisibility">Visibility</label>
+      <select id="catVisibility" name="visibility" class="cmty-composer__select">
+        {% for val, label in visibility_choices %}
+        <option value="{{ val }}" {% if category.visibility == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="cmty-composer__field">
+      <label class="cmty-composer__label">Allowed roles (for Role-restricted visibility)</label>
+      {% for role in "admin,director,teacher,parent,student,finance"|split:"," %}
+      <label style="display:inline-flex;align-items:center;gap:.35rem;margin-right:.75rem;font-size:.875rem;cursor:pointer">
+        <input type="checkbox" name="allowed_roles" value="{{ role }}"
+               {% if category and role in category.allowed_roles %}checked{% endif %}>
+        {{ role|capfirst }}
+      </label>
+      {% endfor %}
+    </div>
+    <div class="cmty-composer__field">
+      <label class="cmty-composer__label" for="catOrder">Display order (lower = first)</label>
+      <input id="catOrder" name="display_order" type="number" class="cmty-composer__input"
+             value="{{ category.display_order|default:'0' }}" min="0" max="999" style="width:80px">
+    </div>
+    <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:.5rem">
+      <label style="display:flex;align-items:center;gap:.4rem;font-size:.875rem;cursor:pointer">
+        <input type="checkbox" name="staff_post_only"
+               {% if category.staff_post_only %}checked{% endif %}>
+        Staff-post only (members can read but not post)
+      </label>
+      <label style="display:flex;align-items:center;gap:.4rem;font-size:.875rem;cursor:pointer">
+        <input type="checkbox" name="is_active"
+               {% if not category or category.is_active %}checked{% endif %}>
+        Active (visible to members)
+      </label>
+    </div>
+    <div style="display:flex;gap:.6rem;margin-top:1.25rem">
+      <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">Save</button>
+      <a href="{% url 'community:admin_categories' %}" class="pub-btn pub-btn--outline pub-btn--sm">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
