@@ -1,7 +1,9 @@
 # School Management System — how the whole thing works
 
 A single-school management system: student records, academic structure, fees and a double-entry
-ledger, results governance, homework, attendance, communications, and role-based dashboards.
+ledger, results governance, homework (with teacher marking), a Virtual School LMS (course builder,
+quizzes, class feed, live classes, points and levels), a teacher gradebook, a school-wide community,
+attendance, communications, and role-based dashboards.
 
 This document is the operational handbook: what each part does, the exact steps for each job, and the
 rules that keep the numbers honest. It describes the system **as it is in this repository today** —
@@ -28,10 +30,13 @@ File references are repo-relative, `path:line`, so you can jump straight to the 
 | `academics` | `AcademicYear`, `Term`, `SchoolClass`, `Stream`, `Subject`, `ClassSubject` |
 | `teachers` | `TeacherProfile`, `TeacherAssignment` (who teaches which class/subject/year) |
 | `finance` | Chart of accounts, fee structures, invoices, payments, allocations, adjustments, expenses, the journal |
-| `results` | Grading config, `ResultSheet`, `ScoreEntry`, the publish workflow, report cards |
-| `homework` | `Homework` and its attachment downloads |
+| `results` | Grading config, `ResultSheet`, `ScoreEntry`, the publish workflow, report cards, broadsheets |
+| `homework` | `Homework`, attachments, submissions, **teacher marking/feedback/release**, revisions |
+| `gradebook` | Teacher gradebook: weights, manual items, excuses, releases, term locks, copy-to-report-card |
+| `learning` | Virtual School: course builder, lessons, quizzes, class feed (+ polls), points/levels, streaks, live classes & calendar, digest |
 | `attendance` | `AttendanceRegister`, `AttendanceEntry`, marking service, rate selectors |
 | `communications` | Announcements, message threads/complaints, inbox |
+| `community` | School-wide community: posts, comments, reactions, moderation, member map, direct messages |
 | `dashboards` | One home page per role + the Director portal |
 | `core` | Audit log, notifications, `SystemEvent`, `SchoolSettings`, navigation, mixins, exports, PDF, health |
 
@@ -84,7 +89,7 @@ Tests and checks:
 
 ```bash
 cd backend
-python -m pytest -q                        # 459 tests, throwaway in-memory SQLite
+python -m pytest -q                        # ~2,500 tests, throwaway in-memory SQLite
 python -m ruff check apps config tests     # config is ruff.toml at repo root
 python manage.py check
 python manage.py makemigrations --check    # must say "No changes detected"
@@ -248,9 +253,11 @@ a URL that no longer reverses renders `href="#"` instead of crashing.
   Announcements, Profile.
 - **parent** — same as student plus linked children.
 
-Note: `SchoolSettings.fees_enabled` exists and is editable, but `NAVIGATION` has no feature-flag key and
-`feature_enabled()` has no production caller ([backend/apps/core/features.py:34](backend/apps/core/features.py#L34)) —
-turning fees off currently hides nothing.
+Note: `SchoolSettings.fees_enabled` is consumed by `apps/core/features.py::feature_enabled("fees")`
+on the Admin/Finance/Director homes and feature-tagged sidebar entries — turning fees off hides dashboard
+figures and the fee-related nav items. It does **not** gate the `/finance/` screens or the ledger itself
+(see §20). The same registry now also gates `learning`, `engagement`, `quizzes`, `feed_community`,
+`live_classes`, `gradebook` and `community`, each via a Boolean column on `SchoolSettings`.
 
 ---
 
@@ -276,9 +283,10 @@ is flagged** ([backend/apps/academics/selectors.py:16](backend/apps/academics/se
 dashboard and export treats that as "no data" (Director exports answer `400 No current term.`). If a page
 looks suddenly empty, check the current flags before anything else.
 
-There are **no edit or delete screens** for years, terms, classes or subjects — create + set-current only.
-Corrections happen in `/django-admin/` (academics and accounts *are* registered there; students, finance,
-results, homework, attendance and teachers are **not** — their `admin.py` files are stubs).
+Years and terms have lifecycle actions (year detail / delete / set-current, term edit / set-current).
+**Classes, streams and subjects are create-only** — corrections there go through `/django-admin/`
+(academics and accounts *are* registered there; students, finance, results, homework, attendance and
+teachers are **not** — their `admin.py` files are stubs).
 
 ---
 
@@ -546,8 +554,10 @@ don't expect a past window to restate itself.
 - **Expense**: `/finance/expenses/record/` → `record_expense`
   ([backend/apps/finance/services.py:917](backend/apps/finance/services.py#L917)). Account must be
   `type=expense` and active (the form already filters), amount ≥ 0.01, date, description, optional
-  attachment (to `expense_attachments/`) and approval note. DR the account / **CR 1000 Cash — always
-  cash, never bank**, which is a real limitation if you pay from the bank. Audit only, no feed event.
+  attachment (to `expense_attachments/`) and approval note. DR the account / **CR `1000` Cash or `1010`
+  Bank depending on `paid_via`** (a real `cash`/`bank` choice on the form; `_post_expense_entry` credits
+  `1010` Bank for a bank claim and `1000` Cash otherwise, asserted by `test_postings.py`). Audit only,
+  no feed event.
   New expense categories: `/finance/accounts/add-expense/` (uppercases the code, forces
   type=expense/normal=debit, `is_system=False`).
 - **Manual journal entries: 🚧 no UI.** `SourceType.MANUAL` exists but only the private `_post_journal_entry`
@@ -576,15 +586,15 @@ don't expect a past window to restate itself.
 | Trial balance + the balanced verdict | `trial_balance_at(date_to=…)` | Director trial balance ✅, Finance ⚙️ |
 | A pupil's account | `student_statement` / `student_balance` | Finance ⚙️ (and the PDF template is missing) |
 
-**The finance screens themselves are ⚙️ today.** All 26 of their templates are absent — every
-`features/finance/*.html` referenced by views except `payment_receipt_pdf.html`
-(verified: 100 templates referenced, 26 missing, all in `features/finance/`). Opening `/finance/`,
-`/finance/ledger/`, `/finance/payments/`, `/finance/reports/outstanding/`, a pupil statement or the
-student "My fee statement" nav item raises `TemplateDoesNotExist` (a 500 page in dev) even though the role
-gate passes. This is the known deferred work (Admin checkpoints 6–7), and
-[backend/apps/core/tests/test_navigation_integrity.py:51](backend/apps/core/tests/test_navigation_integrity.py#L51)
-exempts those URLs so the suite stays honest about it. **The Director portal is the way to read the books
-until then** — it renders from the same interface and its templates all exist.
+**The finance screens are all ✅ today.** `features/finance/` carries 30 templates — overview,
+accounts, fee structures (list/create/detail/upload/preview/commit/template), invoices (list/generate/
+detail), payments (list/record/detail/receipt), adjustments, ledger, reports (summary/classes/
+outstanding + export), student statements (HTML + per-term PDF), expenses, reminders — and the
+student-facing `my-statement/`. `KNOWN_BROKEN` in `test_navigation_integrity.py` is `{}`, so every
+finance sidebar link resolves. Per-term student statements (HTML + PDF, scoped to one term or
+all-time) and receipt PDFs with DUPLICATE stamping on reprint are wired. **The Director portal is the
+read-only companion** — it renders from the same `apps/finance/interface/` façade, so a Director fee
+figure and a Finance fee figure for the same term are the same rows.
 
 Exports that do work ✅ from the Director side: `/dashboards/director/export/performance/`,
 `/export/fees/`, `/export/staff/`, `/export/books-pdf/`. The finance outstanding-fees .xlsx
@@ -636,7 +646,7 @@ included), then writes `results.grade_scale_saved` to the audit log. Removing th
 
 | From | To | Screen | Rule |
 |---|---|---|---|
-| draft | submitted | 🚧 none | `submit_sheet` exists in the service but **no view calls it** |
+| draft | submitted | `/teachers/marks/<assignment>/` ✅ teacher | the teacher's "Submit to Admin" calls `submit_sheet` |
 | submitted | confirmed | `/results/sheets/<pk>/confirm/` ✅ admin | |
 | confirmed | published | `/results/sheets/<pk>/confirm/` flow + `/results/publish/class-term/` ✅ admin | publish invalidates the Director cache and emits the `results.published` feed event |
 | any | draft | `/results/sheets/<pk>/reopen/` ✅ admin | **reason required, non-blank**, stored on the sheet and in the audit summary; clears submitted/confirmed/published stamps |
@@ -694,33 +704,45 @@ publish_sheet(sheet=sheet, actor=admin)        # or publish_class_term(class, te
 - Report card PDF: `/results/report-card/<student_id>/<term_id>/pdf/` — header with school name/motto,
   pupil/class/stream/term meta, **Overall Average %** and **Subjects Taken** boxes, and a
   Subject / Total / Grade / Remark / Position n/m table with a "published results only" note. 404 when the
-  pupil has no published entries for that term; needs the PDF engine.
+  pupil has no published entries for that term; uses the PDF engine (WeasyPrint, or the headless-Chrome
+  fallback). The class broadsheet PDF (`/results/broadsheet_pdf/`) matches the school's paper format and
+  carries a top-of-class callout.
+- `SchoolSettings.show_positions` controls whether the position column renders on report cards and result
+  pages (the settings row wins over the `SCHOOL_*` env defaults).
 - Position formulas: class position = 1 + number of classmates whose average of published totals is
   strictly higher ([backend/apps/results/selectors.py:177](backend/apps/results/selectors.py#L177));
   subject position = 1 + count of entries on the same sheet with a higher total
   ([backend/apps/results/selectors.py:203](backend/apps/results/selectors.py#L203)). Ties share a position
   (no competition ranking). These are computed at read time, and `class_performance` is not cached, so a
   big school pays per request (see §17 for the budgets).
-- `SchoolSettings.show_positions` exists but the PDF and page do not consult it — positions always render.
 
 ---
 
 ## 10. Homework
 
-Read ✅ / write 🚧. `Homework` has title, description, subject, class, optional stream, term, `set_by`
-(roles limited to teacher), `due_date`, optional attachment (`upload_to="homework/"`), and
-`status = draft|published` ([backend/apps/homework/models.py:14](backend/apps/homework/models.py#L14)).
+Read ✅ / write ✅. `Homework` has title, description, subject, class, optional stream, term, `set_by`
+(roles limited to teacher), `due_date`, up to 5 `HomeworkAttachment` files (UUID names, streamed through
+permission-checked views — never on `MEDIA_URL`), `status = draft|published` with `published_at`, an
+optional `max_score` (marking is refused while it is blank), `marks_released_at` (set once for the whole
+class), and `counts_for_gradebook` (opt-in tick feeding the teacher gradebook)
+([backend/apps/homework/models.py:14](backend/apps/homework/models.py#L14)).
 
-Pupils and parents: `/homework/` with `?term=` and `?subject=` filters, an overdue flag computed in
-Python, and `/homework/<pk>/download/` for attachments. Visibility rule
-([backend/apps/homework/selectors.py:16](backend/apps/homework/selectors.py#L16)): published only, own class
-only; **if the pupil has a stream**, they see items with that stream *or* stream-blank ("all streams");
-**if they have no stream**, they see stream-blank items only. Downloads re-check published + class +
-stream (403) and 404 when there is no file.
+**Teacher authoring** (`teacher_views.py`, all `TeacherRequiredMixin` and scoped through
+`selectors.homework_for_teacher` so a teacher only touches their own classes/subjects): list (with term/
+class/status filters and counts), new, edit, delete, **publish/unpublish** (one POST view), preview, and a
+submissions view. **Marking** is built in: `HomeworkMark` (one per submission, `score` against `max_score`,
+written feedback, a `needs_revision` flag that saves the current attempt as a `HomeworkSubmissionRevision`
+and reopens the submission for a fresh one), an autosave endpoint, and a **release** action that sets
+`marks_released_at` for the whole class at once. Until release, students see "awaiting marking".
 
-There is **no create/edit/publish/delete screen** ([backend/apps/homework/urls.py](backend/apps/homework/urls.py)
-has list + download only), no submissions, no grading, no marks, no due-date reminders, and no attachment
-size/type validation. Homework rows can only be created via the shell or the demo seeder.
+**Students and parents**: `/homework/` with `?term=` and `?subject=` filters, an overdue flag computed in
+Python, `/homework/marked/` for released work, `/homework/<pk>/` detail, and `/homework/<pk>/submit/` with
+up to 5 files. There is exactly one `HomeworkSubmission` per (homework, student); resubmitting before the
+due date updates it in place, `is_late` is frozen at submit time. Visibility rule
+([backend/apps/homework/selectors.py:16](backend/apps/homework/selectors.py#L16)): published only, own
+class only; **if the pupil has a stream**, they see items with that stream *or* stream-blank ("all
+streams"); **if they have no stream**, they see stream-blank items only. Downloads re-check published +
+class + stream (403) and 404 when there is no file.
 
 ---
 
@@ -770,6 +792,79 @@ invalidates no cache. The Teacher portal (Module 2) is the checkpoint that gives
   link but cannot navigate to the list. Replies create notifications
   ([backend/apps/communications/services.py:52](backend/apps/communications/services.py#L52)).
   There is no `resolved_at`, so resolution time cannot be reported.
+
+---
+
+## 12a. Virtual School (Learning) — `/learning/`
+
+The LMS is built on top of existing school data — a classroom is computed from a `TeacherAssignment` +
+`ClassSubject` + `Term`, so a teacher's online classroom appears automatically with no enrollment step.
+**Every feature below defaults OFF** and is switched on in School Settings; the feature registry is the
+single source of truth (`apps/core/features.py`), so a switched-off module renders a sentence, never a
+zero.
+
+| Layer | What it does |
+|---|---|
+| Course builder | Topics/modules, lessons with Markdown notes (sanitised via `bleach`), YouTube/Vimeo/Google Drive embeds (`youtube-nocookie.com`), up to 5 attachments per lesson, publish/unpublish, reorder, duplicate, copy course to another term |
+| Quizzes | MC + True/False, up to 20 questions, server-side marking, attempt limits, optional time limit, shuffle, edit-lock after first attempt, regrading + manual marking. **Correct answers never reach the browser before submission.** |
+| Class feed (+ polls) | Teacher posts (with photos/files), student questions, 5 safe emoji reactions, teacher moderation (pin/remove). **Class polls** with a DB-enforced one-vote-per-pupil constraint, live/after-close result visibility |
+| Points & levels | 7 levels (Seedling → Legend), immutable point ledger with idempotency keys (no double-award), teacher manual bonus with reason, reversal rows (never deletes). Points from lessons, homework, feed questions, streaks — **never from marks** |
+| Streaks | School-days only, weekends/term breaks transparent, configurable grace-day allowance |
+| Live classes & calendar (Checkpoint D) | `LiveClassSession` on Google Meet/Zoom/Teams/custom, gated to the active join window (15 min before start to end + 30 min grace), recording links with acknowledgement, student Join + per-class calendar, attendance from join clicks |
+| Teacher digest | `python manage.py send_feed_digest` (daily django-q schedule at ~07:00 Nairobi) — one notification per teacher of unanswered class-feed questions |
+| Progress / notes | Per-module progress bars, overall completion, Continue button, private per-student lesson notes (autosaved via AJAX) |
+
+**Feature flags** (`SchoolSettings` Booleans): `learning_enabled` (all LMS), `engagement_enabled`
+(progress/streaks/points, also requires per-class `ClassEngagementSettings.is_active`), `quizzes_enabled`,
+`feed_community_enabled` (feed + polls), `live_classes_enabled`.
+
+**Security rules:** students only see their own class's classrooms; quiz answers stay server-side until
+submit; lesson notes are private per student; live classes scope to the teacher's own assignments
+(`teacher_can_access_classroom`, admin/director oversee); all files stream through permission-checked
+views, never via `MEDIA_URL`.
+
+---
+
+## 12b. Gradebook — `/gradebook/`
+
+A teacher's per-class, per-subject, per-term gradebook combining counted homework, counted quizzes,
+hand-recorded lab work and the end-of-term exam into one weighted average. Gated by `gradebook_enabled`.
+
+- **`GradebookSetup`** — four weights (homework/quiz/lab/exam, default 30/30/20/20, must total 100 over
+  the buckets in use) plus an FK `exam_sheet` → `results.ResultSheet`. Homework and quiz marks are read
+  **live** from their own records (nothing is copied); `effective_weights()` renormalises over the
+  buckets that actually have work.
+- **Manual items** (`ManualItem`/`ManualScore`) — hand-recorded offline work; **excuses**
+  (`GradebookExcuse`) exempt a pupil from one item.
+- **Release** (`GradebookRelease`/`GradebookResult`) — freezes the grid into a numbered snapshot that
+  pupils and parents see. A released grade cannot change under a family without a new, reasoned release.
+- **Send to report card** — writes the weighted final mark into the linked exam `ResultSheet`.
+- **Term lock** (`GradebookTermLock`, admin) — locks a whole term's gradebook school-wide; ticks and
+  weights are refused while locked (`ensure_tick_writable` is called from the homework/quiz save paths).
+- Director gets a read-only overview + Excel/PDF export; students/parents get `my/`.
+
+---
+
+## 12c. Community — `/community/`
+
+A school-wide message board with three layers. Gated by `community_enabled` (plus `community_paused`,
+`community_index`, `community_student_moderation` on `SchoolSettings`).
+
+| Layer | Who | What |
+|---|---|---|
+| **Public read** | anyone, even anonymous | feed, post detail, events, members, member profile, map, about, search — limited by `Category.visibility` (PUBLIC/SIGNED_IN/ROLE) |
+| **Participation** | signed-in + consented | post, reply (one-level threading), 5 safe emoji reactions, autosaved drafts, report content. Rate-limited (3/min, 30/day); `BlockedWord` matches **hold for review**, never block. |
+| **Moderation** | admin (director is read-only) | approval queue, pin/lock/move, auto-escalating strike ladder (0→REMINDER, 1→MUTE 24h, 2+→SUSPENSION 7d), manual mute/suspend, appeals, category-moderator delegation, insights, anonymise/export |
+
+- **Direct messages** between staff and guardians (students excluded for safeguarding), with unread
+  badges. Conversation pair stored in ascending PK order so it can only exist once.
+- **Member map** is opt-in and stores only a town (from a fixed place list, never an address); students
+  are excluded from the directory, map and messaging; student display name is first name + last initial.
+- **Consent gate**: `CommunityProfile.consented_at` is required before posting; the view and the service
+  both check it and redirect to `community:consent`.
+- Admin views admit admin+director, **but the service layer enforces admin-only** (`_require_staff`
+  rejects director) — the Director is community-read-only. Category moderators (teachers) get limited
+  rights in their category only. Auto-strikes fire only when the actor is an admin.
 
 ---
 
@@ -912,7 +1007,7 @@ this hardware.
 
 ---
 
-## 19. What the 459 tests protect
+## 19. What the ~2,500 tests protect
 
 ```
 cd backend && python -m pytest -q
@@ -942,29 +1037,34 @@ the test fails if the list grows.
 
 ## 20. What is not there yet (ranked by operational impact)
 
-1. **Finance screens (26 templates)** — money is fully calculated, guarded and tested, but no cashier can
-   see or touch it in the browser; every finance URL 500s on `TemplateDoesNotExist`. This is Admin
-   checkpoint 6–7, deliberately deferred. Until then: Director pages read the books, and writes happen via
-   the service layer.
-2. **Results entry has no UI and no admin registration** — sheets and scores can only be created from the
-   shell or the seeder; teachers cannot reach any results screen; `submit_sheet` is unreachable. That is
-   Module 2 (Teacher portal) work.
-3. **Attendance is service-only** — model, constraints, marking service and selectors are done and tested;
-   `/attendance/` is a "coming soon" page, no role can mark, and no dashboard consumes it.
-4. **Homework has no authoring screen** — pupils read it, nobody can write it.
-5. **No student edit / withdraw / restore / delete screen.** `status` changes only via promotion.
-6. **No refunds, no manual journal UI, no bank-paid expense**, no invoice cancellation flow,
-   invoice-less adjustments invisible to the fee totals, and no `due_date` set at invoicing so aging falls
-   back to issue date.
-7. **Fee reminders broadcast to all students and parents** regardless of which pupils you selected.
-8. **`fees_enabled` feature flag is inert** — stored, editable, tested, consumed by nothing.
-9. **Teacher and Finance home pages are placeholders** — hard-coded "–" stat cards and "Phase 5" text even
-   though the views pass real context ([frontend/templates/dashboards/teacher/home.html:19](frontend/templates/dashboards/teacher/home.html#L19)).
-10. **Director KPI cache is not invalidated** by invoice posting, waivers, expenses or attendance (§17).
-11. **Queued jobs need `qcluster`** — credential emails currently sit unsent (3 in this repo's dev DB).
-12. **Deferred by explicit decision**: Director balance sheet, scheduled digests, presentation mode,
-    signed expiring attachment links, and the `student_statement` all-time-vs-term defect (D7); Module 3
-    (student portal S1–S12) and Module 2 (teacher portal T1–T11) are still queued behind the Director series.
+1. **Attendance is service-only** — model, constraints, marking service and selectors are done and tested;
+   `/attendance/` is a "coming soon" page, no role can mark, and no dashboard consumes it. This is
+   Checkpoint E on the LMS roadmap.
+2. **No student edit / withdraw / restore / delete screen.** `status` changes only via promotion;
+   corrections go through `/django-admin/`.
+3. **No refunds, no manual journal UI, and no invoice cancellation flow** — `Invoice.Status.CANCELLED`
+   is declared but no code path writes it. **Bank-paid expenses are done**: `Expense.paid_via` is a real
+   `cash`/`bank` choice and `_post_expense_entry` credits `1010` Bank for a bank claim. Invoice-less
+   adjustments stay invisible to fee totals; `Invoice.due_date` falls back to `issued_date` when fee
+   items carry no due date; **late fees are computed but go nowhere** (`selectors.late_fee_proposals`
+   builds the rows, nothing posts them).
+4. **Fee reminders broadcast to all students and parents** regardless of which pupils you selected.
+5. **`fees_enabled` feature flag is partial** — it hides dashboard figures and feature-tagged sidebar
+   entries, but does **not** gate the `/finance/` screens or the ledger itself.
+6. **Teacher and Finance home pages are placeholders** — hard-coded "–" stat cards and "Phase 5" text even
+   though the views pass real context.
+7. **Director KPI cache is not invalidated** by invoice posting, waivers, expenses or attendance (§17).
+8. **Queued jobs need `qcluster`** — credential emails and the fee-reminder task sit silently if the
+   worker is not running. The class-feed digest has its own daily `DigestSchedule`.
+9. **Deferred by explicit decision**: Director balance sheet, presentation mode, signed expiring
+   attachment links; attendance screens (Checkpoint E), virtual labs (Checkpoint G) and the leaderboard
+   (Checkpoint H) are queued LMS work. Live classes & calendar (Checkpoint D), class polls, the teacher
+   digest, and the gradebook are all **done**.
+
+> Finance screens ✅ (30 templates in `features/finance/`), results entry ✅ (`features/teachers/marks_*`
+> + `features/results/sheets/*`), and homework authoring + marking ✅ are all built now — the earlier
+> version of this list recorded them as missing. The Community app and the Gradebook app are also
+> shipped (see the backend README §5 for both).
 
 ---
 
@@ -972,8 +1072,8 @@ the test fails if the list grows.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| 500 `TemplateDoesNotExist: features/finance/…` | finance UI not built | Use the Director portal to read money; the screen is deferred work |
-| Download answers **503 "No PDF was produced…"** | WeasyPrint's native libs missing (`gobject-2.0-0` on Windows) | Install GTK/WeasyPrint deps, or use the .xlsx exports, which need no native library |
+| 500 `TemplateDoesNotExist: features/finance/…` | should not happen — finance UI is built (30 templates). If it does, run `manage.py check` and `makemigrations --check`; the template tree may be out of sync |
+| Download answers **503 "No PDF was produced…"** | Neither WeasyPrint nor a headless browser could render | Install GTK/WeasyPrint deps, or set `PDF_BROWSER_PATH` to a Chromium/Edge binary for the fallback engine, or use the .xlsx exports, which need no native library |
 | Director pages show "No current term" / export answers 400 | no `Term`/`AcademicYear` flagged `is_current` | `/academics/years/` → Set current; then set the current term |
 | A Director number looks stale | TTL-only invalidation | `/dashboards/director/` after 10 min, or `python manage.py shell`: `from django.core.cache import cache; cache.clear()` |
 | Waived money still showing as debt on an invoice page | adjustments don't change `Invoice.total_amount`; and invoice-less adjustments don't reach `fee_totals` | Attach the invoice to the adjustment; read term/class figures, not the invoice row |
@@ -998,4 +1098,8 @@ the test fails if the list grows.
 - **Sheet** (results) — one class + subject + term (+ stream); the unit that is governed.
 - **Selector / service** — read vs write; views may only call these.
 - **SystemEvent vs AuditLog vs business event** — feed line vs "what changed on this object" vs JSON log.
+- **Release** (gradebook) — a numbered, frozen snapshot of the weighted grid that pupils and parents see; a released grade cannot change without a new, reasoned release.
+- **Strike ladder** (community) — auto-escalating moderation: 0 removals → friendly reminder, 1 → 24h mute, 2+ → 7-day suspension. Auto-strikes fire only when the actor is an admin.
+- **Consent** (community) — `CommunityProfile.consented_at`, the one-time acceptance of the community rules required before a member may post or reply.
+- **Classroom** (learning) — a computed pairing of a class + subject for a term, derived from a `TeacherAssignment`; it is not a stored enrollment.
 - **⚙️ / ✅ / 🚧** — code-only, usable in browser, absent.

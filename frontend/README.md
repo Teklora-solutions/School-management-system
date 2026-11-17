@@ -23,21 +23,26 @@ See the [root README](../README.md) for the running instructions and
 
 ```
 frontend/
-├── templates/                       190+ .html files
+├── templates/                       264 .html files
 │   ├── base.html                    the app shell (130 lines)
 │   ├── partials/                    5 shared snippets
 │   ├── auth/                        5 standalone screens (login, portal chooser, lockout, …)
 │   ├── registration/                4 standalone password-reset flow screens
 │   ├── dashboards/<role>/           6 roles × exactly 5 files = 30 (the role shells + homes)
-│   ├── features/<module>/           130+ screens, 12 modules
+│   ├── features/<module>/           130+ screens, 14 modules
+│   ├── community/                   33 screens: public feed, post detail, consent, my-posts,
+│   │                                search, members, member profile, map, messages, events, about,
+│   │                                warning detail, admin/ moderation queue + tools,
+│   │                                dashboard_cards/ per-role fragments, includes/
 │   └── public/                      6 pages of the school's open website
 └── static/
-    ├── css/    base.css (654) · public_new.css (448) · public.css (621, orphaned)
+    ├── css/    base.css (654) · public_new.css (448) · community.css · community-map.css
+    │          · community_admin.css · feed.css · public.css (621, orphaned)
     ├── js/     base.js (84 lines — the whole JavaScript bundle)
     └── vendor/ bootstrap 5.3.3 · bootstrap-icons 1.11.3 · chart.js 4.4.4
 ```
 
-`features/` per module: finance 30 · academics 12 · teachers 10 · results 9 · students 8 · communications 6 · accounts 5 · homework 5 · core 5 · public 4 · director 9 · **learning 25+** (course builder, lesson view, quiz builder/take/results, class feed, progress, badges, search, copy-course).
+`features/` per module: finance 30 · academics 12 · teachers 10 · results 9 · students 8 · communications 6 · accounts 5 · homework 7 (list, detail, teacher form/list, submissions, mark, marked) · core 5 · public 4 · director 9 · gradebook 8 (list, grid, setup, release, manual item form, my gradebook, director overview, admin locks) · **learning 25+** (course builder, topics, lesson view, quiz builder/take/results, class feed + polls, progress, badges, search, copy-course, live classes, calendar).
 
 ---
 
@@ -187,6 +192,13 @@ bug.
   shell with `pub-nav`, footer, back-to-top and one large inline script; it shares
   `partials/_footer_base.html`, which renders the wide four-column footer only when a view supplies
   `portal_links` (only `apps/public` does).
+- **`community/` templates are their own shell family too**: `community/base.html` builds a tab-rail
+  layout (Community / Events / Members / Map / Messages / About) that reuses the public-site identity
+  and nav, loads `community.css` (and `community-map.css` on the map/messages screens,
+  `community_admin.css` on `admin/` moderation pages), and is **not** a role shell under
+  `dashboards/<role>/` — the community is reached by anyone, including anonymous readers. The
+  `dashboard_cards/<role>.html` fragments are the small community widgets rendered onto each role
+  home by `CommunityCardView`.
 
 ---
 
@@ -224,7 +236,12 @@ Rules that keep the system coherent:
 `static/css/public.css` (621 lines) is **orphaned** — nothing references it. `public_new.css` is the
 live website stylesheet: its own `--pub-*` tokens, amber `#f59e0b` + teal accents, `color-mix()`,
 `clamp()` fluid type, and a real light theme via `[data-theme="light"]` overrides toggled by the inline
-script in `public/base.html`.
+script in `public/base.html`. **The community adds three stylesheets on top of `public_new.css`**:
+`community.css` (the public feed, post detail, members and consent screens — it reuses `--pub-*`
+tokens, so the community shares the website's look), `community-map.css` (the member map, member
+profile and direct-message screens) and `community_admin.css` (the admin moderation queue and tools,
+loaded only on `admin/*` pages). A small `feed.css` is shared by the community feed and the class
+notice board.
 
 ---
 
@@ -311,4 +328,6 @@ needed locally**. Run `python manage.py collectstatic` only for deployment — i
 - `auth/password_reset.html` and `registration/password_reset.html` are both 44 lines and **not identical**; only the `auth/` one is reached by `StaffBlockedPasswordResetView`.
 - `attendance` renders `partials/_coming_soon.html` — the models exist, the screens do not (Checkpoint E).
 - `../school-website/` is an unreferenced static mockup of a different school ("Springfield Academy") kept for design reference.
-- Learning lesson templates include a small amount of inline `fetch()` JS (note autosave, quiz answer autosave, feed reactions) — all with full-page POST fallbacks for JS-off environments.
+- Learning lesson templates include a small amount of inline `fetch()` JS (note autosave, quiz answer autosave, feed reactions, live-class join) — all with full-page POST fallbacks for JS-off environments.
+- Community templates lean on inline `fetch()` for reactions, drafts, replies, reports and the member-map pins — every write path has a full-page POST fallback so the community works with JS off.
+- `community.css` builds on `public_new.css` CSS variables (the community shares the public site's theme, not the portal's dark shell), so a change to `--pub-*` tokens affects both.

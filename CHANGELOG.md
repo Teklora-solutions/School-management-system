@@ -9,9 +9,123 @@ repository on that day. Anything labelled *verified* was checked against the cod
 
 ---
 
-## [Unreleased] — November 2026 (LMS Checkpoints A–C + Step 1 fixes)
+## [Unreleased]
 
-### Added — Virtual School LMS
+A large batch of work landed after the LMS Checkpoints A–C entry below: live classes and class polls
+(Checkpoint D), the teacher gradebook (Checkpoint F), homework marking/feedback/release, a full
+school-wide community app, finance per-term statements, a results broadsheet matching the school's paper
+format, and a headless-Chrome PDF fallback. All feature-flagged and defaulting OFF.
+
+### Added — Virtual School: live classes & calendar (Checkpoint D)
+- **`LiveClassSession`** + **`LiveClassAttendance`** models (`learning.0009`, `0014`): a scheduled video
+  session on Google Meet / Zoom / Teams / custom link, attached to a computed classroom (class + subject).
+  Gated by `live_classes_enabled`. The teacher schedules/cancels/starts/ends; students get a **Join
+  button** active only during the join window (15 min before `scheduled_start` until `scheduled_end` + 30
+  min grace). Recording links with a class notice and an acknowledgement flag; optional link to a lesson.
+  Per-class **calendar** view. `teacher_can_access_classroom()` scopes everything to the teacher's own
+  assignments (admin/director oversee); `fix(learning): gate live classes on the teacher's classroom
+  assignment` closed the bypass.
+
+### Added — Virtual School: class polls
+- **`ClassPoll`** + **`ClassPollOption`** + **`ClassPollVote`** models (`learning.0013`). A poll is a
+  special class-feed post with two or more options; the unique constraint on `(poll, voter)` is a
+  database-level one-vote-per-pupil guarantee. A pupil may change their vote before `closes_at`. Results
+  visibility is `live` or `after_close` (teachers always see the tally). Requires both
+  `feed_community_enabled` and the class's `ClassFeedSettings.is_active`.
+
+### Added — Virtual School: teacher digest, rich feed, topics, quiz upgrades
+- **Teacher digest** (`learning.0011`, `0012`): `python manage.py send_feed_digest` (daily django-q
+  `DigestSchedule` at ~07:00 Nairobi) sends one notification per teacher per school day listing unanswered
+  class-feed questions. `catch_up=False` skips a missed slot rather than running it late; `digest_sent_at`
+  stops a question reappearing.
+- **Rich class feed** (`learning.0016`, `0018`): photos and files on feed posts; `feed_media_services.py`.
+- **Reply mentions** (`learning.0017`) and **reply starters**.
+- **Topics / schedule targeting / lesson comments** (`learning.0020`): `Topic` model, `LessonComment`
+  (moderated), `comment_services.py`, `reply_starters.py`, `topic_services.py`.
+- **Quiz system upgrade Q1 + Q2** (`learning.0015`, `0019`): question types, regrading and manual marking.
+  Quiz results linked from the classroom outline.
+
+### Added — Gradebook (Checkpoint F)
+- New **`gradebook`** app (`gradebook.0001`): `GradebookSetup` (four weights — homework/quiz/lab/exam,
+  default 30/30/20/20, must total 100 over buckets in use; FK `exam_sheet` → `ResultSheet`),
+  `ManualItem`/`ManualScore` (hand-recorded work), `GradebookExcuse` (per-pupil exemptions),
+  `GradebookRelease`/`GradebookResult` (numbered frozen snapshots families see), `GradebookTermLock`
+  (admin lock for a whole term). Homework and quiz marks are read live — nothing is copied; weights
+  renormalise over buckets that have work. **Send-to-report-card** writes the weighted final mark into the
+  linked exam sheet. Director overview + export (xlsx/csv/pdf); `my/` family view. Gated by
+  `gradebook_enabled`. `Homework.counts_for_gradebook` and the homework/quiz save paths call
+  `ensure_tick_writable` so a tick is refused on a locked term.
+
+### Added — Homework: teacher marking, feedback and release
+- **`HomeworkMark`** model, `marks_released_at`, `max_score`, `counts_for_gradebook`
+  (`homework.0004`, `0005`). Teacher marking screen with autosave; written feedback; a **needs-revision**
+  flow that saves the current attempt as a `HomeworkSubmissionRevision` and reopens the submission; a
+  **release** action that sets `marks_released_at` for the whole class at once. Student `marked/` view for
+  released work.
+
+### Added — School-wide Community app
+- New **`community`** app (`community.0001`–`0006`, 13 models, 40 routes, ~200 tests): a school-wide
+  message board at `/community/` with three layers — public read-only feed, consent-gated participation,
+  and admin moderation. Categories control visibility (public / signed-in / role-specific) and
+  `staff_post_only`. Posts/comments with one-level threading, 5 safe emoji reactions, autosaved drafts.
+  **Moderation**: approval queue, pin/lock/move, auto-escalating strike ladder (reminder → 24h mute → 7d
+  suspension), manual mute/suspend, appeals, a word filter that holds for review (never blocks),
+  category-moderator delegation, insights, anonymise/export (parental erasure). **Direct messages**
+  between staff and guardians (students excluded for safeguarding) with unread badges. **Opt-in member
+  map** (town only, never an address). Four SchoolSettings flags: `community_enabled` (master),
+  `community_paused`, `community_index`, `community_student_moderation` (on by default). Director is
+  community-read-only; students' public posts start PENDING.
+
+### Added — Finance: per-term statements and duplicate-stamped receipts
+- **Per-term student statements** (HTML + PDF, scoped to one term or all-time) and receipt PDFs with
+  **DUPLICATE stamping on reprint** (`feat(finance): per-term statements and duplicate-stamped receipts`).
+
+### Added — Results: broadsheet paper format
+- Class broadsheet **PDF** redesigned to match the school's paper format with a top-of-class callout
+  (`feat(results): broadsheet matches the school's paper format`).
+
+### Added — PDF fallback engine
+- `apps/core/pdf.py` now falls back to a **headless Chromium/Edge** print job when WeasyPrint's native
+  libraries are missing — it searches Chrome, Edge and the common Linux command names, or honours
+  `PDF_BROWSER_PATH`. A Windows host with a Chromium browser keeps producing real PDFs; if neither engine
+  renders, the route still answers its honest plain-text 503 (`fix(pdf): print with headless Chrome when
+  WeasyPrint is unavailable`).
+
+### Added — Accounts
+- **Admin types the new staff password**; the member changes it on first login
+  (`feat(accounts): admin types staff passwords; first login changes them`). Clearer portal sign-in for
+  staff and pupils.
+
+### Changed
+- Navigation restructured: classroom links nested under "My Classrooms" and "My Learning"; one classroom
+  menu on teacher and student pages.
+- School Settings gained the community, gradebook, live-classes, and class-feed switches (the Advanced
+  sub-heading holds pause/index/student-moderation); switching community off clears a stale pause.
+- Local Bootstrap Icons used instead of glyph approximations; public root behaviour pinned.
+- `base.css` and `base.js` URLs versioned so edits reach the browser without a hard refresh.
+- **Repository file compliance (mandatory documentation notice):**
+  - `LICENCE` renamed to **`LICENSE`** (preserved via `git mv`); the Teklora Solutions proprietary IP
+    notice is intact. Links in `README.md` and `ROADMAP.md` repointed to `LICENSE`.
+  - `CHANGELOG.md` cleaned up to follow [Keep a Changelog](https://keepachangelog.com/): a single
+    `## [Unreleased]` section now sits at the top (previously there were three), and the stray
+    `[Unreleased] — 2026-10-31` header was converted to a dated entry. Dated history is preserved
+    verbatim. Full `## [X.Y.Z] - YYYY-MM-DD` headers will be adopted when the first semver tag is cut
+    (see [ROADMAP.md](ROADMAP.md) · Q-2).
+  - `ROADMAP.md` milestones and checklists refreshed to the current development state.
+  - `README.md` run/setup instructions verified accurate.
+
+### Verified — test suite
+- **2,538 tests collected** (was ~1,566 at Checkpoint C). New suites: `apps/community/tests/` (~200 tests
+  across `test_community.py`, `test_moderation.py`, `test_participation.py`, `test_map_and_messages.py`),
+  `apps/gradebook/tests/`, plus expanded `apps/homework/tests/` and `apps/learning/tests/` (live classes,
+  polls, digest, rich feed). The 22 pre-existing failures (17 public-site, 4 accounts, 1 static-assets)
+  are unchanged.
+
+---
+
+### LMS Checkpoints A–C + Step 1 fixes
+
+#### Added — Virtual School LMS
 
 #### Foundational setup
 - **Timezone changed** from `Africa/Accra` (GMT+0) to `Africa/Nairobi` (EAT, UTC+3). All streak day-boundary calculations depend on this. No stored data altered (all timestamps are UTC in the DB; only display/`localdate()` changes).
@@ -95,7 +209,7 @@ repository on that day. Anything labelled *verified* was checked against the cod
 
 ---
 
-## [Unreleased] — 2026-10-31
+## 2026-10-31 — documentation foundations
 
 ### Added
 - **`LICENCE`** — proprietary, all rights reserved, owned by **Teklora Solutions** (https://teklora.co.ke/).
@@ -319,9 +433,11 @@ The modules below were already present at the baseline. Their dates are reconstr
 | `teachers` | 2 | `0002_remove_teacherassignment_uniq_teacher_class_subject_stream_year_and_more` |
 | `results` | 7 | `0007_classteacherremark` |
 | `finance` | 10 | `0010_expense_claims_budgets_and_approvals` |
-| `homework` | 3 | `0003_homeworksubmission_homeworksubmissionattachment` |
-| `learning` | 8 | `0008_quiz_models` |
+| `homework` | 5 | `0005_homework_counts_for_gradebook` |
+| `gradebook` | 1 | `0001_initial` |
+| `learning` | 20 | `0020_topics_schedule_targeting_comments` |
 | `public` | 2 | `0002_contactmessage_handled_contactmessage_handled_at` |
+| `community` | 6 | `0006_member_map_and_direct_messages` |
 | `attendance`, `communications` | 1–2 each | initial |
 
 Policy: **additive only** — an applied migration is never edited or deleted, including the finance chart

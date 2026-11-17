@@ -6,15 +6,13 @@ communications, role-based dashboards and the school's own public website.
 Built as a **server-rendered Django 5.1 monolith** with a vendored Bootstrap 5 front end.
 No Docker, no JS build step, no managed services required — it runs on one small Linux box.
 
-- **Backend:** `backend/` — Django project (`config/`) + 12 local apps (`backend/apps/`) → [backend/README.md](backend/README.md)
+- **Backend:** `backend/` — Django project (`config/`) + 15 local apps (`backend/apps/`) → [backend/README.md](backend/README.md)
 - **Frontend:** `frontend/` — Django templates + static assets (no SPA) → [frontend/README.md](frontend/README.md)
 - **Planning and history:** [ROADMAP.md](ROADMAP.md) (the working queue) · [CHANGELOG.md](CHANGELOG.md) (dated history)
-- **Licence:** [LICENCE](LICENCE) — proprietary, all rights reserved. Owned by
+- **Licence:** [LICENSE](LICENSE) — proprietary, all rights reserved. Owned by
   **Teklora Solutions** ([https://teklora.co.ke/](https://teklora.co.ke/))
 - **Deeper reference:** [docs/SYSTEM_GUIDE.md](docs/SYSTEM_GUIDE.md) (architecture handbook),
   [docs/performance.md](docs/performance.md), [docs/decisions/observability.md](docs/decisions/observability.md)
-  — note the guide has drifted from the tree in several places; see [CHANGELOG.md](CHANGELOG.md) for the
-  corrected claims
 
 ---
 
@@ -25,15 +23,17 @@ No Docker, no JS build step, no managed services required — it runs on one sma
 | **Admissions & students** | Student records with unique admission numbers, status (active / repeating / graduated / withdrawn), guardians linked to parent accounts, primary-guardian flag, sponsor + payment-plan notes. Bulk import from `.xlsx` with a two-stage preview → validate → commit job. Admission-form and blank-form PDFs. |
 | **Academics** | Academic years, three terms per year (with a enforced "current" term), classes ordered by `level_order` for promotion, streams (e.g. Blue/Gold), subject catalogue, and class↔subject maps per class or per stream. |
 | **Teachers** | Teacher profiles (staff ID, qualification, department), per-year assignment of teacher ↔ class ↔ subject with a database-enforced **one teacher per class-subject per year**, an assignment matrix, subject-distribution and workload views, and class-teacher appointment. Teachers enter marks against their own assignments only. |
-| **Results** | Exam-only marks (one raw score out of 100 per student per subject — no continuous assessment weighting). `ResultSheet` per class+subject+term(+stream) driven by a state machine **draft → submitted → confirmed → published**, with locked sheets, reopen-with-reason, bulk per-class publish, and a full audit row per transition. Grading is a `GradeScale` per academic year (bands must cover 0–100 with no gap or overlap) with a legacy per-year band fallback. Report cards, class broadsheets and student result pages are WeasyPrint PDFs carrying the school logo, motto, class position, class-teacher remark and signature block. Only **published** sheets are visible to students and parents. |
-| **Finance** | A real double-entry ledger: chart of accounts (asset / liability / equity / income / expense with a normal side and contra flags), fee structures per class+term with itemised fees, optional items with per-pupil elections, discount/scholarship/waiver rules (including siblings-only), invoices with immutable line snapshots, receipts for bank/cheque/mobile-money, allocations, adjustments, expenses, budgets with variance, vendors, open/closed financial periods, backdating limits, and a second-signature approval queue. Gap-free document numbers from a compare-and-set `NumberSeries`. Trial balance, class and school summaries, outstanding reports, Excel exports, student statements, receipt PDFs with DUPLICATE stamping on reprint, and fee reminders via background jobs. |
-| **Homework** | Teachers author homework per class/subject/term/stream with up to 5 attachments, save as draft, publish or unpublish, preview. Students and parents see a list with a NEW badge, submit with up to 5 files, resubmit freely until the due date, and are flagged `is_late` permanently after it. Attachments are stored under UUID names and streamed only through permission-checked views — never exposed as media URLs. |
+| **Results** | Exam-only marks (one raw score out of 100 per student per subject — no continuous assessment weighting). `ResultSheet` per class+subject+term(+stream) driven by a state machine **draft → submitted → confirmed → published**, with locked sheets, reopen-with-reason, bulk per-class publish, and a full audit row per transition. Grading is a `GradeScale` per academic year (bands must cover 0–100 with no gap or overlap) with a legacy per-year band fallback. Report cards, class broadsheets (matching the school's paper format) and student result pages are WeasyPrint PDFs carrying the school logo, motto, class position, class-teacher remark and signature block. Only **published** sheets are visible to students and parents. |
+| **Finance** | A real double-entry ledger: chart of accounts (asset / liability / equity / income / expense with a normal side and contra flags), fee structures per class+term with itemised fees, optional items with per-pupil elections, discount/scholarship/waiver rules (including siblings-only), invoices with immutable line snapshots, receipts for bank/cheque/mobile-money, allocations, adjustments, expenses, budgets with variance, vendors, open/closed financial periods, backdating limits, and a second-signature approval queue. Gap-free document numbers from a compare-and-set `NumberSeries`. Trial balance, class and school summaries, outstanding reports, Excel exports, **per-term student statements** (HTML + PDF, scoped to one term or all-time), receipt PDFs with **DUPLICATE stamping on reprint**, and fee reminders via background jobs. |
+| **Homework** | Teachers author homework per class/subject/term/stream with up to 5 attachments, save as draft, publish or unpublish, preview. Students and parents see a list with a NEW badge, submit with up to 5 files, resubmit freely until the due date, and are flagged `is_late` permanently after it. Attachments are stored under UUID names and streamed only through permission-checked views — never exposed as media URLs. **Teacher marking** is built in: set `max_score`, mark each submission with feedback, autosave as you go, send work back with a "needs revision" note (keeps every earlier attempt as a revision), and release the whole class's marks at once. A homework can be flagged `counts_for_gradebook` so its marks feed the teacher's gradebook. |
 | **Attendance** | Data model is complete and honest (one register per class per day, present / absent / late / excused, `ATTENDED_STATUSES = (present, late)` so an excused absence counts against the rate, future dates refused, services + selectors written). **The UI is still a "coming soon" stub** — see [Known gaps](#9-known-gaps-and-limitations). |
 | **Communications** | Announcements targeted at everyone, at selected roles, or at specific classes, with optional `publish_at` scheduling and expiry, attachments and capped notification fan-out (500 recipients). Read tracking drives the navbar unread badge. A threaded complaints / inquiries / satisfaction desk with `open → in_progress → resolved`, admin/director assignment, replies and attachments. |
-| **Virtual School (Learning)** | A full Cisco-style online classroom built on top of the existing class and teacher-assignment data — no separate enrollment. Classrooms appear automatically when a teacher assignment exists. Features: **course builder** (modules, lessons with Markdown notes, YouTube/Vimeo/Google Drive video embeds, up to 5 file attachments per lesson, publish/unpublish, reorder, duplicate, copy to another term); **quizzes** (multiple-choice and true/false, up to 20 questions, server-side marking, attempt limits, optional time limit, shuffle, show/hide correct answers, teacher results screen with difficulty ranking); **class community feed** (teacher posts announcements/tips/celebrations, students ask questions, safe reactions, teacher moderation with pin/remove); **points and levels** (7 levels from Seedling to Legend, earned by completing lessons, submitting homework, keeping streaks, posting questions — never by marks, never going down); **fair streaks** (school-days only, weekends and term breaks invisible, grace-day allowance); **progress tracking** (per-module progress bars, overall completion, next-lesson Continue button, student private notes per lesson, course search); **student lesson notes** (private per-student, autosaved via AJAX); **teacher controls** (engagement on/off per class, grace-day setting, manual bonus award with reason, full audit ledger with reversal). All features default OFF and are switched on in School Settings. |
-| **Dashboards** | Six role homes, each behind its own role mixin: Admin (school-wide governance), Director (a full analytics suite — class performance and drilldowns, class fee overview and debtors, staff directory, "Books of Account", Chart.js visuals, Excel and PDF exports, Learning Engagement overview, Points Overview), Teacher (my classes, marks entry, homework, classrooms, class feed, class progress, class points), Student (results, fees, homework, announcements, my learning, my progress, my badges), Parent (children switcher, same views per child including learning and quiz results), Finance (the money interface). |
+| **Virtual School (Learning)** | A full Cisco-style online classroom built on top of the existing class and teacher-assignment data — no separate enrollment. Classrooms appear automatically when a teacher assignment exists. Features: **course builder** (topics/modules, lessons with Markdown notes, YouTube/Vimeo/Google Drive video embeds, up to 5 file attachments per lesson, publish/unpublish, reorder, duplicate, copy to another term); **quizzes** (multiple-choice and true/false, up to 20 questions, server-side marking, attempt limits, optional time limit, shuffle, show/hide correct answers, teacher results screen with difficulty ranking, question regrading and manual marking); **class community feed** (teacher posts announcements/tips/celebrations with photos and files, students ask questions, safe reactions, teacher moderation with pin/remove, **class polls** with database-enforced one-vote ballots and live/after-close result visibility); **points and levels** (7 levels from Seedling to Legend, earned by completing lessons, submitting homework, keeping streaks, posting questions — never by marks, never going down); **fair streaks** (school-days only, weekends and term breaks invisible, grace-day allowance); **progress tracking** (per-module progress bars, overall completion, next-lesson Continue button, student private notes per lesson, course search); **student lesson notes** (private per-student, autosaved via AJAX); **teacher controls** (engagement on/off per class, grace-day setting, manual bonus award with reason, full audit ledger with reversal). **Live classes & calendar (Checkpoint D):** teachers schedule sessions on Google Meet/Zoom/Teams or a custom link, gate them to the active join window (15 min before start to end + 30 min grace), attach a recording link (with an acknowledgement notice), and start/end/cancel; students get a Join button and a per-class calendar; **teacher digest** sends one morning notification per teacher per school day listing unanswered class-feed questions. All features default OFF and are switched on in School Settings. |
+| **Gradebook** | A teacher's per-class, per-subject, per-term gradebook that combines counted homework, counted quizzes, hand-recorded lab work and the end-of-term exam into one weighted average. Weights default to 30/30/20/20 and are editable (they must total 100 over the buckets in use). Homework and quiz marks are read live from their own records — nothing is copied — and a teacher can add **manual items** (offline work) and record per-pupil **excuses**. A **release** freezes the grid into a numbered snapshot that pupils and parents see, so a released grade cannot change under a family without a new, reasoned release. The weighted final mark can be **sent to the report card** (writes into the linked exam `ResultSheet`). Admins can **lock a whole term's gradebook** school-wide; the Director gets a read-only overview with Excel/PDF export. Feature flag `gradebook_enabled`. |
+| **Community** | A school-wide message board at `/community/` with three layers: a **public read-only feed** (home, categories, post detail, members, events, about, search, a member map) that anyone can read; **consent-gated participation** (post, reply with one-level threading, 5 safe emoji reactions, autosaved drafts, report content) for signed-in members; and **admin moderation** (approval queue, pin/lock/move, warnings with an auto-escalating strike ladder → mute → suspend, appeals, a word filter that holds content for review rather than blocking, category-moderator delegation, insights, anonymise/export for parental erasure). Categories control visibility (public / signed-in / role-specific) and who may post. **Direct messages** between staff and guardians (students excluded for safeguarding) with unread badges. **Member map** is opt-in and stores only a town, never an address. Four SchoolSettings flags: `community_enabled` (master switch), `community_paused`, `community_index` (allow search engines), `community_student_moderation` (hold student public posts for approval, on by default). |
+| **Dashboards** | Six role homes, each behind its own role mixin: Admin (school-wide governance), Director (a full analytics suite — class performance and drilldowns, class fee overview and debtors, staff directory, "Books of Account", Chart.js visuals, Excel and PDF exports, Learning Engagement overview, Points Overview, gradebook overview), Teacher (my classes, marks entry, homework authoring and marking, classrooms, class feed, class progress, class points, live classes, gradebook), Student (results, fees, homework with marks, announcements, my learning, my progress, my badges, my gradebook), Parent (children switcher, same views per child including learning, quiz results and gradebook), Finance (the money interface). Each role home also carries a community card when the community is on. |
 | **Public website** | The school's own open site served at `/` — home, about, programmes, gallery, contact/enquiry form — built from data the school already maintains plus two small tables (`GalleryPhoto`, `ContactMessage`). Admins edit it under `/website/`, and enquiries are moderated there. |
-| **Administration** | A staff directory with create / detail / deactivate / reactivate and admin-only password reset; a School Settings screen (identity, currency, logo, address, positions on/off, fees/learning/engagement/quizzes feature switches); an audit log viewer; an activity feed and daily report; and structured logging with request IDs throughout. |
+| **Administration** | A staff directory with create / detail / deactivate / reactivate and admin-only password reset (**the admin types the new staff password**; the member changes it on first login); a School Settings screen (identity, currency, logo, address, positions on/off, and feature switches for fees, learning, engagement, quizzes, **live classes, class community feed, gradebook, and the school community** with pause/index/student-moderation sub-controls); an audit log viewer; an activity feed and daily report; and structured logging with request IDs throughout. |
 
 ---
 
@@ -48,7 +48,7 @@ No Docker, no JS build step, no managed services required — it runs on one sma
 | Data validation / env | `django-environ` (`.env` file, silently skipped when real env vars are injected) |
 | Background jobs | `django-q2` with the ORM broker — one extra process (`manage.py qcluster`), no Redis needed |
 | Login throttling | `django-axes` |
-| PDF rendering | `WeasyPrint >=62,<63` |
+| PDF rendering | `WeasyPrint >=62,<63` (primary); **headless Chromium/Edge fallback** in `apps/core/pdf.py` when WeasyPrint's native libs are missing — searches Chrome, Edge and the usual Linux names, or `PDF_BROWSER_PATH`. |
 | Spreadsheets | `openpyxl` (import/export), `pandas` (analysis), `python-dateutil` |
 | Images | `Pillow` (logos, avatars, attachments) |
 | Static files | `whitenoise` with `CompressedManifestStaticFilesStorage` |
@@ -97,10 +97,14 @@ allow-list is exactly one entry — `fonts.googleapis.com` — and it is shrink-
 - SQLite (bundled) for development — nothing to install
 - **Windows only, for PDFs:** WeasyPrint needs the native Pango/GTK libraries. Without them,
   `import weasyprint` raises `OSError: could not find any/library ... gobject-2.0-0`. The app
-  still runs; every PDF route answers an honest plain-text **503** instead of HTML wearing a
-  `.pdf` name. Install GTK runtime (e.g. `pacman -S mingw-w64-x86_64-gtk3`, or the official
-  GTK3 runtime installer) if you need PDFs locally. On Linux, `libpango`, `libcairo`,
-  `libgdk-pixbuf` and `shared-mime-info`.
+  still runs. When WeasyPrint cannot load, `apps/core/pdf.py` falls back to a **headless
+  Chromium/Edge** print job (it searches Chrome, Edge and the common Linux command names, or
+  honours `PDF_BROWSER_PATH`), so PDF routes keep producing a real PDF on a Windows host that
+  has a Chromium browser installed. If neither engine is available the route answers an honest
+  plain-text **503** instead of HTML wearing a `.pdf` name. Install GTK runtime (e.g.
+  `pacman -S mingw-w64-x86_64-gtk3`, or the official GTK3 runtime installer) to use WeasyPrint,
+  or rely on the browser fallback. On Linux, `libpango`, `libcairo`, `libgdk-pixbuf` and
+  `shared-mime-info`.
 - **Production only:** PostgreSQL, and a TLS-terminating reverse proxy (nginx or Caddy).
 
 ---
@@ -202,6 +206,7 @@ environment variables instead. Defaults shown are the development defaults.
 | `LOG_FORMAT` | `verbose` | `json` for ELK/Loki/CloudWatch ingestion. |
 | `SLOW_REQUEST_THRESHOLD_MS` | `500` | `RequestTimingMiddleware` warns above this. |
 | `DIRECTOR_KPI_CACHE_TTL` | `600` | Read at call time, so `.env` works even though it is not in the `env()` defaults. |
+| `PDF_BROWSER_PATH` | empty | Absolute path to a Chromium/Edge binary used by the PDF fallback engine when WeasyPrint's native libs are missing. Empty → the code searches Chrome, Edge and the common Linux command names. |
 
 ---
 
@@ -266,7 +271,7 @@ All Python tooling runs **from `backend/`** — `pytest.ini` and `DJANGO_SETTING
 
 ```bash
 cd backend
-python -m pytest -q                            # ~1,566 tests across 80+ test files
+python -m pytest -q                            # ~2,500 tests across 100+ test files
 python -m pytest --cov=apps --cov-report=term-missing
 python -m ruff check apps config tests
 python manage.py check
@@ -291,6 +296,9 @@ Notable suites that encode project rules rather than just behaviour:
   data migration that seeds it.
 - `test_director_query_count.py` — pins query budgets.
 - `backend/apps/core/tests/test_navigation_integrity.py` — every sidebar link resolves.
+- `backend/apps/community/tests/` — community feed, participation, moderation, member map and direct messages (~200 tests, three files: `test_community.py`, `test_moderation.py`, `test_participation.py`, `test_map_and_messages.py`).
+- `backend/apps/gradebook/tests/` — weights, manual items, excuses, the release freeze, term locks and the copy-to-report-card write.
+- `backend/apps/homework/tests/` and `backend/apps/learning/tests/` — homework marking/release and revisions; live-class scheduling and join auditing; class polls; the digest task.
 
 **Load test** (see [docs/performance.md](docs/performance.md)):
 
@@ -487,9 +495,9 @@ Stated plainly, because they will bite someone:
 - **Screen coverage is partial** — no student edit / withdraw / restore / delete screen; classes, streams and subjects are create-only. Fixes go through `/django-admin/`.
 - **Finance edges:** no refunds, no manual-journal UI, and `Invoice.Status.CANCELLED` exists but no flow ever writes it. Late fees are computed but go nowhere. Re-billing after revising a fee structure doubles `billed`. Fee reminders broadcast to every student/parent regardless of the selection.
 - **The `fees` feature switch is partial** — it replaces figures with a sentence on dashboards but does not gate the `/finance/` screens or the ledger itself.
-- **Virtual School next steps:** Live classes and shared calendar (Checkpoint D), attendance screens (Checkpoint E), gradebook link (Checkpoint F), virtual labs (Checkpoint G), leaderboard (Checkpoint H) — all planned but not yet built.
+- **Virtual School next steps:** shared calendar polish, attendance screens (Checkpoint E), virtual labs (Checkpoint G), leaderboard (Checkpoint H) — all planned but not yet built. Live classes and class polls (Checkpoint D) are done.
 - Teacher and Finance home pages still carry placeholder "–" stat cards.
-- `xhtml2pdf` is in `base.txt` but imported nowhere; WeasyPrint is the only engine.
+- `xhtml2pdf` is in `base.txt` but imported nowhere; WeasyPrint (with the headless-Chrome fallback) is the only engine used.
 - The static-asset suite depends on vendored files that must not be re-downloaded from a CDN (§2). The lesson page loads one external image: YouTube thumbnails from `img.youtube.com` (a static CDN, no cookies, no scripts — this is intentional and documented).
 
 ---
@@ -504,9 +512,9 @@ school-management-system/
 │   │   ├── settings/         # base.py / dev.py / prod.py / test.py
 │   │   ├── urls.py           # root URLconf
 │   │   └── wsgi.py, asgi.py
-│   ├── apps/                 # 13 installed apps (core, accounts, academics, students,
-│   │   │                     #  teachers, results, finance, homework, attendance,
-│   │   │                     #  communications, dashboards, public, **learning**)
+│   ├── apps/                 # 15 installed apps (core, accounts, academics, students,
+│   │   │                     #  teachers, results, finance, homework, gradebook, learning,
+│   │   │                     #  attendance, communications, dashboards, public, **community**)
 │   │   └── public_site/      # dormant, not installed, not routed
 │   ├── tests/                # cross-app integration + architecture tests
 │   ├── requirements/         # base.txt / dev.txt / prod.txt
@@ -516,8 +524,8 @@ school-management-system/
 │   └── pytest.ini
 │
 ├── frontend/                 # Django templates + static assets — see frontend/README.md
-│   ├── templates/            # 153 templates: base, partials, auth, registration,
-│   │                         #   dashboards/<role>/, features/<module>/, public/
+│   ├── templates/            # 264 templates: base, partials, auth, registration,
+│   │                         #   dashboards/<role>/, features/<module>/, public/, community/
 │   └── static/               # css/, js/, vendor/ (Bootstrap 5.3.3, Icons 1.11.3, Chart.js 4.4.4)
 │
 ├── docs/
@@ -540,7 +548,7 @@ school-management-system/
 ├── ruff.toml                 # line-length 88, target py313
 ├── ROADMAP.md                # the working queue: Now / Next / Later, deferred defects, quality backlog
 ├── CHANGELOG.md              # dated history: what shipped, what was verified, what was corrected
-├── LICENCE                   # proprietary — owned by Teklora Solutions, all rights reserved
+├── LICENSE                   # proprietary — owned by Teklora Solutions, all rights reserved
 ├── .env.example              # tracked; copy to .env
 └── .gitignore
 ```
@@ -560,7 +568,7 @@ it never contributed code, data or routes to the school system.
 
 | Symptom | Cause and fix |
 |---|---|
-| PDF routes return a plain-text **503** | WeasyPrint cannot load Pango/GTK. Install the GTK runtime (Windows) or `libpango`/`libcairo`/`libgdk-pixbuf`/`shared-mime-info` (Linux). This is intentional — the app never serves HTML as a `.pdf`. |
+| PDF routes return a plain-text **503** | Neither WeasyPrint nor a headless browser could render. Install the GTK runtime (Windows) or `libpango`/`libcairo`/`libgdk-pixbuf`/`shared-mime-info` (Linux) for WeasyPrint, or set `PDF_BROWSER_PATH` to a Chromium/Edge binary for the fallback engine. This is intentional — the app never serves HTML as a `.pdf`. |
 | `ImproperlyConfigured: Set the SECRET_KEY environment variable` | No `.env` in the project root, or it wasn't copied. `django-environ` reads `<root>/.env` only. |
 | Bulk import / reminders never run, no error | `python manage.py qcluster` is not running. Tasks queue silently in the DB. |
 | `CommandError: refusing to seed ... production settings` | Pass `--force`, or point `DJANGO_SETTINGS_MODULE` at `config.settings.dev`. |
@@ -604,8 +612,9 @@ Chart-of-accounts changes ship as a new migration plus a test that keeps `chart_
 sync with it.
 
 ### Git
-The repository is git-tracked — 493 files as of 2026-10-31, across four commits (`9ad7f9c` baseline,
-`85bdbf6`, `c7b8700`, `29d953b`), no tags yet. `db.sqlite3*`, `media/`, `staticfiles/`, `.env` and
-`node_modules/` are ignored — so the working database you seed is **not** under version control and
-tests are the only safety net for behaviour. Keep `git status` clean before a checkpoint and expect
-`makemigrations --check` to be part of review.
+The repository is git-tracked — 784 files across 73 commits as of November 2026, no tags yet.
+The first four commits (`9ad7f9c` baseline, `85bdbf6`, `c7b8700`, `29d953b`) landed the initial
+import; everything since is incremental checkpoint work. `db.sqlite3*`, `media/`, `staticfiles/`,
+`.env` and `node_modules/` are ignored — so the working database you seed is **not** under
+version control and tests are the only safety net for behaviour. Keep `git status` clean before
+a checkpoint and expect `makemigrations --check` to be part of review.

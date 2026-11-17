@@ -1,12 +1,12 @@
 # Roadmap
 
-Working plan for the School Management System, as of **2026-10-31**. Everything marked *verified* was
+Working plan for the School Management System, as of **November 2026**. Everything marked *verified* was
 checked against the code on that date; anything else is labelled as recorded intent.
 
 Companion documents: [README.md](README.md) (run it, what it does) ·
 [CHANGELOG.md](CHANGELOG.md) (what has already happened) ·
 [backend/README.md](backend/README.md) · [frontend/README.md](frontend/README.md) ·
-[docs/SYSTEM_GUIDE.md](docs/SYSTEM_GUIDE.md) · [LICENCE](LICENCE)
+[docs/SYSTEM_GUIDE.md](docs/SYSTEM_GUIDE.md) · [LICENSE](LICENSE)
 
 ---
 
@@ -42,22 +42,25 @@ entries are dated rather than semver'd.
 |---|---|
 | Public website | Live at `/` (home, about, programmes, gallery, contact) with admin editing at `/website/` |
 | Login and portals | Portal chooser at `/login/`, per-role portals, forced first-login password change, staff self-reset blocked, Axes throttling keyed on credential+IP |
-| Admin portal | Staff directory, School Settings (now includes learning/engagement/quizzes switches), audit log, activity feed + daily report, six role dashboards |
+| Admin portal | Staff directory, School Settings (now includes learning/engagement/quizzes/**live-classes/class-feed/gradebook/community** switches), audit log, activity feed + daily report, six role dashboards. Admins type the new staff password; the member changes it on first login. |
 | Academics | Years, terms, classes, streams, subjects, class-subjects — years/terms have lifecycle actions, classes/streams/subjects are create-only |
 | Students | Roster, profile, admission PDFs, Excel bulk import with preview, promotion batches with idempotency |
 | Teachers | Profiles, per-year assignments with one-teacher-per-subject enforced, matrix, distribution, workload, my-classes, marks entry |
 | Results | Exam-only marks, `GradeScale` per year, `Draft → Submitted → Confirmed → Published` governance, report-card PDF with school identity + class position + CT remark + signature block, class broadsheet **PDF** with top-of-class callout |
-| Finance | Double-entry append-only ledger, fee structures/elections/discounts/plans, invoicing, receipts, reversals, adjustments, expenses, budgets, vendors, periods, approval queue, gap-free numbering, reports + Excel, statements + receipt PDFs, fee reminders |
-| Homework | Teacher authoring with publish/unpublish, 5-file caps, student/parent views, submissions with late flagging. Points awarded on first submission through the engagement ledger. |
+| Finance | Double-entry append-only ledger, fee structures/elections/discounts/plans, invoicing, receipts, reversals, adjustments, expenses (cash **and bank**), budgets, vendors, periods, approval queue, gap-free numbering, reports + Excel, **per-term student statements** (HTML + PDF), receipt PDFs with **DUPLICATE stamping on reprint**, fee reminders |
+| Homework | Teacher authoring with publish/unpublish, 5-file caps, student/parent views, submissions with late flagging. **Teacher marking** (score against `max_score`, written feedback, autosave), **needs-revision** flow keeping earlier attempts as revisions, **release** of marks to the whole class at once. `counts_for_gradebook` tick feeds the gradebook. Points awarded on first submission through the engagement ledger. |
 | Communications | Announcements with scheduling and read tracking, complaint/inquiry threads with status workflow and admin inbox |
 | Attendance | **Models, services, selectors complete — no screens** (single `ComingSoonView` route). Checkpoint E will add the UI. |
 | **Virtual School — course builder** | Full teacher course builder: modules, lessons (Markdown notes sanitised via bleach, YouTube/Vimeo/Google Drive embeds, up to 5 attachments per lesson), publish/unpublish/reorder/duplicate, copy course to another term, preview-as-student, formatting toolbar. Student course outline with completion ticks, Continue button, progress bars, private per-lesson notes with autosave, course search. |
 | **Virtual School — engagement** | Streaks (school-days only, weekends/holidays transparent, configurable grace allowance), per-class on/off switch, teacher class-progress view (completion %, streak, who needs encouragement), student progress page, parent view. |
-| **Virtual School — class feed** | Teacher posts (announcement/tip/celebration/question), student questions, 5 safe emoji reactions (child-safe), teacher pin and soft-remove, no private 1:1 chat. Points awarded for student questions with daily cap and removal reversal. |
+| **Virtual School — class feed** | Teacher posts (announcement/tip/celebration/question) **with photos and files**, student questions, 5 safe emoji reactions (child-safe), teacher pin and soft-remove, **one-level threaded replies**. **Class polls** with a database-enforced one-vote-per-pupil ballot (live/after-close result visibility). Points awarded for student questions with daily cap and removal reversal. Teacher **digest** of unanswered questions (daily, ~07:00 Nairobi). |
 | **Virtual School — points and levels** | 7 levels (Seedling → Legend), immutable point ledger with idempotency keys (no double-award), teacher manual bonus with required reason, reversal rows (never deletes), daily feed cap anti-farming, level-up in-app notification. Points from lessons, homework (on-time and late), feed questions, streak milestones, teacher bonus. Never from marks. |
-| **Virtual School — quizzes** | Teacher quiz builder (MC + True/False, up to 20 questions, explanations, shuffle, pass mark, attempt limits, optional time limit, show/hide correct answers, gradebook flag stored). Edit-lock after first submitted attempt + Duplicate quiz. Student take-quiz with AJAX answer autosave, resume after disconnect, server-side auto-submit on timeout. Results: score, pass/fail, question-by-question review (gated by teacher setting). Teacher results screen: per-student scores, class average, pass rate, difficulty ranking. Points: `pts_quiz_attempt` (first attempt, once) + `pts_quiz_pass` (first pass, once). Correct answers never sent to browser before submission. |
+| **Virtual School — quizzes** | Teacher quiz builder (MC + True/False, up to 20 questions, explanations, shuffle, pass mark, attempt limits, optional time limit, show/hide correct answers, gradebook flag stored). Edit-lock after first submitted attempt + Duplicate quiz. Student take-quiz with AJAX answer autosave, resume after disconnect, server-side auto-submit on timeout. Results: score, pass/fail, question-by-question review (gated by teacher setting). Teacher results screen: per-student scores, class average, pass rate, difficulty ranking. **Question types, regrading and manual marking** (Q1/Q2 upgrades). Points: `pts_quiz_attempt` (first attempt, once) + `pts_quiz_pass` (first pass, once). Correct answers never sent to browser before submission. |
+| **Virtual School — live classes & calendar (Checkpoint D)** | ✅ Done. Teachers schedule sessions on Google Meet/Zoom/Teams/custom, gated to the active join window (15 min before start to end + 30 min grace), start/end/cancel, attach recording links with a class notice. Students get a Join button and a per-class calendar; attendance recorded from join clicks. Gated by `live_classes_enabled`. |
+| **Gradebook (Checkpoint F)** | ✅ Done. Per-class/subject/term gradebook combining counted homework, counted quizzes, hand-recorded lab work and the end-of-term exam into one weighted average (defaults 30/30/20/20, must total 100). Manual items, per-pupil excuses, numbered release snapshots families see, send-to-report-card, admin term lock, director overview + export. Gated by `gradebook_enabled`. |
+| **Community** | ✅ Done. School-wide board at `/community/`: public read-only feed, consent-gated participation (posts, threaded replies, 5 safe reactions, drafts, reports), admin moderation (approval queue, pin/lock/move, auto-escalating strike ladder, mute/suspend, appeals, word filter, category-moderator delegation, insights, anonymise/export), direct messages (staff/guardians, students excluded), opt-in member map. Four SchoolSettings flags; Director is read-only. |
 | Public REST API | **None.** DRF installed and configured; zero serializers, viewsets or API views |
-| Test suite | **1,566 passed, 22 failed** as of Checkpoint C (November 2026). The 22 are the same pre-existing failures from 2026-10-31: 17 `apps/public/tests/test_public_site.py`, 4 `apps/accounts`, 1 `tests/test_static_assets.py`. Zero new failures introduced across all LMS checkpoints. |
+| Test suite | **2,538 collected** as of November 2026 (up from ~1,566 at Checkpoint C). The same 22 pre-existing failures remain: 17 `apps/public/tests/test_public_site.py`, 4 `apps/accounts`, 1 `tests/test_static_assets.py`. Zero new failures introduced across Checkpoints D–F, the gradebook, homework marking and the community app. |
 | CI / CD | None. No `.github/`, no pipeline, no pre-commit config |
 | Deployment | Documented for one Linux box (gunicorn + nginx + Postgres); no containers |
 
@@ -87,10 +90,10 @@ Sizing is deliberately rough: **S** ≈ under an hour of agent work, **M** ≈ o
 |---|---|---|
 | **LMS-A** | Course builder | ✅ **Done** — modules, lessons, attachments, publish/reorder/duplicate/copy |
 | **LMS-B** | Student lesson experience | ✅ **Done** — rendered Markdown, click-to-play video, next/prev nav, private notes, search |
-| **LMS-C** | Quizzes | ✅ **Done** — MC/TF, server-side marking, attempt limits, timer, points integration |
-| **LMS-D** | Live classes and shared calendar | 🔲 Next — teacher schedules a session, students see Join button, shared calendar per class |
+| **LMS-C** | Quizzes | ✅ **Done** — MC/TF, server-side marking, attempt limits, timer, points integration, Q1/Q2 question types + regrading + manual marking |
+| **LMS-D** | Live classes and shared calendar | ✅ **Done** — teacher schedules a session, students see Join button, shared calendar per class, recording links |
 | **LMS-E** | Attendance screens | 🔲 Next — replaces the ComingSoonView stub using existing models |
-| **LMS-F** | Gradebook link | 🔲 Later — quiz scores/homework feed into gradebook; teacher controls what counts |
+| **LMS-F** | Gradebook link | ✅ **Done** — per-class subject gradebook with weights and release; homework/quiz marks feed in live |
 | **LMS-G** | Virtual labs | 🔲 Later — PhET and other free simulations embedded in lessons, worksheet + lab report |
 | **LMS-H** | Leaderboard | 🔲 Later — participation-only, opt-in, class-scoped, never mark-based |
 | **LMS-I** | EduShare Africa | 🔲 Later — owner to provide EduShare stack details |
@@ -153,11 +156,11 @@ oversights — and so nobody "fixes" them silently inside an unrelated checkpoin
 
 | ID | Item | Status detail |
 |---|---|---|
-| **Q-1** | **Clear the pre-existing red tests** | The 22 pre-existing failures are unchanged as of Checkpoint C (November 2026): **17** in `apps/public/tests/test_public_site.py`, **4** in `apps/accounts`, **1** in `tests/test_static_assets.py`. Zero new failures were introduced across all LMS checkpoints (A through C). The suite now passes 1,566 tests. |
-| **Q-2** | **Tag releases and adopt semver** | History is four initial commits with no tags. Until releases are tagged, the CHANGELOG is date-keyed. |
+| **Q-1** | **Clear the pre-existing red tests** | The 22 pre-existing failures are unchanged as of November 2026: **17** in `apps/public/tests/test_public_site.py`, **4** in `apps/accounts`, **1** in `tests/test_static_assets.py`. Zero new failures were introduced across Checkpoints D–F, the gradebook, homework marking and the community app. The suite now collects **2,538 tests** (up from ~1,566 at Checkpoint C). |
+| **Q-2** | **Tag releases and adopt semver** | History is 73 commits with no tags (the first four were the initial import). Until releases are tagged, the CHANGELOG is date-keyed. |
 | **Q-3** | **Delete `apps/public_site/`** | Not installed, not routed, no models, no migrations, no tests — referenced only by its own files. The similar-named `apps/public/tests/test_public_site.py` belongs to the **live** app and must not be touched by this cleanup |
 | **Q-4** | **Delete or formally archive `school-website/`** | 8 static files of a "Springfield Academy" mockup referenced by nothing in `backend/`, `frontend/` or `docs/`. Decide: design reference (then say so in its own README) or delete |
-| **Q-5** | **Bring `docs/SYSTEM_GUIDE.md` back in line with the tree** | Verified stale in several ways: it still says the finance UI is absent (there are 30 templates), that results entry has no teacher UI, that `fees_enabled` is inert, that there are no academics edit/delete screens, and 459 tests against an actual 1,130 collected. The three READMEs now hold the corrected version; the guide needs the same pass |
+| **Q-5** | **Bring `docs/SYSTEM_GUIDE.md` back in line with the tree** | ✅ **Done** (November 2026). The guide's stale claims were corrected — finance UI (30 templates exist), results entry (teacher UI exists), `fees_enabled` (now consumed), academics edit screens (years/terms have lifecycle actions), bank-paid expenses, `show_positions`, the 459→~2,500 test count — and new §12a (Virtual School), §12b (Gradebook) and §12c (Community) sections were added. |
 | **Q-6** | **Add CI** | No pipeline exists. A first workflow is mechanical: install `dev.txt`, `manage.py check`, `makemigrations --check --dry-run`, `ruff check`, `pytest`. Note WeasyPrint's native libraries must be installed in the runner or the PDF tests behave differently from locally |
 | **Q-7** | **Wire up pre-commit** | `pre-commit` and `black` are declared dependencies with no config file and no `[tool.black]`; nothing runs automatically |
 | **Q-8** | **Set up a real SMTP + backup schedule for deployment** | `EMAIL_BACKEND` defaults to console, so credential and reminder emails print to stdout unless configured; `scripts/backup_db.sh` carries a cron example but nothing is installed |

@@ -1,7 +1,8 @@
 # Backend — Django
 
-The Django 5.1 project behind the School Management System: settings, 12 installed apps, the
-double-entry finance engine, the results governance state machine, tests and operations scripts.
+The Django 5.1 project behind the School Management System: settings, 15 installed apps, the
+double-entry finance engine, the results governance state machine, the Virtual School (LMS),
+the school-wide community, the teacher gradebook, tests and operations scripts.
 
 - Project settings/URLs: `backend/config/`
 - Applications: `backend/apps/`
@@ -31,8 +32,10 @@ python manage.py seed_demo_data                           # realistic demo conte
 locally. Production uses `config.settings.prod` and **fails fast** without `DATABASE_URL` and
 `ALLOWED_HOSTS`.
 
-Python 3.12+ (repo venv: 3.13.7). PDF routes additionally need WeasyPrint's native Pango/GTK
-libraries; without them those routes answer a deliberate plain-text **503**.
+Python 3.12+ (repo venv: 3.13.7). PDF routes use WeasyPrint (native Pango/GTK); when those libraries
+are missing, `apps/core/pdf.py` falls back to a **headless Chromium/Edge** print job, so a Windows host
+with a Chromium browser keeps producing real PDFs. If neither engine is available the route answers a
+deliberate plain-text **503**.
 
 ---
 
@@ -54,12 +57,16 @@ backend/
 │   ├── teachers/      # TeacherProfile, TeacherAssignment, marks entry views
 │   ├── results/       # Exam, GradeScale(+Bands), ResultSheet state machine, ScoreEntry, remarks, PDFs
 │   ├── finance/       # the ledger: 1,700-line models.py, billing, payments, approvals, periods
-│   ├── homework/      # Homework, attachments, submissions
+│   ├── homework/      # Homework, attachments, submissions, teacher marking/feedback/release, revisions
+│   ├── gradebook/     # teacher gradebook: weights, manual items, excuses, releases, term locks
+│   ├── learning/      # Virtual School: course builder, lessons, quizzes, class feed (+ polls),
+│   │                  #   points/levels, streaks, student notes, live classes & calendar, digest,
+│   │                  #   Markdown rendering — see §5a below
 │   ├── attendance/    # AttendanceRegister/Entry (+ services, selectors) — UI still a stub
 │   ├── communications/# Announcement(+Read), MessageThread, ThreadMessage
+│   ├── community/     # school-wide community board: posts, comments, reactions, moderation,
+│   │                  #   member map, direct messages, word filter, category moderators
 │   ├── dashboards/    # six role homes + the Director analytics suite
-│   ├── learning/      # Virtual School: course builder, lessons, quizzes, class feed, points/levels,
-│   │                  #   streaks, student notes, Markdown rendering — see §5a below
 │   ├── public/        # the school's open website at / and its editing screens at /website/
 │   └── public_site/   # DORMANT — not in INSTALLED_APPS, not routed. Dead code.
 ├── tests/             # cross-app integration, e2e role matrix, static-asset contract
@@ -129,7 +136,7 @@ own, in `apps/core/middleware.py`.
 
 ### Installed apps
 Django contrib (7, incl. `humanize`) · third-party: `rest_framework`, `django_q`, `axes` · local: the
-12 listed in §2 (`public_site` excluded deliberately).
+15 listed in §2 (`public_site` excluded deliberately).
 
 `ATOMIC_REQUESTS = True` — every request is a transaction, so a crash mid-write cannot leave a
 half-posted journal.
@@ -200,7 +207,9 @@ Models: `BaseModel` (abstract `created_at`/`updated_at`, inherited by everything
 `change_summary` diff, `request_id`, `ip_address`), `SystemEvent` (human-rendered business events for
 the activity feed and daily report), `Notification`, and `SchoolSettings` (singleton pk=1: name, motto,
 phone, email, currency, `show_positions`, `fees_enabled`, plus website logo/address/established/
-about/mission/vision).
+about/mission/vision, and the module feature switches `learning_enabled`/`engagement_enabled`/
+`quizzes_enabled`/`feed_community_enabled`/`live_classes_enabled`/`gradebook_enabled`/
+`community_enabled`/`community_paused`/`community_index`/`community_student_moderation`).
 
 Modules: `money.py` (the one `to_money()` rounding rule + `currency_code()`), `audit_log.py`
 (`log_action(...)` — called explicitly from services, **not** signal-driven), `events.py` +
@@ -285,10 +294,16 @@ See §6.
 `Homework` (subject/class/stream/term, `set_by` teacher, due date, `draft` → `published` with
 `published_at`; one legacy `attachment` plus many `HomeworkAttachment`, capped at 5 by
 `MAX_*` constants), `HomeworkSubmission` (unique per homework+student, note, `submitted_at`, `is_late`
-frozen at submission time), `HomeworkSubmissionAttachment` (same cap). Files upload under UUID names via
-`homework_upload_path` and stream only through `HomeworkFileMixin` views. Teacher routes
-(`teacher_views.py`): list/new/edit/delete/**publish** (one POST view publishes *or* unpublishes via
-`publish_homework`) /preview/submissions. Student+parent routes: list, `<pk>/`, `<pk>/submit/`.
+frozen at submission time), `HomeworkSubmissionAttachment` (same cap), and a **marking layer**:
+`HomeworkMark` (one per submission, `score` against `Homework.max_score`, written feedback, a
+`needs_revision` flag that saves the current attempt as a `HomeworkSubmissionRevision` and reopens the
+submission for a fresh one), `marks_released_at` (set once for the whole class; until then students
+see "awaiting marking"), and `counts_for_gradebook` (opt-in tick that lets the homework's marks feed
+the teacher gradebook). Files upload under UUID names via `homework_upload_path` and stream only
+through `HomeworkFileMixin` views. Teacher routes (`teacher_views.py`): list/new/edit/delete/
+**publish** (one POST view publishes *or* unpublishes via `publish_homework`) /preview/submissions/
+**mark**/mark-autosave/**release**. Student+parent routes: list, `<pk>/`, `<pk>/submit/`, `marked/`
+(the student's released work).
 
 ### `attendance` — `/attendance/`
 `AttendanceRegister` (unique class+date, refuses future dates, `recorded_at` set only on first write so
@@ -311,22 +326,100 @@ inquiry / satisfaction; `open → in_progress → resolved`; `sender` + optional
 
 The LMS is built on top of existing school data — classrooms are computed from `TeacherAssignment` + `ClassSubject` + `Term`, so a teacher's online classroom appears automatically with no extra setup.
 
-**Models (8 migrations, 0001–0008):**
-`CourseModule`, `Lesson` (notes with `notes_format` plain/markdown, `video_url`, up to 5 `LessonAttachment` rows), `LessonProgress`, `LessonAttachment`, `ClassEngagementSettings`, `LearningStreak`, `ClassPost`+`ClassPostReaction` (class feed), `PointConfig`+`PointLedger`+`StudentLevel` (points and levels), `StudentLessonNote` (private per-student), `Quiz`+`QuizQuestion`+`QuizChoice`+`QuizAttempt`+`QuizAttemptAnswer` (quizzes).
+**Models (20 migrations, 0001–0020):**
+`CourseModule`, `Lesson` (notes with `notes_format` plain/markdown, `video_url`, up to 5 `LessonAttachment` rows), `LessonProgress`, `LessonAttachment`, `ClassEngagementSettings`, `LearningStreak`, `ClassPost` (+ `ClassPostReaction`, + `ClassFeedSettings`) for the class feed, `PointConfig`+`PointLedger`+`StudentLevel` (points and levels), `StudentLessonNote` (private per-student), `Quiz`+`QuizQuestion`+`QuizChoice`+`QuizAttempt`+`QuizAttemptAnswer` (quizzes, with Q1/Q2 question-type and regrading upgrades), `Topic` (schedule targeting of lessons), `LessonComment` (per-lesson discussion, moderated), `ClassPoll`+`ClassPollOption`+`ClassPollVote` (class polls with a DB-enforced one-vote-per-pupil constraint), `LiveClassSession`+`LiveClassAttendance` (live classes & calendar — Checkpoint D), and a `DigestSchedule` row that drives the morning teacher digest.
 
 **Services and selectors:**
-`course_services.py` (module/lesson CRUD, reorder, duplicate, copy course), `engagement_services.py` (lesson completion → streak refresh), `feed_services.py` (create/remove/pin posts, reactions), `points_services.py` (award_points, reverse_award, teacher_bonus, check_level_up), `quiz_services.py` (create/publish quiz, add questions/choices, edit-lock after submissions, start_or_resume_attempt, save_answer, submit_attempt with server-side marking, auto_submit_timed_out), `lesson_notes_services.py`, `markdown_utils.py` (safe Markdown→HTML via `markdown`+`bleach`), `video_utils.py` (parse_video_url: all YouTube formats + Vimeo + Drive; uses `youtube-nocookie.com`).
+`course_services.py` (module/lesson CRUD, reorder, duplicate, copy course), `topic_services.py` (topic CRUD/move and lesson targeting), `engagement_services.py` (lesson completion → streak refresh), `feed_services.py` (create/remove/pin posts, reactions), `feed_media_services.py` (photos and files on feed posts), `comment_services.py` + `reply_starters.py` (lesson comments and reply suggestions), `poll_services.py` (create/vote/close polls), `points_services.py` (award_points, reverse_award, teacher_bonus, check_level_up), `quiz_services.py` (create/publish quiz, add questions/choices, edit-lock after submissions, start_or_resume_attempt, save_answer, submit_attempt with server-side marking, auto_submit_timed_out, regrading and manual marking), `lesson_notes_services.py`, `live_class_services.py` (schedule/cancel/start/end sessions, recording links, student join auditing), `digest_tasks.py` (the morning digest of unanswered questions, one per teacher per school day at ~07:00 Nairobi time), `markdown_utils.py` (safe Markdown→HTML via `markdown`+`bleach`), `video_utils.py` (parse_video_url: all YouTube formats + Vimeo + Drive; uses `youtube-nocookie.com`). Selectors mirror each area (`course_selectors`, `feed_selectors`, `poll_selectors`, `live_class_selectors`, `calendar_selectors`, `engagement_selectors`, `points_selectors`, `quiz_selectors`).
+
+**Live classes & calendar (Checkpoint D):** teachers schedule a session on Google Meet/Zoom/Teams or a custom link, gated to the active join window (15 min before `scheduled_start` until `scheduled_end` + 30 min grace); they start/end/cancel, attach a recording URL (with an acknowledgement notice that it was given to the class), and optionally link the recording to a lesson. Students get a Join button and a per-class calendar. Attendance is recorded from join clicks. `teacher_can_access_classroom()` scopes everything to the teacher's own assignments (admin/director oversee).
+
+**Class polls:** a teacher creates a poll post with two or more options; `ClassPollVote`'s unique constraint on `(poll, voter)` makes one-vote-per-pupil a database guarantee. A pupil may change their vote before `closes_at`. Results visibility is `live` or `after_close` (teachers always see the tally). Requires both `feed_community_enabled` and the class's `ClassFeedSettings.is_active`.
+
+**Teacher digest:** `python manage.py send_feed_digest` (also scheduled by `DigestSchedule`, a django-q daily schedule created by migration 0012) notifies each teacher once per school day at ~07:00 Nairobi time of unanswered class-feed questions older than the digest; `catch_up=False` means a missed 07:00 slot is skipped, not run late. `digest_sent_at` on each question stops it reappearing in consecutive digests.
 
 **Feature flags** (all `SchoolSettings` Booleans, all default OFF):
-`learning_enabled` → gates all LMS pages · `engagement_enabled` → gates progress/streaks/points (also requires per-class `ClassEngagementSettings.is_active`) · `quizzes_enabled` → gates quiz builder and student quiz flow.
+`learning_enabled` → gates all LMS pages · `engagement_enabled` → gates progress/streaks/points (also requires per-class `ClassEngagementSettings.is_active`) · `quizzes_enabled` → gates quiz builder and student quiz flow · `feed_community_enabled` → gates the class feed and polls · `live_classes_enabled` → gates live classes & calendar · `gradebook_enabled` is the adjacent flag (see the `gradebook` app below).
 
 **Security rules:**
 - Students can only access classrooms for their own class.
 - Quiz correct answers (`is_correct`) are **never sent to the browser before submission**.
 - Quiz questions are locked after the first submitted attempt (edit-lock with Duplicate-quiz escape hatch).
 - Student lesson notes are private: visible only to that student.
-- Class feed posts and reactions are class-scoped and teacher-moderated.
+- Class feed posts and reactions are class-scoped and teacher-moderated; polls are one-vote-per-pupil.
+- Live classes are scoped to the teacher's assignments; students join only their own class's sessions.
 - All LMS files served through permission-checked streaming views, never via MEDIA_URL.
+
+### `gradebook` — `/gradebook/` (teacher gradebook)
+
+A per-class, per-subject, per-term gradebook that combines counted homework, counted quizzes,
+hand-recorded lab work and the end-of-term exam into one weighted average. Gated by the
+`gradebook_enabled` feature flag.
+
+**Models (migration 0001):** `GradebookSetup` (one per class+subject+term(+stream); four weights —
+`homework_weight`/`quiz_weight`/`lab_weight`/`exam_weight`, default 30/30/20/20, must total 100 over
+the buckets in use; FK `exam_sheet` → `results.ResultSheet`), `ManualItem` (a hand-recorded piece of
+offline work with a max score, bucket and `counts_for_gradebook`), `ManualScore` (a pupil's mark on a
+manual item), `GradebookExcuse` (per-pupil excuse that exempts one item), `GradebookRelease` (a numbered
+frozen snapshot of the whole grid) + `GradebookResult` (one pupil's row in a release), and
+`GradebookTermLock` (admin lock for a whole term's gradebook school-wide).
+
+**How it works:** homework and quiz marks are read **live** from their own records — nothing is copied
+into the gradebook. `effective_weights()` renormalises the four buckets over only those that have work,
+so an empty bucket never drags the average down. A teacher adds manual items, records excuses, edits
+weights, then **releases** (`release_gradebook`) which freezes the grid into the next numbered snapshot
+that pupils and parents see — a released grade cannot change under a family without a new, reasoned
+release. `send_to_report_card` writes the weighted final mark into the linked exam `ResultSheet`.
+`ensure_tick_writable(term)` is called from the homework and quiz save services: while the gradebook is
+on, marking/ticking is refused for a locked term.
+
+**Routes:** teacher grid + setup + release + send-to-report-card + export (xlsx/csv/pdf) + manual-item
+CRUD + excuse revoke; `my/` for the student/parent family view; `director/` overview + export;
+`locks/` for admin term locking. Views are split across `views.py`, `setup_views.py`,
+`release_views.py`, `family_views.py`, `director_views.py`, `export_views.py`, `admin_views.py`.
+
+### `community` — `/community/` (school-wide community)
+
+A school-wide message board mounted at `/community/` with three layers: public read-only feed,
+consent-gated participation, and admin moderation. Gated by four `SchoolSettings` flags:
+`community_enabled` (master switch), `community_paused` (temporary "back soon" page),
+`community_index` (allow search-engine indexing; off → `noindex, nofollow`), and
+`community_student_moderation` (hold student public posts for approval, on by default).
+
+**Models (6 migrations, 0001–0006):** `Category` (visibility PUBLIC/SIGNED_IN/ROLE + `staff_post_only`),
+`Post` (PENDING→PUBLISHED→REMOVED; pin/lock/edit tracking), `Comment` (one-level threading via `parent`
+self-FK; soft-delete), `Reaction` (5 child-safe emoji, unique per user+post+emoji), `CommunityProfile`
+(consent, online-now `last_seen_at`, mute/suspend/strike counters, rate-limit state, opt-in member-map
+location), `DirectConversation`+`DirectMessage` (private 1:1 messaging, pair stored in ascending PK
+order; students excluded), `PostDraft` (one autosaved draft per user), `Warning` (REMINDER/MUTE/
+SUSPENSION/MANUAL levels), `Report`, `Appeal` (one per warning), `BlockedWord` (holds content for
+review, never blocks), `CategoryModerator` (delegated limited moderation per category).
+
+**Services** (`services.py`): posting gate (`can_post_in_category`), create/edit/remove posts and
+comments (Bleach sanitisation, rate limits 3/min and 30/day, duplicate detection), reactions, drafts,
+the auto-escalating strike ladder (0→REMINDER, 1→MUTE 24h, 2+→SUSPENSION 7d), manual mute/suspend,
+reports, appeals, category-moderator delegation, `anonymise_user_content` (parental erasure) and
+`export_user_content` (CSV), member-map location, direct messages. **Selectors** (`selectors.py`):
+feed (`post_feed` with cursor paging, sort new/top/pinned), post detail with threaded replies,
+sidebar stats + leaderboard, members directory (students excluded), search, per-role dashboard cards,
+`community_insights`, member map, member profile, DM inbox.
+
+**Access control:** public categories are readable by anyone (even anonymous); SIGNED_IN categories
+need login; ROLE categories need a matching role. Participation needs `LoginRequiredMixin` + consent
+(`CommunityProfile.consented_at`) + the posting gate. Admin views use a local `AdminRequiredMixin`
+admitting admin+director, **but the service layer enforces admin-only** (`_require_staff` rejects
+director) — the Director is community-read-only. Category moderators (teachers) get limited rights via
+`_require_mod_or_staff` (approve pending, hide, dismiss reports in their category only). Auto-strikes
+fire only when the actor is an admin. Students are excluded from the members directory, the map and
+direct messaging; their public-category posts start PENDING.
+
+**Routes** (`urls.py`, `community:` namespace, 40 routes): public (home, events, members, member
+profile, map, messages, message thread, message start, about, search, category feed, post detail,
+paused); participation (consent, post create/edit/remove, comment create/edit/remove, reaction toggle,
+draft save/clear, my posts, report, warning detail, appeal, dashboard card); admin moderation (queue,
+post approve/restore/pin/unpin/lock/move, warn, warning lift, appeal review, report resolve,
+mute/unmute/suspend/unsuspend, word filter, delegation, insights, categories, category create/edit,
+anonymise, export).
 
 ### `dashboards` — `/dashboards/<role>/` `models.py` is an intentional stub. The Director suite (`views_director.py`) carries
 class performance and per-class drilldown, class fee overview and debtors, staff directory, "Books of
@@ -479,9 +572,11 @@ then calls `create_announcement(audience="by_role", target_roles=["student", "pa
 | `/teachers/` | `teachers` | SchoolRead / Admin / Teacher | Profiles, assignments, matrix, workload, my classes, marks |
 | `/results/` | `results` | mixed / Admin | `my-results/`, report-card PDF, `sheets/`, governance actions, broadsheet, `grading/` |
 | `/finance/` | `finance` | FinanceRead / FinanceWrite | `overview`, `accounts/`, `fee-structures/` (+ upload/preview/commit/template), `invoices/` (+ generate), `payments/` (+ record/receipt/reverse), `adjustments/create/`, `ledger/`, `reports/{trial-balance,summary,classes,outstanding(+export)}`, student statements (HTML+PDF), class/school summaries, `expenses/`, `reminders/`, `my-statement/` |
-| `/homework/` | `homework` | Student/Parent + Teacher | List, detail, submit; teacher CRUD + publish + preview + submissions |
+| `/homework/` | `homework` | Student/Parent + Teacher | List, detail, submit, marked work; teacher CRUD + publish + preview + submissions + **mark + autosave + release** |
+| `/gradebook/` | `gradebook` | Teacher + Student/Parent + Director + Admin | Teacher grid + setup + release + send-to-report-card + export + manual items + excuses; `my/` family view; `director/` overview + export; `locks/` admin term locking. Gated by `gradebook_enabled`. |
 | `/attendance/` | `attendance` | LoginRequired | **Stub** — `ComingSoonView` only |
-| `/learning/` | `learning` | mixed | Virtual School: classrooms, course builder, lessons, quizzes, class feed, progress, badges, points — 35+ named routes. Gated by `learning_enabled` / `engagement_enabled` / `quizzes_enabled` flags. |
+| `/learning/` | `learning` | mixed | Virtual School: classrooms, course builder (topics/modules/lessons), quizzes, class feed (+ polls), progress, badges, points, **live classes & calendar**, student notes — 80+ named routes. Gated by `learning_enabled` / `engagement_enabled` / `quizzes_enabled` / `feed_community_enabled` / `live_classes_enabled` flags. |
+| `/community/` | `community` | mixed (public read + login to post) | Public feed, events, members, member profile, map, messages, about, search; consent-gated posts/comments/reactions/drafts/reports/appeals; admin moderation queue, pin/lock/move, warnings, mute/suspend, word filter, delegation, insights, categories, anonymise/export. Gated by `community_enabled` (+ `community_paused`/`index`/`student_moderation`). |
 | `/communications/` | `communications` | mixed | Announcements, message threads, admin inbox |
 | `/dashboards/<role>/` | `dashboards` | per role | Six role homes + Director analytics |
 | `/audit/log/`, `/school/`, `/activity/` | `core*` | Admin | Audit viewer, School Settings, activity feed + daily report |
@@ -503,6 +598,7 @@ queue limit 50, bulk 10, `catch_up=False`.
 | `validate_bulk_import` | `apps/students/tasks.py` | Student `.xlsx` upload → preview |
 | `validate_fee_structure_upload` | `apps/finance/tasks.py` | Fee-structure `.xlsx` upload → preview |
 | `send_fee_reminder_task` | `apps/finance/tasks.py` | `/finance/reminders/` |
+| `send_feed_digest` | `apps/learning/management/commands/send_feed_digest.py` | `DigestSchedule` (django-q daily, ~07:00 Nairobi) — one morning digest per teacher of unanswered class-feed questions. `catch_up=False`, so a missed slot is skipped. Also runnable by hand: `python manage.py send_feed_digest`. |
 
 Run `python manage.py qcluster`. Without it these jobs queue silently.
 
@@ -511,9 +607,12 @@ Run `python manage.py qcluster`. Without it these jobs queue silently.
 ## 9. Files, PDFs and exports
 
 - **`apps/core/pdf.py`** — `pdf_response()` renders a template through **WeasyPrint**. When WeasyPrint or
-  its native libraries are missing it returns a plain-text **503**; it never returns HTML named `.pdf`.
-  `xhtml2pdf` is in requirements but imported nowhere. PDF templates: report card, class broadsheet,
-  payment receipt, student statement, Director books report, admission form (+blank).
+  its native libraries are missing it falls back to a **headless Chromium/Edge** print job (it searches
+  Chrome, Edge and the common Linux command names, or honours `PDF_BROWSER_PATH`), so a Windows host
+  with a Chromium browser keeps producing real PDFs. If neither engine can render it returns a
+  plain-text **503**; it never returns HTML named `.pdf`. `xhtml2pdf` is in requirements but imported
+  nowhere. PDF templates: report card, class broadsheet, payment receipt, student statement, Director
+  books report, admission form (+blank).
 - **`apps/core/exports.py`** — the only sanctioned spreadsheet path, including the **formula-injection
   defence**: any cell text starting `= + - @ TAB CR` is forced to `data_type="s"`. Also
   `stamp_document()` provenance.
@@ -545,8 +644,9 @@ Per [ADR-004](../docs/decisions/observability.md):
 
 ```bash
 cd backend
-python -m pytest -q                       # ~1,566 tests, 80+ files — see backend/pytest.ini
+python -m pytest -q                       # ~2,500 tests, 100+ files — see backend/pytest.ini
 python -m pytest apps/finance -q          # one app
+python -m pytest apps/community -q        # the community suite (~200 tests)
 python -m pytest tests/e2e -q             # role matrix across the whole URLconf
 python -m pytest --cov=apps --cov-report=term-missing
 python -m ruff check apps config tests
@@ -628,4 +728,4 @@ connections before `DROP/CREATE DATABASE`, prints a post-restore checklist.
 9. `docs/SYSTEM_GUIDE.md` is the reference but has drifted — the finance UI, results entry and test count are all stale. Trust the tree and these READMEs.
 10. There is no CI and no pre-commit config; `black`/`pre-commit` are declared dependencies that nothing
     runs. `manage.py check` + `ruff` + `pytest` + `makemigrations --check` by hand, before every checkpoint.
-11. The `learning` app has 8 migrations (0001–0008). Three later checkpoints add field migrations to existing models — always run `migrate` after pulling.
+11. The `learning` app has 20 migrations (0001–0008 LMS base, 0009–0010 live classes & feed restructure, 0011–0012 digest, 0013 polls, 0014 recording links, 0015/0019 quiz upgrades, 0016–0018 rich feed, 0020 topics/comments) — always run `migrate` after pulling. The `gradebook` app has 1 migration, and `community` has 6 (0001–0006).
