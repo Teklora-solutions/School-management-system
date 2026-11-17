@@ -1,0 +1,1703 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="School Management System">
+  <title>Class Feed · Basic 5 | My School | SMS</title>
+
+  
+  
+  <link rel="stylesheet" href="file:///C:/Users/JNR%20Developer/Desktop/school%20system/school-management-system/frontend/static/vendor/bootstrap/5.3.3/bootstrap.min.css">
+  
+  <link rel="stylesheet" href="file:///C:/Users/JNR%20Developer/Desktop/school%20system/school-management-system/frontend/static/vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css">
+  
+  <link rel="stylesheet" href="file:///C:/Users/JNR%20Developer/Desktop/school%20system/school-management-system/frontend/static/css/base.css">
+  
+<style>
+  .feed-post--pinned {
+    border-color: var(--color-warning) !important;
+    box-shadow: 0 0 0 1px rgba(245,158,11,0.25), var(--shadow-card);
+  }
+  .feed-post--removed {
+    border-color: rgba(239,68,68,0.3) !important;
+    background: rgba(239,68,68,0.04);
+  }
+  .text-muted-sm { color: var(--color-muted); font-size: 0.8rem; }
+  .fw-600 { font-weight: 600; }
+  .reaction-btn { cursor: pointer; transition: all 0.15s ease; }
+  .reaction-btn:hover:not([disabled]) {
+    background: var(--accent-glow) !important;
+    border-color: var(--accent) !important;
+    transform: scale(1.1);
+  }
+  .reaction-btn--active { font-weight: 700; }
+  .feed-rules-banner { display: none; }
+  .feed-rules-banner.visible { display: flex; }
+  .feed-post__body {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+    color: var(--color-text);
+  }
+  .feed-link-btn {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    font-size: 0.8rem;
+  }
+  .feed-status { font-size: 0.72rem; font-weight: 600; }
+  .feed-status--waiting { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .feed-status--answered { background: rgba(16,185,129,0.15); color: #34d399; }
+  .feed-status--best { background: rgba(139,92,246,0.15); color: #a78bfa; }
+  .feed-filters {
+    display: flex;
+    gap: 0.4rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  .feed-filter {
+    flex: 0 0 auto;
+    padding: 0.35rem 0.85rem;
+    border-radius: 99px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .feed-filter--active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .feed-section-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
+    margin-bottom: 0.4rem;
+  }
+  .feed-new-posts { border-radius: 99px; }
+  .feed-skeleton .skeleton-line {
+    height: 0.8rem;
+    border-radius: 6px;
+    background: var(--color-surface-2);
+    margin-bottom: 0.6rem;
+    animation: feedPulse 1.2s ease-in-out infinite;
+  }
+  .feed-skeleton .skeleton-line--short { width: 55%; margin-bottom: 0; }
+  @keyframes feedPulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+  .feed-draft-note { color: var(--color-muted); }
+  .feed-poll {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: .75rem;
+    color: var(--color-text);
+  }
+  .feed-poll__badge { background: rgba(6,182,212,0.15); color: #22d3ee; }
+  .feed-poll__state { background: rgba(148,163,184,0.18); color: var(--color-muted); }
+  .feed-poll__options { border: 0; padding: 0; margin: 0 0 .6rem; }
+  .feed-poll__option {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    min-height: 48px;
+    padding: .65rem .8rem;
+    margin-bottom: .45rem;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    cursor: pointer;
+  }
+  .feed-poll__option input { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; }
+  .feed-poll__option--chosen { border-color: var(--accent); background: var(--accent-glow); }
+  .feed-poll__option-text { font-size: .9rem; }
+  .feed-poll__tick { margin-left: auto; font-size: .75rem; color: var(--accent-light); white-space: nowrap; }
+  .feed-poll__submit { min-height: 46px; font-weight: 600; }
+  .feed-poll__voted { font-size: .85rem; color: var(--accent-light); }
+  .feed-poll__results { list-style: none; padding: 0; margin: 0 0 .4rem; }
+  .feed-poll__result { margin-bottom: .55rem; }
+  .feed-poll__result-label { font-size: .85rem; overflow-wrap: anywhere; }
+  .feed-poll__result-count { font-size: .8rem; color: var(--color-muted); white-space: nowrap; }
+  .feed-poll__bar {
+    height: 10px;
+    margin-top: .2rem;
+    border-radius: 99px;
+    background: var(--color-border);
+    overflow: hidden;
+  }
+  .feed-poll__bar span {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+    border-radius: 99px;
+    background: var(--accent);
+  }
+</style>
+
+</head>
+
+<body data-role="student" data-user-id="2">
+
+  
+  
+  
+  <div class="app-wrapper ">
+
+    
+    
+    <nav class="app-navbar" role="navigation" aria-label="Main navigation">
+      
+      <button class="navbar-icon-btn sidebar-toggle d-lg-none" aria-label="Open menu" aria-expanded="false">
+        <i class="bi bi-list" aria-hidden="true"></i>
+      </button>
+
+      
+      <a class="navbar-brand" href="/dashboard/">
+        <span class="brand-dot"></span>
+        My School
+      </a>
+
+      
+      
+
+      <div class="navbar-spacer"></div>
+
+      <div class="navbar-actions">
+        
+        
+        
+        <a class="navbar-icon-btn navbar-bell"
+           href="/notifications/"
+           title="Notifications"
+           aria-label="Notifications, 2 unread">
+          <i class="bi bi-bell" aria-hidden="true"></i>
+          
+          <span class="navbar-bell__badge">2</span>
+          
+        </a>
+        
+        
+        
+          <span class="badge-role badge-role-student">
+            Student
+          </span>
+        
+
+        
+        
+        <div class="dropdown">
+          <button class="navbar-avatar" type="button"
+                  id="user-menu-btn"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                  aria-label="User menu">
+            
+              TS
+            
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end user-menu"
+              aria-labelledby="user-menu-btn">
+            <li>
+              <div class="px-3 py-2 user-menu__header">
+                <div class="fw-600 user-menu__name">Test Student</div>
+                <div class="text-muted-sm">stu_AUD-001@test.school</div>
+              </div>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/profile/">
+                <i class="bi bi-person me-2"></i>Profile
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <form method="post" action="/logout/" data-logout-form>
+                <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+                <button type="submit" class="dropdown-item user-menu__logout">
+                  <i class="bi bi-box-arrow-right me-2"></i>Sign Out
+                </button>
+              </form>
+            </li>
+          </ul>
+        </div>
+        
+      </div>
+    </nav>
+    
+
+    
+    <div class="sidebar-overlay" role="presentation" aria-hidden="true"></div>
+
+    
+    
+  
+<aside class="app-sidebar" id="app-sidebar" role="navigation" aria-label="Sidebar">
+  
+
+
+  
+    
+    <a href="/dashboard/"
+       class="sidebar-item "
+       >
+      <i class="bi bi-speedometer2" aria-hidden="true"></i>
+      <span>Dashboard</span>
+    </a>
+  
+
+  
+    
+    <a href="/learning/"
+       class="sidebar-item active"
+       aria-current="page">
+      <i class="bi bi-bookshelf" aria-hidden="true"></i>
+      <span>My Learning</span>
+    </a>
+  
+
+  
+    
+    <a href="/learning/feed/"
+       class="sidebar-item "
+       >
+      <i class="bi bi-megaphone" aria-hidden="true"></i>
+      <span>Class Feed</span>
+    </a>
+  
+
+  
+    
+    <a href="/results/my-results/"
+       class="sidebar-item "
+       >
+      <i class="bi bi-bar-chart" aria-hidden="true"></i>
+      <span>My Results</span>
+    </a>
+  
+
+  
+    
+    <a href="/finance/my-statement/"
+       class="sidebar-item "
+       >
+      <i class="bi bi-receipt" aria-hidden="true"></i>
+      <span>Fee Statement</span>
+    </a>
+  
+
+  
+    
+    <a href="/homework/"
+       class="sidebar-item "
+       >
+      <i class="bi bi-journal-bookmark" aria-hidden="true"></i>
+      <span>Homework</span>
+    </a>
+  
+
+  
+    
+    <a href="#" class="sidebar-item has-children "
+       aria-expanded="false"
+       role="button">
+      <i class="bi bi-chat-square-text" aria-hidden="true"></i>
+      <span>Messages</span>
+      <i class="bi bi-chevron-right chevron" aria-hidden="true"></i>
+    </a>
+    <ul class="sidebar-submenu " role="list">
+      
+      <li>
+        <a href="/communications/messages/"
+           class="sidebar-subitem "
+           >
+          <i class="bi bi-envelope" aria-hidden="true"></i>
+          My Messages
+        </a>
+      </li>
+      
+      <li>
+        <a href="/communications/messages/new/"
+           class="sidebar-subitem "
+           >
+          <i class="bi bi-plus-circle" aria-hidden="true"></i>
+          New Message
+        </a>
+      </li>
+      
+    </ul>
+  
+
+  
+    
+    <a href="/communications/"
+       class="sidebar-item "
+       >
+      <i class="bi bi-megaphone" aria-hidden="true"></i>
+      <span>Announcements</span>
+    </a>
+  
+
+  
+    
+    <a href="/profile/"
+       class="sidebar-item "
+       >
+      <i class="bi bi-person" aria-hidden="true"></i>
+      <span>Profile</span>
+    </a>
+  
+
+
+</aside>
+
+
+
+    
+    <main class="app-main" id="main-content" role="main">
+      
+
+
+
+      
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-megaphone me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Basic 5 Feed
+    </h1>
+    <p class="page-subtitle">
+      The living heart of this class — ask, answer and celebrate together
+      
+    </p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap mt-1">
+    
+    <a href="/learning/feed/" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All classes
+    </a>
+  </div>
+</div>
+
+
+<div class="alert alert-info d-flex gap-2 align-items-start mb-3 feed-rules-banner"
+     id="feedRulesBanner" role="note" style="font-size:0.85rem;">
+  <i class="bi bi-info-circle-fill fs-5 flex-shrink-0 mt-1" aria-hidden="true"></i>
+  <div>
+    <strong>Community rules:</strong>
+    Be kind and respectful. Only post things you would say in class.
+    Teachers can see and remove anything that is not appropriate.
+    
+  </div>
+  <button type="button" class="btn-close btn-close-white ms-auto flex-shrink-0"
+          aria-label="Dismiss" onclick="dismissFeedRules()"></button>
+</div>
+
+
+
+<div class="card mb-4 feed-composer">
+  <div class="card-header">
+    <h2 class="card-title">
+      <i class="bi bi-pencil-square me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Add a post
+    </h2>
+  </div>
+  <div class="card-body">
+    <form method="post" action="/learning/class/1/feed/" novalidate
+          data-feed-draft-kind="post" data-feed-draft-class="1">
+      <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+
+      
+        
+        <div class="mb-3">
+          <span class="form-label d-block">What would you like to share?</span>
+          <div class="d-flex flex-wrap gap-2" role="group" aria-label="Post type">
+            <div class="form-check form-check-inline feed-type-option">
+              <input class="form-check-input" type="radio" name="post_type" id="pt_question" value="question" checked>
+              <label class="form-check-label" for="pt_question">
+                <i class="bi bi-question-circle me-1" aria-hidden="true"></i>Ask a question
+              </label>
+            </div>
+            <div class="form-check form-check-inline feed-type-option">
+              <input class="form-check-input" type="radio" name="post_type" id="pt_tip" value="tip">
+              <label class="form-check-label" for="pt_tip">
+                <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>I figured it out
+              </label>
+            </div>
+            <div class="form-check form-check-inline feed-type-option">
+              <input class="form-check-input" type="radio" name="post_type" id="pt_celebration" value="celebration">
+              <label class="form-check-label" for="pt_celebration">
+                <i class="bi bi-stars me-1" aria-hidden="true"></i>Thank you / shout-out
+              </label>
+            </div>
+          </div>
+        </div>
+        
+
+        
+      
+
+      <div class="mb-3">
+        <label class="form-label" for="id_body">
+          Your message
+        </label>
+        <textarea class="form-control feed-draft-input" id="id_body" name="body" rows="3"
+                  maxlength="2000"
+                  data-feed-draft-input
+                  placeholder="Ask a question or share something with the class…"
+                  required></textarea>
+        <div class="text-muted-sm mt-1">
+          Plain text only. Maximum 2&nbsp;000 characters.
+          <span class="feed-draft-note" hidden>Draft saved on this device.</span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-send me-1" aria-hidden="true"></i>
+        Share with class
+      </button>
+    </form>
+  </div>
+</div>
+
+
+
+
+
+
+
+  <div id="feedCommunity"
+     data-feed-class-id="1"
+     data-feed-poll-url="/learning/class/1/feed/poll/"
+     data-feed-items-url="/learning/class/1/feed/items/"
+     data-feed-latest-id="6"
+     data-feed-filter="all">
+
+  
+  <div class="d-flex justify-content-center mb-3">
+    <button type="button" id="feedNewPostsBtn" class="btn btn-primary btn-sm feed-new-posts" hidden>
+      <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
+      <span id="feedNewPostsCount">0</span> new posts
+    </button>
+  </div>
+
+  
+  <nav class="feed-filters mb-3" aria-label="Feed filters">
+    
+    <a href="?filter=all"
+       class="feed-filter feed-filter--active"
+       aria-current="page">All</a>
+    
+    <a href="?filter=questions"
+       class="feed-filter "
+       >Questions</a>
+    
+    <a href="?filter=announcements"
+       class="feed-filter "
+       >Announcements</a>
+    
+    <a href="?filter=pinned"
+       class="feed-filter "
+       >Pinned</a>
+    
+    <a href="?filter=mine"
+       class="feed-filter "
+       >Mine</a>
+    
+  </nav>
+
+  
+  
+  <section class="mb-3" aria-label="Pinned posts">
+    <div class="feed-section-label">
+      <i class="bi bi-pin-angle-fill me-1" aria-hidden="true"></i>Pinned
+    </div>
+    <div class="d-flex flex-column gap-3">
+      
+      
+<article class="card feed-post feed-post--pinned "
+         id="post-1"
+         aria-label="Post by Test Teacher">
+
+  
+  <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+
+    <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
+         style="width:32px;height:32px;font-size:0.75rem;">
+      TT
+      
+    </div>
+
+    <div class="flex-grow-1 min-w-0">
+      <div class="fw-600" style="font-size:0.875rem;">
+        Test Teacher
+        
+        <span class="badge-role badge-role-teacher ms-1"
+              style="font-size:0.65rem;vertical-align:middle;">
+          Teacher
+        </span>
+        
+      </div>
+      <div class="text-muted-sm" style="font-size:0.775rem;">
+        14 Nov 2026, 4:08 p.m.
+        
+        · <i class="bi bi-pin-fill" style="color:var(--color-warning);" aria-label="Pinned"></i> Pinned
+        
+        
+      </div>
+    </div>
+
+    <span class="badge ms-auto"
+          style="background:rgba(14,165,233,0.15);color:#38bdf8;
+                 ">
+      <i class="bi bi-megaphone me-1" aria-hidden="true"></i>
+      
+      
+      
+      
+      
+      Announcement
+    </span>
+  </div>
+
+  
+  <div class="card-body ">
+    <p class="mb-0 feed-post__body">Tomorrow we start fractions. Bring your Maths book, a ruler and two sharp pencils. If you are stuck on tonight&#x27;s homework, ask here before 8pm and I will answer.</p>
+
+    
+
+    
+
+    
+  </div>
+
+  
+  <div class="card-body pt-0 d-flex align-items-center justify-content-between flex-wrap gap-2"
+       style="border-top:1px solid var(--color-border);">
+
+    <div class="d-flex flex-wrap gap-1 align-items-center" role="group" aria-label="Reactions">
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/1/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="👍">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Thumbs up"
+                aria-label="Thumbs up"
+                data-emoji="👍"
+                >👍</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/1/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="✅">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Got it"
+                aria-label="Got it"
+                data-emoji="✅"
+                >✅</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/1/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❓">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="I have a question too"
+                aria-label="I have a question too"
+                data-emoji="❓"
+                >❓</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/1/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❤️">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Love this"
+                aria-label="Love this"
+                data-emoji="❤️"
+                >❤️</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/1/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="🔥">
+        <button type="submit"
+                class="btn btn-sm reaction-btn reaction-btn--active"
+                style="background:var(--accent-glow);
+                       border:1px solid var(--accent);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="This is great"
+                aria-label="This is great"
+                data-emoji="🔥"
+                >🔥<span class="reaction-count" data-count-for="🔥"> 1</span></button>
+      </form>
+      
+      
+      <span class="align-self-center text-muted-sm ms-1" style="font-size:0.8rem;">
+        1 reaction
+      </span>
+      
+    </div>
+
+    <div class="d-flex gap-1 flex-wrap align-items-center">
+      
+      <a href="/learning/class/1/feed/post/1/"
+         class="btn btn-sm"
+         style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.8rem;">
+        <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+        0 replies
+      </a>
+      
+
+      
+    </div>
+  </div>
+</article>
+
+
+      
+    </div>
+  </section>
+  
+
+  
+  <div id="feedStream" class="d-flex flex-column gap-3"
+       role="feed"
+       aria-label="Basic 5 class feed"
+       data-feed-next-before=""
+       data-feed-has-more="0">
+
+    
+    
+    
+<article class="card feed-post  "
+         id="post-6"
+         aria-label="Post by Test Teacher">
+
+  
+  <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+
+    <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
+         style="width:32px;height:32px;font-size:0.75rem;">
+      TT
+      
+    </div>
+
+    <div class="flex-grow-1 min-w-0">
+      <div class="fw-600" style="font-size:0.875rem;">
+        Test Teacher
+        
+        <span class="badge-role badge-role-teacher ms-1"
+              style="font-size:0.65rem;vertical-align:middle;">
+          Teacher
+        </span>
+        
+      </div>
+      <div class="text-muted-sm" style="font-size:0.775rem;">
+        14 Nov 2026, 4:08 p.m.
+        
+        
+      </div>
+    </div>
+
+    <span class="badge ms-auto"
+          style="background:rgba(236,72,153,0.15);color:#f472b6;">
+      
+      
+      
+      
+      
+      
+      Poll
+    </span>
+  </div>
+
+  
+  <div class="card-body ">
+    <p class="mb-0 feed-post__body">Which day should we do the revision quiz?</p>
+
+    
+    
+<section class="feed-poll mt-3" id="poll-6" aria-label="Poll">
+  <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+    <span class="badge feed-poll__badge">
+      <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>Poll
+    </span>
+    
+    <span class="text-muted-sm">No closing time</span>
+    
+  </div>
+
+  
+  <form method="post"
+        action="/learning/class/1/feed/post/6/vote/"
+        class="feed-poll__form">
+    <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+    <input type="hidden" name="from" value="feed">
+    
+    <fieldset class="feed-poll__options">
+      <legend class="visually-hidden">Choose one option</legend>
+      
+      <label class="feed-poll__option">
+        <input type="radio" name="option" value="1"
+                required>
+        <span class="feed-poll__option-text">Monday</span>
+        
+      </label>
+      
+      <label class="feed-poll__option">
+        <input type="radio" name="option" value="2"
+                required>
+        <span class="feed-poll__option-text">Wednesday</span>
+        
+      </label>
+      
+      <label class="feed-poll__option">
+        <input type="radio" name="option" value="3"
+                required>
+        <span class="feed-poll__option-text">Friday</span>
+        
+      </label>
+      
+    </fieldset>
+    <button type="submit" class="btn btn-primary w-100 feed-poll__submit">
+      Vote
+    </button>
+  </form>
+
+  
+
+  
+  <ul class="feed-poll__results" aria-label="Poll results">
+    
+    <li class="feed-poll__result">
+      <div class="d-flex justify-content-between align-items-baseline gap-2">
+        <span class="feed-poll__result-label">
+          Monday
+        </span>
+        <span class="feed-poll__result-count">0 · 0%</span>
+      </div>
+      <div class="feed-poll__bar"
+           role="img"
+           aria-label="Monday: 0 votes, 0 percent">
+        <span style="width: 0%;"></span>
+      </div>
+    </li>
+    
+    <li class="feed-poll__result">
+      <div class="d-flex justify-content-between align-items-baseline gap-2">
+        <span class="feed-poll__result-label">
+          Wednesday
+        </span>
+        <span class="feed-poll__result-count">0 · 0%</span>
+      </div>
+      <div class="feed-poll__bar"
+           role="img"
+           aria-label="Wednesday: 0 votes, 0 percent">
+        <span style="width: 0%;"></span>
+      </div>
+    </li>
+    
+    <li class="feed-poll__result">
+      <div class="d-flex justify-content-between align-items-baseline gap-2">
+        <span class="feed-poll__result-label">
+          Friday
+        </span>
+        <span class="feed-poll__result-count">0 · 0%</span>
+      </div>
+      <div class="feed-poll__bar"
+           role="img"
+           aria-label="Friday: 0 votes, 0 percent">
+        <span style="width: 0%;"></span>
+      </div>
+    </li>
+    
+  </ul>
+  <p class="text-muted-sm mb-0">
+    0 votes
+    
+    
+  </p>
+  
+</section>
+
+
+    
+
+    
+
+    
+  </div>
+
+  
+  <div class="card-body pt-0 d-flex align-items-center justify-content-between flex-wrap gap-2"
+       style="border-top:1px solid var(--color-border);">
+
+    <div class="d-flex flex-wrap gap-1 align-items-center" role="group" aria-label="Reactions">
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/6/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="👍">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Thumbs up"
+                aria-label="Thumbs up"
+                data-emoji="👍"
+                >👍</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/6/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="✅">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Got it"
+                aria-label="Got it"
+                data-emoji="✅"
+                >✅</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/6/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❓">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="I have a question too"
+                aria-label="I have a question too"
+                data-emoji="❓"
+                >❓</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/6/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❤️">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Love this"
+                aria-label="Love this"
+                data-emoji="❤️"
+                >❤️</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/6/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="🔥">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="This is great"
+                aria-label="This is great"
+                data-emoji="🔥"
+                >🔥</button>
+      </form>
+      
+      
+    </div>
+
+    <div class="d-flex gap-1 flex-wrap align-items-center">
+      
+      <a href="/learning/class/1/feed/post/6/"
+         class="btn btn-sm"
+         style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.8rem;">
+        <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+        0 replies
+      </a>
+      
+
+      
+    </div>
+  </div>
+</article>
+
+
+    
+    
+<article class="card feed-post  "
+         id="post-5"
+         aria-label="Post by Test Teacher">
+
+  
+  <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+
+    <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
+         style="width:32px;height:32px;font-size:0.75rem;">
+      TT
+      
+    </div>
+
+    <div class="flex-grow-1 min-w-0">
+      <div class="fw-600" style="font-size:0.875rem;">
+        Test Teacher
+        
+        <span class="badge-role badge-role-teacher ms-1"
+              style="font-size:0.65rem;vertical-align:middle;">
+          Teacher
+        </span>
+        
+      </div>
+      <div class="text-muted-sm" style="font-size:0.775rem;">
+        14 Nov 2026, 4:08 p.m.
+        
+        
+      </div>
+    </div>
+
+    <span class="badge ms-auto"
+          style="background:rgba(236,72,153,0.15);color:#f472b6;">
+      
+      
+      
+      <i class="bi bi-stars me-1" aria-hidden="true"></i>
+      
+      
+      Celebration
+    </span>
+  </div>
+
+  
+  <div class="card-body ">
+    <p class="mb-0 feed-post__body">Well done to everyone who finished every lesson this week. That is 31 pupils — a new class record.</p>
+
+    
+
+    
+
+    
+  </div>
+
+  
+  <div class="card-body pt-0 d-flex align-items-center justify-content-between flex-wrap gap-2"
+       style="border-top:1px solid var(--color-border);">
+
+    <div class="d-flex flex-wrap gap-1 align-items-center" role="group" aria-label="Reactions">
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/5/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="👍">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Thumbs up"
+                aria-label="Thumbs up"
+                data-emoji="👍"
+                >👍</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/5/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="✅">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Got it"
+                aria-label="Got it"
+                data-emoji="✅"
+                >✅</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/5/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❓">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="I have a question too"
+                aria-label="I have a question too"
+                data-emoji="❓"
+                >❓</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/5/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❤️">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Love this"
+                aria-label="Love this"
+                data-emoji="❤️"
+                >❤️</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/5/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="🔥">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="This is great"
+                aria-label="This is great"
+                data-emoji="🔥"
+                >🔥</button>
+      </form>
+      
+      
+    </div>
+
+    <div class="d-flex gap-1 flex-wrap align-items-center">
+      
+      <a href="/learning/class/1/feed/post/5/"
+         class="btn btn-sm"
+         style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.8rem;">
+        <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+        0 replies
+      </a>
+      
+
+      
+    </div>
+  </div>
+</article>
+
+
+    
+    
+<article class="card feed-post  "
+         id="post-4"
+         aria-label="Post by Test Teacher">
+
+  
+  <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+
+    <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
+         style="width:32px;height:32px;font-size:0.75rem;">
+      TT
+      
+    </div>
+
+    <div class="flex-grow-1 min-w-0">
+      <div class="fw-600" style="font-size:0.875rem;">
+        Test Teacher
+        
+        <span class="badge-role badge-role-teacher ms-1"
+              style="font-size:0.65rem;vertical-align:middle;">
+          Teacher
+        </span>
+        
+      </div>
+      <div class="text-muted-sm" style="font-size:0.775rem;">
+        14 Nov 2026, 4:08 p.m.
+        
+        
+      </div>
+    </div>
+
+    <span class="badge ms-auto"
+          style="background:rgba(139,92,246,0.15);color:#a78bfa;
+                 ">
+      
+      
+      
+      
+      <i class="bi bi-flag me-1" aria-hidden="true"></i>
+      
+      Challenge
+    </span>
+  </div>
+
+  
+  <div class="card-body ">
+    <p class="mb-0 feed-post__body">Challenge for the weekend: find three fractions in your kitchen at home and put them in order from smallest to largest.</p>
+
+    
+
+    
+
+    
+  </div>
+
+  
+  <div class="card-body pt-0 d-flex align-items-center justify-content-between flex-wrap gap-2"
+       style="border-top:1px solid var(--color-border);">
+
+    <div class="d-flex flex-wrap gap-1 align-items-center" role="group" aria-label="Reactions">
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/4/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="👍">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Thumbs up"
+                aria-label="Thumbs up"
+                data-emoji="👍"
+                >👍</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/4/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="✅">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Got it"
+                aria-label="Got it"
+                data-emoji="✅"
+                >✅</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/4/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❓">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="I have a question too"
+                aria-label="I have a question too"
+                data-emoji="❓"
+                >❓</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/4/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❤️">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Love this"
+                aria-label="Love this"
+                data-emoji="❤️"
+                >❤️</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/4/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="🔥">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="This is great"
+                aria-label="This is great"
+                data-emoji="🔥"
+                >🔥</button>
+      </form>
+      
+      
+    </div>
+
+    <div class="d-flex gap-1 flex-wrap align-items-center">
+      
+      <a href="/learning/class/1/feed/post/4/"
+         class="btn btn-sm"
+         style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.8rem;">
+        <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+        0 replies
+      </a>
+      
+
+      
+    </div>
+  </div>
+</article>
+
+
+    
+    
+<article class="card feed-post  "
+         id="post-3"
+         aria-label="Post by Test Student">
+
+  
+  <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+
+    <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
+         style="width:32px;height:32px;font-size:0.75rem;">
+      TS
+      
+    </div>
+
+    <div class="flex-grow-1 min-w-0">
+      <div class="fw-600" style="font-size:0.875rem;">
+        Test Student
+        
+        <span class="badge-role badge-role-student ms-1"
+              style="font-size:0.65rem;vertical-align:middle;">
+          Student
+        </span>
+        
+      </div>
+      <div class="text-muted-sm" style="font-size:0.775rem;">
+        14 Nov 2026, 4:08 p.m.
+        
+        
+      </div>
+    </div>
+
+    <span class="badge ms-auto"
+          style="background:rgba(16,185,129,0.15);color:#34d399;
+                 ">
+      
+      
+      <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>
+      
+      
+      
+      Tip
+    </span>
+  </div>
+
+  
+  <div class="card-body ">
+    <p class="mb-0 feed-post__body">I figured out a shortcut for the six times table: say the answer out loud in pairs. It made it much easier for me.</p>
+
+    
+
+    
+
+    
+  </div>
+
+  
+  <div class="card-body pt-0 d-flex align-items-center justify-content-between flex-wrap gap-2"
+       style="border-top:1px solid var(--color-border);">
+
+    <div class="d-flex flex-wrap gap-1 align-items-center" role="group" aria-label="Reactions">
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/3/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="👍">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Thumbs up"
+                aria-label="Thumbs up"
+                data-emoji="👍"
+                >👍</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/3/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="✅">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Got it"
+                aria-label="Got it"
+                data-emoji="✅"
+                >✅</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/3/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❓">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="I have a question too"
+                aria-label="I have a question too"
+                data-emoji="❓"
+                >❓</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/3/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❤️">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Love this"
+                aria-label="Love this"
+                data-emoji="❤️"
+                >❤️</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/3/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="🔥">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="This is great"
+                aria-label="This is great"
+                data-emoji="🔥"
+                >🔥</button>
+      </form>
+      
+      
+    </div>
+
+    <div class="d-flex gap-1 flex-wrap align-items-center">
+      
+      <a href="/learning/class/1/feed/post/3/"
+         class="btn btn-sm"
+         style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.8rem;">
+        <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+        0 replies
+      </a>
+      
+
+      
+    </div>
+  </div>
+</article>
+
+
+    
+    
+<article class="card feed-post  "
+         id="post-2"
+         aria-label="Post by Test Student">
+
+  
+  <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+
+    <div class="navbar-avatar flex-shrink-0" aria-hidden="true"
+         style="width:32px;height:32px;font-size:0.75rem;">
+      TS
+      
+    </div>
+
+    <div class="flex-grow-1 min-w-0">
+      <div class="fw-600" style="font-size:0.875rem;">
+        Test Student
+        
+        <span class="badge-role badge-role-student ms-1"
+              style="font-size:0.65rem;vertical-align:middle;">
+          Student
+        </span>
+        
+      </div>
+      <div class="text-muted-sm" style="font-size:0.775rem;">
+        14 Nov 2026, 4:08 p.m.
+        
+        
+      </div>
+    </div>
+
+    <span class="badge ms-auto"
+          style="background:rgba(245,158,11,0.15);color:#fbbf24;
+                 ">
+      
+      <i class="bi bi-question-circle me-1" aria-hidden="true"></i>
+      
+      
+      
+      
+      Question
+    </span>
+  </div>
+
+  
+  <div class="card-body ">
+    <p class="mb-0 feed-post__body">I do not understand question 4 on the fractions worksheet. When I add 1/2 and 1/3 I get 2/5 but the book says 5/6. Which is right?</p>
+
+    
+
+    
+
+    
+    <div class="mt-3 d-flex align-items-center gap-2 flex-wrap">
+      
+      <span class="badge feed-status feed-status--answered">
+        <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Answered
+      </span>
+      
+      
+      <span class="badge feed-status feed-status--best">
+        <i class="bi bi-star-fill me-1" aria-hidden="true"></i>Best answer chosen
+      </span>
+      
+    </div>
+    
+  </div>
+
+  
+  <div class="card-body pt-0 d-flex align-items-center justify-content-between flex-wrap gap-2"
+       style="border-top:1px solid var(--color-border);">
+
+    <div class="d-flex flex-wrap gap-1 align-items-center" role="group" aria-label="Reactions">
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/2/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="👍">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Thumbs up"
+                aria-label="Thumbs up"
+                data-emoji="👍"
+                >👍</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/2/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="✅">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Got it"
+                aria-label="Got it"
+                data-emoji="✅"
+                >✅</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/2/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❓">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="I have a question too"
+                aria-label="I have a question too"
+                data-emoji="❓"
+                >❓</button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/2/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="❤️">
+        <button type="submit"
+                class="btn btn-sm reaction-btn reaction-btn--active"
+                style="background:var(--accent-glow);
+                       border:1px solid var(--accent);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="Love this"
+                aria-label="Love this"
+                data-emoji="❤️"
+                >❤️<span class="reaction-count" data-count-for="❤️"> 1</span></button>
+      </form>
+      
+      <form method="post"
+            action="/learning/class/1/feed/post/2/action/"
+            class="d-inline reaction-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="LzrT1UdiW5G9EUTem8S6Ka7WHBLNKauUyPQfmSiewiz0JLKMJ6P8TFscZkOfifiM">
+        <input type="hidden" name="action" value="react">
+        <input type="hidden" name="emoji" value="🔥">
+        <button type="submit"
+                class="btn btn-sm reaction-btn "
+                style="background:var(--color-surface-2);
+                       border:1px solid var(--color-border);
+                       border-radius:99px;padding:0.2rem 0.6rem;font-size:0.85rem;"
+                title="This is great"
+                aria-label="This is great"
+                data-emoji="🔥"
+                >🔥</button>
+      </form>
+      
+      
+      <span class="align-self-center text-muted-sm ms-1" style="font-size:0.8rem;">
+        1 reaction
+      </span>
+      
+    </div>
+
+    <div class="d-flex gap-1 flex-wrap align-items-center">
+      
+      <a href="/learning/class/1/feed/post/2/"
+         class="btn btn-sm"
+         style="background:var(--color-surface-2);border:1px solid var(--color-border);font-size:0.8rem;">
+        <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+        2 answers
+        
+      </a>
+      
+
+      
+    </div>
+  </div>
+</article>
+
+
+    
+    
+  </div>
+
+  
+  <div id="feedSkeletons" class="d-flex flex-column gap-3 mt-3" hidden aria-hidden="true">
+    <div class="card feed-skeleton"><div class="card-body"><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--short"></div></div></div>
+    <div class="card feed-skeleton"><div class="card-body"><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--short"></div></div></div>
+  </div>
+
+  <div class="text-center mt-3">
+    <button type="button" id="feedShowMore" class="btn btn-outline-secondary btn-sm"
+            data-feed-items-url="/learning/class/1/feed/items/"
+            data-feed-filter="all"
+            data-feed-before=""
+            hidden>
+      Show more
+    </button>
+  </div>
+</div>
+
+
+
+
+      
+  
+<footer class="app-footer" role="contentinfo">
+  <p>&copy; 2026 <strong>My School</strong>. All rights reserved.</p>
+</footer>
+
+
+    </main>
+
+  </div>
+  
+
+  
+  <script src="file:///C:/Users/JNR%20Developer/Desktop/school%20system/school-management-system/frontend/static/vendor/bootstrap/5.3.3/bootstrap.bundle.min.js"></script>
+  
+  <script src="file:///C:/Users/JNR%20Developer/Desktop/school%20system/school-management-system/frontend/static/js/base.js"></script>
+  
+
+<script src="file:///C:/Users/JNR%20Developer/Desktop/school%20system/school-management-system/frontend/static/js/class_feed.js"></script>
+
+
+</body>
+</html>
