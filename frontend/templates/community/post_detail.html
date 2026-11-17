@@ -4,58 +4,106 @@
 {% block title %}{{ post.title }} — {{ identity.name|default:"School" }} Community{% endblock %}
 {% block meta_description %}{{ post.body|striptags|truncatewords:25 }}{% endblock %}
 
+{% block community_heading %}{% endblock %}
+
 {% block community_content %}
 
-{# ── Back link ── #}
-<a href="{% url 'community:home' %}" class="cmty-back-link">
-  <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to community
-</a>
+{# ── Breadcrumb ── #}
+<nav class="cmty-breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'community:home' %}">
+    <i class="bi bi-arrow-left" aria-hidden="true"></i> Community
+  </a>
+  <span class="cmty-breadcrumb__sep" aria-hidden="true">›</span>
+  <a href="{% url 'community:category_feed' post.category.slug %}">{{ post.category.name }}</a>
+  <span class="cmty-breadcrumb__sep cmty-breadcrumb__sep--tail" aria-hidden="true">›</span>
+  <span class="cmty-breadcrumb__current" aria-current="page">{{ post.title|truncatechars:48 }}</span>
+</nav>
 
 {# ── Post ── #}
 <article class="cmty-post-full {% if post.is_pinned %}cmty-post-full--pinned{% endif %}"
          aria-label="{{ post.title }}">
-  {% if post.is_pinned %}
-  <div class="cmty-post-card__pin" aria-label="Pinned post">
-    <i class="bi bi-pin-fill" aria-hidden="true"></i> Pinned
+  {% if post.status == 'pending' %}
+  <div class="cmty-status-notice" role="status">
+    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+    <span>Waiting for approval — your post is being reviewed.
+      Only you can see it right now.</span>
+  </div>
+  {% elif post.status == 'removed' %}
+  <div class="cmty-status-notice cmty-status-notice--removed" role="status">
+    <i class="bi bi-eye-slash" aria-hidden="true"></i>
+    <span>This post was removed. Only you can see it now.</span>
   </div>
   {% endif %}
 
   {# Author / meta row #}
-  <div class="cmty-post-full__meta">
-    <div class="cmty-post-card__author">
-      {% if post.author and post.author.avatar and post.author.role != 'student' %}
-      <img src="{{ post.author.avatar.url }}" alt="{{ post.author_display_name }}"
-           class="cmty-avatar cmty-avatar--md">
-      {% else %}
-      <span class="cmty-avatar cmty-avatar--md cmty-avatar--initials" aria-hidden="true">
-        {{ post.author_display_name|first|upper }}
-      </span>
-      {% endif %}
-      <div class="cmty-post-card__byline">
-        <span class="cmty-post-card__name">{{ post.author_display_name }}</span>
-        <span class="cmty-role-badge cmty-role-badge--{{ post.author.role|default:'member' }}">
-          {{ post.author_role_display|default:"Member" }}
+  <header class="cmty-post-full__head">
+    <div class="cmty-post-full__author">
+      <span class="cmty-post-card__avatar">
+        {% if post.author and post.author.avatar and post.author.role != 'student' %}
+        <img src="{{ post.author.avatar.url }}" alt="{{ post.author_display_name }}"
+             class="cmty-avatar cmty-avatar--md">
+        {% else %}
+        <span class="cmty-avatar cmty-avatar--md cmty-avatar--initials" aria-hidden="true">
+          {{ post.author_display_name|first|upper }}
         </span>
+        {% endif %}
+        {% if post.author.role == 'admin' or post.author.role == 'director' or post.author.role == 'teacher' %}
+        <span class="cmty-post-card__verified" title="Verified staff" aria-label="Verified staff">
+          <i class="bi bi-patch-check-fill" aria-hidden="true"></i>
+        </span>
+        {% endif %}
+      </span>
+
+      <div class="cmty-post-card__byline">
+        <div class="cmty-post-card__name-row">
+          <span class="cmty-post-card__name">{{ post.author_display_name }}</span>
+          <span class="cmty-role-badge cmty-role-badge--{{ post.author.role|default:'member' }}">{{ post.author_role_display|default:"Member" }}</span>
+        </div>
+        <div class="cmty-post-card__sub">
+          <time class="cmty-post-card__time"
+                data-ts="{{ post.created_at|date:'U' }}"
+                datetime="{{ post.created_at|date:'c' }}"
+                title="{{ post.created_at|date:'D d M Y H:i' }} EAT">
+            {{ post.created_at|timesince }} ago
+          </time>
+          <span class="cmty-dot" aria-hidden="true">·</span>
+          {% if post.is_pinned %}
+          <span class="cmty-post-full__meta-pin"><i class="bi bi-pin-fill" aria-hidden="true"></i> Pinned</span>
+          <span class="cmty-dot" aria-hidden="true">·</span>
+          {% endif %}
+          <a href="{% url 'community:category_feed' post.category.slug %}" class="cmty-post-full__cat">
+            {% if post.category.icon %}<i class="bi {{ post.category.icon }}" aria-hidden="true"></i>{% endif %}
+            {{ post.category.name }}
+          </a>
+        </div>
       </div>
     </div>
-    <div class="cmty-post-card__right-meta">
-      <span class="cmty-post-card__category">
-        {% if post.category.icon %}<i class="bi {{ post.category.icon }}" aria-hidden="true"></i>{% endif %}
-        {{ post.category.name }}
-      </span>
-      <time data-ts="{{ post.created_at|date:'U' }}"
-            datetime="{{ post.created_at|date:'c' }}"
-            title="{{ post.created_at|date:'D d M Y H:i' }} EAT">
-        {{ post.created_at|timesince }} ago
-      </time>
-    </div>
-  </div>
+
+    {# Overflow menu: copy link, report #}
+    <details class="cmty-post-menu" id="cmtyPostMenu">
+      <summary class="cmty-post-menu__trigger" aria-label="Post actions" title="Post actions">
+        <i class="bi bi-three-dots" aria-hidden="true"></i>
+      </summary>
+      <div class="cmty-post-menu__panel">
+        <button type="button" class="cmty-post-menu__item cmty-share-btn" data-url="{{ share_url }}">
+          <i class="bi bi-link-45deg" aria-hidden="true"></i> Copy link
+        </button>
+        {% if request.user.is_authenticated %}
+        <button type="button" class="cmty-post-menu__item" id="cmtyReportToggle"
+                aria-expanded="false" aria-controls="cmtyReportForm">
+          <i class="bi bi-flag" aria-hidden="true"></i> Report to admins
+        </button>
+        {% endif %}
+      </div>
+    </details>
+  </header>
 
   {# Title + body #}
   <h1 class="cmty-post-full__title">{{ post.title }}</h1>
   <div class="cmty-post-full__body">{{ post.body|linebreaks }}</div>
 
-  {# Reactions row #}
+  {# Reactions row — hidden until the post is live #}
+  {% if post.status == 'published' %}
   <div class="cmty-reactions" aria-label="Post reactions">
     {% for r in reactions %}
     {% if request.user.is_authenticated %}
@@ -86,75 +134,56 @@
     </a>
     {% endif %}
   </div>
+  {% endif %}
 
-  {# Share + counts footer #}
+  {# Comment count action #}
   <div class="cmty-post-full__footer">
-    <div class="cmty-post-card__counts">
-      <span class="cmty-count" aria-label="{{ post.reaction_count }} reactions">
-        <i class="bi bi-heart" aria-hidden="true"></i> {{ post.reaction_count|default:"0" }}
-      </span>
-      <span class="cmty-count" aria-label="{{ post.comment_count }} replies">
-        <i class="bi bi-chat" aria-hidden="true"></i> {{ post.comment_count|default:"0" }}
-      </span>
-    </div>
-    <button class="cmty-share-btn" data-url="{{ share_url }}" aria-label="Copy link to this post">
-      <i class="bi bi-share" aria-hidden="true"></i> Share
-    </button>
+    <a href="#comments" class="cmty-action-pill">
+      <i class="bi bi-chat" aria-hidden="true"></i>
+      {{ post.comment_count|default:"0" }}
+      {% if post.comment_count == 1 %}comment{% else %}comments{% endif %}
+    </a>
   </div>
+
+  {% if request.user.is_authenticated %}
+  <div class="cmty-report-form" id="cmtyReportForm" hidden>
+    <form method="post" action="{% url 'community:report' %}">
+      {% csrf_token %}
+      <input type="hidden" name="post_pk" value="{{ post.pk }}">
+      <select name="reason" class="cmty-composer__select" aria-label="Report reason">
+        <option value="inappropriate">Inappropriate or offensive</option>
+        <option value="bullying">Bullying or harassment</option>
+        <option value="spam">Spam or advertising</option>
+        <option value="safety">Safety concern</option>
+        <option value="wrong_category">Wrong category</option>
+        <option value="other">Other</option>
+      </select>
+      <div class="cmty-report-form__actions">
+        <button type="submit" class="pub-btn pub-btn--outline pub-btn--sm">Submit report</button>
+        <button type="button" class="pub-btn pub-btn--outline pub-btn--sm"
+                id="cmtyReportCancel">Cancel</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
 </article>
 
 {# ── Comments ── #}
-<section class="cmty-comments" id="comments" aria-label="Replies">
+<section class="cmty-comments" id="comments" aria-label="Comments">
   <h2 class="cmty-section-label">
     <i class="bi bi-chat-dots" aria-hidden="true"></i>
-    {{ post.comment_count|default:"0" }} {% if post.comment_count == 1 %}reply{% else %}replies{% endif %}
+    {{ post.comment_count|default:"0" }} {% if post.comment_count == 1 %}comment{% else %}comments{% endif %}
   </h2>
 
-  {% for comment in comments %}
-  <article class="cmty-comment {% if comment.is_removed %}cmty-comment--removed{% endif %}"
-           id="comment-{{ comment.pk }}">
-    {% if comment.is_removed %}
-    <p class="cmty-comment__removed"><i class="bi bi-slash-circle" aria-hidden="true"></i> This reply was removed.</p>
-    {% else %}
-    <div class="cmty-comment__meta">
-      {% if comment.author and comment.author.avatar and comment.author.role != 'student' %}
-      <img src="{{ comment.author.avatar.url }}" alt="{{ comment.author_display_name }}"
-           class="cmty-avatar cmty-avatar--sm">
-      {% else %}
-      <span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials" aria-hidden="true">
-        {{ comment.author_display_name|first|upper }}
-      </span>
-      {% endif %}
-      <div>
-        <span class="cmty-post-card__name">{{ comment.author_display_name }}</span>
-        <span class="cmty-role-badge cmty-role-badge--{{ comment.author.role|default:'member' }}">
-          {{ comment.author_role_display|default:"Member" }}
-        </span>
-        <time class="cmty-post-card__time"
-              data-ts="{{ comment.created_at|date:'U' }}"
-              datetime="{{ comment.created_at|date:'c' }}">
-          {{ comment.created_at|timesince }} ago
-        </time>
-      </div>
-    </div>
-    <div class="cmty-comment__body">{{ comment.body|linebreaks }}</div>
-    {% endif %}
-  </article>
-  {% empty %}
-  <div class="cmty-empty cmty-empty--sm">
-    <p class="cmty-empty__text">No replies yet. Be the first to respond.</p>
-  </div>
-  {% endfor %}
-
-  {# Reply gate / form #}
+  {# Comment composer or gate — the first action in the thread #}
   {% if not request.user.is_authenticated %}
   <div class="cmty-reply-gate">
     <i class="bi bi-lock" aria-hidden="true"></i>
-    <a href="{% url 'accounts:login' %}?next={{ request.path }}">Sign in</a> to reply to this post.
+    <a href="{% url 'accounts:login' %}?next={{ request.path }}">Sign in</a> to comment on this post.
   </div>
   {% elif can_reply %}
   <div class="cmty-reply-form" id="cmtyReplyForm">
-    <div class="cmty-post-card__author" style="margin-bottom:.6rem">
+    <div class="cmty-reply-form__head">
       {% if request.user.avatar and request.user.role != 'student' %}
       <img src="{{ request.user.avatar.url }}" alt="" class="cmty-avatar cmty-avatar--sm" aria-hidden="true">
       {% else %}
@@ -162,18 +191,18 @@
         {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
       </span>
       {% endif %}
-      <strong style="font-size:.875rem;color:var(--pub-heading)">Add a reply</strong>
+      <strong class="cmty-reply-form__title">Add a comment</strong>
     </div>
     <form method="post" action="{% url 'community:comment_create' post.pk %}" id="cmtyReplyFormEl" novalidate>
       {% csrf_token %}
       <textarea name="body" id="cmtyReplyBody" class="cmty-reply-textarea"
-                rows="3" maxlength="3000" placeholder="Write your reply…"
-                aria-label="Reply body" aria-required="true"></textarea>
-      <div style="display:flex;align-items:center;gap:.6rem;margin-top:.6rem;flex-wrap:wrap">
+                rows="3" maxlength="3000" placeholder="Add a comment…"
+                aria-label="Comment body" aria-required="true"></textarea>
+      <div class="cmty-reply-form__actions">
         <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm"
                 id="cmtyReplySubmit" aria-busy="false">
           <i class="bi bi-reply" aria-hidden="true"></i>
-          <span>Reply</span>
+          <span>Comment</span>
         </button>
         <span class="cmty-composer__error" id="cmtyReplyError" role="alert" hidden></span>
       </div>
@@ -183,47 +212,34 @@
   <div class="cmty-reply-gate {% if reply_blocked_reason %}cmty-reply-gate--blocked{% endif %}">
     <i class="bi bi-{% if post.is_locked %}lock{% else %}slash-circle{% endif %}"
        aria-hidden="true"></i>
-    {{ reply_blocked_reason|default:"Replies are not available here." }}
+    {{ reply_blocked_reason|default:"Comments are not available here." }}
     {% if reply_blocked_reason == "consent_required" %}
-      <a href="{% url 'community:consent' %}?next={{ request.path }}">Join the community</a> to reply.
+      <a href="{% url 'community:consent' %}?next={{ request.path }}">Join the community</a> to comment.
     {% endif %}
   </div>
   {% endif %}
 
-  {# Report link (bottom of comments section) #}
-  {% if request.user.is_authenticated %}
-  <div class="cmty-report-link" style="margin-top:1rem;text-align:right">
-    <button class="cmty-share-btn" id="cmtyReportToggle" aria-expanded="false"
-            aria-controls="cmtyReportForm">
-      <i class="bi bi-flag" aria-hidden="true"></i> Report this post
-    </button>
-    <div id="cmtyReportForm" hidden style="margin-top:.6rem;text-align:left">
-      <form method="post" action="{% url 'community:report' %}">
-        {% csrf_token %}
-        <input type="hidden" name="post_pk" value="{{ post.pk }}">
-        <select name="reason" class="cmty-composer__select" style="margin-bottom:.4rem"
-                aria-label="Report reason">
-          <option value="inappropriate">Inappropriate or offensive</option>
-          <option value="bullying">Bullying or harassment</option>
-          <option value="spam">Spam or advertising</option>
-          <option value="safety">Safety concern</option>
-          <option value="wrong_category">Wrong category</option>
-          <option value="other">Other</option>
-        </select>
-        <button type="submit" class="pub-btn pub-btn--outline pub-btn--sm">
-          Submit report
-        </button>
-        <button type="button" class="pub-btn pub-btn--outline pub-btn--sm"
-                id="cmtyReportCancel">Cancel</button>
-      </form>
-    </div>
+  <div class="cmty-comment-list">
+  {% for comment in comments %}
+    {% include "community/includes/comment_item.html" with comment=comment can_reply=can_reply %}
+  {% empty %}
+  <div class="cmty-empty cmty-empty--sm">
+    <p class="cmty-empty__text">No comments yet. Start the conversation.</p>
   </div>
-  {% endif %}
+  {% endfor %}
+  </div>
 </section>
+
+{% if latest_comment_pk and post.comment_count > 2 %}
+<a href="#comment-{{ latest_comment_pk }}" class="cmty-jump" id="cmtyJumpLink">
+  <i class="bi bi-arrow-down" aria-hidden="true"></i> Jump to latest comment
+</a>
+{% endif %}
 
 {% endblock %}
 
 {% block extra_js %}
+{{ block.super }}
 <script>
 (function(){
   'use strict';
@@ -254,7 +270,7 @@
     });
   });
 
-  /* ── Reply form AJAX ── */
+  /* ── Top-level comment form (reload so the new comment appears) ── */
   var replyForm = document.getElementById('cmtyReplyFormEl');
   if(replyForm){
     replyForm.addEventListener('submit', function(e){
@@ -264,7 +280,7 @@
       var btn  = document.getElementById('cmtyReplySubmit');
       if(err){ err.hidden=true; err.textContent=''; }
       if(!body || !body.value.trim()){
-        if(err){ err.textContent='Please write something before replying.'; err.hidden=false; }
+        if(err){ err.textContent='Please write something before commenting.'; err.hidden=false; }
         return;
       }
       if(btn){ btn.disabled=true; btn.setAttribute('aria-busy','true'); btn.querySelector('span').textContent='Posting…'; }
@@ -273,26 +289,143 @@
         headers:{'X-Requested-With':'XMLHttpRequest'}, credentials:'same-origin',
       }).then(function(r){ return r.json(); })
         .then(function(d){
-          if(d.ok){ window.location.href = d.redirect || (window.location.pathname+'#comments'); }
-          else {
+          if(d.ok){
+            if(d.redirect){ history.replaceState(null, '', d.redirect); }
+            window.location.reload();
+          } else {
             if(err){ err.textContent=d.error||'Something went wrong.'; err.hidden=false; }
-            if(btn){ btn.disabled=false; btn.setAttribute('aria-busy','false'); btn.querySelector('span').textContent='Reply'; }
+            if(btn){ btn.disabled=false; btn.setAttribute('aria-busy','false'); btn.querySelector('span').textContent='Comment'; }
           }
         }).catch(function(){
           if(err){ err.textContent='Could not connect. Please try again.'; err.hidden=false; }
-          if(btn){ btn.disabled=false; btn.setAttribute('aria-busy','false'); btn.querySelector('span').textContent='Reply'; }
+          if(btn){ btn.disabled=false; btn.setAttribute('aria-busy','false'); btn.querySelector('span').textContent='Comment'; }
         });
     });
   }
 
-  /* ── Report toggle ── */
+  /* ── Inline reply toggles ── */
+  document.querySelectorAll('[data-cmty-reply]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var form = document.getElementById('cmtyInlineReply-' + btn.dataset.cmtyReply);
+      if(!form) return;
+      var open = !form.hidden;
+      form.hidden = open;
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      if(!open){
+        var ta = form.querySelector('textarea');
+        if(ta) ta.focus();
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-cmty-reply-cancel]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var form = btn.closest('form');
+      if(!form) return;
+      form.hidden = true;
+      var ta = form.querySelector('textarea');
+      if(ta) ta.value = '';
+      var err = form.querySelector('.cmty-composer__error');
+      if(err){ err.hidden = true; err.textContent = ''; }
+      var toggle = document.querySelector('[data-cmty-reply="' + form.dataset.parent + '"]');
+      if(toggle) toggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  /* ── Inline reply submit ── */
+  document.querySelectorAll('.cmty-inline-reply').forEach(function(form){
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var body = form.querySelector('textarea');
+      var err  = form.querySelector('.cmty-composer__error');
+      var btn  = form.querySelector('button[type="submit"]');
+      if(err){ err.hidden=true; err.textContent=''; }
+      if(!body || !body.value.trim()){
+        if(err){ err.textContent='Please write something before replying.'; err.hidden=false; }
+        return;
+      }
+      if(btn) btn.disabled = true;
+      fetch(form.action, {
+        method:'POST', body:new FormData(form),
+        headers:{'X-Requested-With':'XMLHttpRequest'}, credentials:'same-origin',
+      }).then(function(r){ return r.json(); })
+        .then(function(d){
+          if(d.ok){
+            if(d.redirect){ history.replaceState(null, '', d.redirect); }
+            window.location.reload();
+          } else {
+            if(err){ err.textContent=d.error||'Something went wrong.'; err.hidden=false; }
+            if(btn) btn.disabled = false;
+          }
+        }).catch(function(){
+          if(err){ err.textContent='Could not connect. Please try again.'; err.hidden=false; }
+          if(btn) btn.disabled = false;
+        });
+    });
+  });
+
+  /* ── "View N more replies" ── */
+  document.querySelectorAll('[data-cmty-replies-more]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var wrap = btn.closest('.cmty-replies');
+      if(wrap){
+        wrap.querySelectorAll('.cmty-replies__extra').forEach(function(el){ el.hidden = false; });
+      }
+      btn.remove();
+    });
+  });
+
+  /* ── Report toggle (from the overflow menu) ── */
   var rt = document.getElementById('cmtyReportToggle');
   var rf = document.getElementById('cmtyReportForm');
   var rc = document.getElementById('cmtyReportCancel');
+  var menu = document.getElementById('cmtyPostMenu');
   if(rt && rf){
-    rt.addEventListener('click', function(){ var open=!rf.hidden; rf.hidden=open; rt.setAttribute('aria-expanded',open?'false':'true'); });
+    rt.addEventListener('click', function(){
+      var open = !rf.hidden;
+      rf.hidden = open;
+      rt.setAttribute('aria-expanded', open ? 'false' : 'true');
+      if(menu) menu.open = false;
+      if(!open) rf.scrollIntoView({behavior:'smooth', block:'center'});
+    });
   }
   if(rc && rf){ rc.addEventListener('click', function(){ rf.hidden=true; if(rt) rt.setAttribute('aria-expanded','false'); }); }
+
+  /* ── Jump-to-latest pill ── */
+  var jump = document.getElementById('cmtyJumpLink');
+  if(jump){
+    var syncJump = function(){
+      jump.classList.toggle('is-visible', window.scrollY > 420);
+    };
+    window.addEventListener('scroll', syncJump, {passive:true});
+    syncJump();
+    jump.addEventListener('click', function(){
+      var id = (jump.getAttribute('href') || '').replace('#', '');
+      var target = document.getElementById(id);
+      if(!target) return;
+      var hidden = target.closest('[hidden]');
+      var more = target.closest('.cmty-replies');
+      var moreBtn = more ? more.querySelector('[data-cmty-replies-more]') : null;
+      if(hidden && moreBtn) moreBtn.click();
+    });
+  }
+
+  /* ── Arriving on a reply that sits behind "View more replies" ── */
+  if(window.location.hash){
+    var hashTarget = document.getElementById(window.location.hash.slice(1));
+    if(hashTarget){
+      var hiddenWrap = hashTarget.closest('[hidden]');
+      var thread = hashTarget.closest('.cmty-replies');
+      var threadMore = thread ? thread.querySelector('[data-cmty-replies-more]') : null;
+      if(hiddenWrap && threadMore) threadMore.click();
+    }
+  }
+
+  /* ── Reply button on the feed opened this page: focus the composer ── */
+  if(new URLSearchParams(window.location.search).get('reply') === '1'){
+    var commentBox = document.getElementById('cmtyReplyBody');
+    if(commentBox){ commentBox.focus({preventScroll:true}); }
+  }
 })();
 </script>
 {% endblock %}

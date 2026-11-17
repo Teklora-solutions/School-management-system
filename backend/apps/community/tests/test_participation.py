@@ -318,6 +318,48 @@ class ReplyTests(TestCase):
         self.assertEqual(Comment.objects.filter(post=self.post).count(), 1)
         self.assertEqual(comment.body, "Nice post!")
 
+    def test_reply_to_comment_sets_parent(self):
+        top = create_comment(actor=self.teacher, post=self.post, body="Top")
+        reply = create_comment(actor=self.student, post=self.post,
+                               body="Nested", parent=top)
+        self.assertEqual(reply.parent_id, top.pk)
+
+    def test_reply_to_reply_joins_top_level_thread(self):
+        top = create_comment(actor=self.teacher, post=self.post, body="Top")
+        first = create_comment(actor=self.student, post=self.post,
+                               body="First", parent=top)
+        second = create_comment(actor=self.teacher, post=self.post,
+                                body="Second", parent=first)
+        self.assertEqual(second.parent_id, top.pk)  # threads stay one level deep
+
+    def test_reply_view_accepts_parent(self):
+        top = create_comment(actor=self.teacher, post=self.post, body="Top")
+        _login(self.client, self.student)
+        resp = self.client.post(
+            reverse("community:comment_create", args=[self.post.pk]),
+            {"body": "Replying to you", "parent": top.pk},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        data = json.loads(resp.content)
+        self.assertTrue(data["ok"])
+        created = Comment.objects.get(pk=data["comment_pk"])
+        self.assertEqual(created.parent_id, top.pk)
+        self.assertIn(f"#comment-{created.pk}", data["redirect"])
+
+    def test_parent_from_another_post_is_rejected(self):
+        other_cat = make_category(slug="rep-other", visibility="public", name="Other")
+        other_post = make_post(author=self.teacher, category=other_cat)
+        foreign = make_comment(author=self.teacher, post=other_post)
+        _login(self.client, self.student)
+        resp = self.client.post(
+            reverse("community:comment_create", args=[self.post.pk]),
+            {"body": "Wrong thread", "parent": foreign.pk},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        data = json.loads(resp.content)
+        self.assertFalse(data["ok"])
+        self.assertFalse(Comment.objects.filter(post=self.post).exists())
+
     def test_reply_blocked_on_locked_post(self):
         from apps.community.services import lock_post
         lock_post(actor=self.admin, post=self.post)   # admin locks, not teacher

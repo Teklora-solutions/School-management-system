@@ -54,7 +54,19 @@ h1,h2,h3,h4,h5{font-family:var(--pub-font-h);color:var(--pub-heading);line-heigh
 .pub-btn--outline:hover{border-color:var(--pub-accent);color:var(--pub-accent)}
 .pub-btn--sm{padding:.5rem 1rem;font-size:.85rem}
 .pub-btn--lg{padding:.9rem 2rem;font-size:1.05rem}
-@media(max-width:639px){.pub-btn--hide-sm{display:none}}
+/* Short label in the navbar on phones so the brand name stays readable */
+.pub-btn__label--xs{display:none}
+@media(max-width:639px){
+  .pub-btn--hide-sm{display:none}
+  .pub-btn__label--full{display:none}
+  .pub-btn__label--xs{display:inline}
+  /* reclaim room the shorter button frees up */
+  .pub-nav__inner{gap:.4rem}
+  .pub-nav__brand{font-size:1rem;gap:.4rem}
+  .pub-nav__logo{height:28px}
+  .pub-nav__actions{gap:.3rem}
+  .pub-nav__actions .pub-btn--sm{padding-inline:.6rem}
+}
 
 /* ── Navbar — FIXED at top, not just sticky ── */
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -87,11 +99,12 @@ main{padding-top:68px}
 .pub-nav__brand{
   display:flex;align-items:center;gap:.55rem;
   font-family:var(--pub-font-h);font-weight:800;font-size:1.05rem;
-  color:var(--pub-heading);flex-shrink:0;
-  /* truncate on tiny screens */
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  max-width:calc(100vw - 180px); /* leave room for actions + toggle */
+  color:var(--pub-heading);
+  /* shrink instead of pushing the action buttons off-screen */
+  flex:1 1 auto;min-width:0;
+  overflow:hidden;white-space:nowrap;
 }
+.pub-nav__brand > span:not(.pub-nav__dot){flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pub-nav__dot{
   width:34px;height:34px;min-width:34px;flex-shrink:0;
   background:linear-gradient(135deg,var(--pub-accent),var(--pub-teal));
@@ -217,6 +230,22 @@ main{padding-top:68px}
 /* Divider between links and buttons */
 .pub-nav__mobile-divider{
   height:1px;background:var(--pub-border);margin:.75rem 0;
+}
+
+/* Theme toggle row (phones only — the bar shows it from 640px up) */
+.pub-nav__theme-row{
+  display:none;
+  align-items:center;gap:.6rem;width:100%;
+  padding:.8rem 1rem;margin-bottom:.25rem;
+  background:none;border:0;border-radius:var(--pub-radius-sm);
+  color:var(--pub-text-muted);font:inherit;font-size:1rem;font-weight:600;
+  text-align:left;cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.pub-nav__theme-row:hover{background:var(--pub-surface-2);color:var(--pub-heading)}
+@media(max-width:639px){
+  .pub-nav__theme-row{display:flex}
+  .pub-theme-toggle--bar{display:none!important}
 }
 
 /* CTA buttons inside drawer */

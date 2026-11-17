@@ -1,0 +1,114 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}{{ member.full_name }} — {{ identity.name|default:"School" }} Community{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/community-map.css' %}">
+{% endblock %}
+
+{% block community_heading %}<h1 class="sr-only">{{ member.full_name }}</h1>{% endblock %}
+
+{% block community_content %}
+
+<article class="cmty-profile">
+
+  <header class="cmty-profile-hero">
+    <div class="cmty-profile-hero__avatar">
+      {% if member.avatar and member.role != 'student' %}
+      <img src="{{ member.avatar.url }}" alt="{{ member.full_name }}" class="cmty-avatar">
+      {% else %}
+      <span class="cmty-avatar cmty-avatar--initials" aria-hidden="true">
+        {{ member.first_name|first|upper }}{{ member.last_name|first|upper }}
+      </span>
+      {% endif %}
+      {% if member_cprofile.is_online %}
+      <span class="cmty-profile-hero__online" title="Online now" aria-label="Online now"></span>
+      {% endif %}
+    </div>
+
+    <div class="cmty-profile-hero__body">
+      <div class="cmty-profile-hero__name-row">
+        <h2 class="cmty-profile-hero__name">{{ member.full_name }}</h2>
+        {% if member.role == 'admin' or member.role == 'director' or member.role == 'teacher' %}
+        <i class="bi bi-patch-check-fill cmty-profile-hero__verified" title="Verified staff" aria-label="Verified staff"></i>
+        {% endif %}
+        <span class="cmty-role-badge cmty-role-badge--{{ member.role }}">{{ member.get_role_display }}</span>
+      </div>
+
+      <div class="cmty-profile-hero__meta">
+        <span>Joined {{ member.date_joined|date:"F Y" }}</span>
+        {% if member_cprofile.is_online %}
+        <span class="cmty-dot" aria-hidden="true">·</span>
+        <span>Online now</span>
+        {% endif %}
+        {% if member_cprofile.is_on_map %}
+        <a href="{% url 'community:map' %}" class="cmty-profile-hero__chip">
+          <i class="bi bi-geo-alt" aria-hidden="true"></i>{{ member_cprofile.location_label }}
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="cmty-profile-hero__actions">
+        {% if is_self %}
+        <a href="{% url 'accounts:profile' %}" class="pub-btn pub-btn--outline pub-btn--sm">
+          <i class="bi bi-pencil-square" aria-hidden="true"></i> Edit my details
+        </a>
+        <a href="{% url 'community:map' %}" class="pub-btn pub-btn--outline pub-btn--sm">
+          <i class="bi bi-globe2" aria-hidden="true"></i> My map settings
+        </a>
+        {% elif can_message %}
+        <form method="post" action="{% url 'community:message_start' member.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">
+            <i class="bi bi-chat-dots" aria-hidden="true"></i> Message
+          </button>
+        </form>
+        {% endif %}
+        {% if not is_self and not can_message %}
+        <span class="cmty-profile-note">Messaging is available to staff and guardians.</span>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <div class="cmty-profile-stats" aria-label="Activity">
+    <div class="cmty-profile-stat">
+      <strong>{{ posts_count }}</strong>
+      <span>Post{{ posts_count|pluralize }}</span>
+    </div>
+    <div class="cmty-profile-stat">
+      <strong>{{ replies_count }}</strong>
+      <span>Repl{{ replies_count|pluralize:"y,ies" }}</span>
+    </div>
+    <div class="cmty-profile-stat">
+      <strong>{{ reactions_received }}</strong>
+      <span>Reaction{{ reactions_received|pluralize }}</span>
+    </div>
+  </div>
+
+  <section class="cmty-profile-section" aria-labelledby="cmtyProfilePosts">
+    <h2 class="cmty-profile-section__title" id="cmtyProfilePosts">
+      <i class="bi bi-chat-square-text" aria-hidden="true"></i>
+      {% if is_self %}My recent posts{% else %}Recent posts{% endif %}
+    </h2>
+
+    {% if recent_posts %}
+      {% for post in recent_posts %}
+        {% include "community/includes/post_card.html" with post=post %}
+      {% endfor %}
+    {% else %}
+    <div class="cmty-empty cmty-empty--sm">
+      <div class="cmty-empty__icon" aria-hidden="true"><i class="bi bi-chat-square"></i></div>
+      <p class="cmty-empty__text">
+        {% if is_self %}You haven't posted yet.{% else %}{{ member.first_name }} hasn't posted yet.{% endif %}
+      </p>
+      <a href="{% url 'community:home' %}" class="pub-btn pub-btn--primary pub-btn--sm">Visit the community</a>
+    </div>
+    {% endif %}
+  </section>
+
+</article>
+
+{% endblock %}

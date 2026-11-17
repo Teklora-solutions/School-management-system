@@ -3,6 +3,10 @@ Category pill row. Expects:
   categories      — list of Category objects the user can see
   active_category_slug — currently selected slug, or "all"
   sort            — current sort value
+
+The first six pills stay visible; the rest live behind the "More…" pill so the
+row reads as a single tidy line on desktop and a swipeable strip on phones.
+The More button sits outside the scroll strip so it never scrolls out of reach.
 {% endcomment %}
 <div class="cmty-pills-wrap">
   <nav class="cmty-pills" id="cmtyCategoryPills" aria-label="Filter by category" tabindex="0">
@@ -13,11 +17,18 @@ Category pill row. Expects:
     </a>
     {% for cat in categories %}
     <a href="{% url 'community:category_feed' cat.slug %}?sort={{ sort|default:'new' }}"
-       class="cmty-pill {% if active_category_slug == cat.slug %}is-active{% endif %}"
+       class="cmty-pill {% if active_category_slug == cat.slug %}is-active{% endif %} {% if forloop.counter > 6 %}cmty-pill--extra{% endif %}"
        {% if active_category_slug == cat.slug %}aria-current="true"{% endif %}>
       {% if cat.icon %}<i class="bi {{ cat.icon }}" aria-hidden="true"></i> {% endif %}
       {{ cat.name }}
     </a>
     {% endfor %}
   </nav>
+  {% if categories|length > 6 %}
+  <button type="button" class="cmty-pill cmty-pill--more" id="cmtyPillsMore"
+          aria-expanded="false" aria-controls="cmtyCategoryPills">
+    <span class="cmty-pill__label">More…</span>
+    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+  </button>
+  {% endif %}
 </div>

@@ -246,6 +246,13 @@ class FeatureGateTests(TestCase):
         resp = self.client.get(reverse("community:paused"))
         self.assertEqual(resp.status_code, 200)
 
+    def test_paused_page_redirects_home_when_community_is_live(self):
+        enable_community()
+        resp = self.client.get(reverse("community:paused"))
+        self.assertRedirects(
+            resp, reverse("community:home"), fetch_redirect_response=False
+        )
+
     def test_home_redirects_to_paused_when_paused(self):
         enable_community(paused=True)
         resp = self.client.get(reverse("community:home"))
@@ -304,6 +311,37 @@ class CommunityViewTests(TestCase):
             title="Gone", status=Post.Status.REMOVED,
         )
         resp = self.client.get(reverse("community:post_detail", args=[removed.pk]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_author_can_open_own_pending_post(self):
+        """The composer redirects to the new post; a held post must not 404."""
+        pending = make_post(
+            author=self.author, category=self.public_cat,
+            title="Waiting approval", status=Post.Status.PENDING,
+        )
+        self.client.force_login(self.author)
+        resp = self.client.get(reverse("community:post_detail", args=[pending.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Waiting for approval")
+
+    def test_author_can_open_own_removed_post(self):
+        removed = make_post(
+            author=self.author, category=self.public_cat,
+            title="Taken down", status=Post.Status.REMOVED,
+        )
+        self.client.force_login(self.author)
+        resp = self.client.get(reverse("community:post_detail", args=[removed.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "This post was removed")
+
+    def test_another_member_cannot_open_someone_elses_pending_post(self):
+        pending = make_post(
+            author=self.author, category=self.public_cat,
+            title="Not yours", status=Post.Status.PENDING,
+        )
+        other = make_user("teacher", username="http_other")
+        self.client.force_login(other)
+        resp = self.client.get(reverse("community:post_detail", args=[pending.pk]))
         self.assertEqual(resp.status_code, 404)
 
     def test_category_feed_200(self):

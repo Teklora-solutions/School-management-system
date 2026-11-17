@@ -3,28 +3,24 @@
 
 {% block title %}Community — {{ identity.name|default:"School" }}{% endblock %}
 
+{% block community_heading %}
+{% if current_category %}
+<h1 class="sr-only">{{ current_category.name }} — community</h1>
+{% else %}
+<h1 class="sr-only">Community feed</h1>
+{% endif %}
+{% endblock %}
+
 {% block community_content %}
 
 {# ── Composer ── #}
 {% include "community/includes/composer.html" %}
 
-{# ── Category pills ── #}
-{% include "community/includes/category_pills.html" with categories=categories active_category_slug=active_category_slug sort=sort %}
-
-{# ── Pinned posts (top of first page, all-category view only) ── #}
-{% if pinned_posts %}
-<section class="cmty-pinned-section" aria-label="Pinned posts">
-  <h2 class="cmty-section-label">
-    <i class="bi bi-pin-fill" aria-hidden="true"></i> Pinned
-  </h2>
-  {% for post in pinned_posts %}
-  {% include "community/includes/post_card.html" %}
-  {% endfor %}
-</section>
-{% endif %}
-
-{# ── Sort bar ── #}
-{% include "community/includes/sort_bar.html" with sort=sort active_category_slug=active_category_slug %}
+{# ── Filter + sort toolbar ── #}
+<div class="cmty-feed-tools">
+  {% include "community/includes/category_pills.html" with categories=categories active_category_slug=active_category_slug sort=sort %}
+  {% include "community/includes/sort_bar.html" with sort=sort active_category_slug=active_category_slug %}
+</div>
 
 {# ── Category banner (when filtered) ── #}
 {% if current_category %}

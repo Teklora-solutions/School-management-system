@@ -27,10 +27,12 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import timedelta
+from decimal import Decimal
 
 import bleach
 
 from django.core.cache import cache
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -44,6 +46,8 @@ from .models import (
     CategoryModerator,
     Comment,
     CommunityProfile,
+    DirectConversation,
+    DirectMessage,
     Post,
     PostDraft,
     Reaction,
@@ -483,7 +487,8 @@ def move_post(*, actor, post: Post, new_category: Category, request=None) -> Pos
 
 # ─── Comments ─────────────────────────────────────────────────────────────────
 
-def create_comment(*, actor, post: Post, body: str, request=None) -> Comment:
+def create_comment(*, actor, post: Post, body: str, parent: Comment | None = None,
+                   request=None) -> Comment:
     if post.status != Post.Status.PUBLISHED:
         raise PermissionError("You cannot reply to this post.")
     if post.is_locked:
@@ -494,6 +499,15 @@ def create_comment(*, actor, post: Post, body: str, request=None) -> Comment:
     allowed, reason = can_post_in_category(actor, post.category)
     if not allowed:
         raise PermissionError(reason)
+
+    if parent is not None:
+        if parent.post_id != post.pk:
+            raise ValueError("That reply belongs to a different post.")
+        if parent.is_removed:
+            raise ValueError("That reply is no longer available.")
+        # Threads stay one level deep: a reply to a reply joins the
+        # top-level thread its target belongs to.
+        parent = parent.parent or parent
 
     body = _sanitise(body)[:3_000]
 
@@ -509,7 +523,7 @@ def create_comment(*, actor, post: Post, body: str, request=None) -> Comment:
 
     word_hold = _contains_blocked_word(body)
     comment = Comment.objects.create(
-        post=post, author=actor, body=body,
+        post=post, author=actor, body=body, parent=parent,
         is_removed=False,
     )
 
@@ -521,14 +535,28 @@ def create_comment(*, actor, post: Post, body: str, request=None) -> Comment:
 
     log_action(actor=actor, action="community.comment.create",
                content_type="community.Comment", object_id=comment.pk,
-               change_summary={"post_id": post.pk}, request=request)
+               change_summary={"post_id": post.pk, "parent_id": parent.pk if parent else None},
+               request=request)
+
+    # Notify the comment author being replied to (unless it's the actor).
+    if (
+        parent is not None
+        and parent.author
+        and parent.author_id != actor.pk
+        and parent.author_id != post.author_id
+    ):
+        notify(recipient=parent.author,
+               title=f"{actor.first_name or 'Someone'} replied to your comment",
+               message=f'In "{post.title}": {body[:100]}',
+               link=post.share_path + f"#comment-{comment.pk}",
+               category="community")
 
     # Notify post author (not if they're replying to themselves)
     if post.author and post.author_id != actor.pk:
         notify(recipient=post.author,
                title=f"{actor.first_name or 'Someone'} replied to your post",
                message=f'In "{post.title}": {body[:100]}',
-               link=post.share_path + "#comments",
+               link=post.share_path + (f"#comment-{comment.pk}" if parent else "#comments"),
                category="community")
     return comment
 
@@ -1081,3 +1109,175 @@ def _require_mod_or_staff(actor, category: Category | None) -> None:
     if category and _is_category_mod(actor, category):
         return
     raise PermissionError("You do not have moderation rights here.")
+
+
+# ─── Member map ──────────────────────────────────────────────────────────────
+
+def set_member_location(
+    *, actor, place_label: str, shared: bool, request=None
+) -> CommunityProfile:
+    """
+    Store an opt-in town for the member map.
+
+    Only places in ``locations.PLACES`` are accepted, so the stored
+    coordinates always match a friendly city label and no address is kept.
+    """
+    from .locations import find_place
+
+    place = find_place(place_label)
+    if place is None:
+        raise ValueError("Choose a town from the list.")
+
+    profile, _ = CommunityProfile.objects.get_or_create(user=actor)
+    profile.location_label = place["label"]
+    profile.location_country = place["country"]
+    profile.latitude = Decimal(str(place["latitude"]))
+    profile.longitude = Decimal(str(place["longitude"]))
+    profile.location_shared = bool(shared)
+    profile.location_updated_at = timezone.now()
+    profile.save(update_fields=[
+        "location_label", "location_country", "latitude", "longitude",
+        "location_shared", "location_updated_at",
+    ])
+
+    log_action(
+        actor=actor,
+        action="community.location.update",
+        content_type="community.CommunityProfile",
+        object_id=profile.pk,
+        change_summary={"place": profile.location_label, "shared": profile.location_shared},
+        request=request,
+    )
+    return profile
+
+
+def clear_member_location(*, actor, request=None) -> None:
+    """Remove the actor's map pin and stop sharing their location."""
+    profile = CommunityProfile.objects.filter(user=actor).first()
+    if profile is None or not profile.has_location:
+        return
+    previous = profile.location_label
+    profile.location_label = ""
+    profile.location_country = ""
+    profile.latitude = None
+    profile.longitude = None
+    profile.location_shared = False
+    profile.location_updated_at = timezone.now()
+    profile.save(update_fields=[
+        "location_label", "location_country", "latitude", "longitude",
+        "location_shared", "location_updated_at",
+    ])
+    log_action(
+        actor=actor,
+        action="community.location.clear",
+        content_type="community.CommunityProfile",
+        object_id=profile.pk,
+        change_summary={"place": previous},
+        request=request,
+    )
+
+
+# ─── Direct messages ─────────────────────────────────────────────────────────
+
+DM_RATE_PER_MINUTE = 12
+DM_MAX_BODY = 2_000
+
+
+def can_use_direct_messages(user) -> bool:
+    """
+    Member-to-member messages are for staff and guardians.
+
+    Students never appear in the members directory or on the map, so they
+    are excluded here too — private pupil-to-pupil chat is out of scope.
+    """
+    return bool(
+        user
+        and getattr(user, "is_authenticated", False)
+        and user.is_active
+        and getattr(user, "role", "") != "student"
+    )
+
+
+def get_or_create_direct_conversation(*, actor, other) -> DirectConversation:
+    from django.db import IntegrityError
+
+    if not can_use_direct_messages(actor) or not can_use_direct_messages(other):
+        raise PermissionError(
+            "Direct messages are available to staff and guardians."
+        )
+    if actor.pk == other.pk:
+        raise ValueError("You cannot message yourself.")
+
+    low, high = sorted((actor, other), key=lambda user: user.pk)
+    try:
+        conversation, _ = DirectConversation.objects.get_or_create(
+            user_a=low, user_b=high
+        )
+    except IntegrityError:
+        conversation = DirectConversation.objects.get(user_a=low, user_b=high)
+    return conversation
+
+
+def send_direct_message(
+    *, actor, conversation: DirectConversation, body: str, request=None
+) -> DirectMessage:
+    if not conversation.includes(actor) or not can_use_direct_messages(actor):
+        raise PermissionError("You cannot post in this conversation.")
+
+    body = (body or "").strip()
+    if not body:
+        raise ValueError("Write a message first.")
+    body = body[:DM_MAX_BODY]
+
+    minute_key = f"community:dm_per_min:{actor.pk}"
+    sent = cache.get(minute_key, 0)
+    if sent >= DM_RATE_PER_MINUTE:
+        raise ValueError(
+            "You're sending messages very quickly. Please wait a moment."
+        )
+    cache.set(minute_key, sent + 1, 60)
+
+    message = DirectMessage.objects.create(
+        conversation=conversation, sender=actor, body=body
+    )
+    DirectConversation.objects.filter(pk=conversation.pk).update(
+        last_message_at=message.created_at
+    )
+
+    recipient = conversation.other_user(actor)
+    from django.urls import reverse
+    notify(
+        recipient=recipient,
+        title=f"New message from {actor.first_name or actor.full_name}",
+        message=body[:120],
+        link=reverse("community:message_thread", kwargs={"pk": conversation.pk}),
+        category="community",
+    )
+    return message
+
+
+def mark_direct_conversation_read(
+    *, conversation: DirectConversation, user
+) -> int:
+    if not conversation.includes(user):
+        return 0
+    return (
+        DirectMessage.objects.filter(
+            conversation=conversation, read_at__isnull=True
+        )
+        .exclude(sender=user)
+        .update(read_at=timezone.now())
+    )
+
+
+def unread_direct_messages(user) -> int:
+    if not can_use_direct_messages(user):
+        return 0
+    return (
+        DirectMessage.objects.filter(
+            Q(conversation__user_a=user) | Q(conversation__user_b=user),
+            read_at__isnull=True,
+        )
+        .exclude(sender=user)
+        .count()
+    )

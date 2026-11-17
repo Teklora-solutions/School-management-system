@@ -228,7 +228,11 @@ class Post(BaseModel):
 
 class Comment(BaseModel):
     """
-    A reply to a post.  One level only — no reply-to-reply.
+    A reply to a post, or a reply to another reply.
+
+    Threads are one level deep: replying to a reply attaches the new
+    comment to the same top-level parent, so the feed never nests deeper
+    than the reference layout.
 
     Soft-delete: removed comments keep their row with is_removed=True so
     the thread count stays accurate and the audit trail is intact.
@@ -239,6 +243,14 @@ class Comment(BaseModel):
         Post,
         on_delete=models.CASCADE,
         related_name="comments",
+        db_index=True,
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="replies",
         db_index=True,
     )
     author = models.ForeignKey(
@@ -375,6 +387,21 @@ class CommunityProfile(BaseModel):
     last_post_at = models.DateTimeField(null=True, blank=True)
     posts_today = models.PositiveSmallIntegerField(default=0)
     posts_today_date = models.DateField(null=True, blank=True)
+    # Opt-in member-map location. Only a town label is stored — never an
+    # address — and members choose whether it is visible to others.
+    location_label = models.CharField(max_length=120, blank=True)
+    location_country = models.CharField(max_length=80, blank=True)
+    latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    location_shared = models.BooleanField(
+        default=False,
+        help_text="Show this member's town on the community map.",
+    )
+    location_updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "community_profile"
@@ -385,6 +412,18 @@ class CommunityProfile(BaseModel):
     @property
     def has_consented(self) -> bool:
         return self.consented_at is not None
+
+    @property
+    def has_location(self) -> bool:
+        return (
+            bool(self.location_label)
+            and self.latitude is not None
+            and self.longitude is not None
+        )
+
+    @property
+    def is_on_map(self) -> bool:
+        return self.has_location and self.location_shared
 
     @property
     def is_online(self) -> bool:
@@ -416,6 +455,82 @@ class CommunityProfile(BaseModel):
         cls.objects.filter(pk=profile.pk).update(last_seen_at=timezone.now())
         profile.last_seen_at = timezone.now()
         return profile
+
+
+# ─── Direct messages ──────────────────────────────────────────────────────────
+
+class DirectConversation(BaseModel):
+    """
+    A private one-to-one conversation between two community members.
+
+    The pair is stored in ascending user-id order (user_a < user_b) so a
+    conversation can only exist once; `other_user()` hides that detail.
+    Students are not part of member-to-member messaging (safeguarding).
+    """
+
+    user_a = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="direct_conversations_as_a",
+    )
+    user_b = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="direct_conversations_as_b",
+    )
+    last_message_at = models.DateTimeField(
+        null=True, blank=True, db_index=True
+    )
+
+    class Meta:
+        db_table = "community_direct_conversation"
+        ordering = ["-last_message_at", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user_a", "user_b"],
+                name="uniq_community_direct_pair",
+            ),
+            models.CheckConstraint(
+                check=models.Q(user_a__lt=models.F("user_b")),
+                name="community_direct_pair_ordered",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"DirectConversation({self.user_a_id}<->{self.user_b_id})"
+
+    def other_user(self, user):
+        return self.user_b if user.pk == self.user_a_id else self.user_a
+
+    def includes(self, user) -> bool:
+        return user.pk in (self.user_a_id, self.user_b_id)
+
+
+class DirectMessage(BaseModel):
+    """A single private message inside a DirectConversation."""
+
+    conversation = models.ForeignKey(
+        DirectConversation,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="direct_messages_sent",
+    )
+    body = models.TextField(max_length=2_000)
+    read_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        db_table = "community_direct_message"
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["conversation", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"DirectMessage#{self.pk} in conversation {self.conversation_id}"
 
 
 # ─── PostDraft ────────────────────────────────────────────────────────────────

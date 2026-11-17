@@ -7,7 +7,7 @@ Visibility rules are enforced here — nothing that should be hidden ever
 reaches a template. Every public-facing selector applies at minimum:
   1. category.is_active
   2. category.visibility matches the user (or visitor)
-  3. post.status == PUBLISHED (PENDING and REMOVED are never shown to non-staff)
+  3. post.status == PUBLISHED (PENDING and REMOVED are visible only to their author)
 """
 
 from __future__ import annotations
@@ -18,7 +18,15 @@ from typing import Any
 from django.db.models import Count, Max, OuterRef, Prefetch, Q, Subquery
 from django.utils import timezone
 
-from .models import Category, Comment, CommunityProfile, Post, Reaction
+from .models import (
+    Category,
+    Comment,
+    CommunityProfile,
+    DirectConversation,
+    DirectMessage,
+    Post,
+    Reaction,
+)
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -196,17 +204,18 @@ def _attach_recent_commenters(posts: list[Post]) -> None:
 
 def post_detail(pk: int, user) -> Post | None:
     """
-    Return a single published post if the user can see its category.
+    Return a published post the user can see, or one of the user's own posts
+    (pending or removed) so the composer redirect and My Posts links never
+    dead-end on the author's own 404.
     Annotates reaction counts and prefetches visible comments.
     """
     category_ids = _visible_category_ids(user)
+    visible = Q(status=Post.Status.PUBLISHED, category_id__in=category_ids)
+    if getattr(user, "is_authenticated", False):
+        visible |= Q(author=user)
     try:
         post = (
-            Post.objects.filter(
-                pk=pk,
-                status=Post.Status.PUBLISHED,
-                category_id__in=category_ids,
-            )
+            Post.objects.filter(visible, pk=pk)
             .select_related("author", "category")
             .annotate(
                 reaction_count=Count("reactions", distinct=True),
@@ -221,12 +230,20 @@ def post_detail(pk: int, user) -> Post | None:
     except Post.DoesNotExist:
         return None
 
-    # Prefetch comments in one query
-    post._comments_list = list(
+    # Prefetch comments in one query, then thread replies under their parent.
+    comments = list(
         Comment.objects.filter(post=post)
         .select_related("author")
         .order_by("created_at")
     )
+    replies_by_parent: dict[int, list] = {}
+    for comment in comments:
+        if comment.parent_id:
+            replies_by_parent.setdefault(comment.parent_id, []).append(comment)
+    for comment in comments:
+        comment.replies_list = replies_by_parent.get(comment.pk, [])
+    post._all_comments = comments
+    post._comments_list = [c for c in comments if c.parent_id is None]
     # Prefetch reactions for the post
     post._reactions_by_emoji = _reactions_summary(post, user)
     return post
@@ -291,6 +308,81 @@ def community_stats(user) -> dict:
         "online_now": online_now,
         "admins": admins,
     }
+
+
+# ─── Leaderboard ─────────────────────────────────────────────────────────────
+
+def top_contributors(user, *, days: int = 30, limit: int = 5) -> list[dict]:
+    """
+    Most active members by posts + replies in the last `days` days.
+
+    Only counts content in categories the requesting user can already see,
+    so the leaderboard never reveals activity that is hidden from them.
+    Display names follow the same student rule as the feed.
+    """
+    from apps.accounts.models import User
+
+    since = timezone.now() - timedelta(days=days)
+    category_ids = _visible_category_ids(user)
+
+    totals: dict[int, int] = {}
+    post_rows = (
+        Post.objects.filter(
+            status=Post.Status.PUBLISHED,
+            category_id__in=category_ids,
+            created_at__gte=since,
+            author__isnull=False,
+        )
+        .values("author_id")
+        .annotate(total=Count("id"))
+    )
+    comment_rows = (
+        Comment.objects.filter(
+            post__status=Post.Status.PUBLISHED,
+            post__category_id__in=category_ids,
+            is_removed=False,
+            created_at__gte=since,
+            author__isnull=False,
+        )
+        .values("author_id")
+        .annotate(total=Count("id"))
+    )
+    for row in post_rows:
+        totals[row["author_id"]] = totals.get(row["author_id"], 0) + row["total"]
+    for row in comment_rows:
+        totals[row["author_id"]] = totals.get(row["author_id"], 0) + row["total"]
+
+    if not totals:
+        return []
+
+    ranked = sorted(totals.items(), key=lambda item: (-item[1], item[0]))[:limit]
+    users = User.objects.filter(pk__in=[pk for pk, _ in ranked]).in_bulk()
+
+    board = []
+    for rank, (user_id, total) in enumerate(ranked, start=1):
+        member = users.get(user_id)
+        if member is None:
+            continue
+        board.append(
+            {
+                "rank": rank,
+                "user": member,
+                "name": _member_display_name(member),
+                "role": member.get_role_display(),
+                "total": total,
+            }
+        )
+    return board
+
+
+def _member_display_name(user) -> str:
+    if user is None:
+        return "Deleted member"
+    if getattr(user, "role", "") == "student":
+        first = user.first_name or user.username
+        last_initial = (user.last_name or "")[:1]
+        return f"{first} {last_initial}." if last_initial else first
+    return user.get_full_name() or user.username
 
 
 # ─── Members directory (signed-in only) ──────────────────────────────────────
@@ -605,3 +697,172 @@ def community_insights() -> dict:
         "total_comments": total_comments,
         "total_members": User.objects.filter(is_active=True).count(),
     }
+
+
+# ─── Member map ──────────────────────────────────────────────────────────────
+
+def map_members(viewer) -> list[dict]:
+    """
+    Members who opted into the map, with their shared town.
+
+    Students are filtered out for the same safeguarding reason they are
+    absent from the members directory: only staff, guardians and other
+    non-student accounts are discoverable.
+    """
+    if viewer is None or not viewer.is_authenticated:
+        return []
+
+    profiles = (
+        CommunityProfile.objects.filter(
+            location_shared=True,
+            latitude__isnull=False,
+            longitude__isnull=False,
+            user__is_active=True,
+        )
+        .exclude(user__role="student")
+        .select_related("user")
+        .order_by("location_country", "location_label", "user__first_name")
+    )
+
+    rows = []
+    for profile in profiles:
+        user = profile.user
+        rows.append(
+            {
+                "user": user,
+                "profile": profile,
+                "name": _member_display_name(user),
+                "role": user.role,
+                "role_label": user.get_role_display(),
+                "label": profile.location_label,
+                "country": profile.location_country,
+                "latitude": float(profile.latitude),
+                "longitude": float(profile.longitude),
+                "online": profile.is_online,
+            }
+        )
+    return rows
+
+
+def map_places(rows: list[dict]) -> list[dict]:
+    """Aggregate map rows by place for the 'top places' list."""
+    places: dict[str, dict] = {}
+    for row in rows:
+        key = row["label"]
+        entry = places.setdefault(
+            key, {"label": key, "country": row["country"], "count": 0}
+        )
+        entry["count"] += 1
+    return sorted(places.values(), key=lambda entry: (-entry["count"], entry["label"]))
+
+
+# ─── Member profile ──────────────────────────────────────────────────────────
+
+def member_profile_context(target, viewer) -> dict:
+    """
+    Public-safe profile data for one member. Respects category visibility,
+    so a profile never reveals posts the viewer could not read in the feed.
+    """
+    category_ids = _visible_category_ids(viewer)
+    posts = (
+        Post.objects.filter(
+            author=target,
+            status=Post.Status.PUBLISHED,
+            category_id__in=category_ids,
+        )
+        .select_related("author", "category")
+        .annotate(
+            reaction_count=Count("reactions", distinct=True),
+            comment_count=Count(
+                "comments",
+                filter=Q(comments__is_removed=False),
+                distinct=True,
+            ),
+            latest_comment_at=Max(
+                "comments__created_at",
+                filter=Q(comments__is_removed=False),
+            ),
+        )
+        .order_by("-created_at")
+    )
+
+    posts_count = posts.count()
+    recent_posts = list(posts[:4])
+    _attach_recent_commenters(recent_posts)
+
+    replies_count = Comment.objects.filter(
+        author=target,
+        is_removed=False,
+        post__status=Post.Status.PUBLISHED,
+        post__category_id__in=category_ids,
+    ).count()
+    reactions_received = Reaction.objects.filter(
+        post__author=target,
+        post__status=Post.Status.PUBLISHED,
+        post__category_id__in=category_ids,
+    ).count()
+
+    profile = CommunityProfile.objects.filter(user=target).first()
+
+    return {
+        "member": target,
+        "member_cprofile": profile,
+        "posts_count": posts_count,
+        "replies_count": replies_count,
+        "reactions_received": reactions_received,
+        "recent_posts": recent_posts,
+    }
+
+
+# ─── Direct messages ─────────────────────────────────────────────────────────
+
+def direct_inbox(user) -> list[dict]:
+    """Conversation rows for the inbox, newest activity first."""
+    from apps.community.services import can_use_direct_messages
+
+    if not can_use_direct_messages(user):
+        return []
+
+    last_message = DirectMessage.objects.filter(
+        conversation=OuterRef("pk")
+    ).order_by("-created_at")
+
+    conversations = (
+        DirectConversation.objects.filter(Q(user_a=user) | Q(user_b=user))
+        .select_related("user_a", "user_b")
+        .annotate(
+            unread=Count(
+                "messages",
+                filter=Q(messages__read_at__isnull=True)
+                & ~Q(messages__sender_id=user.pk),
+                distinct=True,
+            ),
+            last_body=Subquery(last_message.values("body")[:1]),
+            last_sender_id=Subquery(last_message.values("sender_id")[:1]),
+            last_created=Subquery(last_message.values("created_at")[:1]),
+        )
+        .order_by("-last_message_at", "-created_at")
+    )
+
+    rows = []
+    for conversation in conversations:
+        other = conversation.other_user(user)
+        rows.append(
+            {
+                "conversation": conversation,
+                "other": other,
+                "name": _member_display_name(other),
+                "role_label": other.get_role_display(),
+                "unread": conversation.unread,
+                "last_body": conversation.last_body or "",
+                "last_created": conversation.last_created,
+                "last_is_mine": conversation.last_sender_id == user.pk,
+            }
+        )
+    return rows
+
+
+def direct_thread_messages(conversation: DirectConversation) -> list[DirectMessage]:
+    return list(
+        conversation.messages.select_related("sender").order_by("created_at")
+    )

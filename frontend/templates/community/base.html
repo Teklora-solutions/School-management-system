@@ -3,6 +3,8 @@
 
 {% block meta_description %}{{ identity.name|default:"School" }} Community — join the conversation, share ideas and stay connected.{% endblock %}
 
+{% block body_class %}cmty-page{% endblock %}
+
 {% block extra_css %}
 {% if not cs.allow_index %}<meta name="robots" content="noindex, nofollow">{% endif %}
 <link rel="stylesheet" href="{% static 'css/community.css' %}">
@@ -11,58 +13,11 @@
 {% block content %}
 <div class="cmty-wrap">
 
-  {# ── Community header bar ── #}
-  <div class="cmty-header pub-section--tight">
+  {# ── Section tabs ── #}
+  <header class="cmty-header">
     <div class="pub-container">
       <div class="cmty-header__inner">
-        <div class="cmty-header__brand">
-          {% if identity.logo_url %}
-          <img src="{{ identity.logo_url }}" alt="{{ identity.name }} logo" class="cmty-header__logo">
-          {% else %}
-          <span class="cmty-header__dot" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
-          {% endif %}
-          <div>
-            <h1 class="cmty-header__name">{{ identity.name|default:"School" }} Community</h1>
-            {% if identity.motto %}<p class="cmty-header__motto">{{ identity.motto }}</p>{% endif %}
-          </div>
-        </div>
-
-        <div class="cmty-header__actions">
-          {# Search box #}
-          <form class="cmty-search" action="{% url 'community:search' %}" method="get" role="search">
-            <label for="cmtySearchInput" class="sr-only">Search community</label>
-            <span class="cmty-search__icon" aria-hidden="true"><i class="bi bi-search"></i></span>
-            <input id="cmtySearchInput" class="cmty-search__input" type="search" name="q"
-                   placeholder="Search posts…" value="{{ request.GET.q|default:'' }}"
-                   autocomplete="off" maxlength="100">
-          </form>
-
-          {# Sign-in / notification bell #}
-          {% if request.user.is_authenticated %}
-          <div class="cmty-header__user">
-            <a href="{% url 'core_notifications:list' %}" class="cmty-bell" aria-label="Notifications">
-              <i class="bi bi-bell"></i>
-              {% if unread_count %}<span class="cmty-bell__badge">{{ unread_count }}</span>{% endif %}
-            </a>
-            <a href="{{ request.user.get_dashboard_url }}" class="cmty-avatar-btn" aria-label="Go to dashboard">
-              {% if request.user.avatar %}
-              <img src="{{ request.user.avatar.url }}" alt="{{ request.user.full_name }}" class="cmty-avatar cmty-avatar--sm">
-              {% else %}
-              <span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials"
-                    aria-hidden="true">{{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}</span>
-              {% endif %}
-            </a>
-          </div>
-          {% else %}
-          <a href="{% url 'accounts:login' %}?next={{ request.path }}" class="pub-btn pub-btn--primary pub-btn--sm">
-            <i class="bi bi-person" aria-hidden="true"></i> Sign in
-          </a>
-          {% endif %}
-        </div>
-      </div>
-
-      {# ── Tab row ── #}
-      <nav class="cmty-tabs" aria-label="Community sections">
+        <nav class="cmty-tabs" aria-label="Community sections">
         <a href="{% url 'community:home' %}"
            class="cmty-tab {% if active_tab == 'community' %}is-active{% endif %}"
            {% if active_tab == 'community' %}aria-current="page"{% endif %}>
@@ -78,74 +33,152 @@
            {% if active_tab == 'members' %}aria-current="page"{% endif %}>
           <i class="bi bi-people" aria-hidden="true"></i> Members
         </a>
+        <a href="{% url 'community:map' %}"
+           class="cmty-tab {% if active_tab == 'map' %}is-active{% endif %}"
+           {% if active_tab == 'map' %}aria-current="page"{% endif %}>
+          <i class="bi bi-globe2" aria-hidden="true"></i> Map
+        </a>
         <a href="{% url 'community:about' %}"
            class="cmty-tab {% if active_tab == 'about' %}is-active{% endif %}"
            {% if active_tab == 'about' %}aria-current="page"{% endif %}>
           <i class="bi bi-info-circle" aria-hidden="true"></i> About
         </a>
-      </nav>
+        {% if request.user.is_authenticated %}
+        <a href="{% url 'community:my_posts' %}"
+           class="cmty-tab {% if active_tab == 'my-posts' %}is-active{% endif %}"
+           {% if active_tab == 'my-posts' %}aria-current="page"{% endif %}>
+          <i class="bi bi-person-lines-fill" aria-hidden="true"></i> My posts
+        </a>
+        {% endif %}
+        </nav>
+        {% if request.user.is_authenticated and request.user.role != 'student' %}
+        <a href="{% url 'community:messages' %}"
+           class="cmty-tabs__search cmty-tabs__messages {% if active_tab == 'messages' %}is-active{% endif %}"
+           aria-label="Messages{% if unread_messages %} ({{ unread_messages }} unread){% endif %}"
+           title="Messages"
+           {% if active_tab == 'messages' %}aria-current="page"{% endif %}>
+          <i class="bi bi-chat-dots" aria-hidden="true"></i>
+          {% if unread_messages %}
+          <span class="cmty-tabs__badge">{{ unread_messages }}</span>
+          {% endif %}
+        </a>
+        {% endif %}
+        <a href="{% url 'community:search' %}"
+           class="cmty-tabs__search {% if active_tab == 'search' %}is-active{% endif %}"
+           aria-label="Search community" title="Search community"
+           {% if active_tab == 'search' %}aria-current="page"{% endif %}>
+          <i class="bi bi-search" aria-hidden="true"></i>
+        </a>
+      </div>
     </div>
-  </div>
+  </header>
 
-  {# ── Main layout: feed + sidebar ── #}
+  {# ── Main layout: feed + right rail ── #}
   <div class="pub-container">
     <div class="cmty-layout">
 
-      {# Left / main column #}
       <div class="cmty-main">
+        {% block community_heading %}<h1 class="sr-only">Community</h1>{% endblock %}
         {% block community_content %}{% endblock %}
       </div>
 
-      {# Right sidebar — moves below pinned posts on mobile #}
-      <aside class="cmty-sidebar" aria-label="Community info">
+      <aside class="cmty-sidebar" aria-label="Community information">
         {% block community_sidebar %}
-        <div class="cmty-sidebar-card">
-          {% if identity.logo_url %}
-          <img src="{{ identity.logo_url }}" alt="" class="cmty-sidebar-card__banner" aria-hidden="true">
+
+        {# Promo / call to action #}
+        <section class="cmty-promo">
+          <span class="cmty-promo__icon" aria-hidden="true"><i class="bi bi-stars"></i></span>
+          <h2 class="cmty-promo__title">A kinder kind of online</h2>
+          <p class="cmty-promo__text">
+            Be respectful, stay on topic and lift each other up. Read the community
+            guidelines before you dive into the conversation.
+          </p>
+          {% if not request.user.is_authenticated %}
+          <a href="{% url 'accounts:login' %}?next={{ request.path }}" class="cmty-promo__btn">
+            Join the conversation
+          </a>
+          {% elif request.user.community_profile.has_consented %}
+          <a href="{% url 'community:about' %}" class="cmty-promo__btn">Community guidelines</a>
           {% else %}
-          <div class="cmty-sidebar-card__banner cmty-sidebar-card__banner--placeholder" aria-hidden="true">
-            <i class="bi bi-people-fill"></i>
+          <a href="{% url 'community:consent' %}?next={{ request.path }}" class="cmty-promo__btn">
+            Accept the community rules
+          </a>
+          {% endif %}
+        </section>
+
+        {# Community info #}
+        <section class="cmty-info-card">
+          <div class="cmty-info-card__head">
+            <span class="cmty-info-card__mark" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
+            <div class="cmty-info-card__intro">
+              <h2 class="cmty-info-card__title">About this community</h2>
+              <p class="cmty-info-card__tagline">{{ identity.name|default:"Our school" }} · everyone welcome</p>
+            </div>
+          </div>
+
+          {% if identity.about %}
+          <p class="cmty-info-card__desc">{{ identity.about|truncatewords:22 }}</p>
+          {% endif %}
+
+          <div class="cmty-info-card__stats">
+            <div class="cmty-info-card__stat">
+              <strong>{{ stats.total_members }}</strong>
+              <span>Members</span>
+            </div>
+            <div class="cmty-info-card__stat">
+              <strong>{{ stats.online_now }}</strong>
+              <span>Online</span>
+            </div>
+            <div class="cmty-info-card__stat">
+              <strong>{{ stats.admins }}</strong>
+              <span>Admins</span>
+            </div>
+          </div>
+
+          {% if identity.facebook_url or identity.instagram_url or identity.youtube_url %}
+          <div class="cmty-info-card__links">
+            {% if identity.facebook_url %}<a href="{{ identity.facebook_url }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="bi bi-facebook"></i></a>{% endif %}
+            {% if identity.instagram_url %}<a href="{{ identity.instagram_url }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="bi bi-instagram"></i></a>{% endif %}
+            {% if identity.youtube_url %}<a href="{{ identity.youtube_url }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="bi bi-youtube"></i></a>{% endif %}
           </div>
           {% endif %}
-          <div class="cmty-sidebar-card__body">
-            <h2 class="cmty-sidebar-card__title">{{ identity.name|default:"Our School" }} Community</h2>
-            {% if identity.about %}
-            <p class="cmty-sidebar-card__desc">{{ identity.about|truncatewords:25 }}</p>
-            {% endif %}
+        </section>
 
-            {# Stats row #}
-            <div class="cmty-stats">
-              <div class="cmty-stat">
-                <span class="cmty-stat__num">{{ stats.total_members }}</span>
-                <span class="cmty-stat__label">Members</span>
-              </div>
-              <div class="cmty-stat">
-                <span class="cmty-stat__num">{{ stats.online_now }}</span>
-                <span class="cmty-stat__label">Online now</span>
-              </div>
-              <div class="cmty-stat">
-                <span class="cmty-stat__num">{{ stats.admins }}</span>
-                <span class="cmty-stat__label">Admins</span>
-              </div>
-            </div>
-
-            {# Social links #}
-            {% if identity.facebook_url or identity.instagram_url or identity.youtube_url %}
-            <div class="cmty-sidebar-card__links">
-              {% if identity.facebook_url %}<a href="{{ identity.facebook_url }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="bi bi-facebook"></i></a>{% endif %}
-              {% if identity.instagram_url %}<a href="{{ identity.instagram_url }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="bi bi-instagram"></i></a>{% endif %}
-              {% if identity.youtube_url %}<a href="{{ identity.youtube_url }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="bi bi-youtube"></i></a>{% endif %}
-            </div>
-            {% endif %}
-
-            {# CTA for visitors #}
-            {% if not request.user.is_authenticated %}
-            <a href="{% url 'accounts:login' %}?next={% url 'community:home' %}" class="pub-btn pub-btn--primary pub-btn--block" style="margin-top:.75rem">
-              <i class="bi bi-person-plus" aria-hidden="true"></i> Join the conversation
-            </a>
-            {% endif %}
+        {# Leaderboard — posts + replies in the last 30 days #}
+        <section class="cmty-leader-card" aria-labelledby="cmtyLeaderTitle">
+          <div class="cmty-leader-card__head">
+            <h2 class="cmty-leader-card__title" id="cmtyLeaderTitle">
+              <i class="bi bi-trophy" aria-hidden="true"></i> Leaderboard
+            </h2>
+            <span class="cmty-leader-card__range">30 days</span>
           </div>
-        </div>
+
+          {% if leaderboard %}
+          <ol class="cmty-leader-list">
+            {% for row in leaderboard %}
+            <li class="cmty-leader">
+              <span class="cmty-leader__rank {% if row.rank <= 3 %}is-top{% endif %}" aria-label="Rank {{ row.rank }}">{{ row.rank }}</span>
+              {% if row.user.avatar and row.user.role != 'student' %}
+              <img src="{{ row.user.avatar.url }}" alt="" class="cmty-avatar cmty-avatar--sm" aria-hidden="true">
+              {% else %}
+              <span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials" aria-hidden="true">{{ row.name|first|upper }}</span>
+              {% endif %}
+              <span class="cmty-leader__who">
+                <strong>{{ row.name }}</strong>
+                <small>{{ row.role }}</small>
+              </span>
+              <span class="cmty-leader__score" title="{{ row.total }} posts and replies">{{ row.total }}</span>
+            </li>
+            {% endfor %}
+          </ol>
+          <p class="cmty-leader-card__hint">Points count posts and replies from the last 30 days.</p>
+          {% else %}
+          <p class="cmty-leader-card__empty">
+            No activity yet this month. Start the conversation to claim the top spot.
+          </p>
+          {% endif %}
+        </section>
+
         {% endblock %}
       </aside>
 
@@ -159,12 +192,36 @@
 <script>
 (function(){
   'use strict';
-  /* ── Category pill horizontal scroll with keyboard support ── */
+
+  /* ── Keep the active section tab in view on narrow screens ── */
+  var activeTab = document.querySelector('.cmty-tabs .cmty-tab.is-active');
+  if(activeTab && activeTab.scrollIntoView){
+    activeTab.scrollIntoView({block: 'nearest', inline: 'center'});
+  }
+
+  /* ── Category pills: More… toggle reveals the hidden overflow ── */
   var pillRow = document.getElementById('cmtyCategoryPills');
-  if(pillRow){
+  var pillMore = document.getElementById('cmtyPillsMore');
+  if(pillRow && pillMore){
+    pillMore.addEventListener('click', function(){
+      var open = pillRow.classList.toggle('is-expanded');
+      pillMore.setAttribute('aria-expanded', open ? 'true' : 'false');
+      var label = pillMore.querySelector('.cmty-pill__label');
+      var icon  = pillMore.querySelector('i');
+      if(label) label.textContent = open ? 'Less' : 'More…';
+      if(icon)  icon.className = open ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+    });
     pillRow.addEventListener('keydown', function(e){
       if(e.key === 'ArrowRight') pillRow.scrollLeft += 120;
       if(e.key === 'ArrowLeft')  pillRow.scrollLeft -= 120;
+    });
+  }
+
+  /* ── Sort menu: close when tapping outside ── */
+  var sortMenu = document.getElementById('cmtySort');
+  if(sortMenu){
+    document.addEventListener('click', function(e){
+      if(sortMenu.open && !sortMenu.contains(e.target)) sortMenu.open = false;
     });
   }
 
@@ -177,7 +234,6 @@
       var cat    = moreBtn.dataset.cat  || 'all';
       var url    = moreBtn.dataset.url  || window.location.pathname;
       var params = new URLSearchParams({cursor: cursor, sort: sort, cat: cat});
-      /* Skeleton while loading */
       var feed = document.getElementById('cmtyFeed');
       if(feed){
         var sk = document.createElement('div');
@@ -214,9 +270,17 @@
     btn.addEventListener('click', function(){
       var url = btn.dataset.url || window.location.href;
       if(navigator.clipboard){
+        var original = btn.dataset.originalHtml || btn.innerHTML;
+        btn.dataset.originalHtml = original;
         navigator.clipboard.writeText(url).then(function(){
-          btn.textContent = 'Link copied!';
-          setTimeout(function(){ btn.innerHTML = '<i class="bi bi-share" aria-hidden="true"></i> Share'; }, 2200);
+          btn.classList.add('is-copied');
+          btn.innerHTML = '<i class="bi bi-check2" aria-hidden="true"></i> Copied';
+          var menu = btn.closest('details');
+          if(menu) menu.open = false;
+          setTimeout(function(){
+            btn.classList.remove('is-copied');
+            btn.innerHTML = original;
+          }, 2200);
         });
       }
     });
@@ -235,7 +299,6 @@
     var ts = parseInt(el.dataset.ts, 10);
     if(!isNaN(ts)){
       el.textContent = relTime(ts);
-      /* Full date on tap/click for accessibility */
       el.addEventListener('click', function(){
         var full = new Date(ts*1000).toLocaleString('en-KE',{
           timeZone:'Africa/Nairobi',

@@ -2,30 +2,37 @@
 {% load static %}
 
 {% block title %}Community — {{ identity.name|default:"School" }}{% endblock %}
+{% block meta_description %}The {{ identity.name|default:"school" }} community is taking a short break.{% endblock %}
+
+{% block extra_css %}
 <meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="{% static 'css/community.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="pub-section pub-section--alt" style="min-height:60vh;display:flex;align-items:center;">
-  <div class="pub-container" style="text-align:center;max-width:520px;margin:0 auto;">
-    <div style="font-size:3rem;margin-bottom:1rem;" aria-hidden="true">🌱</div>
-    <h1 style="font-family:var(--pub-font-h);font-size:1.6rem;margin-bottom:.75rem;">
-      {% if cs.enabled and cs.paused %}
-        Our community is taking a short break
-      {% else %}
-        Community coming soon
-      {% endif %}
-    </h1>
-    <p style="color:var(--pub-text-muted);line-height:1.75;margin-bottom:1.5rem;">
-      {% if cs.enabled and cs.paused %}
-        We're doing a bit of maintenance. We'll be back very shortly — thank you for your patience.
-      {% else %}
-        We're setting up something great. The {{ identity.name|default:"school" }} community
-        will open soon. Check back for news, conversations and ideas.
-      {% endif %}
-    </p>
-    <a href="{% url 'public:home' %}" class="pub-btn pub-btn--primary">
-      <i class="bi bi-house" aria-hidden="true"></i> Back to home
-    </a>
+<div class="pub-section pub-section--alt">
+  <div class="pub-container">
+    <div class="cmty-paused">
+      <span class="cmty-paused__icon" aria-hidden="true"><i class="bi bi-cup-hot"></i></span>
+      <h1 class="cmty-paused__title">
+        {% if cs.enabled and cs.paused %}
+          Our community is taking a short break
+        {% else %}
+          Community coming soon
+        {% endif %}
+      </h1>
+      <p class="cmty-paused__text">
+        {% if cs.enabled and cs.paused %}
+          We're doing a bit of maintenance. We'll be back very shortly — thank you for your patience.
+        {% else %}
+          We're setting up something great. The {{ identity.name|default:"school" }} community
+          will open soon. Check back for news, conversations and ideas.
+        {% endif %}
+      </p>
+      <a href="{% url 'public:home' %}" class="pub-btn pub-btn--primary">
+        <i class="bi bi-house" aria-hidden="true"></i> Back to home
+      </a>
+    </div>
   </div>
 </div>
 {% endblock %}

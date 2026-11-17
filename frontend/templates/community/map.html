@@ -1,0 +1,642 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}Member map — {{ identity.name|default:"School" }} Community{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/community-map.css' %}">
+{% endblock %}
+
+{% block body_class %}cmty-page cmty-map-page{% endblock %}
+
+{% block community_heading %}<h1 class="sr-only">Member map</h1>{% endblock %}
+
+{% block community_content %}
+
+<section class="cmty-map-hero">
+  <div class="cmty-map-hero__copy">
+    <span class="cmty-map-hero__eyebrow"><i class="bi bi-globe2" aria-hidden="true"></i> Member map</span>
+    <h2 class="cmty-map-hero__title">Where our community calls home</h2>
+    <p class="cmty-map-hero__text">
+      A town-level view of members who chose to share their place. Tap a pin to
+      meet the people there, open a profile, or start a conversation.
+    </p>
+  </div>
+  {% if request.user.is_authenticated %}
+  <div class="cmty-map-hero__stats" aria-label="Map summary">
+    <div class="cmty-map-stat">
+      <strong>{{ map_stats.members }}</strong>
+      <span>On the map</span>
+    </div>
+    <div class="cmty-map-stat">
+      <strong>{{ map_stats.places }}</strong>
+      <span>Towns &amp; cities</span>
+    </div>
+    <div class="cmty-map-stat">
+      <strong>{{ map_stats.countries }}</strong>
+      <span>Countries</span>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+{% if request.user.is_authenticated %}
+<form id="cmtyMapCsrf" hidden>{% csrf_token %}</form>
+{% endif %}
+
+<div class="cmty-map-shell">
+  <div class="cmty-map-toolbar">
+    <div class="cmty-map-legend">
+      <span class="cmty-map-legend__dot" aria-hidden="true"></span>
+      <span id="cmtyMapLegendText">
+        {% if not request.user.is_authenticated %}Members-only view{% elif map_stats.members %}{{ map_stats.members }} member{{ map_stats.members|pluralize }} sharing a town{% else %}No shared locations yet{% endif %}
+      </span>
+      <span class="cmty-map-legend__sep" aria-hidden="true">·</span>
+      <span class="cmty-map-legend__hint" id="cmtyMapLevelHint">Countries</span>
+    </div>
+    {% if request.user.is_authenticated %}
+    <div class="cmty-map-toolbar__actions">
+      {% if my_cprofile.is_on_map %}
+      <button type="button" class="cmty-map-tool" id="cmtyMapLocate" title="Centre on my town">
+        <i class="bi bi-geo-alt" aria-hidden="true"></i>
+        <span>My town</span>
+      </button>
+      {% endif %}
+      <button type="button" class="cmty-map-tool cmty-map-tool--icon" id="cmtyMapZoomOut" aria-label="Zoom out">
+        <i class="bi bi-dash-lg" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="cmty-map-tool cmty-map-tool--icon" id="cmtyMapZoomIn" aria-label="Zoom in">
+        <i class="bi bi-plus-lg" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="cmty-map-tool cmty-map-tool--icon" id="cmtyMapReset" aria-label="Reset map view" title="Reset view">
+        <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="cmty-map-viewport" id="cmtyMapViewport">
+    <div class="cmty-map-stage" id="cmtyMapStage">
+      {% include "community/includes/world_map.svg" %}
+      <div class="cmty-map-pins" id="cmtyMapPins"></div>
+    </div>
+
+    <div class="cmty-map-empty" id="cmtyMapEmpty" hidden>
+      <span class="cmty-map-empty__icon" aria-hidden="true"><i class="bi bi-geo-alt"></i></span>
+      <h3 class="cmty-map-empty__title">No pins on the map yet</h3>
+      <p class="cmty-map-empty__text">
+        Members haven't shared a town yet. Add yours below and put the first
+        pin on the board.
+      </p>
+    </div>
+
+    <aside class="cmty-map-panel" id="cmtyMapPanel" hidden aria-label="Members in this place">
+      <header class="cmty-map-panel__head">
+        <div>
+          <h3 class="cmty-map-panel__title" id="cmtyMapPanelTitle"></h3>
+          <p class="cmty-map-panel__sub" id="cmtyMapPanelSub"></p>
+        </div>
+        <button type="button" class="cmty-map-panel__close" id="cmtyMapPanelClose" aria-label="Close member list">
+          <i class="bi bi-x-lg" aria-hidden="true"></i>
+        </button>
+      </header>
+      <div class="cmty-map-panel__search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="search" id="cmtyMapPanelFilter" placeholder="Find a member…" autocomplete="off" maxlength="60" aria-label="Find a member in this place">
+      </div>
+      <ul class="cmty-map-members" id="cmtyMapPanelList"></ul>
+      <p class="cmty-map-panel__empty" id="cmtyMapPanelEmpty" hidden>No members match that name.</p>
+    </aside>
+
+    {% if not request.user.is_authenticated %}
+    <div class="cmty-map-gate">
+      <span class="cmty-map-gate__icon" aria-hidden="true"><i class="bi bi-person-lock"></i></span>
+      <h3 class="cmty-map-gate__title">Members-only map</h3>
+      <p class="cmty-map-gate__text">
+        Sign in to see where the community is and connect with other members.
+      </p>
+      <a href="{% url 'accounts:login' %}?next={{ request.path }}" class="pub-btn pub-btn--primary">
+        <i class="bi bi-person" aria-hidden="true"></i> Sign in
+      </a>
+    </div>
+    {% endif %}
+
+    {% if request.user.is_authenticated %}
+    <p class="cmty-map-hint" id="cmtyMapHint">
+      <i class="bi bi-arrows-move" aria-hidden="true"></i> Drag to move · scroll or pinch to zoom
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+{% if request.user.is_authenticated %}
+<div class="cmty-map-lower">
+  <section class="cmty-place-card" aria-labelledby="cmtyPlaceTitle">
+    <div class="cmty-place-card__head">
+      <span class="cmty-place-card__icon" aria-hidden="true"><i class="bi bi-pin-map"></i></span>
+      <div>
+        <h2 class="cmty-place-card__title" id="cmtyPlaceTitle">Your place on the map</h2>
+        <p class="cmty-place-card__sub">
+          {% if my_cprofile.is_on_map %}
+            You're showing <strong>{{ my_cprofile.location_label }}</strong>.
+          {% elif my_cprofile.has_location %}
+            Saved <strong>{{ my_cprofile.location_label }}</strong> — currently hidden.
+          {% else %}
+            Share a town, not an address. You can hide it at any time.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    {% if can_message %}
+    <form class="cmty-place-form" method="post" action="{% url 'community:location_update' %}">
+      {% csrf_token %}
+      <label class="cmty-field">
+        <span class="cmty-field__label">Town or city</span>
+        <select name="place" class="cmty-select" required>
+          <option value="">Choose a place…</option>
+          {% for group in place_groups %}
+          <optgroup label="{{ group.region }}">
+            {% for place in group.places %}
+            <option value="{{ place.label }}" {% if my_cprofile.location_label == place.label %}selected{% endif %}>{{ place.label }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="cmty-check">
+        <input type="checkbox" name="shared" {% if not my_cprofile.has_location or my_cprofile.location_shared %}checked{% endif %}>
+        <span>Show me on the member map</span>
+      </label>
+
+      <div class="cmty-place-form__actions">
+        <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">
+          <i class="bi bi-check2" aria-hidden="true"></i> Save location
+        </button>
+        {% if my_cprofile.has_location %}
+        <button type="submit" name="action" value="clear" class="pub-btn pub-btn--ghost pub-btn--sm" formnovalidate>
+          Remove
+        </button>
+        {% endif %}
+      </div>
+      <p class="cmty-place-form__note">
+        <i class="bi bi-shield-check" aria-hidden="true"></i>
+        Only the town is stored. Never your street, school or exact address.
+      </p>
+    </form>
+    {% else %}
+    <p class="cmty-place-card__note">
+      Student accounts aren't shown in the members directory or on the map.
+      Use the school Contact page if you need to reach staff privately.
+    </p>
+    {% endif %}
+  </section>
+
+  <section class="cmty-map-places" aria-labelledby="cmtyPlacesTitle">
+    <h2 class="cmty-map-places__title" id="cmtyPlacesTitle">
+      <i class="bi bi-pin-map-fill" aria-hidden="true"></i> Top places
+    </h2>
+    {% if map_places %}
+    <ol class="cmty-map-places__list">
+      {% for place in map_places %}
+      <li class="cmty-map-place">
+        <span class="cmty-map-place__name">
+          {{ place.label }}
+          <small>{{ place.country }}</small>
+        </span>
+        <span class="cmty-map-place__count">{{ place.count }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="cmty-map-places__empty">
+      Places will appear here as members share their towns.
+    </p>
+    {% endif %}
+    <a href="{% url 'community:members' %}" class="cmty-map-places__link">
+      Browse all members <i class="bi bi-arrow-right" aria-hidden="true"></i>
+    </a>
+  </section>
+</div>
+
+{{ members_json|json_script:"cmtyMapMembers" }}
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% if request.user.is_authenticated %}
+<script>
+(function(){
+  'use strict';
+
+  var dataEl = document.getElementById('cmtyMapMembers');
+  if(!dataEl) return;
+
+  var members = [];
+  try { members = JSON.parse(dataEl.textContent) || []; } catch (err) { members = []; }
+
+  var viewport = document.getElementById('cmtyMapViewport');
+  var stage = document.getElementById('cmtyMapStage');
+  var pinsLayer = document.getElementById('cmtyMapPins');
+  var emptyBox = document.getElementById('cmtyMapEmpty');
+  var panel = document.getElementById('cmtyMapPanel');
+  var panelTitle = document.getElementById('cmtyMapPanelTitle');
+  var panelSub = document.getElementById('cmtyMapPanelSub');
+  var panelList = document.getElementById('cmtyMapPanelList');
+  var panelEmpty = document.getElementById('cmtyMapPanelEmpty');
+  var panelFilter = document.getElementById('cmtyMapPanelFilter');
+  var levelHint = document.getElementById('cmtyMapLevelHint');
+  var csrfInput = document.querySelector('#cmtyMapCsrf input[name="csrfmiddlewaretoken"]');
+  var worldDots = document.getElementById('cmtyWorldDots');
+  var canMessage = {% if can_message %}true{% else %}false{% endif %};
+
+  if(!viewport || !stage || !pinsLayer) return;
+
+  var zoom = 1;
+  var panX = 0;
+  var panY = 0;
+  var minZoom = 1;
+  var maxZoom = 8;
+  var activeKey = null;
+  var activeCluster = null;
+
+  function project(lat, lng){
+    return {
+      x: (lng + 180) / 360 * 100,
+      y: (90 - lat) / 180 * 100
+    };
+  }
+
+  function clamp(value, low, high){
+    return Math.min(high, Math.max(low, value));
+  }
+
+  function clampPan(){
+    var w = viewport.clientWidth;
+    var h = viewport.clientHeight;
+    var maxX = (zoom - 1) * w / 2;
+    var maxY = (zoom - 1) * h / 2;
+    panX = clamp(panX, -maxX, maxX);
+    panY = clamp(panY, -maxY, maxY);
+  }
+
+  function applyTransform(){
+    clampPan();
+    stage.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + zoom + ')';
+    stage.style.setProperty('--z', zoom);
+    // Keep the dotted texture at screen scale so it doesn't bloom into blobs.
+    if(worldDots){
+      worldDots.setAttribute('patternTransform', 'scale(' + (1 / zoom) + ')');
+    }
+  }
+
+  function initials(name){
+    return (name || '?').trim().split(/\s+/).slice(0, 2).map(function(part){
+      return part.charAt(0).toUpperCase();
+    }).join('');
+  }
+
+  function esc(value){
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch){
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+  }
+
+  function avatarHtml(member){
+    if(member.avatar){
+      return '<img class="cmty-avatar cmty-avatar--sm" src="' + esc(member.avatar) + '" alt="">';
+    }
+    return '<span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials" aria-hidden="true">' + esc(initials(member.name)) + '</span>';
+  }
+
+  function buildClusters(){
+    var keyField = zoom >= 2.2 ? 'label' : 'country';
+    var buckets = {};
+    members.forEach(function(member){
+      var key = member[keyField] || member.label;
+      if(!buckets[key]){
+        buckets[key] = { key: key, label: key, members: [], lat: 0, lng: 0, hasSelf: false };
+      }
+      var bucket = buckets[key];
+      bucket.members.push(member);
+      bucket.lat += member.lat;
+      bucket.lng += member.lng;
+      if(member.is_self) bucket.hasSelf = true;
+    });
+
+    var clusters = Object.keys(buckets).map(function(key){
+      var bucket = buckets[key];
+      bucket.lat = bucket.lat / bucket.members.length;
+      bucket.lng = bucket.lng / bucket.members.length;
+      bucket.count = bucket.members.length;
+      return bucket;
+    });
+
+    // Spread pins that would otherwise sit on top of each other.
+    var w = viewport.clientWidth || 1;
+    var h = viewport.clientHeight || 1;
+    var placed = [];
+    clusters.sort(function(a, b){ return b.count - a.count; });
+    clusters.forEach(function(cluster){
+      var point = project(cluster.lat, cluster.lng);
+      var px = point.x / 100 * w;
+      var py = point.y / 100 * h;
+      var tries = 0;
+      while(tries < 18){
+        var clash = placed.some(function(other){
+          var dx = other.px - px;
+          var dy = other.py - py;
+          return Math.sqrt(dx*dx + dy*dy) < 46;
+        });
+        if(!clash) break;
+        var angle = tries * 1.7;
+        var radius = 26 + Math.floor(tries / 6) * 22;
+        px += Math.cos(angle) * radius;
+        py += Math.sin(angle) * radius;
+        tries += 1;
+      }
+      cluster.px = clamp(px, 24, w - 24);
+      cluster.py = clamp(py, 30, h - 24);
+      placed.push(cluster);
+    });
+    return { clusters: clusters, keyField: keyField };
+  }
+
+  function renderPins(){
+    var result = buildClusters();
+    var clusters = result.clusters;
+    pinsLayer.innerHTML = '';
+    levelHint.textContent = result.keyField === 'label' ? 'Towns & cities' : 'Countries';
+
+    clusters.forEach(function(cluster){
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'cmty-map-pin' + (cluster.hasSelf ? ' is-self' : '') + (cluster.key === activeKey ? ' is-active' : '');
+      button.style.left = (cluster.px / (viewport.clientWidth || 1) * 100) + '%';
+      button.style.top = (cluster.py / (viewport.clientHeight || 1) * 100) + '%';
+      button.dataset.key = cluster.key;
+      var label = result.keyField === 'label' ? cluster.label : cluster.label;
+      button.title = label + ' · ' + cluster.count + ' member' + (cluster.count === 1 ? '' : 's');
+      button.setAttribute('aria-label', button.title);
+      button.innerHTML = '<span class="cmty-map-pin__pill">' + cluster.count + '</span>' +
+                         '<span class="cmty-map-pin__tip" aria-hidden="true"></span>';
+      button.addEventListener('click', function(event){
+        event.stopPropagation();
+        openPanel(cluster, result.keyField);
+      });
+      pinsLayer.appendChild(button);
+    });
+
+    if(!members.length){
+      emptyBox.hidden = false;
+    } else {
+      emptyBox.hidden = true;
+    }
+  }
+
+  function memberRow(member){
+    var li = document.createElement('li');
+    li.className = 'cmty-map-member';
+    li.dataset.name = (member.name + ' ' + member.role).toLowerCase();
+    var online = member.online ? '<span class="cmty-map-member__online" title="Online now" aria-label="Online now"></span>' : '';
+    var actions = '<a class="cmty-map-member__link" href="' + esc(member.profile_url) + '">Profile</a>';
+    if(canMessage && !member.is_self){
+      actions += '<button type="button" class="cmty-map-member__msg" data-message-url="' + esc(member.message_url) + '">' +
+                 '<i class="bi bi-chat-dots" aria-hidden="true"></i> Message</button>';
+    }
+    li.innerHTML =
+      '<a class="cmty-map-member__body" href="' + esc(member.profile_url) + '">' +
+        '<span class="cmty-map-member__avatar">' + avatarHtml(member) + online + '</span>' +
+        '<span class="cmty-map-member__who">' +
+          '<strong>' + esc(member.name) + (member.is_self ? ' <em>you</em>' : '') + '</strong>' +
+          '<small class="cmty-role-badge cmty-role-badge--' + esc(member.role_slug) + '">' + esc(member.role) + '</small>' +
+        '</span>' +
+      '</a>' +
+      '<span class="cmty-map-member__actions">' + actions + '</span>';
+    return li;
+  }
+
+  function openPanel(cluster, keyField){
+    activeKey = cluster.key;
+    activeCluster = cluster;
+    panelTitle.textContent = keyField === 'label' ? cluster.label : cluster.label;
+    panelSub.textContent = cluster.count + ' member' + (cluster.count === 1 ? '' : 's') +
+      (keyField === 'label' ? '' : ' across this country');
+    panelFilter.value = '';
+    panelList.innerHTML = '';
+    cluster.members
+      .slice()
+      .sort(function(a, b){ return a.name.localeCompare(b.name); })
+      .forEach(function(member){ panelList.appendChild(memberRow(member)); });
+    panelEmpty.hidden = true;
+    panel.hidden = false;
+    Array.prototype.forEach.call(pinsLayer.children, function(pin){
+      pin.classList.toggle('is-active', pin.dataset.key === cluster.key);
+    });
+  }
+
+  function closePanel(){
+    panel.hidden = true;
+    activeKey = null;
+    activeCluster = null;
+    Array.prototype.forEach.call(pinsLayer.children, function(pin){
+      pin.classList.remove('is-active');
+    });
+  }
+
+  if(panelFilter){
+    panelFilter.addEventListener('input', function(){
+      var query = panelFilter.value.trim().toLowerCase();
+      var shown = 0;
+      Array.prototype.forEach.call(panelList.children, function(row){
+        var match = !query || (row.dataset.name || '').indexOf(query) !== -1;
+        row.hidden = !match;
+        if(match) shown += 1;
+      });
+      panelEmpty.hidden = shown > 0;
+    });
+  }
+
+  var panelClose = document.getElementById('cmtyMapPanelClose');
+  if(panelClose) panelClose.addEventListener('click', closePanel);
+
+  if(panelList){
+    panelList.addEventListener('click', function(event){
+      var button = event.target.closest('[data-message-url]');
+      if(!button || !csrfInput) return;
+      button.disabled = true;
+      button.innerHTML = '<i class="bi bi-arrow-repeat" aria-hidden="true"></i> Opening…';
+      fetch(button.dataset.messageUrl, {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRFToken': csrfInput.value
+        }
+      }).then(function(response){
+        return response.json().then(function(body){
+          if(!response.ok || !body.ok) throw new Error(body.error || 'Could not start the conversation.');
+          window.location.href = body.thread_url;
+        });
+      }).catch(function(error){
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-chat-dots" aria-hidden="true"></i> Message';
+        if(window.console && console.warn) console.warn(error.message);
+        window.alert(error.message || 'Could not start the conversation.');
+      });
+    });
+  }
+
+  // ── Pan & zoom ──────────────────────────────────────────────────────────
+  function zoomAt(newZoom, clientX, clientY){
+    newZoom = clamp(newZoom, minZoom, maxZoom);
+    if(newZoom === zoom) return;
+    var rect = viewport.getBoundingClientRect();
+    var cx = clientX - rect.left - rect.width / 2;
+    var cy = clientY - rect.top - rect.height / 2;
+    var sceneX = (cx - panX) / zoom;
+    var sceneY = (cy - panY) / zoom;
+    zoom = newZoom;
+    panX = cx - sceneX * zoom;
+    panY = cy - sceneY * zoom;
+    applyTransform();
+    renderPins();
+  }
+
+  function zoomBy(factor){
+    var rect = viewport.getBoundingClientRect();
+    zoomAt(zoom * factor, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  var zoomIn = document.getElementById('cmtyMapZoomIn');
+  var zoomOut = document.getElementById('cmtyMapZoomOut');
+  var reset = document.getElementById('cmtyMapReset');
+  if(zoomIn) zoomIn.addEventListener('click', function(){ zoomBy(1.6); });
+  if(zoomOut) zoomOut.addEventListener('click', function(){ zoomBy(1 / 1.6); });
+  if(reset) reset.addEventListener('click', function(){
+    zoom = 1; panX = 0; panY = 0;
+    applyTransform(); renderPins(); closePanel();
+  });
+
+  viewport.addEventListener('wheel', function(event){
+    if(event.target.closest('.cmty-map-panel')) return;
+    if((zoom <= minZoom && event.deltaY > 0) || (zoom >= maxZoom && event.deltaY < 0)) return;
+    event.preventDefault();
+    zoomAt(zoom * (event.deltaY < 0 ? 1.22 : 1 / 1.22), event.clientX, event.clientY);
+  }, { passive: false });
+
+  viewport.addEventListener('dblclick', function(event){
+    if(event.target.closest('.cmty-map-panel, .cmty-map-gate, button')) return;
+    zoomAt(zoom * 1.8, event.clientX, event.clientY);
+  });
+
+  var dragging = false;
+  var dragStartX = 0;
+  var dragStartY = 0;
+  var dragOriginX = 0;
+  var dragOriginY = 0;
+  var moved = 0;
+
+  viewport.addEventListener('pointerdown', function(event){
+    if(event.button !== 0) return;
+    if(event.target.closest('.cmty-map-panel, .cmty-map-gate, .cmty-map-pin, button, a, input, select')) return;
+    dragging = true;
+    moved = 0;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    dragOriginX = panX;
+    dragOriginY = panY;
+    viewport.classList.add('is-dragging');
+    viewport.setPointerCapture(event.pointerId);
+  });
+
+  viewport.addEventListener('pointermove', function(event){
+    if(!dragging) return;
+    var dx = event.clientX - dragStartX;
+    var dy = event.clientY - dragStartY;
+    moved = Math.max(moved, Math.abs(dx) + Math.abs(dy));
+    panX = dragOriginX + dx;
+    panY = dragOriginY + dy;
+    applyTransform();
+  });
+
+  function endDrag(event){
+    if(!dragging) return;
+    dragging = false;
+    viewport.classList.remove('is-dragging');
+    if(viewport.hasPointerCapture && viewport.hasPointerCapture(event.pointerId)){
+      viewport.releasePointerCapture(event.pointerId);
+    }
+    if(moved > 6) renderPins();
+  }
+  viewport.addEventListener('pointerup', endDrag);
+  viewport.addEventListener('pointercancel', endDrag);
+
+  // ── Pinch zoom (two pointers) ──────────────────────────────────────────
+  var pointers = {};
+  viewport.addEventListener('pointerdown', function(event){
+    pointers[event.pointerId] = { x: event.clientX, y: event.clientY };
+  });
+  viewport.addEventListener('pointerup', function(event){
+    delete pointers[event.pointerId];
+  });
+  viewport.addEventListener('pointercancel', function(event){
+    delete pointers[event.pointerId];
+  });
+  viewport.addEventListener('touchmove', function(event){
+    var ids = Object.keys(pointers);
+    if(ids.length !== 2 || event.touches.length !== 2) return;
+    event.preventDefault();
+    var first = pointers[ids[0]];
+    var second = pointers[ids[1]];
+    var distance = Math.hypot(first.x - second.x, first.y - second.y);
+    var now = pointsDistance(event.touches[0], event.touches[1]);
+    if(now > 0 && distance > 0){
+      zoomAt(zoom * (now / distance), (first.x + second.x) / 2, (first.y + second.y) / 2);
+    }
+    pointers[ids[0]] = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    pointers[ids[1]] = { x: event.touches[1].clientX, y: event.touches[1].clientY };
+  }, { passive: false });
+
+  function pointsDistance(a, b){
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  }
+
+  // ── Centre on my town ──────────────────────────────────────────────────
+  var locate = document.getElementById('cmtyMapLocate');
+  if(locate){
+    locate.addEventListener('click', function(){
+      var me = members.filter(function(member){ return member.is_self; })[0];
+      if(!me) return;
+      var point = project(me.lat, me.lng);
+      zoom = 3.2;
+      panX = -((point.x / 100 - 0.5) * viewport.clientWidth * zoom);
+      panY = -((point.y / 100 - 0.5) * viewport.clientHeight * zoom);
+      applyTransform();
+      renderPins();
+      var selected = buildClusters().clusters.filter(function(cluster){
+        return cluster.members.some(function(member){ return member.is_self; });
+      })[0];
+      if(selected) openPanel(selected, zoom >= 2.2 ? 'label' : 'country');
+    });
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────
+  applyTransform();
+  renderPins();
+
+  if(!members.length && emptyBox){
+    emptyBox.hidden = false;
+  }
+
+  window.addEventListener('resize', function(){
+    applyTransform();
+    renderPins();
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

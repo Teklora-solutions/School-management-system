@@ -37,6 +37,8 @@ from .models import (
     CategoryModerator,
     Comment,
     CommunityProfile,
+    DirectConversation,
+    DirectMessage,
     Post,
     Report,
     Warning,
@@ -83,6 +85,7 @@ class CommunityContextMixin:
         ctx["cs"] = _community_settings(self.request)
         ctx["categories"] = selectors.visible_categories(self.request.user)
         ctx["stats"] = selectors.community_stats(self.request.user)
+        ctx["leaderboard"] = selectors.top_contributors(self.request.user)
         ctx["active_category_slug"] = self.kwargs.get(
             "category_slug", self.request.GET.get("cat", "all")
         )
@@ -93,6 +96,9 @@ class CommunityContextMixin:
                 recipient=self.request.user,
                 status=Warning.Status.ACTIVE,
             ).count()
+            ctx["unread_messages"] = services.unread_direct_messages(
+                self.request.user
+            )
         return ctx
 
 
@@ -100,6 +106,14 @@ class CommunityContextMixin:
 
 class CommunityPausedView(TemplateView):
     template_name = "community/paused.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        # Reachable via history or bookmarks while the community is live; showing
+        # "coming soon" there reads as "the community is off" and hides the feed.
+        cs = _community_settings(request)
+        if cs["enabled"] and not cs["paused"]:
+            return redirect(reverse("community:home"))
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -135,10 +149,6 @@ class CommunityHomeView(CommunityGateMixin, CommunityContextMixin, TemplateView)
         ctx["sort"] = sort
         ctx["active_category_slug"] = cat_slug
         ctx["active_tab"] = "community"
-        if cursor is None and cat_slug == "all" and sort != "pinned":
-            ctx["pinned_posts"] = selectors.post_feed(req.user, sort="pinned")["posts"]
-        else:
-            ctx["pinned_posts"] = []
         # Composer state
         if req.user.is_authenticated:
             ctx["draft"] = services.get_draft(req.user)
@@ -168,7 +178,6 @@ class CategoryFeedView(CommunityGateMixin, CommunityContextMixin, TemplateView):
         ctx["sort"] = sort
         ctx["active_category_slug"] = slug
         ctx["current_category"] = category
-        ctx["pinned_posts"] = []
         ctx["active_tab"] = "community"
         if req.user.is_authenticated:
             ctx["draft"] = services.get_draft(req.user)
@@ -188,14 +197,26 @@ class PostDetailView(CommunityGateMixin, CommunityContextMixin, TemplateView):
             raise Http404
         ctx["post"] = post
         ctx["comments"] = post._comments_list
+        ctx["latest_comment_pk"] = post._all_comments[-1].pk if post._all_comments else None
         ctx["reactions"] = post._reactions_by_emoji
         ctx["active_tab"] = "community"
         ctx["share_url"] = self.request.build_absolute_uri(post.share_path)
         # Can the signed-in user reply?
         if self.request.user.is_authenticated:
-            can_reply, reply_reason = services.can_post_in_category(
-                self.request.user, post.category
-            )
+            if post.status == Post.Status.PENDING:
+                can_reply, reply_reason = (
+                    False,
+                    "This post is waiting for approval; replies open once it is published.",
+                )
+            elif post.status == Post.Status.REMOVED:
+                can_reply, reply_reason = (
+                    False,
+                    "This post has been removed, so it no longer takes replies.",
+                )
+            else:
+                can_reply, reply_reason = services.can_post_in_category(
+                    self.request.user, post.category
+                )
             ctx["can_reply"] = can_reply and not post.is_locked
             ctx["reply_blocked_reason"] = reply_reason if not can_reply else (
                 "This thread is locked." if post.is_locked else ""
@@ -315,6 +336,12 @@ class CommentCreateView(CommunityGateMixin, LoginRequiredMixin, View):
     def post(self, request, post_pk):
         post = get_object_or_404(Post, pk=post_pk, status=Post.Status.PUBLISHED)
         body = request.POST.get("body", "").strip()
+        parent = None
+        parent_pk = request.POST.get("parent", "").strip()
+        if parent_pk:
+            parent = Comment.objects.filter(pk=parent_pk).first()
+            if parent is None or parent.post_id != post.pk:
+                return _gate_response(request, "That reply is no longer available.")
 
         allowed, reason = _check_consent_or_gate(request.user)
         if not allowed:
@@ -328,18 +355,19 @@ class CommentCreateView(CommunityGateMixin, LoginRequiredMixin, View):
 
         try:
             comment = services.create_comment(
-                actor=request.user, post=post, body=body, request=request
+                actor=request.user, post=post, body=body, parent=parent, request=request
             )
         except (PermissionError, ValueError) as exc:
             return _gate_response(request, str(exc))
 
+        anchor = f"#comment-{comment.pk}" if parent is not None else "#comments"
         if _wants_json(request):
             return JsonResponse({
                 "ok": True,
                 "comment_pk": comment.pk,
-                "redirect": reverse("community:post_detail", args=[post.pk]) + "#comments",
+                "redirect": reverse("community:post_detail", args=[post.pk]) + anchor,
             })
-        return redirect(reverse("community:post_detail", args=[post.pk]) + "#comments")
+        return redirect(reverse("community:post_detail", args=[post.pk]) + anchor)
 
 
 class CommentEditView(CommunityGateMixin, LoginRequiredMixin, View):
@@ -441,7 +469,7 @@ class MyPostsView(CommunityGateMixin, LoginRequiredMixin, CommunityContextMixin,
         ctx["my_warnings"] = Warning.objects.filter(
             recipient=self.request.user
         ).order_by("-created_at")[:10]
-        ctx["active_tab"] = "community"
+        ctx["active_tab"] = "my-posts"
         return ctx
 
 
@@ -552,8 +580,247 @@ class CommunitySearchView(CommunityGateMixin, CommunityContextMixin, TemplateVie
         q = self.request.GET.get("q", "").strip()
         ctx["q"] = q
         ctx["results"] = selectors.search_posts(q, self.request.user) if q else []
-        ctx["active_tab"] = "community"
+        ctx["active_tab"] = "search"
         return ctx
+
+
+# ─── Member map ──────────────────────────────────────────────────────────────
+
+class CommunityMapView(CommunityGateMixin, CommunityContextMixin, TemplateView):
+    template_name = "community/map.html"
+
+    def get_context_data(self, **kwargs):
+        from apps.community.locations import DEFAULT_CENTRE, PLACE_GROUPS
+
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_tab"] = "map"
+        ctx["place_groups"] = [
+            {
+                "region": region,
+                "places": [
+                    {"label": f"{city}, {country}", "city": city, "country": country}
+                    for city, country, _lat, _lng in places
+                ],
+            }
+            for region, places in PLACE_GROUPS
+        ]
+        ctx["default_centre"] = DEFAULT_CENTRE
+        ctx["map_rows"] = []
+        ctx["map_places"] = []
+        ctx["map_stats"] = {"members": 0, "places": 0, "countries": 0}
+        ctx["my_cprofile"] = None
+        ctx["can_message"] = False
+
+        user = self.request.user
+        if user.is_authenticated:
+            rows = selectors.map_members(user)
+            ctx["map_rows"] = rows
+            ctx["map_places"] = selectors.map_places(rows)[:6]
+            ctx["map_stats"] = {
+                "members": len(rows),
+                "places": len({row["label"] for row in rows}),
+                "countries": len({row["country"] for row in rows}),
+            }
+            ctx["my_cprofile"] = getattr(user, "community_profile", None)
+            ctx["can_message"] = services.can_use_direct_messages(user)
+
+            members_json = []
+            for row in rows:
+                member = row["user"]
+                members_json.append(
+                    {
+                        "id": member.pk,
+                        "name": row["name"],
+                        "role": row["role_label"],
+                        "role_slug": row["role"],
+                        "avatar": member.avatar.url
+                        if member.avatar and member.role != "student"
+                        else "",
+                        "label": row["label"],
+                        "country": row["country"],
+                        "lat": row["latitude"],
+                        "lng": row["longitude"],
+                        "online": row["online"],
+                        "is_self": member.pk == user.pk,
+                        "profile_url": reverse(
+                            "community:member_profile", args=[member.pk]
+                        ),
+                        "message_url": reverse(
+                            "community:message_start", args=[member.pk]
+                        ),
+                    }
+                )
+            ctx["members_json"] = members_json
+        else:
+            ctx["members_json"] = []
+        return ctx
+
+
+class LocationUpdateView(CommunityGateMixin, LoginRequiredMixin, View):
+    def post(self, request):
+        allowed, _ = _check_consent_or_gate(request.user)
+        if not allowed:
+            return _gate_response(
+                request,
+                "Please accept the community rules before sharing your location.",
+                reverse("community:consent") + "?next=" + reverse("community:map"),
+            )
+
+        if request.POST.get("action") == "clear":
+            services.clear_member_location(actor=request.user, request=request)
+            messages.success(request, "Your location has been removed from the map.")
+            return redirect("community:map")
+
+        place = request.POST.get("place", "").strip()
+        shared = request.POST.get("shared") == "on"
+        try:
+            services.set_member_location(
+                actor=request.user,
+                place_label=place,
+                shared=shared,
+                request=request,
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect("community:map")
+
+        if shared:
+            messages.success(request, "You're on the map. Hello from your corner of the world!")
+        else:
+            messages.success(request, "Location saved — you're hidden from the map.")
+        return redirect("community:map")
+
+
+# ─── Member profile ──────────────────────────────────────────────────────────
+
+class MemberProfileView(CommunityGateMixin, CommunityContextMixin, LoginRequiredMixin, TemplateView):
+    template_name = "community/member_profile.html"
+
+    def get_context_data(self, **kwargs):
+        from apps.accounts.models import User
+
+        ctx = super().get_context_data(**kwargs)
+        target = get_object_or_404(User, pk=self.kwargs["pk"], is_active=True)
+        if target.role == "student" and target.pk != self.request.user.pk:
+            raise Http404("Member not found.")
+
+        ctx.update(selectors.member_profile_context(target, self.request.user))
+        is_self = target.pk == self.request.user.pk
+        ctx["is_self"] = is_self
+        ctx["can_message"] = (
+            not is_self
+            and services.can_use_direct_messages(self.request.user)
+            and services.can_use_direct_messages(target)
+        )
+        ctx["active_tab"] = "members"
+        return ctx
+
+
+# ─── Direct messages ─────────────────────────────────────────────────────────
+
+class StartConversationView(CommunityGateMixin, LoginRequiredMixin, View):
+    def post(self, request, user_pk):
+        from apps.accounts.models import User
+
+        target = get_object_or_404(User, pk=user_pk, is_active=True)
+
+        allowed, _ = _check_consent_or_gate(request.user)
+        if not allowed:
+            return _gate_response(
+                request,
+                "Please accept the community rules before messaging.",
+                reverse("community:consent") + "?next=" + reverse("community:map"),
+            )
+
+        try:
+            conversation = services.get_or_create_direct_conversation(
+                actor=request.user, other=target
+            )
+        except (PermissionError, ValueError) as exc:
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+            messages.error(request, str(exc))
+            return redirect(
+                request.META.get("HTTP_REFERER", reverse("community:map"))
+            )
+
+        thread_url = reverse(
+            "community:message_thread", kwargs={"pk": conversation.pk}
+        )
+        if _wants_json(request):
+            return JsonResponse({"ok": True, "thread_url": thread_url})
+        return redirect(thread_url)
+
+
+class DirectInboxView(CommunityGateMixin, CommunityContextMixin, LoginRequiredMixin, TemplateView):
+    template_name = "community/messages.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not services.can_use_direct_messages(request.user):
+            messages.info(
+                request,
+                "Direct messages are available to staff and guardians. "
+                "Students can contact the school from the Contact page.",
+            )
+            return redirect("community:home")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["conversations"] = selectors.direct_inbox(self.request.user)
+        ctx["active_tab"] = "messages"
+        return ctx
+
+
+class DirectThreadView(CommunityGateMixin, CommunityContextMixin, LoginRequiredMixin, TemplateView):
+    template_name = "community/message_thread.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not services.can_use_direct_messages(request.user):
+            messages.info(
+                request,
+                "Direct messages are available to staff and guardians.",
+            )
+            return redirect("community:home")
+        self.conversation = get_object_or_404(
+            DirectConversation.objects.select_related("user_a", "user_b"),
+            pk=kwargs["pk"],
+        )
+        if not self.conversation.includes(request.user):
+            raise Http404("Conversation not found.")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        services.mark_direct_conversation_read(
+            conversation=self.conversation, user=self.request.user
+        )
+        ctx["conversation"] = self.conversation
+        ctx["other"] = self.conversation.other_user(self.request.user)
+        ctx["thread_messages"] = selectors.direct_thread_messages(self.conversation)
+        ctx["active_tab"] = "messages"
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        allowed, _ = _check_consent_or_gate(request.user)
+        if not allowed:
+            return _gate_response(
+                request,
+                "Please accept the community rules before messaging.",
+                reverse("community:consent") + "?next=" + request.path,
+            )
+        try:
+            services.send_direct_message(
+                actor=request.user,
+                conversation=self.conversation,
+                body=request.POST.get("body", ""),
+                request=request,
+            )
+        except (PermissionError, ValueError) as exc:
+            messages.error(request, str(exc))
+        return redirect(
+            "community:message_thread", pk=self.conversation.pk
+        )
 
 
 # ─── Admin: moderation queue (M3) ────────────────────────────────────────────

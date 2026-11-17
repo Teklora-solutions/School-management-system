@@ -1,0 +1,100 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}{{ other.full_name }} — Messages{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/community-map.css' %}">
+{% endblock %}
+
+{% block community_heading %}<h1 class="sr-only">Conversation with {{ other.full_name }}</h1>{% endblock %}
+
+{% block community_content %}
+
+<div class="cmty-thread">
+  <header class="cmty-thread__head">
+    <a href="{% url 'community:messages' %}" class="cmty-thread__back" aria-label="Back to messages">
+      <i class="bi bi-arrow-left" aria-hidden="true"></i>
+    </a>
+    {% if other.avatar %}
+    <img src="{{ other.avatar.url }}" alt="" class="cmty-avatar cmty-avatar--sm">
+    {% else %}
+    <span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials" aria-hidden="true">
+      {{ other.first_name|first|upper }}{{ other.last_name|first|upper }}
+    </span>
+    {% endif %}
+    <div class="cmty-thread__who">
+      <a href="{% url 'community:member_profile' other.pk %}" class="cmty-thread__name">
+        {{ other.full_name }}
+        {% if other.community_profile.is_online %}<span class="dot-online" title="Online now" aria-label="Online now"></span>{% endif %}
+      </a>
+      <span class="cmty-thread__sub">{{ other.get_role_display }}</span>
+    </div>
+    <a href="{% url 'community:member_profile' other.pk %}" class="pub-btn pub-btn--outline pub-btn--sm">Profile</a>
+  </header>
+
+  <div class="cmty-thread__messages" id="cmtyThreadMessages">
+    {% for msg in thread_messages %}
+    <div class="cmty-bubble {% if msg.sender_id == request.user.pk %}is-mine{% endif %}">
+      {% if msg.sender_id != request.user.pk %}
+        {% if msg.sender.avatar %}
+        <img src="{{ msg.sender.avatar.url }}" alt="" class="cmty-avatar cmty-avatar--xs cmty-bubble__avatar">
+        {% else %}
+        <span class="cmty-avatar cmty-avatar--xs cmty-avatar--initials cmty-bubble__avatar" aria-hidden="true">
+          {{ msg.sender.first_name|first|upper }}
+        </span>
+        {% endif %}
+      {% endif %}
+      <div class="cmty-bubble__content">
+        {{ msg.body|linebreaksbr }}
+        <time class="cmty-bubble__time" datetime="{{ msg.created_at|date:'c' }}"
+              title="{{ msg.created_at|date:'D d M Y H:i' }}">
+          {{ msg.created_at|timesince }} ago
+        </time>
+      </div>
+    </div>
+    {% empty %}
+    <p class="cmty-thread__empty">
+      This is the start of your conversation with {{ other.first_name }}.
+      Say hello below.
+    </p>
+    {% endfor %}
+  </div>
+
+  <form class="cmty-thread__composer" method="post" action="{% url 'community:message_thread' conversation.pk %}">
+    {% csrf_token %}
+    <label for="cmtyThreadBody" class="sr-only">Your message</label>
+    <textarea id="cmtyThreadBody" name="body" rows="1" maxlength="2000" required
+              placeholder="Write a message…"></textarea>
+    <button type="submit" class="cmty-thread__send">
+      <i class="bi bi-send" aria-hidden="true"></i> Send
+    </button>
+  </form>
+  <p class="cmty-thread__note">
+    <i class="bi bi-lock" aria-hidden="true"></i>
+    Private between you and {{ other.first_name }}. Be kind — school staff can
+    review reported conversations.
+  </p>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function(){
+  'use strict';
+  var list = document.getElementById('cmtyThreadMessages');
+  if(list){ list.scrollTop = list.scrollHeight; }
+  var body = document.getElementById('cmtyThreadBody');
+  if(body){
+    body.focus();
+    body.addEventListener('input', function(){
+      body.style.height = 'auto';
+      body.style.height = Math.min(body.scrollHeight, 140) + 'px';
+    });
+  }
+})();
+</script>
+{% endblock %}

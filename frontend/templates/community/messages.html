@@ -1,0 +1,77 @@
+{% extends "community/base.html" %}
+{% load static %}
+
+{% block title %}Messages — {{ identity.name|default:"School" }} Community{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/community-map.css' %}">
+{% endblock %}
+
+{% block community_heading %}<h1 class="sr-only">Messages</h1>{% endblock %}
+
+{% block community_content %}
+
+<div class="cmty-page-head">
+  <h2 class="cmty-page-head__title">
+    <i class="bi bi-chat-dots" aria-hidden="true"></i> Messages
+  </h2>
+  <p class="cmty-page-head__sub">
+    Private conversations with other staff and guardians. Students don't appear
+    in member messaging — contact the school office for pupil matters.
+  </p>
+</div>
+
+{% if conversations %}
+<ul class="cmty-convo-list" aria-label="Conversations">
+  {% for row in conversations %}
+  <li class="cmty-convo">
+    <a href="{% url 'community:message_thread' row.conversation.pk %}" class="cmty-convo__link">
+      {% if row.other.avatar %}
+      <img src="{{ row.other.avatar.url }}" alt="" class="cmty-avatar cmty-avatar--md">
+      {% else %}
+      <span class="cmty-avatar cmty-avatar--md cmty-avatar--initials" aria-hidden="true">
+        {{ row.other.first_name|first|upper }}{{ row.other.last_name|first|upper }}
+      </span>
+      {% endif %}
+      <span class="cmty-convo__body">
+        <span class="cmty-convo__top">
+          <span class="cmty-convo__name">{{ row.name }}</span>
+          {% if row.last_created %}
+          <time class="cmty-convo__time" datetime="{{ row.last_created|date:'c' }}"
+                title="{{ row.last_created|date:'D d M Y H:i' }}">
+            {{ row.last_created|timesince }} ago
+          </time>
+          {% endif %}
+        </span>
+        <span class="cmty-convo__snippet">
+          {% if row.last_is_mine %}<em>You:</em> {% endif %}{{ row.last_body|truncatechars:80 }}
+        </span>
+      </span>
+      {% if row.unread %}
+      <span class="cmty-convo__unread" aria-label="{{ row.unread }} unread">{{ row.unread }}</span>
+      {% endif %}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="cmty-empty">
+  <div class="cmty-empty__icon" aria-hidden="true"><i class="bi bi-chat-square-dots"></i></div>
+  <h3 class="cmty-empty__title">No conversations yet</h3>
+  <p class="cmty-empty__text">
+    Find someone on the member map or in the directory, open their profile and
+    say hello.
+  </p>
+  <div class="cmty-messages-empty__actions">
+    <a href="{% url 'community:map' %}" class="pub-btn pub-btn--primary pub-btn--sm">
+      <i class="bi bi-globe2" aria-hidden="true"></i> Open the map
+    </a>
+    <a href="{% url 'community:members' %}" class="pub-btn pub-btn--outline pub-btn--sm">
+      <i class="bi bi-people" aria-hidden="true"></i> Browse members
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

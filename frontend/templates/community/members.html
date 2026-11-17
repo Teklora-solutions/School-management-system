@@ -3,11 +3,17 @@
 
 {% block title %}Members — {{ identity.name|default:"School" }} Community{% endblock %}
 
+{% block community_heading %}<h1 class="sr-only">Community members</h1>{% endblock %}
+
 {% block community_content %}
 <div class="cmty-members-head">
   <h2 class="cmty-section-label">
     <i class="bi bi-people" aria-hidden="true"></i> Members
   </h2>
+
+  <a href="{% url 'community:map' %}" class="cmty-members-map-link">
+    <i class="bi bi-globe2" aria-hidden="true"></i> Member map
+  </a>
 
   {# Stats summary (always shown) #}
   <div class="cmty-stats cmty-stats--inline">
@@ -51,6 +57,7 @@
 <ul class="cmty-member-list" aria-label="Community members">
   {% for member in members %}
   <li class="cmty-member-row">
+    <a href="{% url 'community:member_profile' member.pk %}" class="cmty-member-row__link">
     {% if member.avatar %}
     <img src="{{ member.avatar.url }}" alt="{{ member.get_full_name }}"
          class="cmty-avatar cmty-avatar--md">
@@ -63,6 +70,8 @@
       <span class="cmty-member-row__name">{{ member.get_full_name|default:member.username }}</span>
       <span class="cmty-role-badge cmty-role-badge--{{ member.role }}">{{ member.get_role_display }}</span>
     </div>
+    <i class="bi bi-chevron-right cmty-member-row__chev" aria-hidden="true"></i>
+    </a>
   </li>
   {% endfor %}
 </ul>

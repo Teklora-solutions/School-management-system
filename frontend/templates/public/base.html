@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="{% static 'css/public_new.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
-<body data-theme="{{ identity.theme|default:'dark' }}">
+<body class="{% block body_class %}{% endblock %}" data-theme="{{ identity.theme|default:'dark' }}">
 
 <!-- ═══ NAVBAR ═════════════════════════════════════════════════════════════ -->
 <nav class="pub-nav" id="pub-nav" aria-label="Main navigation">
@@ -42,7 +42,7 @@
 
       <!-- Action buttons + hamburger -->
       <div class="pub-nav__actions">
-        <button class="pub-theme-toggle" aria-label="Switch to light mode" id="pubThemeToggle"><i class="bi bi-sun" aria-hidden="true"></i></button>
+        <button class="pub-theme-toggle pub-theme-toggle--bar" data-theme-toggle aria-label="Switch to light mode" id="pubThemeToggle"><i class="bi bi-sun" aria-hidden="true"></i></button>
         {% if request.user.is_authenticated %}
         <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary pub-btn--sm">
           <i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard
@@ -50,7 +50,9 @@
         {% else %}
         <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--sm pub-btn--hide-sm">Apply Now</a>
         <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary pub-btn--sm">
-          <i class="bi bi-person" aria-hidden="true"></i> Student Portal
+          <i class="bi bi-person" aria-hidden="true"></i>
+          <span class="pub-btn__label--full">Student Portal</span>
+          <span class="pub-btn__label--xs">Portal</span>
         </a>
         {% endif %}
         <!-- Hamburger — hidden on desktop via CSS -->
@@ -77,6 +79,12 @@
     {% endfor %}
 
     <div class="pub-nav__mobile-divider"></div>
+
+    <!-- Theme toggle — lives here on phones, where the bar has no room -->
+    <button class="pub-nav__theme-row" data-theme-toggle aria-label="Switch to light mode">
+      <i class="bi bi-sun" aria-hidden="true"></i>
+      <span class="pub-nav__theme-label">Switch to light mode</span>
+    </button>
 
     <!-- CTA buttons -->
     <div class="pub-nav__mobile-actions">
@@ -250,26 +258,28 @@
     }
   }, {passive:true});
 
-  /* ── Dark mode toggle ── */
-  var themeBtn = document.getElementById('pubThemeToggle');
+  /* ── Dark mode toggle (bar button + mobile menu row) ── */
+  var themeBtns = document.querySelectorAll('[data-theme-toggle]');
   var STORAGE_KEY = 'pub-theme';
   var saved = localStorage.getItem(STORAGE_KEY) ||
     (window.matchMedia('(prefers-color-scheme:light)').matches ? 'light' : 'dark');
   function applyTheme(t){
     document.documentElement.setAttribute('data-theme', t);
-    if(themeBtn) {
+    themeBtns.forEach(function(themeBtn){
       themeBtn.querySelector('i').className = t === 'light' ? 'bi bi-moon' : 'bi bi-sun';
       themeBtn.setAttribute('aria-label', t === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
-    }
+      var label = themeBtn.querySelector('.pub-nav__theme-label');
+      if(label) label.textContent = t === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+    });
   }
   applyTheme(saved);
-  if(themeBtn){
-    themeBtn.addEventListener('click', function(){
+  themeBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
       var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
       applyTheme(next);
       localStorage.setItem(STORAGE_KEY, next);
     });
-  }
+  });
 
   /* ── Back to top ── */
   var backBtn = document.getElementById('pubBackTop');

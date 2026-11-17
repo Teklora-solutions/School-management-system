@@ -3,11 +3,21 @@
 
 {% block title %}Search — {{ identity.name|default:"School" }} Community{% endblock %}
 
+{% block community_heading %}<h1 class="sr-only">Search community</h1>{% endblock %}
+
 {% block community_content %}
 <h2 class="cmty-section-label">
   <i class="bi bi-search" aria-hidden="true"></i>
   {% if q %}Results for "{{ q }}"{% else %}Search the community{% endif %}
 </h2>
+
+<form class="cmty-search-form" method="get" role="search">
+  <label for="cmtySearchPageInput" class="sr-only">Search community posts</label>
+  <span class="cmty-search__icon" aria-hidden="true"><i class="bi bi-search"></i></span>
+  <input id="cmtySearchPageInput" class="cmty-search__input" type="search" name="q"
+         value="{{ q|default:'' }}" placeholder="Search posts…" autocomplete="off" maxlength="100">
+  <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">Search</button>
+</form>
 
 {% if q %}
   {% if results %}

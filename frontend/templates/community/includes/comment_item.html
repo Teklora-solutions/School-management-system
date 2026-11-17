@@ -1,0 +1,92 @@
+{% comment %}
+One comment in a thread. Expects `comment`; optional `is_reply`.
+Top-level comments render their replies underneath.
+{% endcomment %}
+<article class="cmty-comment{% if is_reply %} cmty-comment--reply{% endif %}{% if comment.is_removed %} cmty-comment--removed{% endif %}"
+         id="comment-{{ comment.pk }}">
+  <div class="cmty-comment__avatar">
+    {% if comment.author and comment.author.avatar and comment.author.role != 'student' %}
+    <img src="{{ comment.author.avatar.url }}" alt="{{ comment.author_display_name }}"
+         class="cmty-avatar cmty-avatar--sm">
+    {% else %}
+    <span class="cmty-avatar cmty-avatar--sm cmty-avatar--initials" aria-hidden="true">
+      {{ comment.author_display_name|first|upper }}
+    </span>
+    {% endif %}
+  </div>
+
+  <div class="cmty-comment__main">
+    <div class="cmty-comment__bubble">
+      <header class="cmty-comment__head">
+        <span class="cmty-comment__name">{{ comment.author_display_name }}</span>
+        {% if comment.author.role == 'admin' or comment.author.role == 'director' or comment.author.role == 'teacher' %}
+        <i class="bi bi-patch-check-fill cmty-comment__verified" title="Verified staff"
+           aria-label="Verified staff"></i>
+        {% endif %}
+        <time class="cmty-comment__time"
+              data-ts="{{ comment.created_at|date:'U' }}"
+              datetime="{{ comment.created_at|date:'c' }}"
+              title="{{ comment.created_at|date:'D d M Y H:i' }} EAT">
+          {{ comment.created_at|timesince }} ago
+        </time>
+      </header>
+      {% if comment.is_removed %}
+      <p class="cmty-comment__removed">
+        <i class="bi bi-slash-circle" aria-hidden="true"></i> This comment was removed.
+      </p>
+      {% else %}
+      <div class="cmty-comment__body">{{ comment.body|linebreaks }}</div>
+      {% endif %}
+    </div>
+
+    {% if not comment.is_removed and can_reply %}
+    <div class="cmty-comment__actions">
+      <button type="button" class="cmty-comment__action" data-cmty-reply="{{ comment.pk }}"
+              aria-expanded="false" aria-controls="cmtyInlineReply-{{ comment.pk }}">
+        <i class="bi bi-reply" aria-hidden="true"></i> Reply
+      </button>
+    </div>
+
+    <form method="post" action="{% url 'community:comment_create' post.pk %}"
+          class="cmty-inline-reply" id="cmtyInlineReply-{{ comment.pk }}"
+          data-parent="{{ comment.pk }}" hidden novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="parent" value="{{ comment.pk }}">
+      <textarea name="body" rows="2" maxlength="3000" class="cmty-reply-textarea"
+                placeholder="Reply to {{ comment.author_display_name }}…"
+                aria-label="Reply to {{ comment.author_display_name }}" required></textarea>
+      <div class="cmty-inline-reply__actions">
+        <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">
+          <i class="bi bi-reply" aria-hidden="true"></i>
+          <span>Reply</span>
+        </button>
+        <button type="button" class="pub-btn pub-btn--outline pub-btn--sm" data-cmty-reply-cancel>
+          Cancel
+        </button>
+        <span class="cmty-composer__error" role="alert" hidden></span>
+      </div>
+    </form>
+    {% endif %}
+
+    {% if not is_reply and comment.replies_list %}
+    <div class="cmty-replies">
+      {% for reply in comment.replies_list %}
+        {% if forloop.counter > 2 %}
+        <div class="cmty-replies__extra" hidden>
+          {% include "community/includes/comment_item.html" with comment=reply can_reply=can_reply is_reply=True %}
+        </div>
+        {% else %}
+          {% include "community/includes/comment_item.html" with comment=reply can_reply=can_reply is_reply=True %}
+        {% endif %}
+      {% endfor %}
+      {% if comment.replies_list|length > 2 %}
+      <button type="button" class="cmty-replies__more" data-cmty-replies-more>
+        <i class="bi bi-arrow-return-right" aria-hidden="true"></i>
+        View {{ comment.replies_list|length|add:"-2" }} more
+        {% if comment.replies_list|length|add:"-2" == 1 %}reply{% else %}replies{% endif %}
+      </button>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</article>
