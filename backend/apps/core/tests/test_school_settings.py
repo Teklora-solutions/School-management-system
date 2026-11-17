@@ -214,6 +214,10 @@ class SchoolSettingsWriteTests(TestCase):
                 "live_classes_enabled": "on" if row.live_classes_enabled else "",
                 "feed_community_enabled": "on" if row.feed_community_enabled else "",
                 "notification_quiet_hours_enabled": "on" if row.notification_quiet_hours_enabled else "",
+                "community_enabled": "on" if row.community_enabled else "",
+                "community_paused": "on" if row.community_paused else "",
+                "community_index": "on" if row.community_index else "",
+                "community_student_moderation": "on" if row.community_student_moderation else "",
                 "quiet_hours_start": str(row.quiet_hours_start),
                 "quiet_hours_end": str(row.quiet_hours_end),
                 "theme": row.theme or "dark",
@@ -254,6 +258,10 @@ class SchoolSettingsWriteTests(TestCase):
                 "live_classes_enabled": "on" if row.live_classes_enabled else "",
                 "feed_community_enabled": "on" if row.feed_community_enabled else "",
                 "notification_quiet_hours_enabled": "on" if row.notification_quiet_hours_enabled else "",
+                "community_enabled": "on" if row.community_enabled else "",
+                "community_paused": "on" if row.community_paused else "",
+                "community_index": "on" if row.community_index else "",
+                "community_student_moderation": "on" if row.community_student_moderation else "",
                 "quiet_hours_start": str(row.quiet_hours_start),
                 "quiet_hours_end": str(row.quiet_hours_end),
                 "theme": row.theme or "dark",
@@ -310,6 +318,86 @@ class SchoolSettingsWriteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Enter a valid email address")
         self.assertEqual(SchoolSettings.objects.get(pk=1).name, "")
+
+    def test_the_community_switches_render_on_the_settings_page(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "School community")
+        self.assertContains(response, "Advanced")
+        self.assertContains(response, "Pause the community")
+        self.assertContains(response, "Let search engines index community pages")
+        self.assertContains(response, "Hold student posts for approval")
+
+    def test_ticking_community_enabled_turns_the_feature_on(self):
+        from apps.core.features import feature_enabled
+
+        row = SchoolSettings.load()
+        self.client.force_login(self.admin)
+        self.client.post(
+            self.url,
+            {
+                "name": row.name,
+                "motto": row.motto,
+                "phone": row.phone,
+                "email": row.email,
+                "currency": row.currency,
+                "quiet_hours_start": str(row.quiet_hours_start),
+                "quiet_hours_end": str(row.quiet_hours_end),
+                "community_enabled": "on",
+            },
+        )
+
+        self.assertTrue(SchoolSettings.objects.get(pk=1).community_enabled)
+        self.assertTrue(feature_enabled("community"))
+
+    def test_switching_the_community_off_clears_a_stale_pause(self):
+        row = SchoolSettings.load()
+        row.community_enabled = True
+        row.community_paused = True
+        row.save()
+
+        self.client.force_login(self.admin)
+        self.client.post(
+            self.url,
+            {
+                "name": row.name,
+                "motto": row.motto,
+                "phone": row.phone,
+                "email": row.email,
+                "currency": row.currency,
+                "quiet_hours_start": str(row.quiet_hours_start),
+                "quiet_hours_end": str(row.quiet_hours_end),
+                # Enabled is posted unchecked; pause is still boxed.
+                "community_paused": "on",
+            },
+        )
+
+        saved = SchoolSettings.objects.get(pk=1)
+        self.assertFalse(saved.community_enabled)
+        self.assertFalse(saved.community_paused)
+
+    def test_a_pause_set_while_enabling_is_kept(self):
+        row = SchoolSettings.load()
+        self.client.force_login(self.admin)
+        self.client.post(
+            self.url,
+            {
+                "name": row.name,
+                "motto": row.motto,
+                "phone": row.phone,
+                "email": row.email,
+                "currency": row.currency,
+                "quiet_hours_start": str(row.quiet_hours_start),
+                "quiet_hours_end": str(row.quiet_hours_end),
+                "community_enabled": "on",
+                "community_paused": "on",
+            },
+        )
+
+        saved = SchoolSettings.objects.get(pk=1)
+        self.assertTrue(saved.community_enabled)
+        self.assertTrue(saved.community_paused)
 
 
 class SchoolSettingsAccessTests(TestCase):

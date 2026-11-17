@@ -457,6 +457,63 @@
               {% endwith %}
 
               <hr class="my-4">
+              <p class="fw-600 mb-1">School community</p>
+              <p class="text-muted-sm">
+                The school-wide community page at /community/. Visitors can read
+                Public posts without an account; members post and reply after
+                signing in. Off by default — nothing appears until you switch it on.
+              </p>
+
+              {% with field=form.community_enabled %}
+              <div class="mb-3 d-flex align-items-start gap-2">
+                {{ field }}
+                <div>
+                  <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                </div>
+              </div>
+              {% endwith %}
+
+              {% with field=form.community_student_moderation %}
+              <div class="mb-3 d-flex align-items-start gap-2">
+                {{ field }}
+                <div>
+                  <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                </div>
+              </div>
+              {% endwith %}
+
+              <div class="mt-4 pt-3 border-top">
+                <p class="fw-600 mb-1 text-muted-sm">Advanced</p>
+                <p class="text-muted-sm mb-3">
+                  Optional controls for maintenance and search visibility.
+                  Leave these alone unless you need them. Pausing only applies
+                  while the community is on; switching the community off clears it.
+                </p>
+
+                {% with field=form.community_paused %}
+                <div class="mb-3 d-flex align-items-start gap-2">
+                  {{ field }}
+                  <div>
+                    <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                    {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                  </div>
+                </div>
+                {% endwith %}
+
+                {% with field=form.community_index %}
+                <div class="mb-3 d-flex align-items-start gap-2">
+                  {{ field }}
+                  <div>
+                    <label for="{{ field.id_for_label }}" class="form-label mb-0 fw-600">{{ field.label }}</label>
+                    {% if field.help_text %}<div class="text-muted-sm">{{ field.help_text }}</div>{% endif %}
+                  </div>
+                </div>
+                {% endwith %}
+              </div>
+
+              <hr class="my-4">
               <p class="fw-600 mb-1">Homework marking and feedback</p>
               <p class="text-muted-sm">
                 Turning this on adds a marking screen to each homework: a mark out of

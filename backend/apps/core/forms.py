@@ -150,6 +150,8 @@ FIELD_TABS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "quiet_hours_start", "quiet_hours_end", "feed_teacher_starters",
             "feed_student_starters", "homework_grading_enabled",
             "homework_late_penalty_enabled",
+            "community_enabled", "community_paused", "community_index",
+            "community_student_moderation",
         ),
     ),
 )
@@ -199,6 +201,10 @@ class SchoolSettingsForm(forms.ModelForm):
             "homework_grading_enabled",
             "homework_late_penalty_enabled",
             "gradebook_enabled",
+            "community_enabled",
+            "community_paused",
+            "community_index",
+            "community_student_moderation",
             "logo",
             "address",
             "established_on",
@@ -229,6 +235,12 @@ class SchoolSettingsForm(forms.ModelForm):
             "office_hours",
             "map_embed_url",
         ]
+        labels = {
+            "community_enabled": "School community",
+            "community_paused": "Pause the community",
+            "community_index": "Let search engines index community pages",
+            "community_student_moderation": "Hold student posts for approval",
+        }
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "motto": forms.TextInput(attrs={"class": "form-control"}),
@@ -283,7 +295,7 @@ class SchoolSettingsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for checkbox in ("show_positions", "fees_enabled", "learning_enabled", "engagement_enabled", "quizzes_enabled", "live_classes_enabled", "feed_community_enabled", "feed_media_enabled", "feed_student_uploads_enabled", "notification_quiet_hours_enabled"):
+        for checkbox in ("show_positions", "fees_enabled", "learning_enabled", "engagement_enabled", "quizzes_enabled", "live_classes_enabled", "feed_community_enabled", "feed_media_enabled", "feed_student_uploads_enabled", "notification_quiet_hours_enabled", "community_enabled", "community_paused", "community_index", "community_student_moderation"):
             self.fields[checkbox].required = False
         # Integer fields: a POST that omits them (older tests, partial forms)
         # must keep the model default rather than saving NULL.
@@ -307,6 +319,14 @@ class SchoolSettingsForm(forms.ModelForm):
 
     def clean_currency(self) -> str:
         return self.cleaned_data["currency"].strip().upper()
+
+    def clean(self):
+        cleaned = super().clean()
+        # Paused only means something while the community is switched on.
+        # Leaving it set behind a hidden page silently breaks it on re-enable.
+        if not cleaned.get("community_enabled"):
+            cleaned["community_paused"] = False
+        return cleaned
 
     @staticmethod
     def _clean_starters(raw: str, label: str) -> str:
