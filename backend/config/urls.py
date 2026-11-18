@@ -77,6 +77,8 @@ urlpatterns = [
         include("apps.communications.urls", namespace="communications"),
     ),
     path("dashboards/", include("apps.dashboards.urls", namespace="dashboards")),
+    # AI assistant configuration (admin only; the assistant is off by default)
+    path("assistant/", include("apps.assistant.urls", namespace="assistant")),
 ]
 
 # Serve media files in development

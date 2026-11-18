@@ -30,6 +30,10 @@ CACHES = {
     }
 }
 
+# ── AI assistant — a fixed throwaway key, never a real one ───────────────────
+# Base64 of 32 zero bytes: valid Fernet material and obviously a test value.
+ASSISTANT_ENCRYPTION_KEY = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
+
 # ── Axes — disable lockouts during tests ─────────────────────────────────────
 AXES_ENABLED = False
 

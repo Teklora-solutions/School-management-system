@@ -38,6 +38,7 @@ File references are repo-relative, `path:line`, so you can jump straight to the 
 | `communications` | Announcements, message threads/complaints, inbox |
 | `community` | School-wide community: posts, comments, reactions, moderation, member map, direct messages |
 | `dashboards` | One home page per role + the Director portal |
+| `assistant` | AI assistant configuration: provider list, encrypted keys, settings and usage (full docs in [`docs/ai-assistant/`](docs/ai-assistant/README.md)) |
 | `core` | Audit log, notifications, `SystemEvent`, `SchoolSettings`, navigation, mixins, exports, PDF, health |
 
 **The layering rule** every module follows:
@@ -931,6 +932,24 @@ school name, motto, phone, email, currency, `show_positions`, `fees_enabled`. `l
 fallback, the row is the override, and a missing row still renders sensible values. Every template gets
 them through `context_processors.school_settings`. Writes go through
 `core.services.update_school_settings` and are audit-logged.
+
+---
+
+## 15a. AI Assistant ✅ (admin configuration only)
+
+**Status: Module 1 of 6.** The assistant itself does not speak to anyone yet. What exists is the
+admin's control panel: `/assistant/settings/` (switch — **off by default**, house rules, default
+provider, budget, daily limit, handoff email) and `/assistant/providers/` (add/edit a provider, test
+the gateway). Provider API keys are encrypted with Fernet before storage; the encryption key lives in
+`ASSISTANT_ENCRYPTION_KEY` and is never in the database. Only the last four characters of a provider
+key are ever shown, and none appear in logs or audit entries. The only adapter in this build is a fake
+provider that runs in-process, so nothing leaves the server. Budget fields are recorded, not enforced;
+knowledge, retrieval, record tools, safeguarding and handoff are later modules.
+
+Full documentation: [README](ai-assistant/README.md) · [admin guide](ai-assistant/admin-guide.md) ·
+[security and privacy](ai-assistant/security-and-privacy.md) · [architecture](ai-assistant/architecture.md) ·
+[data model](ai-assistant/data-model.md) · [evaluation](ai-assistant/evaluation.md) ·
+[runbook](ai-assistant/runbook.md) · [changelog](ai-assistant/changelog.md).
 
 ---
 

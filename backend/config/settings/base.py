@@ -77,6 +77,7 @@ LOCAL_APPS = [
     "apps.dashboards",
     "apps.public",
     "apps.community",
+    "apps.assistant",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -187,6 +188,13 @@ MEDIA_ROOT = Path(env("MEDIA_ROOT", default=str(BASE_DIR / "media")))
 FEED_MEDIA_ROOT = Path(
     env("FEED_MEDIA_ROOT", default=str(BASE_DIR / "private_feed"))
 )
+
+# ─── AI Assistant ─────────────────────────────────────────────────────────────
+# One or more Fernet keys, comma-separated, newest first. The first key encrypts;
+# every key is tried when decrypting, which is how rotation works. See
+# docs/ai-assistant/security-and-privacy.md. Empty means no provider key can be
+# saved until an operator sets it.
+ASSISTANT_ENCRYPTION_KEY = env("ASSISTANT_ENCRYPTION_KEY", default="")
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},

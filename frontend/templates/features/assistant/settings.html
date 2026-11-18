@@ -1,0 +1,143 @@
+{% extends base_template %}
+
+{% block title %}AI Assistant | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-robot me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      AI Assistant
+    </h1>
+    <p class="page-subtitle">
+      Who answers, with what rules, within what budget — and who takes over when a
+      conversation needs a person.
+    </p>
+  </div>
+  <a href="{% url 'assistant:providers' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-hdd-network me-1" aria-hidden="true"></i>Providers
+  </a>
+</div>
+
+{% if not crypto_configured %}
+<div class="alert alert-warning" role="alert">
+  <strong>No encryption key is configured on this server.</strong>
+  Settings can be saved, but an API key cannot be stored safely until your
+  developer sets <code>ASSISTANT_ENCRYPTION_KEY</code>.
+</div>
+{% endif %}
+
+{% if not form.instance.enabled %}
+<div class="alert alert-secondary" role="status">
+  <i class="bi bi-power me-1" aria-hidden="true"></i>
+  The assistant is <strong>switched off</strong>. Nothing is sent to any provider;
+  the only provider available in this version is the fake one used for testing.
+</div>
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="form-check form-switch mb-2">
+            {{ form.enabled }}
+            <label class="form-check-label fw-600" for="{{ form.enabled.id_for_label }}">
+              {{ form.enabled.label }}
+            </label>
+          </div>
+          <div class="text-muted-sm">
+            Off is the safe default. Switching this on only becomes meaningful once a
+            conversation screen exists; until then it records the school's decision.
+          </div>
+          {% for e in form.enabled.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-600 mb-3">Provider</h2>
+
+          <div class="mb-3">
+            <label for="{{ form.default_provider.id_for_label }}" class="form-label fw-600">
+              {{ form.default_provider.label }}
+            </label>
+            {{ form.default_provider }}
+            <div class="text-muted-sm mt-1">
+              {% if provider_count %}
+                The provider new conversations would use.
+              {% else %}
+                No providers yet — <a href="{% url 'assistant:provider_create' %}">add one</a>.
+              {% endif %}
+            </div>
+            {% for e in form.default_provider.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-0">
+            <label for="{{ form.house_rules.id_for_label }}" class="form-label fw-600">
+              {{ form.house_rules.label }}
+            </label>
+            {{ form.house_rules }}
+            <div class="text-muted-sm mt-1">
+              Tone, language, and things the assistant must never say. These are rules,
+              not knowledge — documents are added in a later module.
+            </div>
+            {% for e in form.house_rules.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-600 mb-3">Limits and handoff</h2>
+
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label for="{{ form.monthly_budget_ksh.id_for_label }}" class="form-label fw-600">
+                {{ form.monthly_budget_ksh.label }}
+              </label>
+              {{ form.monthly_budget_ksh }}
+              <div class="text-muted-sm mt-1">0 means no spending at all.</div>
+              {% for e in form.monthly_budget_ksh.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.daily_message_limit.id_for_label }}" class="form-label fw-600">
+                {{ form.daily_message_limit.label }}
+              </label>
+              {{ form.daily_message_limit }}
+              <div class="text-muted-sm mt-1">0 means no messages at all.</div>
+              {% for e in form.daily_message_limit.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-12">
+              <label for="{{ form.handoff_email.id_for_label }}" class="form-label fw-600">
+                {{ form.handoff_email.label }}
+              </label>
+              {{ form.handoff_email }}
+              <div class="text-muted-sm mt-1">
+                Where conversations that need a person are sent. Used once handoff is
+                built; safeguarding escalation can never be switched off.
+              </div>
+              {% for e in form.handoff_email.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check2 me-1" aria-hidden="true"></i>Save settings
+        </button>
+        <a href="{% url 'accounts:dashboard_redirect' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

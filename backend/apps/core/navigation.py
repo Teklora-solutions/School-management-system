@@ -188,6 +188,11 @@ NAVIGATION: dict[str, list[dict]] = {
             "url_name": "core_school:settings",
         },
         {
+            "label": "AI Assistant",
+            "icon": "bi-robot",
+            "url_name": "assistant:settings",
+        },
+        {
             "label": "Website",
             "icon": "bi-globe",
             "url_name": "public_admin:gallery_list",
