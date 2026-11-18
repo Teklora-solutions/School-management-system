@@ -25,6 +25,7 @@ class AssistantSettingsForm(forms.ModelForm):
         model = AssistantSettings
         fields = (
             "enabled",
+            "kill_switch",
             "public_enabled",
             "signed_in_enabled",
             "student_tutor_enabled",
@@ -36,6 +37,8 @@ class AssistantSettingsForm(forms.ModelForm):
             "public_visitor_daily_limit",
             "public_ip_daily_limit",
             "public_site_daily_limit",
+            "console_daily_limit",
+            "console_monthly_budget_ksh",
             "safeguarding_contact_name",
             "safeguarding_contact_phone",
             "safeguarding_contact_email",
@@ -44,12 +47,27 @@ class AssistantSettingsForm(forms.ModelForm):
             "working_hours_end",
             "alert_retention_months",
             "handoff_email",
+            "widget_enabled",
+            "widget_opening_en",
+            "widget_opening_sw",
+            "widget_max_message_chars",
+            "widget_feedback_enabled",
+            "widget_pow_enabled",
+            "sla_normal_minutes",
+            "sla_urgent_minutes",
+            "sla_critical_minutes",
+            "sla_reminder_percent",
+            "conversation_retention_days",
+            "handoff_retention_months",
+            "callback_retention_days",
+            "feedback_reason_retention_days",
             "consent_approved",
             "consent_approved_by",
             "consent_approved_on",
         )
         widgets = {
             "enabled": SWITCH,
+            "kill_switch": SWITCH,
             "public_enabled": SWITCH,
             "signed_in_enabled": SWITCH,
             "student_tutor_enabled": SWITCH,
@@ -61,6 +79,8 @@ class AssistantSettingsForm(forms.ModelForm):
             "public_visitor_daily_limit": NUMBER,
             "public_ip_daily_limit": NUMBER,
             "public_site_daily_limit": NUMBER,
+            "console_daily_limit": NUMBER,
+            "console_monthly_budget_ksh": MONEY,
             "safeguarding_contact_name": TEXT,
             "safeguarding_contact_phone": TEXT,
             "safeguarding_contact_email": forms.EmailInput(attrs={"class": "form-control"}),
@@ -69,6 +89,20 @@ class AssistantSettingsForm(forms.ModelForm):
             "working_hours_end": TIME,
             "alert_retention_months": NUMBER,
             "handoff_email": forms.EmailInput(attrs={"class": "form-control"}),
+            "widget_enabled": SWITCH,
+            "widget_opening_en": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "widget_opening_sw": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "widget_max_message_chars": NUMBER,
+            "widget_feedback_enabled": SWITCH,
+            "widget_pow_enabled": SWITCH,
+            "sla_normal_minutes": NUMBER,
+            "sla_urgent_minutes": NUMBER,
+            "sla_critical_minutes": NUMBER,
+            "sla_reminder_percent": NUMBER,
+            "conversation_retention_days": NUMBER,
+            "handoff_retention_months": NUMBER,
+            "callback_retention_days": NUMBER,
+            "feedback_reason_retention_days": NUMBER,
             "consent_approved": SWITCH,
             "consent_approved_by": TEXT,
             "consent_approved_on": forms.DateInput(
@@ -76,7 +110,8 @@ class AssistantSettingsForm(forms.ModelForm):
             ),
         }
         labels = {
-            "enabled": "Assistant switched on (global)",
+            "enabled": "Assistant switched on (public and signed-in)",
+            "kill_switch": "STOP EVERYTHING NOW (stop switch)",
             "public_enabled": "Public assistant on the website",
             "signed_in_enabled": "Signed-in assistant",
             "student_tutor_enabled": "Student tutor mode",
@@ -88,6 +123,8 @@ class AssistantSettingsForm(forms.ModelForm):
             "public_visitor_daily_limit": "Public: questions per visitor per day",
             "public_ip_daily_limit": "Public: questions per IP per day",
             "public_site_daily_limit": "Public: questions per day, whole site",
+            "console_daily_limit": "Test tools: requests per day",
+            "console_monthly_budget_ksh": "Test tools: monthly ceiling (KSh)",
             "safeguarding_contact_name": "Safeguarding contact name",
             "safeguarding_contact_phone": "Safeguarding contact phone",
             "safeguarding_contact_email": "Safeguarding contact email",
@@ -96,6 +133,20 @@ class AssistantSettingsForm(forms.ModelForm):
             "working_hours_end": "Working hours end",
             "alert_retention_months": "DRAFT: erase a closed alert's excerpt after (months)",
             "handoff_email": "Handoff email",
+            "widget_enabled": "Public chat widget on the website",
+            "widget_opening_en": "Widget opening message (English)",
+            "widget_opening_sw": "Widget opening message (Kiswahili)",
+            "widget_max_message_chars": "Widget: longest message accepted (characters)",
+            "widget_feedback_enabled": "Widget: ask whether an answer helped",
+            "widget_pow_enabled": "Widget: bot check when a conversation starts",
+            "sla_normal_minutes": "Normal handoffs: reply within (minutes)",
+            "sla_urgent_minutes": "Urgent handoffs: reply within (minutes)",
+            "sla_critical_minutes": "Critical handoffs: reply within (minutes)",
+            "sla_reminder_percent": "Remind the assignee at (% of the target)",
+            "conversation_retention_days": "DRAFT: delete a chat with no handoff after (days)",
+            "handoff_retention_months": "DRAFT: delete a resolved handoff after (months)",
+            "callback_retention_days": "DRAFT: delete callback details after (days)",
+            "feedback_reason_retention_days": "DRAFT: delete feedback reasons after (days)",
             "consent_approved": "Consent wording approved",
             "consent_approved_by": "Approved by (name)",
             "consent_approved_on": "Approved on (date)",
@@ -150,6 +201,36 @@ class AssistantSettingsForm(forms.ModelForm):
                 "consent_approved",
                 "Tick “Consent wording approved” as well, or clear the name and date.",
             )
+
+        if cleaned.get("widget_enabled"):
+            if not cleaned.get("public_enabled"):
+                self.add_error(
+                    "widget_enabled",
+                    "Switch on the public assistant before the website widget.",
+                )
+            if not (approved and by and on):
+                self.add_error(
+                    "widget_enabled",
+                    "The widget may not appear until the consent wording is approved "
+                    "with a name and a date.",
+                )
+
+        longest = cleaned.get("widget_max_message_chars")
+        if longest is not None and not 50 <= longest <= 4000:
+            self.add_error(
+                "widget_max_message_chars",
+                "Choose between 50 and 4000 characters.",
+            )
+        remind = cleaned.get("sla_reminder_percent")
+        if remind is not None and not 1 <= remind <= 99:
+            self.add_error(
+                "sla_reminder_percent",
+                "Choose a percentage between 1 and 99.",
+            )
+        for field in ("sla_normal_minutes", "sla_urgent_minutes", "sla_critical_minutes"):
+            value = cleaned.get(field)
+            if value is not None and value < 1:
+                self.add_error(field, "A service-level target must be at least one minute.")
         return cleaned
 
 

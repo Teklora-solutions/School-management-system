@@ -76,6 +76,21 @@ def _staff_recipients():
     return User.objects.filter(role__in=SAFETY_ROLES, is_active=True)
 
 
+def would_notify(settings_row) -> dict:
+    """
+    What a real alert would send and to whom. The admin test tools show this
+    and deliberately create no alert, notification or email.
+    """
+    return {
+        "contact_name": (settings_row.safeguarding_contact_name or "").strip(),
+        "contact_phone": (settings_row.safeguarding_contact_phone or "").strip(),
+        "contact_email": (settings_row.safeguarding_contact_email or "").strip(),
+        "roles": ["Admin", "Director"],
+        "handoff_email": (settings_row.handoff_email or "").strip(),
+        "escalation_minutes": settings_row.escalation_minutes,
+    }
+
+
 def create_alert(
     *,
     profile: str,

@@ -1,0 +1,298 @@
+{% extends base_template %}
+
+{% block title %}Answer desk | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-chat-left-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Answer desk
+    </h1>
+    <p class="page-subtitle">
+      Ask a question as any audience and see exactly what a real reader would
+      get. This desk uses the same visibility and retrieval code as a real
+      request — there is no admin shortcut and no hidden extra knowledge.
+    </p>
+  </div>
+</div>
+
+{% include "features/assistant/_tabs.html" %}
+
+{% if settings_row.kill_switch %}
+<div class="alert alert-danger" role="alert">
+  <strong>The stop switch is on.</strong> Nothing is sent to a provider. Switch it
+  off in <a href="{% url 'assistant:settings' %}" class="alert-link">settings</a> to test.
+</div>
+{% endif %}
+
+{% if not safeguarding_contact_set %}
+<div class="alert alert-warning" role="alert">
+  No safeguarding contact is set. A triggered test still shows what would happen,
+  but the safe reply falls back to the general office line. Set the contact in
+  <a href="{% url 'assistant:settings' %}" class="alert-link">Assistant settings</a>.
+</div>
+{% endif %}
+
+<div class="alert alert-info" role="note">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  Test tools have their own limits: {{ console_daily_limit }} requests per day and a
+  monthly ceiling of KSh {{ console_monthly_budget_ksh }}. They are exempt from the
+  public and signed-in switches so you can test before go-live, but never from the
+  stop switch or their own limits. Gaps you find here are recorded as tests.
+  <a href="{% url 'assistant:knowledge_gaps' %}" class="alert-link">Open gaps: {{ open_gap_count }}</a>.
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger" role="alert">
+            {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label for="{{ form.question.id_for_label }}" class="form-label fw-600">{{ form.question.label }}</label>
+            {{ form.question }}
+            {% for e in form.question.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.audience.id_for_label }}" class="form-label fw-600">{{ form.audience.label }}</label>
+            {{ form.audience }}
+            <div class="text-muted-sm mt-1">
+              Visitor sees only public collections; a signed-in role also sees
+              collections for that role and class.
+            </div>
+            {% for e in form.audience.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.preview_class.id_for_label }}" class="form-label fw-600">{{ form.preview_class.label }}</label>
+            {{ form.preview_class }}
+            {% for e in form.preview_class.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.provider.id_for_label }}" class="form-label fw-600">{{ form.provider.label }}</label>
+            {{ form.provider }}
+            {% for e in form.provider.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-send me-1" aria-hidden="true"></i>Ask as this audience
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <details class="mt-3">
+      <summary class="fw-600">Fixed refusal wording (DRAFT)</summary>
+      <div class="border rounded p-3 mt-2 text-muted-sm" style="white-space:pre-line;">{{ refusal_draft_en }}</div>
+      <div class="border rounded p-3 mt-2 text-muted-sm" style="white-space:pre-line;">{{ refusal_draft_sw }}</div>
+      <p class="text-muted-sm mt-2 mb-0">
+        This wording is a <strong>draft</strong> for the school to approve. The school
+        contact always comes first, in English and Kiswahili.
+      </p>
+    </details>
+  </div>
+
+  <div class="col-lg-8">
+    {% if result %}
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            {% if result.screened %}
+            <span class="badge bg-danger">Safeguarding — passed to a person</span>
+            {% elif result.error %}
+            <span class="badge bg-danger">No answer — provider problem</span>
+            {% elif result.refused %}
+            <span class="badge bg-warning text-dark">Refused — nothing reliable found</span>
+            {% elif result.verified %}
+            <span class="badge bg-success">Verified</span>
+            {% else %}
+            <span class="badge bg-danger">Unverified — not shown to a reader</span>
+            {% endif %}
+            <span class="text-muted-sm">Previewed as {{ result.audience_label }}</span>
+          </div>
+
+          {% if result.error %}
+          <div class="alert alert-danger mb-2" role="alert">{{ result.error }}</div>
+          {% endif %}
+
+          {% if result.screened %}
+          <div class="alert alert-danger mb-3" role="alert">
+            <strong>A safeguarding rule fired. The provider was not called.</strong>
+            This preview sent <strong>no alert</strong> to anyone. In a live
+            conversation these are exactly the people who would be told.
+          </div>
+          <dl class="row small mb-3">
+            <dt class="col-5 col-md-4">Rules</dt>
+            <dd class="col-7 col-md-8">{{ result.rules_fired|join:", "|default:"—" }}</dd>
+            <dt class="col-5 col-md-4">Categories</dt>
+            <dd class="col-7 col-md-8">{{ result.categories|join:", "|default:"—" }}</dd>
+            <dt class="col-5 col-md-4">Safe reply sent</dt>
+            <dd class="col-7 col-md-8" style="white-space:pre-line;">{{ result.safe_reply }}</dd>
+          </dl>
+          {% if result.alert_preview %}
+          <div class="border rounded p-3 bg-light">
+            <div class="fw-600 mb-1">Who would be alerted (nothing was sent)</div>
+            <ul class="mb-1 small">
+              {% if result.alert_preview.name %}
+              <li>Safeguarding contact: {{ result.alert_preview.name }}
+                {% if result.alert_preview.phone %} · {{ result.alert_preview.phone }}{% endif %}
+                {% if result.alert_preview.email %} · {{ result.alert_preview.email }}{% endif %}
+              </li>
+              {% endif %}
+              {% if result.alert_preview.handoff_email %}
+              <li>Handoff email: {{ result.alert_preview.handoff_email }}</li>
+              {% endif %}
+              <li>In-app roles: {{ result.alert_preview.roles|join:", "|default:"—" }}</li>
+            </ul>
+            {% if result.alert_preview.escalation_minutes %}
+            <div class="text-muted-sm">
+              If unacknowledged after {{ result.alert_preview.escalation_minutes }} minutes
+              during working hours, the director and admin would be alerted again.
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% endif %}
+
+          {% if result.refused %}
+          <div class="mb-3">
+            <span class="badge bg-warning-subtle text-warning-emphasis">DRAFT wording</span>
+            <div class="border rounded p-3 mt-2" style="white-space:pre-line;">{{ result.refusal_text }}</div>
+          </div>
+          {% endif %}
+
+          {% if result.provider_called %}
+            {% if result.verified %}
+            <div class="border rounded p-3 mb-3" style="white-space:pre-line;">{{ result.answer }}</div>
+            {% else %}
+            <div class="alert alert-danger" role="alert">
+              <strong>This answer is unverified and would never reach a reader.</strong>
+              {% if result.citation_missing %}No valid source was cited.{% endif %}
+              {% if result.figure_problems %}
+              These figures do not appear in the cited passages:
+              {{ result.figure_problems|join:", " }}.
+              {% endif %}
+              The reader would receive the fixed refusal instead.
+            </div>
+            {% if result.answer %}
+            <div class="border rounded p-3 mb-3 text-muted-sm" style="white-space:pre-line;">{{ result.answer }}</div>
+            {% endif %}
+            {% endif %}
+
+            {% if result.citations %}
+            <div class="mb-3">
+              <div class="fw-600 mb-1">Cited sources</div>
+              <ul class="small mb-0">
+                {% for citation in result.citations %}
+                <li>
+                  <strong>{{ citation.label }}</strong> ·
+                  <a href="{% url 'assistant:knowledge_document' citation.document_id %}">{{ citation.title }}</a>
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endif %}
+
+            <div class="text-muted-sm">
+              {{ result.provider_name }} · {{ result.model|default:"no model recorded" }} ·
+              {{ result.latency_ms }} ms · {{ result.tokens_in }} in / {{ result.tokens_out }} out tokens
+              {% if result.unknown_citations %} · {{ result.unknown_citations }} unknown citation marker(s) removed{% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if result.screened %}
+        {% if result.gap_id %}
+        <div class="text-muted-sm mb-3">A test gap was recorded for this question.</div>
+        {% endif %}
+      {% elif result.refused and result.gap_id %}
+      <div class="alert alert-secondary" role="note">
+        A test gap was recorded so the missing knowledge can be added.
+        <a href="{% url 'assistant:knowledge_gaps' %}" class="alert-link">Open the gap list</a>.
+      </div>
+      {% elif not result.verified and result.gap_id %}
+      <div class="alert alert-secondary" role="note">
+        An unverified answer was recorded as a test gap.
+        <a href="{% url 'assistant:knowledge_gaps' %}" class="alert-link">Open the gap list</a>.
+      </div>
+      {% endif %}
+
+      {% if result.sources %}
+      <div class="card">
+        <div class="card-body">
+          <h2 class="h6 fw-600 mb-1">What retrieval found</h2>
+          <p class="text-muted-sm">
+            Two rankings over the passages this audience may see — vector similarity
+            and keyword term frequency — merged by rank. Match the scores against
+            the model in use; K4 calibrates the floor on real embeddings.
+          </p>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Source</th>
+                  <th scope="col">Document / section</th>
+                  <th scope="col" class="text-end">Vector</th>
+                  <th scope="col" class="text-end">Keyword</th>
+                  <th scope="col" class="text-end">Merged</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for source in result.sources %}
+                <tr>
+                  <td class="fw-600">{{ source.label|default:"—" }}</td>
+                  <td class="small">
+                    <div class="fw-600">{{ source.document_title }}</div>
+                    <div class="text-muted">{{ source.heading|default:"Passage" }} · #{{ source.ordinal|add:1 }}</div>
+                  </td>
+                  <td class="text-end small">{{ source.vector_score|floatformat:3 }}</td>
+                  <td class="text-end small">{{ source.keyword_score|floatformat:2 }}</td>
+                  <td class="text-end small">{{ source.combined_score|floatformat:4 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="text-muted-sm mt-2">
+            Top vector score {{ result.top_vector|floatformat:3 }} · top keyword score
+            {{ result.top_keyword|floatformat:2 }}.
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="card mt-3">
+        <div class="card-body">
+          <h2 class="h6 fw-600 mb-2">What a reader would receive</h2>
+          <div class="border rounded p-3 bg-light" style="white-space:pre-line;">{{ result.delivered_to_reader }}</div>
+          <div class="text-muted-sm mt-2">
+            Unverified answers are never delivered: the fixed refusal is used instead.
+          </div>
+        </div>
+      </div>
+    {% else %}
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column align-items-center justify-content-center text-center py-5">
+        <i class="bi bi-chat-square-text fs-1 text-muted" aria-hidden="true"></i>
+        <p class="mt-3 mb-1 fw-600">Nothing asked yet</p>
+        <p class="text-muted-sm mb-0">
+          Choose an audience and type a question. You will see the sources, each
+          score, the citations, and exactly what the reader would get.
+        </p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -129,6 +129,7 @@ def _record_embedding_usage(
     reply=None,
     error: ProviderError | None = None,
     latency_ms=0,
+    source=UsageEvent.Source.INGESTION,
 ):
     settings_row = _settings_row()
     tokens = getattr(reply, "tokens", 0) if reply else 0
@@ -136,7 +137,7 @@ def _record_embedding_usage(
         provider=provider,
         provider_label=getattr(provider, "name", "") or "",
         actor=actor,
-        source=UsageEvent.Source.INGESTION,
+        source=source,
         profile=profile,
         model_name=model_name or "",
         tokens_in=tokens,
@@ -172,7 +173,25 @@ def call_chain(
     settings_row = _settings_row()
     last_error: ProviderError | None = None
 
-    if profile != UsageEvent.Profile.CONSOLE:
+    if settings_row.kill_switch:
+        raise AllProvidersUnavailable(
+            "The assistant is stopped by the stop switch. Nothing was sent to a provider.",
+            retryable=False,
+        )
+
+    if profile == UsageEvent.Profile.CONSOLE:
+        budget = limits.check_console_limits(
+            settings_row,
+            reserve=limits.estimated_chat_cost(
+                providers[0] if providers else None,
+                settings_row,
+                sum(len(message.content) for message in messages),
+                max_tokens,
+            ),
+        )
+        if not budget.allowed:
+            raise AllProvidersUnavailable(budget.reason, retryable=False)
+    else:
         if not settings_row.enabled:
             raise AllProvidersUnavailable("The assistant is switched off.")
         budget = limits.check_budget(
@@ -276,6 +295,7 @@ def embed_chain(
     *,
     actor=None,
     profile: str = UsageEvent.Profile.INGESTION,
+    source: str = UsageEvent.Source.INGESTION,
     retries: int = DEFAULT_RETRIES,
     sleep=time.sleep,
 ) -> EmbeddingResult:
@@ -294,11 +314,25 @@ def embed_chain(
     candidates = [p for p in providers if registry.model_for(p, "embed")]
     budget_provider = candidates[0] if candidates else (providers[0] if providers else None)
 
-    budget = limits.check_embedding_budget(
-        settings_row,
-        budget_provider,
-        prompt_chars=sum(len(text) for text in texts),
-    )
+    if settings_row.kill_switch:
+        raise AllProvidersUnavailable(
+            "The assistant is stopped by the stop switch. Nothing was sent to a provider.",
+            retryable=False,
+        )
+
+    if profile == UsageEvent.Profile.CONSOLE:
+        budget = limits.check_console_limits(
+            settings_row,
+            reserve=limits.estimated_embedding_cost(
+                budget_provider, settings_row, sum(len(text) for text in texts)
+            ),
+        )
+    else:
+        budget = limits.check_embedding_budget(
+            settings_row,
+            budget_provider,
+            prompt_chars=sum(len(text) for text in texts),
+        )
     if not budget.allowed:
         raise AllProvidersUnavailable(budget.reason, retryable=False)
 
@@ -334,6 +368,7 @@ def embed_chain(
                     model_name=model_name,
                     error=exc,
                     latency_ms=elapsed,
+                    source=source,
                 )
                 last_error = exc
                 breaker_record_failure(provider)
@@ -351,6 +386,7 @@ def embed_chain(
                     model_name=model_name,
                     error=error,
                     latency_ms=elapsed,
+                    source=source,
                 )
                 last_error = error
                 breaker_record_failure(provider)
@@ -365,6 +401,7 @@ def embed_chain(
                     model_name=model_name,
                     reply=reply,
                     latency_ms=elapsed,
+                    source=source,
                 )
                 return EmbeddingResult(
                     reply=reply,

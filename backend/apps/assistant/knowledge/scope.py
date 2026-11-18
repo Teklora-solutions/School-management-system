@@ -12,6 +12,7 @@ the reader may not see never influences an answer or a citation.
 from __future__ import annotations
 
 import datetime
+from dataclasses import dataclass
 
 from django.db.models import Q
 from django.utils import timezone
@@ -21,7 +22,7 @@ from ..models import (
     KnowledgeDocument,
     KnowledgeStatus,
 )
-from .roles import ROLE_LABELS, roles_list
+from .roles import ROLE_LABELS, roles_list, VALID_ROLES
 
 _AUDIENCE_RANK = {
     KnowledgeAudience.PUBLIC: 0,
@@ -171,11 +172,68 @@ def _not_expired_q(prefix: str, day: datetime.date) -> Q:
     )
 
 
-def visible_documents(user, on_date: datetime.date | None = None):
+@dataclass(frozen=True)
+class Audience:
     """
-    Approved documents in approved, effective collections that this user may
-    see — as a queryset, so the audience filter happens in the database before
-    any ranking.
+    Who is reading. One object serves real users and the admin preview, so the
+    preview can never take a shortcut around the visibility rules.
+    """
+
+    role: str  # empty for a visitor
+    class_ids: tuple[int, ...] = ()
+    is_authenticated: bool = False
+
+    @property
+    def is_visitor(self) -> bool:
+        return not self.is_authenticated
+
+    @property
+    def signature(self) -> str:
+        """Stable key material for caches. Roles and classes only, no identity."""
+        if self.is_visitor:
+            return "visitor"
+        classes = ",".join(str(pk) for pk in sorted(self.class_ids))
+        return f"{self.role}|{classes}"
+
+    @property
+    def label(self) -> str:
+        if self.is_visitor:
+            return "Visitor"
+        label = ROLE_LABELS.get(self.role, self.role)
+        if self.class_ids:
+            label += " · class ids " + ", ".join(str(pk) for pk in sorted(self.class_ids))
+        return label
+
+
+def audience_for_user(user) -> Audience:
+    if not user or not getattr(user, "is_authenticated", False):
+        return Audience("", (), False)
+    return Audience(
+        role=getattr(user, "role", "") or "",
+        class_ids=tuple(sorted(user_class_ids(user))),
+        is_authenticated=True,
+    )
+
+
+def audience_for_preview(role: str, class_ids=()) -> Audience:
+    """The answer desk builds the same object a real reader would get."""
+    role = (role or "").strip()
+    if role in ("", "visitor"):
+        return Audience("", (), False)
+    if role not in VALID_ROLES:
+        raise ValueError("Unknown role for preview.")
+    return Audience(
+        role=role,
+        class_ids=tuple(sorted({int(pk) for pk in (class_ids or [])})),
+        is_authenticated=True,
+    )
+
+
+def scoped_documents(audience: Audience, on_date: datetime.date | None = None):
+    """
+    Approved documents the audience may see, as a queryset, so the filter runs
+    in the database before any ranking. Effective dates are applied at read
+    time, which is what makes a cached ranking safe to reuse.
     """
     day = on_date or timezone.localdate()
     queryset = (
@@ -201,11 +259,11 @@ def visible_documents(user, on_date: datetime.date | None = None):
     public_q = Q(audience=KnowledgeAudience.PUBLIC, roles="") & Q(
         classes__isnull=True
     )
-    if not user or not getattr(user, "is_authenticated", False):
+    if audience.is_visitor:
         return queryset.filter(public_q).distinct()
 
-    role = getattr(user, "role", "") or ""
-    class_ids = user_class_ids(user)
+    role = audience.role
+    class_ids = set(audience.class_ids)
     # Canonical role strings let both SQLite and PostgreSQL filter with LIKE,
     # so the audience filter stays in the database before any ranking.
     signed_in_q = Q(audience=KnowledgeAudience.SIGNED_IN) & (
@@ -217,3 +275,15 @@ def visible_documents(user, on_date: datetime.date | None = None):
         signed_in_q &= Q(classes__isnull=True)
 
     return queryset.filter(public_q | signed_in_q).distinct()
+
+
+def visible_collection_ids(audience: Audience, on_date: datetime.date | None = None) -> list[int]:
+    return sorted(
+        set(scoped_documents(audience, on_date).values_list("collection_id", flat=True))
+    )
+
+
+def visible_documents(user, on_date: datetime.date | None = None):
+    """Backwards-compatible wrapper: a real user's visible documents."""
+    return scoped_documents(audience_for_user(user), on_date)
+

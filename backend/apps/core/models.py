@@ -439,6 +439,18 @@ class SchoolSettings(BaseModel):
         help_text="Our Values text shown on the About page.",
     )
 
+    # ── Home page hero background image ───────────────────────────────────
+    hero_image = models.ImageField(
+        upload_to="school/hero/",
+        null=True,
+        blank=True,
+        help_text=(
+            "Hero background image shown on the public home page. "
+            "Recommended: 1600 × 900 px. Leave blank to use the "
+            "default gradient background."
+        ),
+    )
+
     class Meta:
         db_table = "core_school_settings"
         verbose_name = "school settings"

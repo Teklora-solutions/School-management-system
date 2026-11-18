@@ -27,6 +27,15 @@ class GalleryPhoto(BaseModel):
         help_text="One line shown under the photo. Leave blank for no caption.",
     )
     image = models.ImageField(upload_to="gallery/")
+    category = models.CharField(
+        max_length=100,
+        blank=True,
+        db_index=True,
+        help_text=(
+            'Optional category tag for the gallery filter, e.g. "Sports", '
+            '"Arts", "Science". Leave blank for no filter label.'
+        ),
+    )
     display_order = models.PositiveSmallIntegerField(
         default=0,
         db_index=True,

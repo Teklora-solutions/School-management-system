@@ -10,6 +10,16 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 
 
+def _pub_ctx(request: object) -> dict:
+    """Public-site context for pages that extend public/base.html."""
+    from apps.public import selectors as pub_selectors  # local import avoids circular
+    return {
+        "identity":     pub_selectors.site_identity(request),
+        "nav_links":    pub_selectors.nav_links(request),
+        "portal_links": pub_selectors.portal_links(),
+    }
+
+
 def axes_lockout_response(request, credentials, *args, **kwargs) -> HttpResponse:
     """
     Called by django-axes when a client is locked out.
@@ -28,7 +38,7 @@ def axes_lockout_response(request, credentials, *args, **kwargs) -> HttpResponse
             {"error": "Too many failed login attempts. Please try again in 1 hour."},
             status=403,
         )
-    return render(request, "auth/lockout.html", status=403)
+    return render(request, "auth/lockout.html", _pub_ctx(request), status=403)
 
 
 def get_client_ip(request) -> str | None:

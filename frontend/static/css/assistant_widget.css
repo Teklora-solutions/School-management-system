@@ -1,0 +1,523 @@
+/*
+  assistant_widget.css
+  --------------------
+  The public chat widget (Module 3, CP3).
+
+  Every colour, radius and space comes from the public site's own tokens
+  (--pub-*), so the widget follows the school's palette and the light/dark
+  theme without a second design system. Each var() carries a fallback so the
+  widget still renders if the public theme is ever replaced.
+
+  Layout: a launcher in the corner; a panel on desktop; the panel becomes the
+  full screen on a phone. Touch targets are at least 44px, meaning is never
+  carried by colour alone (alignment and labels carry it too), and motion is
+  removed when the device asks for less.
+*/
+
+.aw {
+  --aw-radius: var(--pub-radius-lg, 20px);
+  --aw-border: 1px solid var(--pub-border-strong, rgba(60, 45, 20, 0.22));
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 300;
+  font-family: var(--pub-font, system-ui, -apple-system, 'Segoe UI', sans-serif);
+  font-size: var(--pub-text-sm, 0.875rem);
+  line-height: 1.5;
+}
+
+.aw [hidden] {
+  display: none !important;
+}
+
+.aw-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Launcher ─────────────────────────────────────────────────────────── */
+
+.aw-launcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0.75rem 1.1rem;
+  border: var(--aw-border);
+  border-radius: 999px;
+  background: var(--pub-accent, #c47c14);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--pub-shadow-lg, 0 10px 36px rgba(60, 40, 10, 0.13));
+}
+
+.aw-launcher:hover {
+  background: var(--pub-accent-hover, #a36510);
+}
+
+.aw-launcher svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.aw-launcher:focus-visible,
+.aw-panel button:focus-visible,
+.aw-panel textarea:focus-visible,
+.aw-panel input:focus-visible {
+  outline: 3px solid var(--pub-accent-ring, rgba(196, 124, 20, 0.28));
+  outline-offset: 2px;
+}
+
+/* ── Panel ────────────────────────────────────────────────────────────── */
+
+.aw-panel {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(5.25rem, calc(env(safe-area-inset-bottom) + 4.75rem));
+  display: flex;
+  flex-direction: column;
+  width: min(400px, calc(100vw - 2rem));
+  height: min(620px, calc(100dvh - 7rem));
+  overflow: hidden;
+  border: var(--aw-border);
+  border-radius: var(--aw-radius);
+  background: var(--pub-surface, #fff);
+  color: var(--pub-text, #2d2416);
+  box-shadow: var(--pub-shadow-xl, 0 20px 56px rgba(60, 40, 10, 0.16));
+}
+
+.aw-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-bottom: var(--aw-border);
+  background: var(--pub-bg-alt, #f3f0eb);
+}
+
+.aw-title {
+  margin: 0;
+  color: var(--pub-heading, #1a1108);
+  font-size: var(--pub-text-base, 1rem);
+  font-weight: 700;
+}
+
+.aw-subtitle {
+  margin: 0.15rem 0 0;
+  color: var(--pub-text-muted, #6b5c47);
+  font-size: var(--pub-text-xs, 0.75rem);
+}
+
+.aw-head__actions {
+  display: flex;
+  gap: 0.25rem;
+  flex: none;
+}
+
+.aw-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pub-text, #2d2416);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.aw-iconbtn:hover {
+  background: var(--pub-surface-2, #ede9e3);
+  border-color: var(--pub-border, rgba(60, 45, 20, 0.11));
+}
+
+.aw-iconbtn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.aw-consent {
+  margin: 0;
+  padding: 0.65rem 1rem;
+  border-bottom: var(--aw-border);
+  background: var(--pub-accent-bg, rgba(196, 124, 20, 0.09));
+  color: var(--pub-text-muted, #6b5c47);
+  font-size: var(--pub-text-xs, 0.75rem);
+}
+
+/* ── Conversation ─────────────────────────────────────────────────────── */
+
+.aw-log {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  scrollbar-width: thin;
+}
+
+.aw-msg {
+  max-width: 92%;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--pub-radius, 12px);
+  border: var(--aw-border);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.aw-msg--assistant {
+  align-self: flex-start;
+  background: var(--pub-surface-2, #ede9e3);
+  border-bottom-left-radius: 4px;
+}
+
+.aw-msg--visitor {
+  align-self: flex-end;
+  background: var(--pub-accent-bg, rgba(196, 124, 20, 0.09));
+  border-color: var(--pub-accent, #c47c14);
+  border-bottom-right-radius: 4px;
+}
+
+.aw-msg--notice {
+  align-self: center;
+  max-width: 100%;
+  border-style: dashed;
+  background: transparent;
+  color: var(--pub-text-muted, #6b5c47);
+  font-size: var(--pub-text-xs, 0.75rem);
+  text-align: center;
+}
+
+.aw-msg--error {
+  border-color: var(--pub-danger, #c0392b);
+  background: var(--pub-danger-bg, rgba(192, 57, 43, 0.09));
+}
+
+.aw-msg__who {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: var(--pub-text-xs, 0.75rem);
+  font-weight: 700;
+  color: var(--pub-text-muted, #6b5c47);
+}
+
+.aw-sources {
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--pub-text-xs, 0.75rem);
+  color: var(--pub-text-muted, #6b5c47);
+}
+
+.aw-sources li {
+  margin-top: 0.15rem;
+}
+
+.aw-typing {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.aw-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pub-text-muted, #6b5c47);
+  animation: aw-pulse 1.1s ease-in-out infinite;
+}
+
+.aw-typing span:nth-child(2) { animation-delay: 0.15s; }
+.aw-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes aw-pulse {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50%      { opacity: 1;    transform: translateY(-2px); }
+}
+
+.aw-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.aw-chip {
+  min-height: 36px;
+  padding: 0.35rem 0.7rem;
+  border: var(--aw-border);
+  border-radius: 999px;
+  background: var(--pub-surface, #fff);
+  color: var(--pub-text, #2d2416);
+  font: inherit;
+  font-size: var(--pub-text-xs, 0.75rem);
+  cursor: pointer;
+}
+
+.aw-chip:hover {
+  border-color: var(--pub-accent, #c47c14);
+}
+
+.aw-thanks {
+  margin: 0.4rem 0 0;
+  font-size: var(--pub-text-xs, 0.75rem);
+  color: var(--pub-text-muted, #6b5c47);
+}
+
+/* ── Suggestions ──────────────────────────────────────────────────────── */
+
+.aw-suggests {
+  padding: 0 1rem 0.6rem;
+}
+
+.aw-suggests__label {
+  margin: 0 0 0.35rem;
+  font-size: var(--pub-text-xs, 0.75rem);
+  font-weight: 700;
+  color: var(--pub-text-muted, #6b5c47);
+}
+
+.aw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+/* ── Composer ─────────────────────────────────────────────────────────── */
+
+.aw-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-top: var(--aw-border);
+  background: var(--pub-surface, #fff);
+}
+
+.aw-composer textarea {
+  flex: 1 1 auto;
+  min-height: 44px;
+  max-height: 120px;
+  padding: 0.55rem 0.7rem;
+  border: var(--aw-border);
+  border-radius: var(--pub-radius, 12px);
+  background: var(--pub-bg, #faf9f7);
+  color: var(--pub-text, #2d2416);
+  font: inherit;
+  resize: none;
+}
+
+.aw-composer textarea::placeholder {
+  color: var(--pub-text-muted, #6b5c47);
+}
+
+.aw-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: var(--pub-radius, 12px);
+  background: var(--pub-accent, #c47c14);
+  color: #fff;
+  cursor: pointer;
+}
+
+.aw-send:hover {
+  background: var(--pub-accent-hover, #a36510);
+}
+
+.aw-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.aw-send svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Honeypot: a real visitor never sees it, a simple bot fills it in. */
+.aw-hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.aw-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0 0.75rem 0.6rem;
+  background: var(--pub-surface, #fff);
+}
+
+.aw-linkbtn {
+  min-height: 40px;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--pub-teal, #0d7c6e);
+  font: inherit;
+  font-size: var(--pub-text-xs, 0.75rem);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── Status line ──────────────────────────────────────────────────────── */
+
+.aw-status {
+  padding: 0 1rem 0.4rem;
+  min-height: 1.1rem;
+  font-size: var(--pub-text-xs, 0.75rem);
+  color: var(--pub-text-muted, #6b5c47);
+}
+
+/* ── Callback form ────────────────────────────────────────────────────── */
+
+.aw-callback {
+  padding: 0.75rem 1rem;
+  border-top: var(--aw-border);
+  background: var(--pub-bg-alt, #f3f0eb);
+}
+
+.aw-callback h3 {
+  margin: 0 0 0.4rem;
+  color: var(--pub-heading, #1a1108);
+  font-size: var(--pub-text-sm, 0.875rem);
+}
+
+.aw-callback p {
+  margin: 0 0 0.5rem;
+  font-size: var(--pub-text-xs, 0.75rem);
+  color: var(--pub-text-muted, #6b5c47);
+}
+
+.aw-field {
+  display: block;
+  margin-bottom: 0.45rem;
+}
+
+.aw-field span {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: var(--pub-text-xs, 0.75rem);
+  font-weight: 700;
+}
+
+.aw-field input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0.45rem 0.6rem;
+  border: var(--aw-border);
+  border-radius: var(--pub-radius-sm, 6px);
+  background: var(--pub-surface, #fff);
+  color: var(--pub-text, #2d2416);
+  font: inherit;
+}
+
+.aw-callback__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.aw-primary {
+  min-height: 40px;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--pub-radius-sm, 6px);
+  background: var(--pub-accent, #c47c14);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.aw-primary:hover {
+  background: var(--pub-accent-hover, #a36510);
+}
+
+.aw-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Phone: the panel takes the screen ────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .aw-launcher__label {
+    display: none;
+  }
+
+  .aw-launcher {
+    width: 56px;
+    height: 56px;
+    justify-content: center;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .aw-panel {
+    inset: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .aw-head {
+    padding-top: max(0.9rem, env(safe-area-inset-top));
+  }
+}
+
+/* ── Less motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .aw *,
+  .aw *::before,
+  .aw *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Forced colours ───────────────────────────────────────────────────── */
+
+@media (forced-colors: active) {
+  .aw-launcher,
+  .aw-send,
+  .aw-primary {
+    border: 1px solid ButtonText;
+  }
+
+  .aw-msg {
+    border: 1px solid CanvasText;
+  }
+}

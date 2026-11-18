@@ -2,8 +2,9 @@
 
 > **Status: approved design, 2026-11-18.** Module 1 Step 2 (the foundation) is built: model gateway,
 > provider adapters, budgets, limits, guardrails, alerts, admin screens and the test console. Module 2
-> K1 (knowledge data model, private storage and admin screens) and K2 (reading, chunking, embeddings
-> and the ingestion worker) are also built. The chat screens, retrieval and record tools are still
+> K1 (knowledge data model, private storage and admin screens), K2 (reading, chunking, embeddings
+> and the ingestion worker) and K3 (hybrid retrieval, answers, citations, the answer desk and gaps)
+> are also built. The chat screens and record tools are still
 > planned. This document marks **built** and **planned** throughout; nothing planned is described as
 > if it exists.
 
@@ -38,15 +39,20 @@ the view **and** the service.
 | Guardrails | `backend/apps/assistant/guardrails/` | mandatory safeguarding pack, admin rules, PII masking, injection fencing, safe reply | built |
 | Alerts | `backend/apps/assistant/alerts.py` + `tasks.py` + `middleware.py` | alert rows, acknowledgement, escalation, email with recorded failures | built |
 | Limits | `backend/apps/assistant/limits.py` | budgets, signed-in daily limit, public visitor + IP + site caps | built |
-| Retrieval | `backend/apps/assistant/knowledge/` + planned `retrieval/` | K1 built: shelves, documents, private files, audience/class scope filter, version history. K2 built: extraction, chunking, embeddings, ingestion worker, re-index. K3: ranking, citations, refusal |
+| Retrieval | `backend/apps/assistant/knowledge/` | K1 built: shelves, documents, private files, audience/class scope filter, version history. K2 built: extraction, chunking, embeddings, ingestion worker, re-index. K3 built: hybrid ranking, citations, figure check, refusal, answer cache, gaps, answer desk |
 | Tools | `backend/apps/assistant/tools/` | read-only record tools wrapping existing services | planned (Module 4) |
 | Policies | `backend/apps/assistant/policies.py` | the two assistant profiles | planned (chat modules) |
 | Selectors | `backend/apps/assistant/selectors.py` | settings, providers, usage, rules, alerts, failures | built |
 | Services | `backend/apps/assistant/services.py` | configuration writes, connection test, test console | built |
-| Views | `backend/apps/assistant/views.py` + `urls.py` | admin screens, director alerts, test console | built |
-| Tasks | `backend/apps/assistant/tasks.py` | safeguarding email and its limited retry | built |
+| Views | `backend/apps/assistant/views.py` + `knowledge/views.py` + `urls.py` | admin screens, director alerts, test console, answer desk, gaps, document check | built |
+| Tasks | `backend/apps/assistant/tasks.py` | safeguarding email, its limited retry, and knowledge ingestion | built |
 
-## 3. Request flow (planned conversation path)
+## 3. Request flow
+
+The pipeline below is the whole design. Steps 1, 3, 4, 5 and 6 exist in
+`knowledge/answers.py::answer_question()` and are exercised today by the admin answer desk. Step 2 is
+enforced inside the gateway (`limits.check_console_limits` for the desks, `limits.check_budget` for
+live profiles). Step 7 writes usage and gaps; message rows wait for the conversation module.
 
 ```
 browser
@@ -60,7 +66,7 @@ view ──► service: assistant.answer()
            ├─ 2. limits.check()               kill switch, rate limit, budget headroom
            │        └─ stop ──► plain message, no provider call, UsageEvent(outcome=blocked)
            │
-           ├─ 3. retrieval.search()           scope filter BEFORE ranking (Module 2 K3)
+           ├─ 3. retrieval.search()           scope filter BEFORE ranking (built in K3)
            │        └─ top N approved chunks with source ids
            │
            ├─ 4. prompt assembly              system rules + house rules + fenced DATA block
@@ -69,9 +75,10 @@ view ──► service: assistant.answer()
            ├─ 5. gateway.chat()               ordered providers, retries, circuit breaker
            │        └─ all down ──► "I can't answer right now…" + school contact
            │
-           ├─ 6. output checks                no system prompt echo, no out-of-scope identifiers
+           ├─ 6. output checks                citations + figures; failure = unverified
            │
            └─ 7. records                      UsageEvent (tokens, cost, latency, outcome);
+                                              KnowledgeGap when refused or unverified;
                                               Message rows only after retention is approved
 ```
 
@@ -121,7 +128,7 @@ error message is replaced with `[key]` before it can be stored.
   No stack trace, no provider detail beyond the plain classification.
 - Every attempt writes a `UsageEvent`, including failed attempts.
 
-## 5. Knowledge and retrieval (Module 2; K1–K2 built, K3 planned)
+## 5. Knowledge and retrieval (Module 2; K1–K3 built)
 
 ### 5.1 Built in K1 — documents, storage and scope
 
@@ -162,38 +169,120 @@ switch: an admin can prepare the knowledge base, and prove the pipeline, while c
 extraction quality depends on the file; and the embedding model must stay stable per document —
 changing it flags every affected document **Needs re-index**.
 
-### 5.3 Planned (K3) — ranking and answers
+### 5.3 Built in K3 — hybrid retrieval and answers
 
 ```
 question
   │
-  ├─ policy scope (public / role / class)  ← applied as a database filter FIRST
-  ▼
-eligible chunks only
+  ├─ mask PII; safeguarding screen (a hit stops here)  ← none of the rest runs
   │
-  ├─ embedding of the question (same model the chunks were indexed with)
-  ├─ cosine similarity in process (portable) or pgvector (later)
+  ├─ scope: audience built from the same code a real reader uses
+  │        (role + sorted class ids + visible shelves)  ← database filter FIRST
   ▼
-top N (6) chunks, de-duplicated, with document title + id
+eligible, READY, non-stale passages only
+  │
+  ├─ embed the masked question (one embedding call, cached 30 days by model+text)
+  ├─ vector ranking: cosine(question, passage) in Python, per passage
+  ├─ keyword ranking: weighted term frequency over passage text
+  ├─ merge with reciprocal rank fusion (RRF)
+  ▼
+top 5 passages with label S1…S5, title, heading and both scores
+  │
+  ├─ weak result → refusal, NO chat call, gap recorded
+  ▼
+system prompt + fenced SOURCES (data, never instructions) + fenced masked question
   │
   ▼
-prompt: numbered SOURCES block, answer must cite [S1], [S2]
+one chat call → citation check (unknown markers stripped, valid ones kept)
+  │
+  ├─ no valid citation, or a figure not in the cited text → UNVERIFIED
+  │        └─ never shown to a reader; fixed refusal used instead; gap recorded
+  ▼
+verified answer + citations (and the answer cached for 1 hour, re-validated on read)
 ```
 
-Rules:
-- **Scope before ranking.** A chunk the asker may not see never enters the candidate set, however
-  well it would rank. `visible_documents()` still runs first and K3 may not widen its result.
-- **Embedding model is pinned to the chunk.** Every chunk stores its embedding model and dimension.
-  Retrieval only considers chunks embedded with the current model; stale documents are ignored rather
-  than compared.
-- **Portable storage first.** Embeddings are stored as JSON float arrays in the database. Ranking is
-  cosine similarity computed in Python. At school scale (thousands, not millions, of chunks) this is
-  one to two seconds at worst and needs no new service, no extension and works on SQLite.
-- **pgvector is the upgrade path, not the start.** The selector's signature is
-  `search(scope, query_vector, limit)`; a pgvector implementation can replace the body later without
-  touching services or views.
-- **Citations are mandatory.** If no chunk clears the relevance floor, the assistant says so and does
-  not improvise.
+**Named constants, one place.** `knowledge/retrieval.py` holds `TOP_K = 5`, `MIN_SCORE = 0.30`,
+`MAX_QUESTION = 4000`, `RRF_K = 60` and `KEYWORD_DIGIT_WEIGHT = 3.0`. A comment there states plainly
+that scores are **not comparable across embedding models**: `MIN_SCORE` only means something for the
+model in use, it is a conservative floor rather than a tuned value, and K4 calibrates it and the
+weights on the school's evaluation set with **real** embeddings. The fake provider's numbers are
+meaningless for calibration.
+
+**Method — hybrid search.** The two rankings are built from the same already-scoped passages:
+
+- **Vector ranking.** Cosine similarity between the question embedding and each passage embedding.
+  Only passages embedded with the current model and dimension are compared; stale documents are
+  excluded before scoring.
+- **Keyword ranking.** Simple term-frequency over the passage text. Text is tokenised on letters,
+  digits and apostrophes, lower-cased and split identically for English and Kiswahili; a short
+  stopword list in both languages is dropped. A token containing a digit (a fee amount, a date part,
+  a class number) counts **three times**, because an exact figure matters more than a vague match.
+- **Merge.** Reciprocal rank fusion: each passage scores `1/(60 + position)` in each list it appears
+  in, and the two scores are summed. RRF uses only order, so a keyword hit lifts a passage the
+  vectors missed, and a passage strong in both rises above one strong in only one.
+
+This is what makes *"Grade 4 term fee"* retrieve the passage with that exact class and figure even
+when a semantically similar passage about a different class scores higher on the vector side. A test
+builds exactly that case with patched scores and proves the exact figure wins.
+
+**Scope is never widened.** `scope.scoped_documents()` is applied as a database filter first, and
+retrieval may only rank what it returned. Passages carry no audience of their own, so a cached or
+hand-edited row cannot drift away from its document. A hand-edited public document on a signed-in
+shelf is refused by the same filter.
+
+**Refusal.** If the best vector score is below `MIN_SCORE` **and** no keyword token matches, retrieval
+returns a refusal with **no sources at all** (so a caller cannot use passages from a refused search),
+no chat call is made, and a `KnowledgeGap` with reason `no_match` records the masked question, the
+audience shape, the language guess and the top score.
+
+**Citations and the figure check.** Unknown markers such as `[S9]` are stripped; valid ones are kept
+and each resolves to a passage id, document id and title. Every number, amount, date part and time
+part in the answer must appear in the text of the passages it cited (commas are ignored; numbered
+list markers such as `1.` are not figures). A missing valid citation, an empty answer, or any
+unmatched figure marks the answer **unverified**. `knowledge/answers.py::deliver()` is the only
+function a user-facing screen may use, and it **never returns an unverified answer**: it returns the
+fixed refusal instead. The answer desk shows the raw answer, the warning and the exact figure problems
+so the admin can see why; the *"what a reader would receive"* panel shows the refusal.
+
+**Honest limit of the check.** It proves that each cited figure exists in the cited text. It does not
+prove the sentence around the figure is a fair summary, that a claim without a figure is supported, or
+that a true figure was used for the right point. It is a guard against invented money and dates, not a
+proof of correctness. K4's question set is what measures correctness.
+
+**Refusal wording.** Fixed English and Kiswahili lines in `answers.py` (`REFUSAL_EN`, `REFUSAL_SW`),
+school contact first, both marked **DRAFT** for the school's review; the answer desk displays them.
+
+**Answer desk (admin).** `/assistant/knowledge/answer-desk/`. The admin picks an audience (Visitor,
+Parent, Student, Teacher, Finance, Director, Admin), optional class ids and an optional provider, and
+asks. The view builds the audience with `scope.audience_for_preview()` — the **same** `Audience`
+object a real reader gets — and runs the same `answer_question()` code. There is no admin branch in
+visibility or retrieval. Tests prove a Visitor preview never returns a signed-in document, a Parent
+of class A never returns class B material, and a Student never returns Finance or Teacher shelves.
+Desk asks are `Profile.CONSOLE` usage, and any gap they record is `is_test=True` so it never pollutes
+the real gap picture. A safeguarding hit shows the rule, the safe reply and exactly who would be
+alerted — and sends **no** alert and **no** email; a test proves no alert row and no notification.
+
+**Per-document check.** On the document page, *"Test this document"* scores that document's own
+passages by the same hybrid method. The question embedding is the **only** provider call; no answer is
+generated, and the page says so. Disabled until the document is READY, and blocked while its
+personal-data scan is unresolved.
+
+**Personal data in documents.** Extraction is followed by a heuristic scan
+(`knowledge/personal_data.py`) for emails, Kenyan phones, ID/admission-like numbers and likely person
+names next to pupil/parent words. Findings record the kind, heading, passage number and a **masked**
+snippet — every other finding in the snippet window is masked too, and the raw value is never stored.
+A document with findings cannot be approved or embedded until an admin records the required
+confirmation (who, when, and the exact wording); the upload/paste screens carry the warning. The
+scan is a heuristic and says so; the confirmation, not the scan, is the decision point. Exactly what
+ingestion sends is documented in [security-and-privacy.md](security-and-privacy.md).
+
+**Gaps.** `KnowledgeGap` stores only the masked question, the previewed role, the sorted class ids,
+a language hint, the reason, the top score, and — for test tools — `is_test`. No user, IP or session
+is stored. The admin can resolve (with a note) or delete any gap. Resolved gaps are proposed for
+erasure **90 days after resolution** (`GAP_RETENTION_DAYS = 90`); that period is **DRAFT** and no
+scheduled job deletes anything until it is approved.
+
+**Answer cache.** See section 11 for the exact key and read-time re-validation rules.
 
 ## 6. Tools (Module 4, designed now)
 
@@ -313,11 +402,18 @@ Handoff is never silent.
 
 ## 9. Budgets, limits, kill switch (built)
 
-Enforced in `gateway.generate()` before any provider call, in this order:
+Enforced in the gateway before any provider call, in this order:
 
-1. **Global switch** — `AssistantSettings.enabled` (default OFF), plus `public_enabled` and
-   `signed_in_enabled` (both default OFF). The console profile `UsageEvent.Profile.CONSOLE` is
-   exempt so an admin can prove a provider works while the assistant is off.
+0. **Kill switch** — `AssistantSettings.kill_switch` (default OFF) stops **everything**: the live
+   assistant, the admin answer desk, the provider test console and background reading. It is checked
+   before every other switch and limit and always wins.
+1. **Live switches** — `AssistantSettings.enabled` (default OFF), plus `public_enabled` and
+   `signed_in_enabled` (both default OFF). The admin answer desk and the provider console are
+   **exempt** from these and from the rate limits below, so an admin can prove a provider and the
+   knowledge base before go-live. They are **not** exempt from the kill switch or from their own
+   console limits: `console_daily_limit` (default 50 requests/day across both desks) and
+   `console_monthly_budget_ksh` (default KSh 500, separate from the site-wide budget). Both are
+   admin-editable on the settings screen.
 2. **Rate limit** (`limits.py`) — signed-in users: `daily_message_limit` per user per day (default
    20). Public visitors: a **signed cookie** identifies the visitor (10 questions/day/visitor by
    default), the client IP is a backstop (30/day/IP), and a site-wide ceiling caps the whole public
@@ -325,15 +421,16 @@ Enforced in `gateway.generate()` before any provider call, in this order:
    cache counters, so a redeploy cannot reset the day; the day boundary is Nairobi time.
 3. **Budget** — month-to-date spend per provider and overall, against the admin's KSh ceiling.
    Estimated worst-case cost of this call is reserved before the call; if it would cross the line the
-   call is refused with a plain message. Per-provider cap is optional.
+   call is refused with a plain message. Per-provider cap is optional. Console calls are priced and
+   recorded like any other, but counted against the console ceiling rather than the site-wide budget.
 4. **Provider circuit state** — an open circuit skips straight to the fallback list.
 
 Costs come from prices the admin enters per provider (USD per million tokens) and a USD→KSh rate in
 settings. Every call writes a `UsageEvent` with tokens, estimated cost, latency, provider, model,
 outcome and the policy profile; never the key or the message. Usage rows are the ledger budgets read.
 
-The global kill switch stops new conversations immediately; in-flight calls are allowed to finish or
-time out.
+The kill switch stops new calls from every path at once; in-flight calls are allowed to finish or time
+out. The live switches stop new conversations for their audience while leaving the desks usable.
 
 Why not per-IP alone: on Kenyan mobile networks thousands of people share one carrier NAT address, so
 a per-IP-only limit would either turn away a whole school's worth of visitors after 30 questions or be
@@ -367,14 +464,33 @@ production, locmem locally).
 | Key | Value | TTL |
 |---|---|---|
 | `assistant:settings` | settings row + provider list | 60 s, invalidated on save |
-| `assistant:embed:<sha256(text)>:<model>` | embedding vector | 30 days |
-| `assistant:retrieval:<hash(question, scope, knowledge_version)>` | top chunks | 10 min |
+| `assistant:qembed:<sha256(model signature, masked question)>` | question embedding vector + model + dimension | 30 days |
+| `assistant:retrieval:<sha256(audience signature, question, model signature, knowledge version)>` | ranked passage ids with vector, keyword and merged scores; top scores; refusal reason | 10 min |
+| `assistant:answer:<sha256(audience signature, visible collection ids, sha256(masked question), model signature, knowledge version)>` | answer text, citation ids/titles, verified/refused flags, top scores, language | 1 hour |
 | `assistant:circuit:<provider_id>` | breaker state | 5 min |
 | `assistant:rate:<scope>:<id>:<day>` | counters | until end of Nairobi day |
-| Public FAQ answer | answer + citations | 1 hour, busted on knowledge change |
 
-Cached answers never bypass guardrails for the individual asker: the input screen runs before the
-cache lookup, and the cache key includes the policy profile.
+**Cache keys are hashes only.** No question text, role or class list appears in a key.
+
+**A cached answer can never cross an audience.** The audience signature is the role **and** the sorted
+class ids; the key also includes the ids of the collections visible to that audience at the time, the
+embedding-model signature and a knowledge version counter. A cached answer for class A is therefore
+never served to class B or to a different role. Tests cover a different class, a different role and a
+changed collection set.
+
+**Effective dates are checked at read time, not left to the TTL.** The chosen rule is: cached rows
+store passage **ids and scores**, and every cached id is re-hydrated through the live scope query
+(`retrieval.visible_chunk_map`) before it is used. A document that has passed its end date (or was
+unapproved, archived or marked stale) is dropped even though the cache still holds its id; if any
+cited passage is gone, the whole cached answer is discarded and the question runs again. Cached
+retrieval does the same, so an expired passage never influences a ranking. A cached refusal is safe
+to reuse because it contains no passages.
+
+**No private data in cache values.** A stored answer holds the answer text, citation labels/ids/titles,
+the verified/refused flags, the top scores and a language hint — and nothing about the asker: no user
+id, no IP, no session, and **not the question** (typed or masked). Retrieval values hold passage ids
+and numbers only. Safeguarding screening runs **before** any cache lookup, so a cached answer can
+never bypass it for the individual asker.
 
 ## 12. Scaling: what runs where, and when to split
 
@@ -430,11 +546,11 @@ Verified 2026-11-18:
 
 ## 14. Data model overview
 
-Built (twelve tables, see [data-model.md](data-model.md)): `AssistantSettings`, `ProviderConfig`,
+Built (thirteen tables, see [data-model.md](data-model.md)): `AssistantSettings`, `ProviderConfig`,
 `UsageEvent`, `CustomGuardrailRule`, `SafeguardingAlert`, `AssistantJobFailure`, plus the four
 knowledge catalogue tables `KnowledgeCollection`, `KnowledgeDocument`, `KnowledgeDocumentVersion` and
-`KnowledgeQAPair`, and the two K2 tables `KnowledgeChunk` (text, heading path, JSON embedding, model,
-dimension) and `KnowledgeIngestRun` (one row per attempt).
+`KnowledgeQAPair`, the two K2 tables `KnowledgeChunk` (text, heading path, JSON embedding, model,
+dimension) and `KnowledgeIngestRun` (one row per attempt), and the K3 table `KnowledgeGap`.
 
 - The **mandatory safeguarding rule pack is not a table** — it lives in
   `guardrails/mandatory.py`, versioned in code, so no admin screen or database edit can weaken it.
@@ -446,6 +562,10 @@ dimension) and `KnowledgeIngestRun` (one row per attempt).
   raises, and the admin download route is the only read path.
 - Audience roles are a canonical pipe-wrapped string so the scope filter is plain SQL on SQLite and
   PostgreSQL alike.
+- `KnowledgeGap` holds only the masked question, role, sorted class ids, language hint, reason, top
+  score and test flag; no user, IP or session.
+- Documents carry a personal-data scan state and the finding locations (kind, heading, passage,
+  masked snippet), plus who confirmed, when, and the exact wording they agreed to.
 
 Planned, in order of module:
 - **Conversations and handoffs (Module 3):** `Conversation`, `Message`, `HandoffRule`, `Handoff` and
@@ -458,10 +578,14 @@ Planned, in order of module:
 | Keys encrypted, masked, never logged | `crypto.py`, provider services, forms (`render_value=False`), tests asserting absence |
 | Tests never call a real provider | `providers/fake.py`; registry refuses real kinds without an adapter |
 | Safeguarding cannot be disabled | `guardrails/` mandatory pack; no setting reads it; service always calls it |
-| Scope filtering before ranking | `knowledge/scope.py::visible_documents()` — built in K1; retrieval must call it and may not re-expand the set |
+| Scope filtering before ranking | `knowledge/scope.py::scoped_documents()` — K3 retrieval calls it and may not re-expand the set; the answer desk builds the reader's `Audience` with the same function |
+| Unverified answers never reach a reader | `knowledge/answers.py::deliver()` returns the fixed refusal unless the answer is verified; the chat module must call it, not read `answer.answer` |
+| A cached answer cannot outlive its audience or an effective date | Hashed key over role + sorted classes + visible shelves + model + knowledge version; `visible_chunk_map()` re-checks every cached passage at read time |
+| Personal data is not embedded without a decision | `personal_data.record_scan()` at extraction; approval blocked while `pii_blocks_embeddings`; `ingest` refuses; confirmation records who/when/wording |
+| The kill switch always wins | `gateway.call_chain()` / `embed_chain()` check `kill_switch` before console or live logic |
 | Knowledge files are never public | `KnowledgeStorage.url()` raises; the only read route is the admin download view (attachment, `nosniff`, audited) |
 | No other person's data | tool permission checks in services; asker identity from session |
-| Documents are data | prompt assembly fences DATA; output check for prompt echo |
+| Documents are data | prompt assembly fences SOURCES and the question; injection tests cover a hostile document and a hostile question |
 | Sensitive actions audited | `core.audit_log.log_action`, the same path Module 1 already uses |
 | New switches default OFF | model defaults and forms |
 
@@ -503,3 +627,20 @@ The user approved the design with the changes below; Module 1 Step 2 builds to t
 | Embedding storage | JSON float arrays, as decided in K1; no pgvector, no local model |
 | Re-index trigger | Status and shelf saves queue or purge automatically; a provider embedding-model change flags documents **Needs re-index**; a manual action and command are available |
 | Ingestion and switches | Ingestion uses the budget but does **not** require the assistant's global switch, so the base can be prepared before go-live |
+
+### Module 2 K3 — approved 2026-11-18
+
+| Decision | Ruling |
+|---|---|
+| Test place | The admin **answer desk** is where an admin tries real questions and previews each audience |
+| Audience preview | The preview calls the **same** scope and retrieval code a real reader uses; no admin bypass or special case. Tested: Visitor never sees signed-in material, Parent of class A never sees class B, Student never sees Finance or Teacher shelves |
+| Relevance knobs | `TOP_K`, `MIN_SCORE`, `MAX_QUESTION` are named constants in one place with a comment that scores differ by model; the top score and each source's score are recorded with every answer and gap; K4 calibrates on real embeddings |
+| Hybrid search | Vector ranking plus a keyword term-frequency ranking (English/Kiswahili tokenising, case and punctuation insensitive, digit tokens weighted 3×), merged with reciprocal rank fusion; tested that an exact "Grade 4 term fee" passage beats a semantically similar different one |
+| Uncited answers | Unknown citation markers stripped; a missing valid citation **or** a figure absent from the cited text marks the answer **unverified**; an unverified answer is never shown to a reader — the fixed refusal is used |
+| Gaps | Only role, class signature, language hint, date and the masked question are stored; admin may delete any gap; resolved gaps proposed for erasure after **90 days (DRAFT)** |
+| Answer cache | Keys are hashes including role, sorted class ids and visible collection ids; cached passages are re-validated against live scope and effective dates at read time (chosen over short TTLs); values hold no question and no asker data |
+| Per-document check | One provider call — the question embedding — and no answer generation; stated on the screen |
+| Refusal wording | Fixed English and Kiswahili lines, school contact first, marked **DRAFT** |
+| Console exemption | The answer desk and provider console are exempt from the live switches but **not** from the kill switch or their own daily cap (default 50) and monthly ceiling (default KSh 500), both admin-editable. This changed the existing provider console's behaviour: it was previously exempt from budgets |
+| Safeguarding in test tools | Show the rule, safe reply and who would be alerted; send **no** real alert or email; mark created gaps as tests |
+| Personal data in documents | Scan before embedding, list findings with heading/passage and a masked snippet, require an admin confirmation (who, when, wording) before approval or embedding, warn on the upload screen |

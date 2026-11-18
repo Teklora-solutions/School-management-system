@@ -16,7 +16,7 @@ from django.db import transaction
 
 from apps.core.audit_log import log_action
 
-from . import crypto, gateway, limits, selectors
+from . import alerts, crypto, gateway, limits, selectors
 from .guardrails import build_messages, build_safe_reply, mask_text, screen
 from .models import (
     AssistantSettings,
@@ -190,12 +190,14 @@ def delete_provider(*, provider: ProviderConfig, actor=None, request=None) -> No
 def _mark_stale_embeddings() -> None:
     """Flag passages embedded by a model that is no longer in service."""
     from .knowledge import ingest as knowledge_ingest
+    from .knowledge import versions
 
     models = {
         (provider.embedding_model_name or "").strip()
         for provider in ProviderConfig.objects.filter(is_active=True)
     }
     knowledge_ingest.mark_stale_for_models({model for model in models if model})
+    versions.bump()
 
 
 def test_provider(*, provider: ProviderConfig, actor=None, request=None):
@@ -230,6 +232,7 @@ class ConsoleResult:
     rules_fired: list[str] = field(default_factory=list)
     categories: list[str] = field(default_factory=list)
     safe_reply: str = ""
+    alert_preview: dict = field(default_factory=dict)
     provider_name: str = ""
     answer: str = ""
     latency_ms: int = 0
@@ -242,9 +245,9 @@ class ConsoleResult:
 def run_console(*, question: str, provider_id: int | None, actor=None) -> ConsoleResult:
     """
     The admin test console. No real user data, no alert rows are created, and
-    the safeguarding screening still runs first. The console is exempt from
-    budget and rate limits so a provider can be checked before go-live; its
-    usage is still recorded.
+    the safeguarding screening still runs first. The console is exempt from the
+    live public/signed-in switches and the site budget, but the stop switch and
+    its own daily and monthly limits always apply; its usage is still recorded.
     """
     settings_row = AssistantSettings.load()
     custom = list(selectors.custom_rules_active())
@@ -259,6 +262,7 @@ def run_console(*, question: str, provider_id: int | None, actor=None) -> Consol
             rules_fired=screening.rule_ids,
             categories=screening.categories,
             safe_reply=build_safe_reply(settings_row),
+            alert_preview=alerts.would_notify(settings_row),
             provider_name="(not called)",
         )
 

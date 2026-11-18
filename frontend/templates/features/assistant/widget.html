@@ -1,0 +1,133 @@
+{% load static core_extras assistant_widget %}
+{% comment %}
+  The public chat widget (Module 3, CP3). Mounted once, from public/base.html.
+
+  ``widget_available`` reads the same switches the endpoint does, from a value
+  cached for a minute and cleared when the settings are saved. With the widget
+  switched off — the default for a new school — this file renders nothing at
+  all: no markup, no stylesheet, no script, no state request. The launcher also
+  starts hidden and is only revealed once /assistant/chat/state/ has answered,
+  so a visitor never sees a button that cannot work. All words that come from
+  the server are written with textContent by assistant_widget.js; nothing from
+  a visitor or a provider is ever set as HTML.
+{% endcomment %}
+{% widget_available as widget_on %}
+{% if widget_on %}
+<div class="aw" id="assistant-widget"
+     data-state-url="{% url 'assistant:chat_state' %}"
+     data-send-url="{% url 'assistant:chat_send' %}"
+     data-new-url="{% url 'assistant:chat_new' %}"
+     data-feedback-url="{% url 'assistant:chat_feedback' %}"
+     data-callback-url="{% url 'assistant:chat_callback' %}"
+     data-school="{{ SCHOOL_NAME|default:'the school'|escapejs }}">
+
+  <button type="button" class="aw-launcher" id="aw-launcher"
+          aria-label="Ask the school" data-i18n-label="askSchool"
+          aria-expanded="false" aria-controls="aw-panel" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.9 8.9 0 0 1-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5Z"/>
+      <path d="M8.5 11.5h.01M12.5 11.5h.01M16.5 11.5h.01"/>
+    </svg>
+    <span class="aw-launcher__label" data-i18n="askSchool">Ask the school</span>
+  </button>
+
+  <section class="aw-panel" id="aw-panel" role="dialog"
+           aria-labelledby="aw-title" hidden>
+    <header class="aw-head">
+      <div>
+        <h2 class="aw-title" id="aw-title">{{ SCHOOL_NAME|default:"The school" }} assistant</h2>
+        <p class="aw-subtitle" data-i18n="aiNotice">AI assistant — not a person</p>
+      </div>
+      <div class="aw-head__actions">
+        <button type="button" class="aw-iconbtn" id="aw-lang"
+                aria-label="Switch to Kiswahili" data-i18n-label="switchToSw">SW</button>
+        <button type="button" class="aw-iconbtn" id="aw-close"
+                aria-label="Close the chat" data-i18n-label="closeChat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" aria-hidden="true" focusable="false">
+            <path d="M6 6l12 12M18 6L6 18"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <p class="aw-consent" id="aw-consent" hidden></p>
+
+    <div class="aw-log" id="aw-log" role="log" aria-live="off"
+         aria-label="Conversation" tabindex="0"></div>
+    <p class="aw-status" id="aw-status" role="status" aria-live="polite"></p>
+
+    <div class="aw-suggests" id="aw-suggests" hidden>
+      <p class="aw-suggests__label" data-i18n="tryAsking">Try asking</p>
+      <div class="aw-chips" id="aw-chips"></div>
+    </div>
+
+    <div class="aw-callback" id="aw-callback" hidden>
+      <form id="aw-callback-form" novalidate>
+        <h3 data-i18n="callbackTitle">Ask the school to contact you</h3>
+        <p data-i18n="callbackHelp">
+          Leave your details and a member of staff will get back to you. Only the
+          school office can see them.
+        </p>
+        <p id="aw-callback-purpose" lang="en"></p>
+        <label class="aw-field">
+          <span data-i18n="nameLabel">Your name</span>
+          <input type="text" name="name" id="aw-callback-name" autocomplete="name"
+                 maxlength="120" required>
+        </label>
+        <label class="aw-field">
+          <span data-i18n="phoneLabel">Phone number</span>
+          <input type="tel" name="phone" id="aw-callback-phone" autocomplete="tel"
+                 maxlength="40" inputmode="tel">
+        </label>
+        <label class="aw-field">
+          <span data-i18n="emailLabel">Email address</span>
+          <input type="email" name="email" id="aw-callback-email" autocomplete="email"
+                 maxlength="200">
+        </label>
+        <div class="aw-hp" aria-hidden="true">
+          <label for="aw-callback-website">Website</label>
+          <input type="text" name="website" id="aw-callback-website" tabindex="-1"
+                 autocomplete="off">
+        </div>
+        <p id="aw-callback-msg" role="status" aria-live="polite" tabindex="-1"></p>
+        <div class="aw-callback__actions">
+          <button type="submit" class="aw-primary" id="aw-callback-send"
+                  data-i18n="sendRequest">Send request</button>
+          <button type="button" class="aw-linkbtn" id="aw-callback-cancel"
+                  data-i18n="cancel">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <form class="aw-composer" id="aw-composer" autocomplete="off">
+      <div class="aw-hp" aria-hidden="true">
+        <label for="aw-website">Website</label>
+        <input type="text" name="website" id="aw-website" tabindex="-1"
+               autocomplete="off">
+      </div>
+      <label class="aw-sr" for="aw-input" data-i18n="yourQuestion">Your question</label>
+      <textarea id="aw-input" name="message" rows="1" maxlength="1000"
+                enterkeyhint="send" data-i18n-placeholder="placeholder"
+                placeholder="Type your question"></textarea>
+      <button type="submit" class="aw-send" id="aw-send">
+        <span class="aw-sr" data-i18n="send">Send</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M4 12l16-8-6 16-3-6-7-2Z"/>
+        </svg>
+      </button>
+    </form>
+
+    <footer class="aw-foot">
+      <button type="button" class="aw-linkbtn" id="aw-person"
+              data-i18n="talkToPerson">Talk to a person</button>
+      <button type="button" class="aw-linkbtn" id="aw-new"
+              data-i18n="startAgain">Start again</button>
+    </footer>
+  </section>
+</div>
+<link rel="stylesheet" href="{% static_v 'css/assistant_widget.css' %}">
+<script src="{% static_v 'js/assistant_widget.js' %}" defer></script>
+{% endif %}

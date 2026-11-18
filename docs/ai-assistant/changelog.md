@@ -1,5 +1,214 @@
 # Changelog
 
+## 2026-11-18 — Module 3, CP3: the public chat widget
+
+**Added**
+
+- **Widget markup** (`frontend/templates/features/assistant/widget.html`): one launcher, a dialog
+  panel with the school name, the "AI assistant — not a person" notice, a language switch, the consent
+  paragraph, the conversation log, suggestions, a callback form and a composer. All visitor- and
+  provider-supplied words are written with `textContent`; the script has no way to inject markup.
+- **Mount gate** (`templatetags/assistant_widget.py`, `models.WIDGET_GATE_CACHE_KEY`): the template is
+  included once, from `public/base.html`, but renders nothing unless `chat.off_reason()` is clear. The
+  answer is cached for 60 seconds and cleared by `AssistantSettings.save()`, so a switched-off school
+  ships no markup, stylesheet or script and public pages pay at most one settings query per minute.
+- **Styles** (`frontend/static/css/assistant_widget.css`): built on the public site's `--pub-*` tokens
+  (light and dark), a phone-first full-screen panel and a desktop card, 44px touch targets, visible
+  focus rings, `prefers-reduced-motion` and forced-colors handling. No external fonts, icons or CDNs;
+  the launcher and buttons use inline SVG.
+- **Behaviour** (`frontend/static/js/assistant_widget.js`): vanilla, no libraries. Fetches the widget
+  state, solves the proof of work in small slices, streams the reply from `chat/send/` as SSE (JSON
+  fallback), reuses the visitor's language from `localStorage`, offers the suggestions, attaches
+  helpful / not helpful / report controls with an optional reason, opens the callback form, starts a
+  new conversation, hides itself if the state reports the widget off mid-session, and announces each
+  finished reply through the polite status region.
+- **Tests**: 20 in `tests/test_widget_ui.py` — off by default; each gate alone keeps it off; mounted on
+  all five public pages; never on staff dashboards; saving settings clears the cached decision; one
+  settings query per minute (none on the next render); the base template includes it exactly once; no
+  dashboard shell mounts it; no HTML-writing APIs; no external URLs; labelled dialog, log, status and
+  launcher (including at phone widths, where its visible label is hidden); honeypots match the views;
+  keyboard entry and Escape; no inline styles; the script speaks the server event names; both
+  languages define the same words; suggestions drawn on first load; feedback chips named from the
+  language pack.
+
+**Fixed during the browser check** (all found on a throwaway database copy):
+
+- the launcher had no accessible name at ≤640px because its label is hidden and the SVG is
+  `aria-hidden`; it now carries `aria-label` / `data-i18n-label` so it stays named and translates;
+- the suggested questions were hidden on first load because only a language switch redrew them;
+- feedback chip labels were created from already-translated text and went blank after language
+  tagging; they are now drawn from the language pack and update in place.
+
+**Migration.** None. `makemigrations --check` reports no changes.
+
+**Results (2026-11-18)**: `apps/assistant` **502 passed, 0 failed**. Full suite **3036 passed,
+4 failed** — the two known `PromotionTests`, `test_public_layout_loads_the_local_icon_stylesheet`, and
+`apps/core/tests/test_static_version.py::test_login_page_requests_a_fresh_copy_of_the_stylesheet`
+(expects `css/base.css?v=`; the concurrently edited `frontend/templates/auth/login.html` loads
+`css/public_new.css`). No assistant test fails.
+
+**Browser check** (isolated copy, fake provider, desktop shell resized to 531px): launcher named and
+translated, panel opened, consent and opening shown, suggestions rendered, a suggested question sent
+and answered with the honest refusal and both languages, feedback sent with a reason, language
+switched to Kiswahili (chrome, screen-reader labels and chips all changed), callback form completed
+and stored with the server-written purpose, reload restored the conversation, "Start again" cleared
+it and redrew the suggestions. **Not confirmed there**: the desktop-width panel (the browser window
+was 531px wide) and a real-provider answer with citations (only the fake adapter was configured, so
+every answer took the refusal path). The refusal line names the school from School Settings, which
+read "My School" on the copy while the public pages showed demo content — a data difference in the
+copy, not code.
+
+**Not in this step**
+
+- No handoff rules or routing (CP4), no human inbox, takeover or SLA (CP5).
+- No deletion, export or retention command for chat data (CP6).
+- Consent wording is still DRAFT; its approval name and date are placeholders until go-live.
+
+## 2026-11-18 — Module 3, CP2: the public chat backend
+
+**Added**
+
+- **Public chat service** (`apps/assistant/chat.py`): one gate for the whole widget (`off_reason()`:
+  kill switch → `enabled` → `public_enabled` → `widget_enabled` → approved consent wording →
+  `public_visitor_daily_limit`), conversation and message serialisation, `begin()` (honeypot → proof of
+  work → clean → length cap → per-visitor/IP/site limits → mask → store), `complete()` (the K3 answer
+  pipeline with the Public audience and `Profile.PUBLIC`), `start_new_conversation()`,
+  `record_feedback()` and `request_callback()`.
+- **Widget endpoints** (`apps/assistant/chat_views.py`): `chat/state/`, `chat/send/`, `chat/new/`,
+  `chat/feedback/` and `chat/callback/`. They accept JSON or form posts, are CSRF-protected, answer
+  `Cache-Control: no-store`, and set the signed visitor cookie only when it is new.
+- **Streaming**: `chat/send/` answers as server-sent events (`status`, `start`, `delta`, `done`) when
+  asked. The reply is **verified before the first text is sent**; provider tokens are never relayed.
+  JSON clients get the same verified text in one payload.
+- **Visitor identity without tracking**: a signed `assistant_visitor` cookie (30 days, httponly,
+  SameSite=Lax) holds a random key; only its SHA-256 hash is stored on the conversation. No IP address
+  is stored on a conversation, message or callback row.
+- **Cheap proof of work** (`apps/assistant/pow.py`): SHA-256 over a cached, single-use challenge bound
+  to the visitor digest (`DIFFICULTY = 4` leading hex zeros, 10-minute life), used only when
+  `widget_pow_enabled` is on.
+- **Safeguarding stays mandatory for visitors**: a real hit on a public message creates a
+  `SafeguardingAlert` with the masked question, and only the safe reply is returned. Honeypot and PoW
+  refusals never reach the model.
+- **Limits**: one key per request (`limits.get_visitor_key`/`ensure_visitor`) so a first-time visitor's
+  check and count use the same key; the site-wide ceiling remains the cost backstop.
+- **Private data by default**: visitor messages are stored masked (`body = body_masked`); callback
+  details are the one consented exception, with a server-written purpose sentence naming the retention
+  period. Feedback reasons are capped and tied to the visitor's own assistant message.
+- **Tests**: 52 new in `tests/test_public_chat.py` (default-off, gating by each switch and consent,
+  honeypot, PoW success/failure/replay, length caps, visitor/IP/site limits, usage recording, verified
+  and refused answers, safeguarding alert, Kiswahili detection, cookie properties and hashing, SSE
+  framing, feedback ownership, callback limits and dedupe, CSRF).
+
+**Migration.** None. CP2 adds no model fields; `0006` was applied earlier the same day after a
+separate go.
+
+**Results (2026-11-18)**: `apps/assistant` **482 passed, 0 failed**. Full suite **3016 passed,
+4 failed** — the two known `PromotionTests`, `test_public_layout_loads_the_local_icon_stylesheet`, and
+`apps/core/tests/test_static_version.py::test_login_page_requests_a_fresh_copy_of_the_stylesheet`,
+the last of which expects `css/base.css?v=` and now receives `css/public_new.css` from the
+concurrently edited `frontend/templates/auth/login.html` (written 19:04 today, outside this module).
+No assistant test fails.
+
+**Not in this step**
+
+- No widget interface yet (CP3): nothing is rendered on the public site.
+- No handoff rules, inbox, takeover or SLA (CP4–CP5).
+- Consent wording is still DRAFT and its approval name and date are placeholders until go-live.
+
+## 2026-11-18 — Module 2, K3: hybrid retrieval, answers, the answer desk and gaps
+
+**Added**
+
+- **Hybrid retrieval** (`knowledge/retrieval.py`): a vector ranking (cosine over in-process JSON
+  embeddings) and a keyword ranking (weighted term frequency, English/Kiswahili tokenising, case and
+  punctuation insensitive, digit tokens weighted three times) merged with reciprocal rank fusion
+  (`RRF_K = 60`). Named constants in one place: `TOP_K = 5`, `MIN_SCORE = 0.30`, `MAX_QUESTION = 4000`.
+  A comment records that scores are not comparable across embedding models and that K4 calibrates them
+  with real embeddings. Scope is applied as a database filter **before** any ranking; only READY,
+  non-stale passages embedded with the current model are scored. Weak results are refused **with no
+  sources attached**, so a caller cannot use passages from a refused search.
+- **Answer pipeline** (`knowledge/answers.py`): safeguarding screen → retrieval → refusal check →
+  fenced sources and masked question → one chat call → citation check. Unknown citation markers are
+  stripped. `figure_check()` requires every number, amount, date part and time part in the answer to
+  appear in the text of the cited passages. A missing valid citation, an empty answer or any unmatched
+  figure marks the answer **unverified**. `deliver()` is the only reader-facing entry point and returns
+  the fixed refusal for anything unverified. `KnowledgeGap` rows are written for refusals and
+  unverified answers. The fixed refusal wording is in English and Kiswahili, school contact first, and
+  is marked **DRAFT**.
+- **Answer cache**: hashed keys over the audience signature (role + sorted class ids), the visible
+  collection ids, a hash of the masked question, the embedding-model signature and a knowledge version.
+  Cached passage ids are re-hydrated through the live scope and effective dates at read time (the
+  chosen rule over short TTLs), so an expired or unapproved document drops out even while cached.
+  Values hold no question and nothing about the asker. A cached refusal carries no passages.
+- **Answer desk** (`knowledge/views.py`, `knowledge/answer_desk.html`): ask as Visitor, Parent,
+  Student, Teacher, Finance, Director or Admin, with optional class ids and provider. The preview builds
+  the same `Audience` object a real reader gets and runs the same retrieval/answer code — no admin
+  bypass. Shows the reader-facing text, status, retrieval scores, citations, raw unverified answer and
+  figure problems, provider statistics, a safeguarding **preview** (rule, safe reply, who would be
+  alerted — nothing sent) and a gap notice. Desk usage is `Profile.CONSOLE`; desk gaps are tests.
+- **Per-document check**: **Test this document** on the document page scores that document's own
+  passages with the same hybrid method. The question embedding is the only provider call; no answer is
+  generated, and the page says so.
+- **Gaps screen**: open list with filter by state and an **Include test runs** toggle; resolve with a
+  note; delete any gap (with confirmation). Only the masked question, role, class signature, language
+  hint, reason, top score and test flag are stored. Resolved-gap erasure is proposed at **90 days**
+  (`GAP_RETENTION_DAYS = 90`, **DRAFT**; nothing is deleted automatically).
+- **Console controls (D9)**: a new `kill_switch` stops everything, including the answer desk, the test
+  console and ingestion. The desks are exempt from `enabled`, `public_enabled` and `signed_in_enabled`,
+  but have their own `console_daily_limit` (default 50 requests/day) and
+  `console_monthly_budget_ksh` (default KSh 500, separate from the site-wide budget). **This changes
+  the provider console's behaviour**: it used to be fully exempt from budgets, and now counts against
+  its own cap and ceiling (and still the kill switch). Both are admin-editable on the settings screen.
+- **Personal data in documents** (`knowledge/personal_data.py`): every document is scanned for emails,
+  Kenyan phones, ID/admission-like numbers and likely person names next to pupil/parent/guardian words
+  (English and Kiswahili), before anything is embedded. Findings record kind, heading, passage number
+  and a **masked** snippet (every finding in the window is masked, not only the reported one); the raw
+  value is never stored. A document with findings cannot be approved or embedded until an admin records
+  the required confirmation — who, when and the exact wording. The add/edit screens carry the warning
+  and say exactly what is sent. This adds fields to `KnowledgeDocument`.
+- **Tests**: 72 new — `tests/test_knowledge_answers.py` (39: tokenising, digit weighting, RRF lift, the
+  exact "Grade 4 term fee" case, audience/class scoping, expired/archived rows, figure and citation
+  checks, unverified handling, cache isolation and read-time expiry, Kiswahili, safeguarding,
+  prompt injection and fence escaping) and `tests/test_knowledge_desk.py` (33: desk access and the
+  three audience-preview cases, safeguarding preview with no alert/email, console caps and kill switch,
+  document check, personal-data scan/confirm gate, gaps).
+
+**Migration (read this).** `assistant/0005_assistantsettings_console_daily_limit_and_more` contains all
+K3 schema changes in one additive migration: nine added fields (`kill_switch`, the two console limits,
+and six document personal-data fields), a help-text change on `enabled`, and the new `KnowledgeGap`
+table with two indexes. `showmigrations` was run first, `sqlmigrate` was shown, the database was
+backed up, and `makemigrations --check` and `manage.py check` are clean. **However,
+`showmigrations assistant` already reported `0005` as applied on this workstation before the separate
+approval for applying it was given** — a concurrent tool runs migrations in this shared folder
+(recorded for `0004` as well). The change is additive only; nothing was dropped or altered. If you
+would rather revert it, `python manage.py migrate assistant 0004` is available and needs your explicit
+approval, because it drops the K3 columns and the gap table.
+
+**Results (2026-11-18)**: `apps/assistant` **381 passed, 0 failed** (re-run after the cache fix). Full
+suite **2913 passed, 6 failed** — the two known `PromotionTests`, plus four failures caused by the
+concurrent public-site template rewrite outside this module
+(`test_public_layout_loads_the_local_icon_stylesheet` and three `apps/public/tests/test_public_site.py`
+tests against `frontend/templates/public/base.html`). No assistant test fails. The full-suite failure
+count moved from 3 to 6 during this module because that concurrent work continued in the same shared
+folder; the assistant suite total was unchanged.
+
+**Results (2026-11-18, later — Module 3 CP1)**: `apps/assistant` **430 passed, 0 failed** (+49 new
+model and settings-form tests). Full suite **2965 passed, 3 failed** — the two known `PromotionTests`
+plus `test_public_layout_loads_the_local_icon_stylesheet`. The three `apps/public/tests/test_public_site.py`
+failures from earlier in the day are gone; the remaining styling failure is still in the concurrently
+edited `frontend/templates/public/base.html`, outside this module. Migration `0006` was **not** applied
+for this run; it was applied later the same day after a separate go (see Module 3 CP2 below).
+
+**Not in this step**
+
+- No public or signed-in chat screen; the answer desk is admin-only (Modules 3 and 4).
+- No evaluation set, scoring or first real results (K4); no calibration of `MIN_SCORE` or the weights
+  has been done, and with the fake provider the numbers would be meaningless.
+- No real provider call was made in building or testing this, and no real key exists in the repository.
+- No model-based second-layer safeguarding detection.
+- No automatic gap erasure; the 90-day period is a DRAFT proposal.
+- The consent wording remains DRAFT and is shown to nobody.
+
 ## 2026-11-18 — Module 2, K2: reading, chunking, embeddings and the ingestion worker
 
 **Added**

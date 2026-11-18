@@ -1,40 +1,29 @@
+{% extends "public/base.html" %}
 {% load static core_extras %}
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="robots" content="noindex">
-  <title>Temporarily blocked | {{ SCHOOL_NAME }}</title>
-  <link rel="stylesheet" href="{% static 'vendor/bootstrap/5.3.3/bootstrap.min.css' %}">
-  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">
-  <link rel="stylesheet" href="{% static_v 'css/base.css' %}">
-</head>
-<body>
 
-<div class="login-page">
-  <div class="login-card" style="text-align:center;">
+{% block title %}Temporarily Blocked | {{ identity.name|default:SCHOOL_NAME }}{% endblock %}
+{% block meta_description %}Sign-in temporarily blocked.{% endblock %}
 
-    <div class="login-logo">
-      <div class="login-logo-icon" style="background:linear-gradient(135deg,var(--color-danger),#b91c1c);">
-        <i class="bi bi-exclamation-octagon-fill" aria-hidden="true" style="color:#fff;"></i>
-      </div>
-      <h1 style="font-size:1.35rem;margin-bottom:0.25rem;">Too many sign-in attempts</h1>
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card" style="text-align:center">
+
+    <div class="auth-card__icon auth-card__icon--danger" style="margin:0 auto var(--pub-sp-4)">
+      <span class="pub-icon pub-icon--xl" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/></svg>
+      </span>
     </div>
 
-    <p style="color:var(--color-muted);font-size:0.9375rem;margin-bottom:1.5rem;">
-      This computer has been stopped from signing in for one hour. No password has
-      been changed and no account has been locked — wait an hour, or ask the school
-      administrator to reset your password.
+    <h1 class="auth-card__title">Too many sign-in attempts</h1>
+    <p class="auth-card__sub" style="margin-bottom:var(--pub-sp-6)">
+      This computer has been stopped from signing in for one hour. No password has been changed
+      and no account has been locked — wait an hour, or ask the school administrator to reset your password.
     </p>
 
-    <a class="btn btn-primary" href="{% url 'accounts:login' %}">
-      <i class="bi bi-arrow-left me-2"></i>Back to the portals
+    <a class="auth-submit" href="{% url 'accounts:login' %}" style="display:block;text-align:center;text-decoration:none">
+      Back to the portals
     </a>
 
   </div>
 </div>
-
-<script src="{% static 'vendor/bootstrap/5.3.3/bootstrap.bundle.min.js' %}"></script>
-</body>
-</html>
+{% endblock %}

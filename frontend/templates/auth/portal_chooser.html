@@ -1,50 +1,42 @@
+{% extends "public/base.html" %}
 {% load static core_extras %}
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="Choose your sign-in portal for {{ SCHOOL_NAME }}.">
-  <title>Sign In | {{ SCHOOL_NAME }}</title>
-  <link rel="stylesheet" href="{% static 'vendor/bootstrap/5.3.3/bootstrap.min.css' %}">
-  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">
-  <link rel="stylesheet" href="{% static_v 'css/base.css' %}">
-</head>
-<body>
 
-<div class="login-page">
-  {% include "partials/_messages.html" %}
+{% block title %}Sign In | {{ identity.name|default:SCHOOL_NAME }}{% endblock %}
+{% block meta_description %}Sign in to the {{ identity.name|default:SCHOOL_NAME }} portal.{% endblock %}
 
-  <div class="login-stage login-stage--chooser">
-    <header class="login-chooser-head">
-      <div class="login-logo-icon" aria-hidden="true">
-        <i class="bi bi-mortarboard-fill"></i>
-      </div>
-      <p class="login-kicker">{{ SCHOOL_MOTTO }}</p>
-      <h1>{{ SCHOOL_NAME }}</h1>
-      <p class="login-aside__blurb">Choose the portal that matches your role. Each one asks for the right sign-in detail.</p>
-    </header>
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card auth-card--wide">
 
-    <div class="portal-grid">
+    <div class="auth-chooser-head">
+      <p class="auth-kicker">{{ identity.motto|default:SCHOOL_MOTTO }}</p>
+      <h1>{{ identity.name|default:SCHOOL_NAME }}</h1>
+      <p>Choose the portal that matches your role. Each one asks for the right sign-in detail.</p>
+    </div>
+
+    <div class="auth-portal-grid">
       {% for portal in portals %}
-      <a class="portal-tile"
+      <a class="auth-portal-tile"
          data-role="{{ portal.slug }}"
          href="{% url 'accounts:role_login' portal.slug %}{% if next %}?next={{ next|urlencode }}{% endif %}">
-        <span class="portal-tile__icon" aria-hidden="true">
+        <span class="auth-portal-tile__icon" aria-hidden="true">
           <i class="bi {{ portal.icon }}"></i>
         </span>
-        <span class="portal-tile__body">
+        <span class="auth-portal-tile__body">
           <strong>{{ portal.label }}</strong>
           <span>{{ portal.blurb }}</span>
-          <span class="portal-tile__credential">{{ portal.field_label }}</span>
+          <span class="auth-portal-tile__credential">{{ portal.field_label }}</span>
         </span>
       </a>
       {% endfor %}
     </div>
+
   </div>
 </div>
 
-<script src="{% static 'vendor/bootstrap/5.3.3/bootstrap.bundle.min.js' %}"></script>
-<script src="{% static_v 'js/base.js' %}"></script>
-</body>
-</html>
+{% comment %}Bootstrap Icons are still used for portal tile icons — load the local vendor file only on these pages{% endcomment %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">
+{% endblock %}

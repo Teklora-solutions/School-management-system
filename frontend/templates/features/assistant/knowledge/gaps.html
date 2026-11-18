@@ -1,0 +1,116 @@
+{% extends base_template %}
+
+{% block title %}Knowledge gaps | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-question-diamond me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Knowledge gaps
+    </h1>
+    <p class="page-subtitle">
+      Questions the assistant could not answer reliably, so the missing
+      knowledge can be added. Only the masked question, the audience shape, the
+      language guess, the score and the date are kept — nothing about the person
+      who asked.
+    </p>
+  </div>
+</div>
+
+{% include "features/assistant/_tabs.html" %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-5">
+        <label for="gap-state" class="form-label small fw-600">Show</label>
+        <select name="state" id="gap-state" class="form-select">
+          <option value="open"{% if state == "open" %} selected{% endif %}>Open gaps ({{ open_count }})</option>
+          <option value="resolved"{% if state == "resolved" %} selected{% endif %}>Resolved</option>
+          <option value="all"{% if state == "all" %} selected{% endif %}>Everything</option>
+        </select>
+      </div>
+      <div class="col-sm-5">
+        <div class="form-check form-switch mt-4">
+          <input class="form-check-input" type="checkbox" role="switch" id="gap-tests" name="tests" value="1"{% if include_tests %} checked{% endif %}>
+          <label class="form-check-label" for="gap-tests">
+            Include test gaps (from the answer desk and test console)
+          </label>
+        </div>
+      </div>
+      <div class="col-sm-2">
+        <button type="submit" class="btn btn-outline-primary w-100">Apply</button>
+      </div>
+    </form>
+    {% if open_test_count %}
+    <div class="text-muted-sm mt-2">{{ open_test_count }} open gap(s) came from test tools.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="alert alert-warning" role="note">
+  <span class="badge bg-warning-subtle text-warning-emphasis">DRAFT</span>
+  Proposed retention: a resolved gap is erased after {{ retention_days }} days.
+  Nothing is deleted automatically until the school approves this period. You can
+  delete any gap now, resolved or not.
+</div>
+
+{% if gaps %}
+<div class="card">
+  <div class="card-body">
+    {% for gap in gaps %}
+    <div class="border-start border-3 ps-3 mb-4{% if gap.is_resolved %} border-success{% else %} border-warning{% endif %}">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        <span class="fw-600">{{ gap.question }}</span>
+        {% if gap.is_test %}<span class="badge bg-info-subtle text-info-emphasis">Test</span>{% endif %}
+        {% if gap.is_resolved %}
+        <span class="badge bg-success-subtle text-success-emphasis">Resolved</span>
+        {% else %}
+        <span class="badge bg-warning-subtle text-warning-emphasis">{{ gap.get_reason_display }}</span>
+        {% endif %}
+      </div>
+      <div class="text-muted-sm mb-2">
+        {{ gap.audience_label }} · {{ gap.language_hint|default:"en" }}
+        {% if gap.top_score is not None %} · top score {{ gap.top_score|floatformat:3 }}{% endif %}
+        · {{ gap.created_at|date:"j M Y, H:i" }}
+        {% if gap.resolved_at %} · resolved {{ gap.resolved_at|date:"j M Y" }}{% if gap.resolved_by %} by {{ gap.resolved_by.full_name }}{% endif %}{% endif %}
+      </div>
+      {% if gap.resolution_note %}
+      <div class="text-muted-sm mb-2">Note: {{ gap.resolution_note }}</div>
+      {% endif %}
+
+      <div class="d-flex flex-wrap gap-2">
+        {% if not gap.is_resolved %}
+        <form method="post" action="{% url 'assistant:knowledge_gap_resolve' gap.pk %}" class="d-flex gap-2 flex-grow-1">
+          {% csrf_token %}
+          <input type="text" name="note" class="form-control form-control-sm" maxlength="300"
+                 placeholder="What was added or changed?" aria-label="Resolution note">
+          <button type="submit" class="btn btn-outline-success btn-sm text-nowrap">Mark answered</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{% url 'assistant:knowledge_gap_delete' gap.pk %}"
+              onsubmit="return confirm('Delete this gap permanently?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-check2-circle fs-1 text-success" aria-hidden="true"></i>
+    <p class="mt-3 mb-1 fw-600">No gaps to show</p>
+    <p class="text-muted-sm mb-0">
+      Questions the assistant cannot answer reliably will appear here. Use the
+      answer desk to test an audience before go-live.
+    </p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

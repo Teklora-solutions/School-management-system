@@ -205,14 +205,21 @@
               <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Read it again
             </button>
           </form>
+          {% if document.chunk_count and not document.pii_blocks_embeddings %}
+          <a href="{% url 'assistant:knowledge_document_check' document.pk %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-search me-1" aria-hidden="true"></i>Test this document
+          </a>
+          {% else %}
           <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
             <i class="bi bi-search me-1" aria-hidden="true"></i>Test this document
           </button>
+          {% endif %}
         </div>
         <div class="text-muted-sm mt-2">
           Reading happens in the background: text is extracted, split into
           passages and embedded. Approving starts a read; archiving removes the
-          passages immediately. Testing a search arrives with retrieval (K3).
+          passages immediately. “Test this document” scores its own passages
+          against a question; the question embedding is the only provider call.
         </div>
 
         {% if ingest_runs %}
@@ -242,6 +249,68 @@
               {% endfor %}
             </tbody>
           </table>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+          <h2 class="h6 fw-600 mb-0">Personal data check</h2>
+          {% if document.pii_state == "found" %}
+          <span class="badge bg-danger-subtle text-danger-emphasis">Needs a decision</span>
+          {% elif document.pii_state == "confirmed" %}
+          <span class="badge bg-success-subtle text-success-emphasis">Confirmed</span>
+          {% elif document.pii_state == "clean" %}
+          <span class="badge bg-success-subtle text-success-emphasis">Nothing detected</span>
+          {% else %}
+          <span class="badge bg-secondary-subtle text-secondary-emphasis">Not scanned</span>
+          {% endif %}
+        </div>
+        <p class="text-muted-sm">
+          The document's passage text — not its title, file name or metadata — is
+          sent to the embedding provider when it is read. This scan looks for
+          emails, phone numbers, ID-like numbers and likely names next to
+          pupil/parent words before anything is sent.
+        </p>
+
+        {% if document.pii_state == "found" %}
+        <div class="alert alert-danger" role="alert">
+          Personal data was detected. This document cannot be approved or read
+          until you confirm the wording below or edit the document.
+        </div>
+        <ul class="small">
+          {% for finding in document.pii_findings %}
+          <li>
+            <strong>{{ finding.kind }}</strong> · passage {{ finding.passage|add:1 }}
+            {% if finding.heading %} · {{ finding.heading }}{% endif %}
+            <div class="text-muted font-monospace">{{ finding.snippet }}</div>
+          </li>
+          {% endfor %}
+        </ul>
+        <form method="post" action="{% url 'assistant:knowledge_document_confirm_pii' document.pk %}">
+          {% csrf_token %}
+          <div class="border rounded p-3 mb-2 small">{{ pii_confirmation_text }}</div>
+          <button type="submit" class="btn btn-outline-danger btn-sm">
+            Record my decision and allow this document
+          </button>
+        </form>
+        {% elif document.pii_state == "confirmed" %}
+        <p class="small mb-1">{{ document.pii_confirmation_text }}</p>
+        <div class="text-muted-sm">
+          Recorded by {{ document.pii_confirmed_by.full_name|default:"an admin" }}
+          on {{ document.pii_confirmed_at|date:"j M Y, H:i" }}.
+        </div>
+        {% elif document.pii_state == "clean" %}
+        <div class="text-muted-sm">
+          Scanned {{ document.pii_scanned_at|date:"j M Y, H:i" }}. The scan is a
+          heuristic: it can miss unusual spellings and may flag a harmless number.
+        </div>
+        {% else %}
+        <div class="text-muted-sm">
+          Not scanned yet. It is scanned when added, and again before any passage
+          is embedded.
         </div>
         {% endif %}
       </div>

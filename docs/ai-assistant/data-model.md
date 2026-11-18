@@ -1,10 +1,12 @@
 # Data model
 
-The `assistant` app owns twelve tables. Migration `0001_initial` created the first three; migration
+The `assistant` app owns thirteen tables. Migration `0001_initial` created the first three; migration
 `0002` (applied locally on 2026-11-18) adds the fields and tables introduced by Module 1 Step 2;
 migration `0003_knowledge_base` (applied locally on 2026-11-18, after `sqlmigrate` review) adds the
 four knowledge catalogue tables in Module 2 K1; migration `0004_knowledge_ingestion` (applied
-2026-11-18) adds the two K2 tables and the `ingestion` choices. No existing table outside the app is
+2026-11-18) adds the two K2 tables and the `ingestion` choices; migration
+`0005_assistantsettings_console_daily_limit_and_more` (K3) adds the kill switch, the console limits,
+the document personal-data fields and the `KnowledgeGap` table. No existing table outside the app is
 changed.
 
 Every table inherits `apps.core.models.BaseModel`, which adds `created_at` (indexed) and `updated_at`.
@@ -13,7 +15,8 @@ Every table inherits `apps.core.models.BaseModel`, which adds `created_at` (inde
 
 | Field | Type | Meaning |
 |---|---|---|
-| `enabled` | boolean, default **false** | Global kill switch. |
+| `enabled` | boolean, default **false** | Master switch for the public and signed-in assistant. |
+| `kill_switch` | boolean, default **false** | Stops everything, including the answer desk, the test console and background reading. Always wins. |
 | `public_enabled` | boolean, default **false** | Website assistant for visitors. |
 | `signed_in_enabled` | boolean, default **false** | Assistant for signed-in users. |
 | `student_tutor_enabled` | boolean, default **false** | Tutor mode; needs the signed-in switch and a contact. |
@@ -25,6 +28,8 @@ Every table inherits `apps.core.models.BaseModel`, which adds `created_at` (inde
 | `public_visitor_daily_limit` | positive small int, default 10 | Questions per visitor per day (signed cookie). |
 | `public_ip_daily_limit` | positive small int, default 30 | Questions per IP per day (backstop). |
 | `public_site_daily_limit` | positive int, default 300 | Questions across the whole public assistant per day. |
+| `console_daily_limit` | positive small int, default 50 | Answer desk + test console requests per day. 0 stops the test tools. |
+| `console_monthly_budget_ksh` | decimal(10,2), default 500 | The test tools' own monthly ceiling, separate from the site-wide budget. 0 stops them. |
 | `safeguarding_contact_name` | char(120), blank | Named person in the safe reply. |
 | `safeguarding_contact_phone` | char(40), blank | Contact phone. |
 | `safeguarding_contact_email` | email, blank | Contact email. |
@@ -170,14 +175,22 @@ Indexes: `(status, audience)`. Ordering: name.
 | `indexed_at` | datetime, nullable | When indexing last succeeded (K2). |
 | `chunk_count` | positive int, default 0 | Chunks stored for this document (K2). |
 | `last_error` | char(300), blank | Last ingestion failure in plain words (K2). |
+| `pii_state` | char(12) | `unscanned`, `clean`, `found` or `confirmed` (K3 scan). |
+| `pii_findings` | JSON list, default `[]` | Where personal data was seen: kind, heading, passage number and a **masked** snippet. The matching value itself is never stored. |
+| `pii_scanned_at` | datetime, nullable | When the scan last ran. |
+| `pii_confirmed_by_id` | FK → user, nullable, `SET_NULL` | Who accepted sending the document to the provider. |
+| `pii_confirmed_at` | datetime, nullable | When they accepted. |
+| `pii_confirmation_text` | char(300), blank | The exact wording they agreed to. |
 
 Indexes: `(status, audience)`, `(collection, status)`, `content_sha256`, `file_sha256`,
 `ingestion_state`. Ordering: collection, title.
 
 **How audience is stored.** Roles are a canonical pipe-wrapped string (`|parent|teacher|`), not a JSON
 array. Both SQLite and PostgreSQL support `roles__contains="|parent|"`, so the same filter runs on
-development and production. The selector `knowledge/scope.py::visible_documents(user, on_date)` builds
-the database filter **first**; ranking (K3) receives only the rows that survived it.
+development and production. The selector `knowledge/scope.py::scoped_documents(audience, on_date)`
+builds the database filter **first**; ranking receives only the rows that survived it. The answer desk
+builds its preview audience with `audience_for_preview()`, which produces the same `Audience` object a
+real reader gets.
 
 **The audience ceiling.** A document may be narrower than its shelf, never broader. This is checked in
 `KnowledgeDocument.clean()`, again in the upload/edit forms so the error lands on the right field, and
@@ -244,6 +257,27 @@ so a passage cannot drift away from its document's audience.
 
 Ordering: newest first. The five most recent runs are shown on the document page. Rows are kept as
 the record of what was read and when; they are ordinary history, not an alert or audit trail.
+
+## `assistant_knowledgegap` — questions the assistant could not answer reliably
+
+| Field | Type | Meaning |
+|---|---|---|
+| `question` | char(300) | The **masked** question. |
+| `role` | char(20), blank | The previewed role; empty means a visitor. |
+| `class_signature` | char(120), blank | Sorted class ids the tested audience belonged to, comma separated. |
+| `language_hint` | char(8), blank | `en` or `sw`, guessed from the wording. |
+| `reason` | char(20) | `no_match` (nothing relevant found) or `unverified` (an answer could not be verified). |
+| `top_score` | float, nullable | Best vector similarity at the time, for K4 calibration. |
+| `is_test` | boolean, default false | Recorded from the answer desk or test console; hidden from the real gap list by default. |
+| `resolved_at` / `resolved_by_id` | datetime/FK, nullable | When and by whom it was resolved. |
+| `resolution_note` | char(300), blank | What was done (for example "added the fees page"). |
+
+Indexes: `(-created_at)` and `(resolved_at, is_test)`. Ordering: newest first.
+
+**Nothing about the asker is stored** — no name, user id, IP address or session. The admin can delete
+any gap from the gaps screen. Resolved gaps are proposed for erasure **90 days after resolution**
+(`GAP_RETENTION_DAYS = 90`, **DRAFT**); no scheduled job deletes anything until that period is
+approved.
 
 ## What is deliberately absent
 

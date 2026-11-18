@@ -4,7 +4,13 @@ config/urls.py
 Root URL configuration. Each app registers its own urls under a namespace.
 """
 
-from apps.accounts.views import PortalChooserView, StaffBlockedPasswordResetView
+from apps.accounts.views import (
+    PortalChooserView,
+    PublicPasswordResetCompleteView,
+    PublicPasswordResetConfirmView,
+    PublicPasswordResetDoneView,
+    StaffBlockedPasswordResetView,
+)
 from apps.core.health import LivenessView
 from django.conf import settings
 from django.conf.urls.static import static
@@ -36,7 +42,23 @@ urlpatterns = [
     # Django auth: provides password_reset/done/, reset/<uidb64>/<token>/,
     # reset/done/, password_change/, password_change/done/, login/, logout/.
     # The password_reset entry point above is overridden by our custom view;
-    # the remaining URLs (confirm, done) use the built-in views.
+    # the continuation views below are overridden so they receive public-site
+    # context (identity, nav_links, portal_links) and can extend public/base.html.
+    path(
+        "accounts/password_reset/done/",
+        PublicPasswordResetDoneView.as_view(),
+        name="password_reset_done",
+    ),
+    path(
+        "accounts/reset/<uidb64>/<token>/",
+        PublicPasswordResetConfirmView.as_view(),
+        name="password_reset_confirm",
+    ),
+    path(
+        "accounts/reset/done/",
+        PublicPasswordResetCompleteView.as_view(),
+        name="password_reset_complete",
+    ),
     path("accounts/", include("django.contrib.auth.urls")),
     # Health / readiness probes (no auth required — for load-balancer / k8s)
     path("healthz/", LivenessView.as_view(), name="liveness"),

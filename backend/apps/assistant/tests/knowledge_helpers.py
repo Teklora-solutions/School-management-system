@@ -6,18 +6,25 @@ import io
 import shutil
 import tempfile
 import zipfile
+from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import patch
 
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
 from apps.accounts.models import ParentProfile
+from apps.assistant.knowledge import ingest
 from apps.assistant.knowledge.roles import roles_key
 from apps.assistant.models import (
+    AssistantSettings,
     KnowledgeAudience,
     KnowledgeCollection,
     KnowledgeDocument,
     KnowledgeDocumentVersion,
     KnowledgeStatus,
+    ProviderConfig,
 )
 from apps.dashboards.tests.fixtures import (
     make_class,
@@ -116,3 +123,55 @@ class KnowledgeTestCase(TestCase):
             document=document, version=1, title=title, content=data.get("body_text", "")
         )
         return document
+
+
+class AnswerTestCase(KnowledgeTestCase):
+    """A funded, enabled assistant row and the fake chat + embedding provider."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        row = AssistantSettings.load()
+        row.enabled = True
+        row.monthly_budget_ksh = Decimal("1000")
+        row.usd_to_ksh = Decimal("130")
+        row.console_daily_limit = 50
+        row.console_monthly_budget_ksh = Decimal("500")
+        row.save()
+        self.provider = ProviderConfig.objects.create(
+            name="Fake provider",
+            kind=ProviderConfig.Kind.FAKE,
+            model_name="fake",
+            embedding_model_name="fake-embed",
+            input_usd_per_1m=Decimal("0.10"),
+            output_usd_per_1m=Decimal("0.20"),
+            embedding_usd_per_1m=Decimal("0.02"),
+            priority=1,
+            is_active=True,
+        )
+
+    def make_ready(self, body: str, *, title: str = "Fee policy", collection=None, **kwargs):
+        collection = collection or self.make_collection(f"Ready {title}")
+        document = self.make_document(
+            collection, title=title, body_text=body, **kwargs
+        )
+        ingest.ingest_document(document.pk)
+        document.refresh_from_db()
+        self.assertEqual(
+            document.ingestion_state,
+            KnowledgeDocument.IngestionState.READY,
+            document.last_error,
+        )
+        return document
+
+    def chat_result(self, text: str):
+        reply = SimpleNamespace(text=text, tokens_in=8, tokens_out=6, model="fake")
+        return SimpleNamespace(
+            reply=reply, provider=self.provider, latency_ms=5, attempts=1
+        )
+
+    def patch_chat(self, text: str):
+        return patch(
+            "apps.assistant.knowledge.answers.gateway.call_chain",
+            return_value=self.chat_result(text),
+        )

@@ -1,33 +1,48 @@
 {% extends "public/base.html" %}
 {% block title %}Admissions &amp; Contact | {{ identity.name|default:"Springfield Academy" }}{% endblock %}
+{% block meta_description %}Apply to {{ identity.name|default:"Springfield Academy" }}. Learn about our admissions process, key dates, and how to reach our team.{% endblock %}
 
 {% block content %}
 
-<!-- HERO -->
-<header class="pub-hero pub-hero--image" style="background-image:url('https://picsum.photos/seed/sfa-contact-bg/1600/600')">
-  <div class="pub-hero__overlay"></div>
+{# ── HERO ───────────────────────────────────────────────────────────────── #}
+<header class="pub-hero">
+  <div class="pub-hero__bg"></div>
   <div class="pub-container">
-    <div data-reveal style="max-width:700px">
+    <div data-reveal style="max-width:680px">
       <p class="pub-eyebrow">Admissions &amp; Contact</p>
-      <h1 class="pub-hero__title">Join the <span>{{ identity.name|default:"Springfield" }} Family</span></h1>
-      <p class="pub-hero__text">Applications are open. Here's everything you need — the process, the key dates, and how to reach us.</p>
+      <h1 class="pub-hero__title">
+        Begin Your <span class="pub-highlight">Journey</span> With Us
+      </h1>
+      <p class="pub-hero__text">
+        Every great school story starts with a conversation. Tell us about your child and we will guide you through the rest — from your first visit to opening day.
+      </p>
       <div class="pub-hero__actions">
-        <a href="#inquiry" class="pub-btn pub-btn--primary pub-btn--lg"><i class="bi bi-pencil" aria-hidden="true"></i> Apply Now</a>
-        <a href="#visit" class="pub-btn pub-btn--outline pub-btn--lg"><i class="bi bi-calendar-event" aria-hidden="true"></i> Book a Visit</a>
+        <a href="#inquiry" class="pub-btn pub-btn--primary pub-btn--lg">
+          <span class="pub-icon pub-icon--sm" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/></svg>
+          </span>
+          Send an Enquiry
+        </a>
+        <a href="#visit" class="pub-btn pub-btn--outline pub-btn--lg">
+          <span class="pub-icon pub-icon--sm" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/></svg>
+          </span>
+          Book a Visit
+        </a>
       </div>
     </div>
   </div>
 </header>
 
-<!-- ADMISSIONS STEPS -->
+{# ── ADMISSIONS STEPS ────────────────────────────────────────────────────── #}
 <section class="pub-section">
   <div class="pub-container">
     <div class="pub-section-head" data-reveal>
       <p class="pub-eyebrow">How to Apply</p>
       <h2>{% if admission_steps %}{{ admission_steps|length }} Simple Step{{ admission_steps|length|pluralize }}{% else %}Four Simple Steps{% endif %}</h2>
-      <p>From first inquiry to first day, we'll guide you through every step.</p>
+      <p>From your first message to your child's first day — we make it straightforward.</p>
     </div>
-    <div class="pub-steps" data-reveal>
+    <div class="pub-steps" data-reveal-stagger>
       {% if admission_steps %}
         {% for step in admission_steps %}
         <div class="pub-step">
@@ -37,20 +52,37 @@
         </div>
         {% endfor %}
       {% else %}
-        <div class="pub-step"><div class="pub-step__num">1</div><h3 class="pub-step__title">Submit Inquiry</h3><p class="pub-step__text">Fill in the form below. Our admissions office will respond within 48 hours.</p></div>
-        <div class="pub-step"><div class="pub-step__num">2</div><h3 class="pub-step__title">Campus Visit</h3><p class="pub-step__text">Tour the campus, meet teachers and see a class in session.</p></div>
-        <div class="pub-step"><div class="pub-step__num">3</div><h3 class="pub-step__title">Assessment</h3><p class="pub-step__text">A friendly, age-appropriate assessment helps us place your child in the right class.</p></div>
-        <div class="pub-step"><div class="pub-step__num">4</div><h3 class="pub-step__title">Welcome</h3><p class="pub-step__text">Receive your offer, complete enrolment and join us for your first day.</p></div>
+        <div class="pub-step">
+          <div class="pub-step__num">1</div>
+          <h3 class="pub-step__title">Send an Enquiry</h3>
+          <p class="pub-step__text">Fill in the form below. Our admissions team will reply within 48 hours.</p>
+        </div>
+        <div class="pub-step">
+          <div class="pub-step__num">2</div>
+          <h3 class="pub-step__title">Campus Visit</h3>
+          <p class="pub-step__text">Tour the school, meet the teachers, and see a class in session.</p>
+        </div>
+        <div class="pub-step">
+          <div class="pub-step__num">3</div>
+          <h3 class="pub-step__title">Assessment</h3>
+          <p class="pub-step__text">A friendly, age-appropriate assessment helps us place your child in the right class.</p>
+        </div>
+        <div class="pub-step">
+          <div class="pub-step__num">4</div>
+          <h3 class="pub-step__title">Welcome Day</h3>
+          <p class="pub-step__text">Receive your offer, complete enrolment and join us for your first day.</p>
+        </div>
       {% endif %}
     </div>
   </div>
 </section>
 
-<!-- KEY DATES + FAQ -->
+{# ── KEY DATES + FAQ ─────────────────────────────────────────────────────── #}
 <section class="pub-section pub-section--alt">
   <div class="pub-container">
-    <div class="pub-grid pub-grid--2" style="max-width:1000px;margin:0 auto;gap:3rem">
+    <div class="pub-grid pub-grid--2" style="max-width:1040px;margin:0 auto;gap:clamp(2rem,5vw,4rem)">
 
+      {# Key dates #}
       <div data-reveal>
         <p class="pub-eyebrow">Mark Your Calendar</p>
         <h2 style="margin-bottom:1.5rem">Key Admissions Dates</h2>
@@ -58,7 +90,7 @@
           {% if key_dates %}
             {% for kd in key_dates %}
             <div class="pub-key-date">
-              <div style="text-align:center;min-width:60px">
+              <div style="text-align:center;min-width:56px">
                 <div class="pub-key-date__day">{{ kd.day }}</div>
                 <div class="pub-key-date__month">{{ kd.month }}</div>
               </div>
@@ -69,15 +101,31 @@
             </div>
             {% endfor %}
           {% else %}
-            <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Jan</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Applications Open</div><div class="pub-key-date__text">Inquiry forms accepted for all year groups.</div></div></div>
-            <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">28</div><div class="pub-key-date__month">Feb</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Open Day</div><div class="pub-key-date__text">10:00 AM — Campus tours and meet-and-greet.</div></div></div>
-            <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">31</div><div class="pub-key-date__month">Mar</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Application Deadline</div><div class="pub-key-date__text">Final day for September intake applications.</div></div></div>
-            <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Apr</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Assessment Day</div><div class="pub-key-date__text">On-campus assessments for all applicants.</div></div></div>
-            <div class="pub-key-date"><div style="text-align:center;min-width:60px"><div class="pub-key-date__day">01</div><div class="pub-key-date__month">May</div></div><div class="pub-key-date__info"><div class="pub-key-date__title">Offers Issued</div><div class="pub-key-date__text">Admission decisions communicated to families.</div></div></div>
+            <div class="pub-key-date">
+              <div style="text-align:center;min-width:56px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Jan</div></div>
+              <div class="pub-key-date__info"><div class="pub-key-date__title">Applications Open</div><div class="pub-key-date__text">Enquiry forms accepted for all year groups.</div></div>
+            </div>
+            <div class="pub-key-date">
+              <div style="text-align:center;min-width:56px"><div class="pub-key-date__day">28</div><div class="pub-key-date__month">Feb</div></div>
+              <div class="pub-key-date__info"><div class="pub-key-date__title">Open Day</div><div class="pub-key-date__text">10:00 AM — Campus tours and meet-the-team.</div></div>
+            </div>
+            <div class="pub-key-date">
+              <div style="text-align:center;min-width:56px"><div class="pub-key-date__day">31</div><div class="pub-key-date__month">Mar</div></div>
+              <div class="pub-key-date__info"><div class="pub-key-date__title">Application Deadline</div><div class="pub-key-date__text">Final day for the next intake's applications.</div></div>
+            </div>
+            <div class="pub-key-date">
+              <div style="text-align:center;min-width:56px"><div class="pub-key-date__day">15</div><div class="pub-key-date__month">Apr</div></div>
+              <div class="pub-key-date__info"><div class="pub-key-date__title">Assessment Day</div><div class="pub-key-date__text">On-campus assessments for all applicants.</div></div>
+            </div>
+            <div class="pub-key-date">
+              <div style="text-align:center;min-width:56px"><div class="pub-key-date__day">01</div><div class="pub-key-date__month">May</div></div>
+              <div class="pub-key-date__info"><div class="pub-key-date__title">Offers Issued</div><div class="pub-key-date__text">Admission decisions sent to all families.</div></div>
+            </div>
           {% endif %}
         </div>
       </div>
 
+      {# FAQ accordion #}
       <div data-reveal>
         <p class="pub-eyebrow">Good to Know</p>
         <h2 style="margin-bottom:1.5rem">Frequently Asked Questions</h2>
@@ -85,30 +133,30 @@
           {% if faqs %}
             {% for faq in faqs %}
             <div class="pub-accordion__item">
-              <button class="pub-accordion__header">{{ faq.question }} <span class="pub-accordion__icon">+</span></button>
+              <button class="pub-accordion__header">{{ faq.question }} <span class="pub-accordion__icon" aria-hidden="true">+</span></button>
               <div class="pub-accordion__body"><div class="pub-accordion__body-inner">{{ faq.answer }}</div></div>
             </div>
             {% endfor %}
           {% else %}
             <div class="pub-accordion__item">
-              <button class="pub-accordion__header">What are the age requirements? <span class="pub-accordion__icon">+</span></button>
-              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Early Years accepts children from age 3. Primary starts at 6 (Grade 1). Secondary at 11 (Grade 7). We assess each child individually to ensure the right placement.</div></div>
+              <button class="pub-accordion__header">What are the age requirements? <span class="pub-accordion__icon" aria-hidden="true">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Early Years accepts children from age 3. Primary starts at 6 (Grade 1). Secondary at 11 (Grade 7). We assess each child to ensure the right placement.</div></div>
             </div>
             <div class="pub-accordion__item">
-              <button class="pub-accordion__header">Is there an entrance exam? <span class="pub-accordion__icon">+</span></button>
-              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">For Early Years, there is no exam — just a play-based observation. For Primary and Secondary, there is a short assessment in English and Maths plus an informal interview.</div></div>
+              <button class="pub-accordion__header">Is there an entrance exam? <span class="pub-accordion__icon" aria-hidden="true">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">For Early Years, there is no exam — just a friendly observation session. For Primary and Secondary, there is a short assessment in English and Maths plus an informal conversation.</div></div>
             </div>
             <div class="pub-accordion__item">
-              <button class="pub-accordion__header">Do you offer scholarships? <span class="pub-accordion__icon">+</span></button>
-              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Yes. We offer merit scholarships for Secondary students and need-based financial aid for all year groups. Contact our admissions office for details.</div></div>
+              <button class="pub-accordion__header">Do you offer scholarships? <span class="pub-accordion__icon" aria-hidden="true">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Yes. We offer merit scholarships for Secondary students and need-based assistance for all year groups. Contact our admissions office for details.</div></div>
             </div>
             <div class="pub-accordion__item">
-              <button class="pub-accordion__header">What's included in tuition? <span class="pub-accordion__icon">+</span></button>
-              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Tuition covers all classes, textbooks and standard extracurricular activities. Transport, individual music lessons and after-school care are billed separately.</div></div>
+              <button class="pub-accordion__header">What is included in tuition? <span class="pub-accordion__icon" aria-hidden="true">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Tuition covers all classes, textbooks and standard co-curricular activities. Transport, individual music tuition and after-school care are billed separately.</div></div>
             </div>
             <div class="pub-accordion__item">
-              <button class="pub-accordion__header">Can we visit before applying? <span class="pub-accordion__icon">+</span></button>
-              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Absolutely — we encourage it! Book a campus visit using the form below or attend one of our Open Days.</div></div>
+              <button class="pub-accordion__header">Can we visit before applying? <span class="pub-accordion__icon" aria-hidden="true">+</span></button>
+              <div class="pub-accordion__body"><div class="pub-accordion__body-inner">Absolutely — we encourage it. Book a campus visit using the form below or come to one of our Open Days.</div></div>
             </div>
           {% endif %}
         </div>
@@ -118,106 +166,175 @@
   </div>
 </section>
 
-<!-- INQUIRY FORM -->
+{# ── ENQUIRY FORM ────────────────────────────────────────────────────────── #}
 <section class="pub-section" id="inquiry">
   <div class="pub-container">
     <div class="pub-section-head" data-reveal>
       <p class="pub-eyebrow">Get in Touch</p>
-      <h2>Submit an Inquiry</h2>
-      <p>Fill in the form and our admissions office will contact you within 48 hours.</p>
+      <h2>Send Us a Message</h2>
+      <p>Our admissions team will reply within 48 hours.</p>
     </div>
-    <div style="max-width:680px;margin:0 auto" data-reveal>
 
-      {% if enquiry_saved %}
-      <div class="pub-form-success pub-form-success--static" id="pubFormSuccess" role="status">
-        <h3><i class="bi bi-check-lg" aria-hidden="true"></i> Inquiry Submitted!</h3>
-        <p>Thank you — your message is with our admissions office. We'll reply within 48 hours.</p>
-      </div>
-      {% else %}
-      <div class="pub-form-success" id="pubFormSuccess" role="status">
-        <h3><i class="bi bi-check-lg" aria-hidden="true"></i> Inquiry Submitted!</h3>
-        <p>Thank you — your message is with our admissions office. We'll reply within 48 hours.</p>
-      </div>
-      {% endif %}
+    <div style="max-width:700px;margin:0 auto" data-reveal>
+      <div class="pub-form-card">
 
-      <div class="pub-form-alert" id="pubFormError" role="alert" hidden>
-        <strong>We couldn't send your message.</strong>
-        <span id="pubFormErrorText">Please try again in a moment, or call the school on the number below.</span>
-      </div>
+        {# Success message — shown after a no-JS POST redirect, or via JS #}
+        {% if enquiry_saved %}
+        <div class="pub-form-success pub-form-success--static" id="pubFormSuccess" role="status">
+          <h3>
+            <span class="pub-icon pub-icon--md" aria-hidden="true" style="display:inline-flex;vertical-align:middle;margin-right:.3em">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/></svg>
+            </span>
+            Inquiry Submitted!
+          </h3>
+          <p>Thank you — your message is with our admissions team. We will reply within 48 hours.</p>
+        </div>
+        {% else %}
+        <div class="pub-form-success" id="pubFormSuccess" role="status">
+          <h3>
+            <span class="pub-icon pub-icon--md" aria-hidden="true" style="display:inline-flex;vertical-align:middle;margin-right:.3em">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/></svg>
+            </span>
+            Inquiry Submitted!
+          </h3>
+          <p>Thank you — your message is with our admissions team. We will reply within 48 hours.</p>
+        </div>
+        {% endif %}
 
-      {% if form.non_field_errors %}
-      <div class="pub-form-alert" role="alert">
-        {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
-      </div>
-      {% endif %}
+        <div class="pub-form-alert" id="pubFormError" role="alert" hidden>
+          <strong>We could not send your message.</strong>
+          <span id="pubFormErrorText">Please try again in a moment, or call the school directly.</span>
+        </div>
 
-      <form method="post" id="pub-inquiry-form" novalidate>
-        {% csrf_token %}
-        <div class="pub-form-grid-2">
-          <div class="pub-form-group">
-            <label class="pub-form-label" for="{{ form.name.id_for_label }}">Full Name <span>*</span></label>
-            {{ form.name }}
-            <span class="pub-form-error{% if form.name.errors %} is-visible{% endif %}" data-error="name">{% for e in form.name.errors %}{{ e }}{% endfor %}</span>
+        {% if form.non_field_errors %}
+        <div class="pub-form-alert" role="alert">
+          {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" id="pub-inquiry-form" novalidate>
+          {% csrf_token %}
+          <div class="pub-form-grid-2">
+            <div class="pub-form-group">
+              <label class="pub-form-label" for="{{ form.name.id_for_label }}">Full Name <span>*</span></label>
+              {{ form.name }}
+              <span class="pub-form-error{% if form.name.errors %} is-visible{% endif %}" data-error="name">{% for e in form.name.errors %}{{ e }}{% endfor %}</span>
+            </div>
+            <div class="pub-form-group">
+              <label class="pub-form-label" for="{{ form.email.id_for_label }}">Email Address <span>*</span></label>
+              {{ form.email }}
+              <span class="pub-form-error{% if form.email.errors %} is-visible{% endif %}" data-error="email">{% for e in form.email.errors %}{{ e }}{% endfor %}</span>
+            </div>
+            <div class="pub-form-group">
+              <label class="pub-form-label" for="{{ form.phone.id_for_label }}">Phone Number <span style="font-weight:400;color:var(--pub-text-muted)">(optional)</span></label>
+              {{ form.phone }}
+              <span class="pub-form-error{% if form.phone.errors %} is-visible{% endif %}" data-error="phone">{% for e in form.phone.errors %}{{ e }}{% endfor %}</span>
+            </div>
           </div>
           <div class="pub-form-group">
-            <label class="pub-form-label" for="{{ form.email.id_for_label }}">Email Address <span>*</span></label>
-            {{ form.email }}
-            <span class="pub-form-error{% if form.email.errors %} is-visible{% endif %}" data-error="email">{% for e in form.email.errors %}{{ e }}{% endfor %}</span>
+            <label class="pub-form-label" for="{{ form.message.id_for_label }}">Your Message <span>*</span></label>
+            {{ form.message }}
+            <span class="pub-form-error{% if form.message.errors %} is-visible{% endif %}" data-error="message">{% for e in form.message.errors %}{{ e }}{% endfor %}</span>
           </div>
-          <div class="pub-form-group">
-            <label class="pub-form-label" for="{{ form.phone.id_for_label }}">Phone Number</label>
-            {{ form.phone }}
-            <span class="pub-form-error{% if form.phone.errors %} is-visible{% endif %}" data-error="phone">{% for e in form.phone.errors %}{{ e }}{% endfor %}</span>
+          {# Honeypot — hidden from real users, traps bots that fill every field #}
+          {{ form.website }}
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:1rem;margin-top:var(--pub-sp-2)">
+            <button type="submit" class="pub-btn pub-btn--primary pub-btn--lg">
+              <span class="pub-icon pub-icon--sm" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/></svg>
+              </span>
+              Submit Enquiry
+            </button>
+            <span style="font-size:var(--pub-text-sm);color:var(--pub-text-muted)">We reply within 48 hours.</span>
           </div>
-        </div>
-        <div class="pub-form-group">
-          <label class="pub-form-label" for="{{ form.message.id_for_label }}">Your Message <span>*</span></label>
-          {{ form.message }}
-          <span class="pub-form-error{% if form.message.errors %} is-visible{% endif %}" data-error="message">{% for e in form.message.errors %}{{ e }}{% endfor %}</span>
-        </div>
-        {{ form.website }}
-        <div style="margin-top:1.5rem;display:flex;flex-wrap:wrap;align-items:center;gap:1rem">
-          <button type="submit" class="pub-btn pub-btn--primary pub-btn--lg"><i class="bi bi-pencil" aria-hidden="true"></i> Submit Inquiry</button>
-          <span style="font-size:.85rem;color:var(--pub-text-muted)">We'll reply within 48 hours.</span>
-        </div>
-      </form>
+        </form>
+
+      </div>{# /.pub-form-card #}
     </div>
   </div>
 </section>
 
-<!-- CONTACT DETAILS + MAP -->
+{# ── CONTACT DETAILS + MAP ───────────────────────────────────────────────── #}
 <section class="pub-section pub-section--alt" id="visit">
   <div class="pub-container">
-    <div class="pub-grid pub-grid--2" style="max-width:900px;margin:0 auto;gap:2.5rem">
+    <div class="pub-section-head" data-reveal>
+      <p class="pub-eyebrow">Find Us</p>
+      <h2>Come and See Us</h2>
+      <p>We welcome visitors. Book a tour or drop in during office hours.</p>
+    </div>
 
+    <div class="pub-grid pub-grid--2" style="max-width:960px;margin:0 auto;gap:clamp(2rem,5vw,4rem)">
+
+      {# Contact details #}
       <div data-reveal>
-        <p class="pub-eyebrow">Find Us</p>
-        <h2 style="margin-bottom:1.5rem">Contact Details</h2>
-        <div style="display:flex;flex-direction:column;gap:1.25rem">
-          <div class="pub-contact-detail"><i class="bi bi-geo-alt pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Address</strong><span class="pub-text-muted">{{ identity.address|default:"24 Education Road, Cantonments, Accra, Ghana" }}</span></div></div>
+        <div style="display:flex;flex-direction:column;gap:1.5rem">
+
+          <div class="pub-key-date" style="align-items:flex-start">
+            <span class="pub-contact-detail__icon pub-icon pub-icon--xl" aria-hidden="true" style="color:var(--pub-accent);flex-shrink:0;margin-top:2px">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M12.166 8.94c-.524 1.062-1.234 2.12-1.96 3.07A32 32 0 0 1 8 14.58a32 32 0 0 1-2.206-2.57c-.726-.95-1.436-2.008-1.96-3.07C3.304 7.867 3 6.862 3 6a5 5 0 0 1 10 0c0 .862-.305 1.867-.834 2.94M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10"/><path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/></svg>
+            </span>
+            <div>
+              <strong class="pub-contact-detail__label">Address</strong>
+              <span class="pub-text-muted" style="display:block">{{ identity.address|default:"School address — set this in School Settings." }}</span>
+            </div>
+          </div>
+
           {% if identity.phone %}
-          <div class="pub-contact-detail"><i class="bi bi-telephone pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Phone</strong><a class="pub-text-muted" href="tel:{{ identity.phone }}">{{ identity.phone }}</a></div></div>
+          <div class="pub-key-date" style="align-items:center">
+            <span class="pub-contact-detail__icon pub-icon pub-icon--xl" aria-hidden="true" style="color:var(--pub-accent);flex-shrink:0">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3.654 1.328a.678.678 0 0 0-1.015-.063L1.605 2.3c-.483.484-.661 1.169-.45 1.77a17.6 17.6 0 0 0 4.168 6.608 17.6 17.6 0 0 0 6.608 4.168c.601.211 1.286.033 1.77-.45l1.034-1.034a.678.678 0 0 0-.063-1.015l-2.307-1.794a.68.68 0 0 0-.58-.122l-2.19.547a1.75 1.75 0 0 1-1.657-.459L5.482 8.062a1.75 1.75 0 0 1-.46-1.657l.548-2.19a.68.68 0 0 0-.122-.58zM1.884.511a1.745 1.745 0 0 1 2.612.163L6.29 2.98c.329.423.445.974.315 1.494l-.547 2.19a.68.68 0 0 0 .178.643l2.457 2.457a.68.68 0 0 0 .644.178l2.189-.547a1.75 1.75 0 0 1 1.494.315l2.306 1.794c.829.645.905 1.87.163 2.611l-1.034 1.034c-.74.74-1.846 1.065-2.877.702a18.6 18.6 0 0 1-7.01-4.42 18.6 18.6 0 0 1-4.42-7.009c-.362-1.03-.037-2.137.703-2.877z"/></svg>
+            </span>
+            <div>
+              <strong class="pub-contact-detail__label">Phone</strong>
+              <a class="pub-text-muted" href="tel:{{ identity.phone }}" style="display:block">{{ identity.phone }}</a>
+            </div>
+          </div>
           {% endif %}
-          {% if identity.admissions_email %}
-          <div class="pub-contact-detail"><i class="bi bi-envelope pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Admissions Email</strong><a class="pub-text-muted" href="mailto:{{ identity.admissions_email }}">{{ identity.admissions_email }}</a></div></div>
-          {% elif identity.email %}
-          <div class="pub-contact-detail"><i class="bi bi-envelope pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Email</strong><a class="pub-text-muted" href="mailto:{{ identity.email }}">{{ identity.email }}</a></div></div>
+
+          {% if identity.admissions_email or identity.email %}
+          <div class="pub-key-date" style="align-items:center">
+            <span class="pub-contact-detail__icon pub-icon pub-icon--xl" aria-hidden="true" style="color:var(--pub-accent);flex-shrink:0">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/></svg>
+            </span>
+            <div>
+              <strong class="pub-contact-detail__label">{% if identity.admissions_email %}Admissions Email{% else %}Email{% endif %}</strong>
+              <a class="pub-text-muted" href="mailto:{% if identity.admissions_email %}{{ identity.admissions_email }}{% else %}{{ identity.email }}{% endif %}" style="display:block">{% if identity.admissions_email %}{{ identity.admissions_email }}{% else %}{{ identity.email }}{% endif %}</a>
+            </div>
+          </div>
           {% endif %}
-          <div class="pub-contact-detail"><i class="bi bi-clock pub-contact-detail__icon" aria-hidden="true"></i><div><strong class="pub-contact-detail__label">Office Hours</strong><span class="pub-text-muted">{% if identity.office_hours %}{{ identity.office_hours }}{% else %}Monday – Friday, 8:00 AM – 4:00 PM{% endif %}</span></div></div>
+
+          <div class="pub-key-date" style="align-items:center">
+            <span class="pub-contact-detail__icon pub-icon pub-icon--xl" aria-hidden="true" style="color:var(--pub-accent);flex-shrink:0">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/></svg>
+            </span>
+            <div>
+              <strong class="pub-contact-detail__label">Office Hours</strong>
+              <span class="pub-text-muted" style="display:block">{% if identity.office_hours %}{{ identity.office_hours }}{% else %}Monday – Friday, 8:00 AM – 4:00 PM{% endif %}</span>
+            </div>
+          </div>
+
         </div>
       </div>
 
+      {# Map or placeholder #}
       <div data-reveal>
         {% if identity.map_embed_url %}
-        <iframe src="{{ identity.map_embed_url }}" width="100%" height="350"
-                style="border:0;border-radius:var(--pub-radius-lg);" allowfullscreen="" loading="lazy"
-                referrerpolicy="no-referrer-when-downgrade" title="School location map"></iframe>
+        <iframe src="{{ identity.map_embed_url }}" width="100%" height="380"
+                style="border:0;border-radius:var(--pub-radius-lg);display:block"
+                allowfullscreen loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
+                title="School location map"></iframe>
         {% else %}
         <div class="pub-map-placeholder">
           <div>
-            <i class="bi bi-geo-alt pub-map-icon" aria-hidden="true"></i>
-            <p>Set a Google Maps embed URL in School Settings to show the map here.</p>
-            <p style="font-size:.75rem;margin-top:.5rem;color:var(--pub-text-muted)">{% if identity.address %}{{ identity.address }}{% else %}24 Education Road, Cantonments, Accra{% endif %}</p>
+            <span class="pub-icon pub-icon--2xl pub-map-icon" aria-hidden="true" style="margin:0 auto var(--pub-sp-3)">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M12.166 8.94c-.524 1.062-1.234 2.12-1.96 3.07A32 32 0 0 1 8 14.58a32 32 0 0 1-2.206-2.57c-.726-.95-1.436-2.008-1.96-3.07C3.304 7.867 3 6.862 3 6a5 5 0 0 1 10 0c0 .862-.305 1.867-.834 2.94M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10"/><path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/></svg>
+            </span>
+            <p style="font-weight:600;margin-bottom:var(--pub-sp-2)">Map coming soon</p>
+            <p style="font-size:var(--pub-text-sm)">Set a Google Maps embed URL in School Settings to show the map here.</p>
+            {% if identity.address %}
+            <p style="font-size:var(--pub-text-xs);margin-top:var(--pub-sp-3);color:var(--pub-text-muted)">{{ identity.address }}</p>
+            {% endif %}
           </div>
         </div>
         {% endif %}

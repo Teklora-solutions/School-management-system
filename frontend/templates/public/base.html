@@ -1,35 +1,61 @@
 {% load static %}
 <!doctype html>
-<html lang="en" data-theme="{{ identity.theme|default:'dark' }}">
+<html lang="en" data-theme="{{ identity.theme|default:'light' }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="{% block meta_description %}{{ identity.motto|default:identity.name }} — {{ identity.name }}{% endblock %}">
   <title>{% block title %}{{ identity.name|default:"Springfield Academy" }}{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">
+
+  {# Self-hosted Outfit font — no external request, font-display:swap prevents blank text #}
+  <link rel="preload" href="{% static 'fonts/outfit-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
+
+  {# Single stylesheet — Outfit @font-face is declared inside it #}
   <link rel="stylesheet" href="{% static 'css/public_new.css' %}">
   {% block extra_css %}{% endblock %}
+  {% comment %}
+    Anti-flash script: runs synchronously in <head> before first paint.
+    Reads the versioned localStorage key (pub-theme-v2). If the user has
+    an explicit saved preference, apply it now so the page never flashes
+    the wrong theme. The server already set data-theme on <html>; we only
+    override it if the user's choice differs.
+  {% endcomment %}
+  <script>
+  (function(){
+    var k = 'pub-theme-v2';
+    var v = localStorage.getItem(k);
+    if (v === 'dark' || v === 'light') {
+      document.documentElement.setAttribute('data-theme', v);
+    }
+  })();
+  </script>
 </head>
-<body class="{% block body_class %}{% endblock %}" data-theme="{{ identity.theme|default:'dark' }}">
+<body class="{% block body_class %}{% endblock %}" data-theme="{{ identity.theme|default:'light' }}">
 
-<!-- ═══ NAVBAR ═════════════════════════════════════════════════════════════ -->
+{# ═══ NAVBAR ════════════════════════════════════════════════════════════════ #}
 <nav class="pub-nav" id="pub-nav" aria-label="Main navigation">
   <div class="pub-container">
     <div class="pub-nav__inner">
 
-      <!-- Brand -->
+      {# Brand #}
       <a href="{% url 'public:home' %}" class="pub-nav__brand">
         {% if identity.logo_url %}
         <img class="pub-nav__logo" src="{{ identity.logo_url }}" alt="{{ identity.name|default:'School logo' }}">
         {% else %}
-        <span class="pub-nav__dot" aria-hidden="true"><i class="bi bi-building" aria-hidden="true"></i></span>
+        <span class="pub-nav__badge" aria-hidden="true">
+          {# Building icon — inline SVG, no font file #}
+          <span class="pub-icon pub-icon--md">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M4 2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zM4 5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM7.5 5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM4.5 8a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z"/>
+              <path d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1zm11 0H3v14h3v-2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V15h3z"/>
+            </svg>
+          </span>
+        </span>
         {% endif %}
-        <span>{{ identity.name|default:"Springfield Academy" }}</span>
+        <span class="pub-nav__brand-name">{{ identity.name|default:"Springfield Academy" }}</span>
       </a>
 
-      <!-- Desktop links -->
+      {# Desktop nav links #}
       <ul class="pub-nav__links" role="list">
         {% for link in nav_links %}
         <li>
@@ -40,22 +66,38 @@
         {% endfor %}
       </ul>
 
-      <!-- Action buttons + hamburger -->
+      {# Action buttons + hamburger #}
       <div class="pub-nav__actions">
-        <button class="pub-theme-toggle pub-theme-toggle--bar" data-theme-toggle aria-label="Switch to light mode" id="pubThemeToggle"><i class="bi bi-sun" aria-hidden="true"></i></button>
+        {# Theme toggle — bar version (desktop); phone version is in the mobile drawer #}
+        <button class="pub-theme-toggle pub-theme-toggle--bar" data-theme-toggle
+                aria-label="Switch to dark mode" id="pubThemeToggle">
+          {# JS replaces this SVG's path on toggle; we start with moon (light theme default) #}
+          <span class="pub-icon pub-icon--md" id="pubThemeIcon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+              <path id="pubThemeIconPath" d="M6 .278a.77.77 0 0 1 .08.858 7.2 7.2 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277q.792-.001 1.533-.16a.79.79 0 0 1 .81.316.73.73 0 0 1-.031.893A8.35 8.35 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.75.75 0 0 1 6 .278"/>
+            </svg>
+          </span>
+        </button>
+
         {% if request.user.is_authenticated %}
         <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary pub-btn--sm">
-          <i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard
+          <span class="pub-icon pub-icon--sm" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5V6a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4M3.732 5.732a.5.5 0 0 1 .707 0l.915.914a.5.5 0 1 1-.708.708l-.914-.915a.5.5 0 0 1 0-.707M2 10a.5.5 0 0 1 .5-.5h1.586a.5.5 0 0 1 0 1H2.5A.5.5 0 0 1 2 10m9.5 0a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1H12a.5.5 0 0 1-.5-.5m.754-4.246a.39.39 0 0 0-.527-.02L7.547 9.31a.91.91 0 1 0 1.302 1.258l3.434-4.297a.39.39 0 0 0-.029-.518z"/><path fill-rule="evenodd" d="M0 10a8 8 0 1 1 15.547 2.661c-.442 1.253-1.845 1.602-2.932 1.25C11.309 13.488 9.475 13 8 13c-1.474 0-3.31.488-4.615.911-1.087.352-2.49.003-2.932-1.25A8 8 0 0 1 0 10m8-7a7 7 0 0 0-6.603 9.329c.203.575.923.876 1.68.63C4.397 12.533 6.358 12 8 12s3.604.532 4.923.96c.757.245 1.477-.056 1.68-.631A7 7 0 0 0 8 3"/></svg>
+          </span>
+          Dashboard
         </a>
         {% else %}
-        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--sm pub-btn--hide-sm">Apply Now</a>
+        <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline pub-btn--sm pub-btn--hide-xs">Apply Now</a>
         <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary pub-btn--sm">
-          <i class="bi bi-person" aria-hidden="true"></i>
+          <span class="pub-icon pub-icon--sm" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/></svg>
+          </span>
           <span class="pub-btn__label--full">Student Portal</span>
           <span class="pub-btn__label--xs">Portal</span>
         </a>
         {% endif %}
-        <!-- Hamburger — hidden on desktop via CSS -->
+
+        {# Hamburger — hidden on desktop via CSS #}
         <button class="pub-nav__toggle"
                 id="pubNavToggle"
                 aria-label="Open navigation menu"
@@ -68,10 +110,9 @@
     </div>
   </div>
 
-  <!-- Mobile drawer -->
+  {# Mobile drawer #}
   <div class="pub-nav__mobile" id="pubNavMobile" aria-hidden="true" role="dialog" aria-label="Navigation menu">
 
-    <!-- Nav links -->
     {% for link in nav_links %}
     <a class="pub-nav__link {% if link.is_active %}is-active{% endif %}"
        href="{{ link.url }}"
@@ -80,28 +121,46 @@
 
     <div class="pub-nav__mobile-divider"></div>
 
-    <!-- Theme toggle — lives here on phones, where the bar has no room -->
-    <button class="pub-nav__theme-row" data-theme-toggle aria-label="Switch to light mode">
-      <i class="bi bi-sun" aria-hidden="true"></i>
-      <span class="pub-nav__theme-label">Switch to light mode</span>
+    {# Theme toggle row — phone only (bar toggle is hidden via CSS on small screens) #}
+    <button class="pub-nav__theme-row" data-theme-toggle aria-label="Switch to dark mode">
+      <span class="pub-icon pub-icon--md" id="pubThemeIconMobile" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+          <path id="pubThemeIconPathMobile" d="M6 .278a.77.77 0 0 1 .08.858 7.2 7.2 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277q.792-.001 1.533-.16a.79.79 0 0 1 .81.316.73.73 0 0 1-.031.893A8.35 8.35 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.75.75 0 0 1 6 .278"/>
+        </svg>
+      </span>
+      <span class="pub-nav__theme-label">Switch to dark mode</span>
     </button>
 
-    <!-- CTA buttons -->
     <div class="pub-nav__mobile-actions">
       {% if request.user.is_authenticated %}
-      <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary"><i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard</a>
+      <a href="{{ request.user.get_dashboard_url }}" class="pub-btn pub-btn--primary">
+        <span class="pub-icon pub-icon--sm" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5V6a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4M3.732 5.732a.5.5 0 0 1 .707 0l.915.914a.5.5 0 1 1-.708.708l-.914-.915a.5.5 0 0 1 0-.707M2 10a.5.5 0 0 1 .5-.5h1.586a.5.5 0 0 1 0 1H2.5A.5.5 0 0 1 2 10m9.5 0a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1H12a.5.5 0 0 1-.5-.5m.754-4.246a.39.39 0 0 0-.527-.02L7.547 9.31a.91.91 0 1 0 1.302 1.258l3.434-4.297a.39.39 0 0 0-.029-.518z"/><path fill-rule="evenodd" d="M0 10a8 8 0 1 1 15.547 2.661c-.442 1.253-1.845 1.602-2.932 1.25C11.309 13.488 9.475 13 8 13c-1.474 0-3.31.488-4.615.911-1.087.352-2.49.003-2.932-1.25A8 8 0 0 1 0 10m8-7a7 7 0 0 0-6.603 9.329c.203.575.923.876 1.68.63C4.397 12.533 6.358 12 8 12s3.604.532 4.923.96c.757.245 1.477-.056 1.68-.631A7 7 0 0 0 8 3"/></svg>
+        </span>
+        Dashboard
+      </a>
       {% else %}
-      <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary"><i class="bi bi-person" aria-hidden="true"></i> Student Portal</a>
-      <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline"><i class="bi bi-pencil" aria-hidden="true"></i> Apply Now</a>
+      <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--primary">
+        <span class="pub-icon pub-icon--sm" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/></svg>
+        </span>
+        Student Portal
+      </a>
+      <a href="{% url 'public:contact' %}" class="pub-btn pub-btn--outline">
+        <span class="pub-icon pub-icon--sm" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/></svg>
+        </span>
+        Apply Now
+      </a>
       {% endif %}
     </div>
   </div>
 </nav>
 
-<!-- Backdrop — dims the page when mobile menu is open -->
+{# Backdrop — dims the page when mobile menu is open #}
 <div class="pub-nav__backdrop" id="pubNavBackdrop" aria-hidden="true"></div>
 
-<!-- ═══ PAGE CONTENT ═══════════════════════════════════════════════════════ -->
+{# ═══ PAGE CONTENT ══════════════════════════════════════════════════════════ #}
 <main id="main-content">
   {% if messages %}
   <div class="pub-container pub-messages">
@@ -115,18 +174,25 @@
   {% block content %}{% endblock %}
 </main>
 
-<!-- ═══ FOOTER ═════════════════════════════════════════════════════════════ -->
+{# ═══ FOOTER ════════════════════════════════════════════════════════════════ #}
 <footer class="pub-footer">
   <div class="pub-container">
     <div class="pub-footer__grid">
 
-      <!-- Brand col -->
+      {# Brand col #}
       <div class="pub-footer__col">
         <div class="pub-footer__brand">
           {% if identity.logo_url %}
           <img class="pub-footer__logo" src="{{ identity.logo_url }}" alt="{{ identity.name|default:'School logo' }}">
           {% else %}
-          <span class="pub-nav__dot pub-nav__dot--footer" aria-hidden="true"><i class="bi bi-building" aria-hidden="true"></i></span>
+          <span class="pub-nav__dot pub-nav__dot--footer" aria-hidden="true">
+            <span class="pub-icon pub-icon--sm">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zM4 5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM7.5 5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM4.5 8a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z"/>
+                <path d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1zm11 0H3v14h3v-2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V15h3z"/>
+              </svg>
+            </span>
+          </span>
           {% endif %}
           {{ identity.name|default:"Springfield Academy" }}
         </div>
@@ -135,20 +201,43 @@
         </p>
         {% if identity.address or identity.phone or identity.email %}
         <div class="pub-footer__contact">
-          {% if identity.address %}<span><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ identity.address }}</span>{% endif %}
-          {% if identity.phone %}<a href="tel:{{ identity.phone }}"><i class="bi bi-telephone" aria-hidden="true"></i> {{ identity.phone }}</a>{% endif %}
-          {% if identity.email %}<a href="mailto:{{ identity.email }}"><i class="bi bi-envelope" aria-hidden="true"></i> {{ identity.email }}</a>{% endif %}
+          {% if identity.address %}
+          <span>
+            <span class="pub-icon pub-icon--sm" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M12.166 8.94c-.524 1.062-1.234 2.12-1.96 3.07A32 32 0 0 1 8 14.58a32 32 0 0 1-2.206-2.57c-.726-.95-1.436-2.008-1.96-3.07C3.304 7.867 3 6.862 3 6a5 5 0 0 1 10 0c0 .862-.305 1.867-.834 2.94M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10"/><path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/></svg></span>
+            {{ identity.address }}
+          </span>
+          {% endif %}
+          {% if identity.phone %}
+          <a href="tel:{{ identity.phone }}">
+            <span class="pub-icon pub-icon--sm" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3.654 1.328a.678.678 0 0 0-1.015-.063L1.605 2.3c-.483.484-.661 1.169-.45 1.77a17.6 17.6 0 0 0 4.168 6.608 17.6 17.6 0 0 0 6.608 4.168c.601.211 1.286.033 1.77-.45l1.034-1.034a.678.678 0 0 0-.063-1.015l-2.307-1.794a.68.68 0 0 0-.58-.122l-2.19.547a1.75 1.75 0 0 1-1.657-.459L5.482 8.062a1.75 1.75 0 0 1-.46-1.657l.548-2.19a.68.68 0 0 0-.122-.58zM1.884.511a1.745 1.745 0 0 1 2.612.163L6.29 2.98c.329.423.445.974.315 1.494l-.547 2.19a.68.68 0 0 0 .178.643l2.457 2.457a.68.68 0 0 0 .644.178l2.189-.547a1.75 1.75 0 0 1 1.494.315l2.306 1.794c.829.645.905 1.87.163 2.611l-1.034 1.034c-.74.74-1.846 1.065-2.877.702a18.6 18.6 0 0 1-7.01-4.42 18.6 18.6 0 0 1-4.42-7.009c-.362-1.03-.037-2.137.703-2.877z"/></svg></span>
+            {{ identity.phone }}
+          </a>
+          {% endif %}
+          {% if identity.email %}
+          <a href="mailto:{{ identity.email }}">
+            <span class="pub-icon pub-icon--sm" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/></svg></span>
+            {{ identity.email }}
+          </a>
+          {% endif %}
         </div>
         {% endif %}
         <div class="pub-footer__social">
-          {% if identity.facebook_url %}<a href="{{ identity.facebook_url }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="bi bi-facebook" aria-hidden="true"></i></a>{% else %}<a href="#" aria-label="Facebook"><i class="bi bi-facebook" aria-hidden="true"></i></a>{% endif %}
-          {% if identity.instagram_url %}<a href="{{ identity.instagram_url }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="bi bi-instagram" aria-hidden="true"></i></a>{% else %}<a href="#" aria-label="Instagram"><i class="bi bi-instagram" aria-hidden="true"></i></a>{% endif %}
-          {% if identity.youtube_url %}<a href="{{ identity.youtube_url }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="bi bi-youtube" aria-hidden="true"></i></a>{% else %}<a href="#" aria-label="YouTube"><i class="bi bi-youtube" aria-hidden="true"></i></a>{% endif %}
-          {% if identity.linkedin_url %}<a href="{{ identity.linkedin_url }}" target="_blank" rel="noopener" aria-label="LinkedIn"><i class="bi bi-linkedin" aria-hidden="true"></i></a>{% else %}<a href="#" aria-label="LinkedIn"><i class="bi bi-linkedin" aria-hidden="true"></i></a>{% endif %}
+          {% if identity.facebook_url %}<a href="{{ identity.facebook_url }}" target="_blank" rel="noopener" aria-label="Facebook">{% else %}<a href="#" aria-label="Facebook">{% endif %}
+            <span class="pub-icon pub-icon--sm" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951"/></svg></span>
+          </a>
+          {% if identity.instagram_url %}<a href="{{ identity.instagram_url }}" target="_blank" rel="noopener" aria-label="Instagram">{% else %}<a href="#" aria-label="Instagram">{% endif %}
+            <span class="pub-icon pub-icon--sm" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0C5.829 0 5.556.01 4.703.048 3.85.088 3.269.222 2.76.42a3.9 3.9 0 0 0-1.417.923A3.9 3.9 0 0 0 .42 2.76C.222 3.268.087 3.85.048 4.7.01 5.555 0 5.827 0 8.001c0 2.172.01 2.444.048 3.297.04.852.174 1.433.372 1.942.205.526.478.972.923 1.417.444.445.89.719 1.416.923.51.198 1.09.333 1.942.372C5.555 15.99 5.827 16 8 16s2.444-.01 3.298-.048c.851-.04 1.434-.174 1.943-.372a3.9 3.9 0 0 0 1.416-.923c.445-.445.718-.891.923-1.417.197-.509.332-1.09.372-1.942C15.99 10.445 16 10.173 16 8s-.01-2.445-.048-3.299c-.04-.851-.175-1.433-.372-1.941a3.9 3.9 0 0 0-.923-1.417A3.9 3.9 0 0 0 13.24.42c-.51-.198-1.092-.333-1.943-.372C10.443.01 10.172 0 7.998 0zm-.717 1.442h.718c2.136 0 2.389.007 3.232.046.78.035 1.204.166 1.486.275.373.145.64.319.92.599s.453.546.598.92c.11.281.24.705.275 1.485.039.843.047 1.096.047 3.231s-.008 2.389-.047 3.232c-.035.78-.166 1.203-.275 1.485a2.5 2.5 0 0 1-.599.919c-.28.28-.546.453-.92.598-.28.11-.704.24-1.485.276-.843.038-1.096.047-3.232.047s-2.39-.009-3.233-.047c-.78-.036-1.203-.166-1.485-.276a2.5 2.5 0 0 1-.92-.598 2.5 2.5 0 0 1-.6-.92c-.109-.281-.24-.705-.275-1.485-.038-.843-.046-1.096-.046-3.233s.008-2.388.046-3.231c.036-.78.166-1.204.276-1.486.145-.373.319-.64.599-.92s.546-.453.92-.598c.282-.11.705-.24 1.485-.276.738-.034 1.024-.044 2.515-.045zm4.988 1.328a.96.96 0 1 0 0 1.92.96.96 0 0 0 0-1.92m-4.27 1.122a4.109 4.109 0 1 0 0 8.217 4.109 4.109 0 0 0 0-8.217m0 1.441a2.667 2.667 0 1 1 0 5.334 2.667 2.667 0 0 1 0-5.334"/></svg></span>
+          </a>
+          {% if identity.youtube_url %}<a href="{{ identity.youtube_url }}" target="_blank" rel="noopener" aria-label="YouTube">{% else %}<a href="#" aria-label="YouTube">{% endif %}
+            <span class="pub-icon pub-icon--sm" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.051 1.999h.089c.822.003 4.987.033 6.11.335a2.01 2.01 0 0 1 1.415 1.42c.101.38.172.883.22 1.402l.01.104.022.26.008.104c.065.914.073 1.77.074 1.957v.075c-.001.194-.01 1.108-.082 2.06l-.008.105-.009.104c-.05.572-.124 1.14-.235 1.558a2.01 2.01 0 0 1-1.415 1.42c-1.16.312-5.569.334-6.18.335h-.142c-.309 0-1.587-.006-2.927-.052l-.17-.006-.087-.004-.171-.007-.171-.007c-1.11-.049-2.167-.128-2.654-.26a2.01 2.01 0 0 1-1.415-1.419c-.111-.417-.185-.986-.235-1.558L.09 9.82l-.008-.104A31 31 0 0 1 0 7.68v-.123c.002-.215.01-.958.064-1.778l.007-.103.003-.052.008-.104.022-.26.01-.104c.048-.519.119-1.023.22-1.402a2.01 2.01 0 0 1 1.415-1.42c.487-.13 1.544-.21 2.654-.26l.17-.007.172-.006.086-.003.171-.007A100 100 0 0 1 7.858 2zM6.4 5.209v4.818l4.157-2.408z"/></svg></span>
+          </a>
+          {% if identity.linkedin_url %}<a href="{{ identity.linkedin_url }}" target="_blank" rel="noopener" aria-label="LinkedIn">{% else %}<a href="#" aria-label="LinkedIn">{% endif %}
+            <span class="pub-icon pub-icon--sm" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854zm4.943 12.248V6.169H2.542v7.225zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248S2.4 3.226 2.4 3.934c0 .694.521 1.248 1.327 1.248zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016l.016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225z"/></svg></span>
+          </a>
         </div>
       </div>
 
-      <!-- Explore col -->
+      {# Explore col #}
       <div class="pub-footer__col">
         <h4>Explore</h4>
         {% for link in nav_links %}
@@ -156,17 +245,20 @@
         {% endfor %}
       </div>
 
-      <!-- Portals col -->
+      {# Portal Login col #}
       <div class="pub-footer__col">
         <h4><a href="{% url 'accounts:login' %}" class="pub-footer__title-link">Portal Login</a></h4>
         {% for portal in portal_links %}
         <a href="{{ portal.url }}">
-          <i class="bi bi-circle-fill pub-portal-dot" aria-hidden="true"></i> {{ portal.label }}
+          <span class="pub-icon pub-icon--sm" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4"/></svg>
+          </span>
+          <span class="pub-portal-dot" aria-hidden="true">&#9679;</span>{{ portal.label }}
         </a>
         {% endfor %}
       </div>
 
-      <!-- CTA col -->
+      {# CTA col #}
       <div class="pub-footer__col">
         <h4>Join Us</h4>
         <p class="pub-footer__inquiry">
@@ -182,16 +274,27 @@
   </div>
 </footer>
 
-<button class="pub-back-top" id="pubBackTop" aria-label="Back to top"><i class="bi bi-arrow-up" aria-hidden="true"></i></button>
+{# Back to top #}
+<button class="pub-back-top" id="pubBackTop" aria-label="Back to top">
+  <span class="pub-icon pub-icon--md" aria-hidden="true">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L7.5 2.707V14.5a.5.5 0 0 0 .5.5z"/></svg>
+  </span>
+</button>
 
 <script>
 (function(){
   'use strict';
 
+  /* ── SVG icon paths for the theme toggle ──
+     moon = "light theme is active, click for dark"
+     sun  = "dark theme is active, click for light"  */
+  var ICON_MOON = 'M6 .278a.77.77 0 0 1 .08.858 7.2 7.2 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277q.792-.001 1.533-.16a.79.79 0 0 1 .81.316.73.73 0 0 1-.031.893A8.35 8.35 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.75.75 0 0 1 6 .278';
+  var ICON_SUN  = 'M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6m0 1a4 4 0 1 0 0-8 4 4 0 0 0 0 8M8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0m0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13m8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5M3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8m10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0m-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0m9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707M4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708';
+
   /* ── Navbar scroll class ── */
-  var pubNav  = document.getElementById('pub-nav');
-  var toggle  = document.getElementById('pubNavToggle');
-  var mobile  = document.getElementById('pubNavMobile');
+  var pubNav   = document.getElementById('pub-nav');
+  var toggle   = document.getElementById('pubNavToggle');
+  var mobile   = document.getElementById('pubNavMobile');
   var backdrop = document.getElementById('pubNavBackdrop');
 
   if(pubNav){
@@ -208,11 +311,9 @@
     mobile.setAttribute('aria-hidden', 'false');
     if(backdrop){ backdrop.classList.add('is-visible'); }
     document.body.style.overflow = 'hidden';
-    /* Move focus to first link for keyboard users */
     var firstLink = mobile.querySelector('a, button');
     if(firstLink) setTimeout(function(){ firstLink.focus(); }, 50);
   }
-
   function closeMenu(){
     pubNav.classList.remove('is-open');
     toggle.setAttribute('aria-expanded', 'false');
@@ -228,54 +329,62 @@
       pubNav.classList.contains('is-open') ? closeMenu() : openMenu();
     });
   }
-
-  /* Close when a nav link inside the drawer is tapped */
   if(mobile){
     mobile.querySelectorAll('a').forEach(function(link){
-      link.addEventListener('click', function(){
-        /* small delay so the navigation fires before we collapse */
-        setTimeout(closeMenu, 80);
-      });
+      link.addEventListener('click', function(){ setTimeout(closeMenu, 80); });
     });
   }
-
-  /* Close on backdrop click */
-  if(backdrop){
-    backdrop.addEventListener('click', closeMenu);
-  }
-
-  /* Close on Escape key */
+  if(backdrop){ backdrop.addEventListener('click', closeMenu); }
   document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape' && pubNav && pubNav.classList.contains('is-open')){
-      closeMenu();
-    }
+    if(e.key === 'Escape' && pubNav && pubNav.classList.contains('is-open')) closeMenu();
   });
-
-  /* Close if viewport grows past the mobile breakpoint */
   window.addEventListener('resize', function(){
-    if(window.innerWidth >= 1024 && pubNav && pubNav.classList.contains('is-open')){
-      closeMenu();
-    }
+    if(window.innerWidth >= 1024 && pubNav && pubNav.classList.contains('is-open')) closeMenu();
   }, {passive:true});
 
-  /* ── Dark mode toggle (bar button + mobile menu row) ── */
-  var themeBtns = document.querySelectorAll('[data-theme-toggle]');
-  var STORAGE_KEY = 'pub-theme';
-  var saved = localStorage.getItem(STORAGE_KEY) ||
-    (window.matchMedia('(prefers-color-scheme:light)').matches ? 'light' : 'dark');
-  function applyTheme(t){
+  /* ── Theme toggle ── */
+  var themeBtns   = document.querySelectorAll('[data-theme-toggle]');
+  /*
+   * Key is versioned so stale values from before W1 (when dark was default)
+   * do not override the new light default. Users who explicitly toggled after
+   * W1 keep their choice; everyone else gets the server-rendered default.
+   */
+  var STORAGE_KEY = 'pub-theme-v2';
+
+  /*
+   * Priority order:
+   *   1. User's explicit saved choice (this version of the key only)
+   *   2. The server-rendered data-theme attribute (school's setting)
+   *   3. OS preference as a tiebreaker if server attr is somehow missing
+   */
+  var serverTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  var osTheme     = window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
+  var saved       = localStorage.getItem(STORAGE_KEY) || serverTheme;
+
+  function applyTheme(t) {
     document.documentElement.setAttribute('data-theme', t);
-    themeBtns.forEach(function(themeBtn){
-      themeBtn.querySelector('i').className = t === 'light' ? 'bi bi-moon' : 'bi bi-sun';
-      themeBtn.setAttribute('aria-label', t === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
-      var label = themeBtn.querySelector('.pub-nav__theme-label');
-      if(label) label.textContent = t === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+    var iconPath  = document.getElementById('pubThemeIconPath');
+    var iconPathM = document.getElementById('pubThemeIconPathMobile');
+    /* moon = currently light, click to go dark
+       sun  = currently dark,  click to go light */
+    var newPath  = (t === 'dark') ? ICON_SUN : ICON_MOON;
+    var newLabel = (t === 'dark') ? 'Switch to light mode' : 'Switch to dark mode';
+    if (iconPath)  iconPath.setAttribute('d', newPath);
+    if (iconPathM) iconPathM.setAttribute('d', newPath);
+    themeBtns.forEach(function(btn) {
+      btn.setAttribute('aria-label', newLabel);
+      var label = btn.querySelector('.pub-nav__theme-label');
+      if (label) label.textContent = newLabel;
     });
   }
+
+  /* Apply immediately — before paint so there is no colour flash */
   applyTheme(saved);
-  themeBtns.forEach(function(btn){
-    btn.addEventListener('click', function(){
-      var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+
+  themeBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next    = (current === 'dark') ? 'light' : 'dark';
       applyTheme(next);
       localStorage.setItem(STORAGE_KEY, next);
     });
@@ -294,15 +403,15 @@
 
   /* ── Scroll reveal ── */
   if('IntersectionObserver' in window){
-    var reveals = document.querySelectorAll('[data-reveal]');
+    var revealEls = document.querySelectorAll('[data-reveal], [data-reveal-stagger]');
     var obs = new IntersectionObserver(function(entries){
       entries.forEach(function(e){
         if(e.isIntersecting){ e.target.classList.add('is-visible'); obs.unobserve(e.target); }
       });
-    }, {threshold:0.12, rootMargin:'0px 0px -40px 0px'});
-    reveals.forEach(function(el){ obs.observe(el); });
+    }, {threshold:0.10, rootMargin:'0px 0px -40px 0px'});
+    revealEls.forEach(function(el){ obs.observe(el); });
   } else {
-    document.querySelectorAll('[data-reveal]').forEach(function(el){ el.classList.add('is-visible'); });
+    document.querySelectorAll('[data-reveal],[data-reveal-stagger]').forEach(function(el){ el.classList.add('is-visible'); });
   }
 
   /* ── Animated counters ── */
@@ -313,8 +422,8 @@
     var start  = performance.now();
     function step(now){
       var p = Math.min((now - start)/dur, 1);
-      var e = 1 - Math.pow(1-p, 3);
-      el.textContent = Math.floor(e * target).toLocaleString() + suffix;
+      var ease = 1 - Math.pow(1-p, 3);
+      el.textContent = Math.floor(ease * target).toLocaleString() + suffix;
       if(p < 1) requestAnimationFrame(step);
       else el.textContent = target.toLocaleString() + suffix;
     }
@@ -357,7 +466,7 @@
   });
 
   /* ── Gallery filter + lightbox ── */
-  var filterBtns = document.querySelectorAll('.pub-filter-btn');
+  var filterBtns   = document.querySelectorAll('.pub-filter-btn');
   var galleryItems = document.querySelectorAll('.pub-gallery__item');
   filterBtns.forEach(function(btn){
     btn.addEventListener('click', function(){
@@ -369,10 +478,10 @@
       });
     });
   });
-  var lightbox    = document.getElementById('pubLightbox');
-  var lbImg       = document.getElementById('pubLbImg');
-  var lbCaption   = document.getElementById('pubLbCaption');
-  var lbIndex     = 0;
+  var lightbox  = document.getElementById('pubLightbox');
+  var lbImg     = document.getElementById('pubLbImg');
+  var lbCaption = document.getElementById('pubLbCaption');
+  var lbIndex   = 0;
   function visibleItems(){ return Array.from(galleryItems).filter(function(i){ return i.style.display !== 'none'; }); }
   galleryItems.forEach(function(item){
     item.addEventListener('click', function(){
@@ -390,10 +499,10 @@
   }
   function showLbImg(vis){
     var el  = vis[lbIndex];
-    var img = el.querySelector('img');
-    var cap = el.querySelector('.pub-gallery__overlay span');
-    if(lbImg){ lbImg.src = img.src; lbImg.alt = img.alt; }
-    if(lbCaption) lbCaption.textContent = cap ? cap.textContent : img.alt;
+    var img = el ? el.querySelector('img') : null;
+    var cap = el ? el.querySelector('.pub-gallery__overlay span') : null;
+    if(img && lbImg){ lbImg.src = img.src; lbImg.alt = img.alt; }
+    if(lbCaption) lbCaption.textContent = cap ? cap.textContent : (img ? img.alt : '');
   }
   function closeLb(){ if(lightbox){ lightbox.classList.remove('is-open'); document.body.style.overflow = ''; } }
   function lbNav(dir){ var vis = visibleItems(); lbIndex = (lbIndex + dir + vis.length) % vis.length; showLbImg(vis); }
@@ -414,9 +523,9 @@
   /* ── Hero carousel ── */
   var carousel = document.querySelector('.pub-carousel');
   if(carousel){
-    var track  = carousel.querySelector('.pub-carousel__track');
-    var slides = carousel.querySelectorAll('.pub-carousel__slide');
-    var dotsC  = carousel.querySelector('.pub-carousel__dots');
+    var track   = carousel.querySelector('.pub-carousel__track');
+    var slides  = carousel.querySelectorAll('.pub-carousel__slide');
+    var dotsC   = carousel.querySelector('.pub-carousel__dots');
     var prevBtn = carousel.querySelector('.pub-carousel__btn--prev');
     var nextBtn = carousel.querySelector('.pub-carousel__btn--next');
     var idx = 0, timer;
@@ -430,23 +539,18 @@
       });
     }
     var dots = carousel.querySelectorAll('.pub-carousel__dot');
-    function goTo(i){
-      idx = (i + slides.length) % slides.length;
-      if(track) track.style.transform = 'translateX(-' + (idx*100) + '%)';
-      dots.forEach(function(d,di){ d.classList.toggle('is-active', di===idx); });
-    }
+    function goTo(i){ idx=(i+slides.length)%slides.length; if(track) track.style.transform='translateX(-'+(idx*100)+'%)'; dots.forEach(function(d,di){ d.classList.toggle('is-active',di===idx); }); }
     function next(){ goTo(idx+1); }
-    function prev(){ goTo(idx-1); }
-    function start(){ timer = setInterval(next, 5000); }
     function reset(){ clearInterval(timer); start(); }
-    if(prevBtn) prevBtn.addEventListener('click', function(){ prev(); reset(); });
+    function start(){ timer=setInterval(next,5000); }
+    if(prevBtn) prevBtn.addEventListener('click', function(){ goTo(idx-1); reset(); });
     if(nextBtn) nextBtn.addEventListener('click', function(){ next(); reset(); });
     carousel.addEventListener('mouseenter', function(){ clearInterval(timer); });
     carousel.addEventListener('mouseleave', start);
-    var tx = 0;
-    carousel.addEventListener('touchstart', function(e){ tx = e.touches[0].clientX; }, {passive:true});
-    carousel.addEventListener('touchend',   function(e){ var dx = e.changedTouches[0].clientX - tx; if(Math.abs(dx)>50){ dx<0?next():prev(); reset(); } }, {passive:true});
-    if(slides.length > 1) start();
+    var tx=0;
+    carousel.addEventListener('touchstart', function(e){ tx=e.touches[0].clientX; },{passive:true});
+    carousel.addEventListener('touchend',   function(e){ var dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>50){dx<0?next():goTo(idx-1); reset();} },{passive:true});
+    if(slides.length>1) start();
   }
 
   /* ── Testimonial slider ── */
@@ -459,109 +563,72 @@
     if(tdotsC && tslides.length > 1){
       tslides.forEach(function(_,i){
         var d = document.createElement('button');
-        d.className = 'pub-testimonial__dot' + (i===0?' is-active':'');
+        d.className = 'pub-testimonial__dot'+(i===0?' is-active':'');
         d.setAttribute('aria-label','Testimonial '+(i+1));
         d.addEventListener('click', function(){ tGoTo(i); });
         tdotsC.appendChild(d);
       });
     }
     var tdots = tslider.querySelectorAll('.pub-testimonial__dot');
-    function tGoTo(i){
-      tidx = (i + tslides.length) % tslides.length;
-      if(ttrack) ttrack.style.transform = 'translateX(-'+(tidx*100)+'%)';
-      tdots.forEach(function(d,di){ d.classList.toggle('is-active', di===tidx); });
-    }
+    function tGoTo(i){ tidx=(i+tslides.length)%tslides.length; if(ttrack) ttrack.style.transform='translateX(-'+(tidx*100)+'%)'; tdots.forEach(function(d,di){ d.classList.toggle('is-active',di===tidx); }); }
     if(tslides.length > 1) setInterval(function(){ tGoTo(tidx+1); }, 6000);
   }
 
-  /* ── Inquiry form: validated here, confirmed only after the server saves it ── */
+  /* ── Inquiry form (AJAX + fallback POST, confirmed only after the row is stored) ── */
   var form = document.getElementById('pub-inquiry-form');
   if(form){
     var successMsg = document.getElementById('pubFormSuccess');
     var errorBox   = document.getElementById('pubFormError');
     var errorText  = document.getElementById('pubFormErrorText');
     var submitBtn  = form.querySelector('[type="submit"]');
-    var FIELDS = ['name','email','phone','message'];
+    var FIELDS     = ['name','email','phone','message'];
 
-    function fieldEl(name){ return form.querySelector('[name="'+name+'"]'); }
-    function errorEl(name){ return form.querySelector('[data-error="'+name+'"]'); }
-    function showErr(name, msg){
-      var inp = fieldEl(name), err = errorEl(name);
-      if(inp) inp.classList.add('is-invalid');
-      if(err){ err.textContent = msg; err.classList.add('is-visible'); }
-    }
-    function clearErr(name){
-      var inp = fieldEl(name), err = errorEl(name);
-      if(inp) inp.classList.remove('is-invalid');
-      if(err){ err.textContent = ''; err.classList.remove('is-visible'); }
-    }
-    function hideAlert(){ if(errorBox) errorBox.hidden = true; }
-    function showAlert(msg){
-      if(errorText && msg) errorText.textContent = msg;
-      if(errorBox){ errorBox.hidden = false; errorBox.scrollIntoView({behavior:'smooth',block:'center'}); }
-    }
+    function fieldEl(n){ return form.querySelector('[name="'+n+'"]'); }
+    function errorEl(n){ return form.querySelector('[data-error="'+n+'"]'); }
+    function showErr(n,msg){ var i=fieldEl(n),e=errorEl(n); if(i) i.classList.add('is-invalid'); if(e){e.textContent=msg;e.classList.add('is-visible');} }
+    function clearErr(n){ var i=fieldEl(n),e=errorEl(n); if(i) i.classList.remove('is-invalid'); if(e){e.textContent='';e.classList.remove('is-visible');} }
+    function hideAlert(){ if(errorBox) errorBox.hidden=true; }
+    function showAlert(msg){ if(errorText&&msg) errorText.textContent=msg; if(errorBox){errorBox.hidden=false;errorBox.scrollIntoView({behavior:'smooth',block:'center'});} }
     function validate(){
-      FIELDS.forEach(clearErr);
-      hideAlert();
-      var valid = true;
-      var name = fieldEl('name'), email = fieldEl('email');
-      var phone = fieldEl('phone'), msg = fieldEl('message');
-      if(name && !name.value.trim()){ showErr('name','Please enter your name.'); valid=false; }
-      if(email && !email.value.trim()){ showErr('email','Please enter your email.'); valid=false; }
-      else if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)){ showErr('email','Enter a valid email.'); valid=false; }
-      if(phone && phone.value.trim() && !/^[\d\s()+\-]{7,20}$/.test(phone.value)){ showErr('phone','Enter a valid phone number.'); valid=false; }
-      if(msg && !msg.value.trim()){ showErr('message','Please enter a message.'); valid=false; }
+      FIELDS.forEach(clearErr); hideAlert();
+      var valid=true;
+      var name=fieldEl('name'),email=fieldEl('email'),phone=fieldEl('phone'),msg=fieldEl('message');
+      if(name&&!name.value.trim()){showErr('name','Please enter your name.');valid=false;}
+      if(email&&!email.value.trim()){showErr('email','Please enter your email.');valid=false;}
+      else if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)){showErr('email','Enter a valid email.');valid=false;}
+      if(phone&&phone.value.trim()&&!/^[\d\s()+\-]{7,20}$/.test(phone.value)){showErr('phone','Enter a valid phone number.');valid=false;}
+      if(msg&&!msg.value.trim()){showErr('message','Please enter a message.');valid=false;}
       return valid;
     }
-    function lock(on){
-      if(!submitBtn) return;
-      submitBtn.disabled = on;
-      submitBtn.setAttribute('aria-busy', on ? 'true' : 'false');
-    }
+    function lock(on){ if(!submitBtn) return; submitBtn.disabled=on; submitBtn.setAttribute('aria-busy',on?'true':'false'); }
 
     form.addEventListener('submit', function(e){
       e.preventDefault();
       if(successMsg) successMsg.classList.remove('is-visible','pub-form-success--static');
       if(!validate()) return;
       lock(true);
-      fetch(form.getAttribute('action') || window.location.href, {
-        method: 'POST',
-        body: new FormData(form),
-        headers: {'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
-        credentials: 'same-origin'
+      fetch(form.getAttribute('action')||window.location.href,{
+        method:'POST',
+        body:new FormData(form),
+        headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
+        credentials:'same-origin'
       }).then(function(res){
-        return res.json().catch(function(){ return {}; }).then(function(data){
-          return {status: res.status, data: data || {}};
-        });
+        return res.json().catch(function(){return{};}).then(function(data){return{status:res.status,data:data||{}};});
       }).then(function(result){
-        var data = result.data;
-        if(data.ok === true){
-          form.reset();
-          FIELDS.forEach(clearErr);
-          if(successMsg){
-            successMsg.classList.add('is-visible');
-            successMsg.scrollIntoView({behavior:'smooth',block:'center'});
-          }
+        var data=result.data;
+        if(data.ok===true){
+          form.reset(); FIELDS.forEach(clearErr);
+          if(successMsg){successMsg.classList.add('is-visible');successMsg.scrollIntoView({behavior:'smooth',block:'center'});}
           return;
         }
-        var errors = data.errors || {};
-        FIELDS.forEach(function(name){
-          if(errors[name] && errors[name].length) showErr(name, errors[name][0]);
-        });
-        if(errors.__all__ && errors.__all__.length){
-          showAlert(errors.__all__[0]);
-        } else if(errors.name || errors.email || errors.phone || errors.message){
-          showAlert('Please check the highlighted fields and try again.');
-        } else if(result.status === 429){
-          showAlert('You have sent several messages just now. Please wait a few minutes and try again.');
-        } else {
-          showAlert('The school could not take your message just now. Please try again in a moment.');
-        }
+        var errors=data.errors||{};
+        FIELDS.forEach(function(n){ if(errors[n]&&errors[n].length) showErr(n,errors[n][0]); });
+        if(errors.__all__&&errors.__all__.length) showAlert(errors.__all__[0]);
+        else if(result.status===429) showAlert('You have sent several messages recently. Please wait a few minutes and try again.');
+        else showAlert('The school could not take your message just now. Please try again in a moment.');
       }).catch(function(){
         showAlert('We could not reach the school — your message has not been sent. Please check your connection and try again.');
-      }).then(function(){
-        lock(false);
-      });
+      }).then(function(){ lock(false); });
     });
   }
 
@@ -569,5 +636,7 @@
 </script>
 
 {% block extra_js %}{% endblock %}
+
+{% include "features/assistant/widget.html" %}
 </body>
 </html>

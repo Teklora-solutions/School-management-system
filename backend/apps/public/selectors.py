@@ -117,6 +117,8 @@ def site_identity(request: Any = None) -> dict:
         "admissions_email": _str("admissions_email"),
         "office_hours": _str("office_hours"),
         "map_embed_url": _str("map_embed_url"),
+        # ── Hero background image ──────────────────────────────────────────
+        "hero_image_url": row.hero_image.url if getattr(row, "hero_image", None) else "",
     }
     if request is not None:
         request._site_identity = values

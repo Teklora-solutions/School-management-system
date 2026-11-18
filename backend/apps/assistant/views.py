@@ -321,13 +321,17 @@ class TestConsoleView(AdminRequiredMixin, View):
     def _render(self, request, form, result=None):
         from django.shortcuts import render
 
+        settings_row = selectors.assistant_settings()
         return render(
             request,
             self.template_name,
             {
                 "form": form,
                 "result": result,
-                "safeguarding_contact_set": selectors.assistant_settings().has_safeguarding_contact,
+                "settings_row": settings_row,
+                "safeguarding_contact_set": settings_row.has_safeguarding_contact,
+                "console_daily_limit": settings_row.console_daily_limit,
+                "console_monthly_budget_ksh": settings_row.console_monthly_budget_ksh,
             },
         )
 

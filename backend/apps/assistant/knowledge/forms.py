@@ -21,6 +21,7 @@ from ..models import (
     KnowledgeCollection,
     KnowledgeDocument,
     KnowledgeQAPair,
+    ProviderConfig,
 )
 from . import scope
 from .roles import roles_key, roles_list
@@ -283,3 +284,70 @@ class KnowledgeStatusForm(forms.Form):
         widget=SELECT,
         label="Status",
     )
+
+
+class AnswerDeskForm(forms.Form):
+    """A question, and the audience it is previewed for."""
+
+    question = forms.CharField(
+        label="Question",
+        widget=forms.Textarea(
+            attrs={"class": "form-control", "rows": 3, "placeholder": "Type a question…"}
+        ),
+    )
+    audience = forms.ChoiceField(
+        label="Preview as",
+        choices=(("visitor", "Visitor (not signed in)"),) + tuple(User.Role.choices),
+        initial="visitor",
+        widget=SELECT,
+    )
+    preview_class = forms.ModelChoiceField(
+        required=False,
+        queryset=SchoolClass.objects.none(),
+        label="Class (for a parent, student or teacher)",
+        empty_label="No class",
+        widget=SELECT,
+    )
+    provider = forms.ModelChoiceField(
+        queryset=ProviderConfig.objects.none(),
+        required=False,
+        label="Provider for the answer",
+        empty_label="Use the default provider",
+        widget=SELECT,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["preview_class"].queryset = class_queryset()
+        self.fields["provider"].queryset = ProviderConfig.objects.filter(
+            is_active=True
+        ).order_by("priority", "name")
+
+    def clean_question(self):
+        value = (self.cleaned_data.get("question") or "").strip()
+        if len(value) < 3:
+            raise forms.ValidationError("Type a question to test.")
+        return value
+
+    def class_ids(self) -> list[int]:
+        school_class = self.cleaned_data.get("preview_class")
+        return [school_class.pk] if school_class else []
+
+
+class DocumentCheckForm(forms.Form):
+    question = forms.CharField(
+        label="Question",
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 3,
+                "placeholder": "For example: what is the Grade 4 term fee?",
+            }
+        ),
+    )
+
+    def clean_question(self):
+        value = (self.cleaned_data.get("question") or "").strip()
+        if len(value) < 3:
+            raise forms.ValidationError("Type a question to test.")
+        return value

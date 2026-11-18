@@ -1,108 +1,110 @@
+{% extends "public/base.html" %}
 {% load static core_extras %}
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="Sign in to the {{ portal.heading }} at {{ SCHOOL_NAME }}.">
-  <title>{{ portal.heading }} Sign In | {{ SCHOOL_NAME }}</title>
-  <link rel="stylesheet" href="{% static 'vendor/bootstrap/5.3.3/bootstrap.min.css' %}">
-  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">
-  <link rel="stylesheet" href="{% static_v 'css/base.css' %}">
-</head>
-{# data-role drives the accent colours in css/base.css, so each portal is its own colour #}
-<body data-role="{{ portal.slug }}">
 
-<div class="login-page">
-  {% include "partials/_messages.html" %}
+{% block title %}{{ portal.heading }} Sign In | {{ identity.name|default:SCHOOL_NAME }}{% endblock %}
+{% block meta_description %}Sign in to the {{ portal.heading }} at {{ identity.name|default:SCHOOL_NAME }}.{% endblock %}
 
-  <div class="login-stage">
-    <aside class="login-aside">
-      <div class="login-logo-icon" aria-hidden="true">
-        <i class="bi {{ portal.icon }}"></i>
-      </div>
-      <p class="login-kicker">{{ SCHOOL_NAME }}</p>
-      <h1>{{ portal.heading }}</h1>
-      <p class="login-aside__blurb">{{ portal.blurb }}</p>
-      <p class="login-aside__hint">Sign in with {{ portal.credential }}.</p>
-    </aside>
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">
+{% endblock %}
 
-    <section class="login-panel">
-      <h2>Sign in</h2>
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card">
 
-      {% if form.non_field_errors %}
-      <div class="login-alert" role="alert">
-        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
-        <span>{% for error in form.non_field_errors %}{{ error }}{% endfor %}</span>
-      </div>
-      {% endif %}
+    {# Portal icon and heading #}
+    <div class="auth-card__icon" style="background:color-mix(in srgb,var(--pc-{{ portal.slug }}-color,var(--pub-accent)) 13%,transparent);color:var(--pc-{{ portal.slug }}-color,var(--pub-accent))">
+      <i class="bi {{ portal.icon }}" style="font-size:1.5rem" aria-hidden="true"></i>
+    </div>
+    <p style="text-align:center;font-size:var(--pub-text-xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--pub-accent);margin-bottom:var(--pub-sp-1)">{{ identity.name|default:SCHOOL_NAME }}</p>
+    <h1 class="auth-card__title">{{ portal.heading }}</h1>
+    <p class="auth-card__sub">{{ portal.blurb }}<br>Sign in with {{ portal.credential }}.</p>
 
-      <form method="post" id="login-form" novalidate>
-        {% csrf_token %}
+    {# Non-field errors #}
+    {% if form.non_field_errors %}
+    <div class="auth-alert" role="alert">
+      <span class="pub-icon pub-icon--sm" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/></svg>
+      </span>
+      <span>{% for error in form.non_field_errors %}{{ error }}{% endfor %}</span>
+    </div>
+    {% endif %}
 
-        <div class="login-field">
-          <label for="id_login_username">{{ portal.field_label }}</label>
-          {{ form.username }}
-          {% if form.username.errors %}
-            <p class="login-field__error">{{ form.username.errors.0 }}</p>
-          {% endif %}
-        </div>
+    <form method="post" id="login-form" novalidate>
+      {% csrf_token %}
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
-        <div class="login-field">
-          <label for="id_login_password">Password</label>
-          <div class="login-password">
-            {{ form.password }}
-            <button type="button" id="toggle-password" class="login-password__toggle" aria-label="Show password">
-              <i class="bi bi-eye" id="pw-eye-icon" aria-hidden="true"></i>
-            </button>
-          </div>
-          {% if form.password.errors %}
-            <p class="login-field__error">{{ form.password.errors.0 }}</p>
-          {% endif %}
-        </div>
-
-        <button type="submit" class="btn btn-primary login-submit" id="login-submit-btn">
-          Sign in
-        </button>
-      </form>
-
-      <p class="login-recover">
-        {% if portal.self_reset %}
-          Forgot your password?
-          <a href="{% url 'password_reset' %}">Reset it here</a>
-        {% else %}
-          Forgot your password? Ask the school administrator to reset it.
+      <div class="auth-field">
+        <label for="id_login_username">{{ portal.field_label }}</label>
+        {{ form.username }}
+        {% if form.username.errors %}
+          <p class="auth-field__error">{{ form.username.errors.0 }}</p>
         {% endif %}
-      </p>
-
-      <div class="login-switch">
-        <p class="login-switch__label">Not your portal?</p>
-        <div class="login-switch__links">
-          {% for other in other_portals %}
-            <a href="{% url 'accounts:role_login' other.slug %}{% if next %}?next={{ next|urlencode }}{% endif %}">{{ other.label }}</a>
-          {% endfor %}
-        </div>
-        <a class="login-back" href="{% url 'accounts:login' %}">
-          <i class="bi bi-arrow-left" aria-hidden="true"></i> All portals
-        </a>
       </div>
-    </section>
+
+      <div class="auth-field">
+        <label for="id_login_password">Password</label>
+        <div class="auth-password">
+          {{ form.password }}
+          <button type="button" id="toggle-password" class="auth-password__toggle" aria-label="Show password">
+            <span class="pub-icon pub-icon--sm" aria-hidden="true">
+              <svg id="pw-eye-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
+                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
+              </svg>
+            </span>
+          </button>
+        </div>
+        {% if form.password.errors %}
+          <p class="auth-field__error">{{ form.password.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <button type="submit" class="auth-submit" id="login-submit-btn">Sign in</button>
+    </form>
+
+    <p class="auth-recover">
+      {% if portal.self_reset %}
+        Forgot your password? <a href="{% url 'password_reset' %}">Reset it here</a>
+      {% else %}
+        Forgot your password? Ask the school administrator to reset it.
+      {% endif %}
+    </p>
+
+    <div class="auth-switch">
+      <p class="auth-switch__label">Not your portal?</p>
+      <div class="auth-switch__links">
+        {% for other in other_portals %}
+          <a href="{% url 'accounts:role_login' other.slug %}{% if next %}?next={{ next|urlencode }}{% endif %}">{{ other.label }}</a>
+        {% endfor %}
+      </div>
+      <a class="auth-back" href="{% url 'accounts:login' %}">
+        <span class="pub-icon pub-icon--sm" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/></svg>
+        </span>
+        All portals
+      </a>
+    </div>
+
   </div>
 </div>
+{% endblock %}
 
-<script src="{% static 'vendor/bootstrap/5.3.3/bootstrap.bundle.min.js' %}"></script>
-<script src="{% static_v 'js/base.js' %}"></script>
+{% block extra_js %}
 <script>
-  const toggleBtn = document.getElementById('toggle-password');
-  const pwField = document.getElementById('id_login_password');
-  const eyeIcon = document.getElementById('pw-eye-icon');
-
-  toggleBtn?.addEventListener('click', () => {
-    const showing = pwField.type === 'text';
-    pwField.type = showing ? 'password' : 'text';
-    eyeIcon.className = showing ? 'bi bi-eye' : 'bi bi-eye-slash';
-    toggleBtn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+(function() {
+  var btn   = document.getElementById('toggle-password');
+  var field = document.getElementById('id_login_password');
+  var icon  = document.getElementById('pw-eye-icon');
+  var EYE      = '<path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>';
+  var EYESLASH = '<path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7 7 0 0 0 2.79-.588M5.21 3.088A7 7 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474z"/><path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12z"/>';
+  if (!btn || !field) return;
+  btn.addEventListener('click', function() {
+    var isPassword = field.type === 'password';
+    field.type = isPassword ? 'text' : 'password';
+    icon.innerHTML = isPassword ? EYESLASH : EYE;
+    btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
   });
+})();
 </script>
-</body>
-</html>
+{% endblock %}

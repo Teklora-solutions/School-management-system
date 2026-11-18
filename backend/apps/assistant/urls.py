@@ -2,12 +2,19 @@
 
 from django.urls import path
 
-from . import views
+from . import chat_views, views
 from .knowledge import views as knowledge_views
 
 app_name = "assistant"
 
 urlpatterns = [
+    # Public chat widget endpoints (visitor-facing, no login, all switched OFF
+    # by default). Server-side rules live in chat.py.
+    path("chat/state/", chat_views.WidgetStateView.as_view(), name="chat_state"),
+    path("chat/send/", chat_views.ChatSendView.as_view(), name="chat_send"),
+    path("chat/new/", chat_views.ChatNewView.as_view(), name="chat_new"),
+    path("chat/feedback/", chat_views.ChatFeedbackView.as_view(), name="chat_feedback"),
+    path("chat/callback/", chat_views.ChatCallbackView.as_view(), name="chat_callback"),
     path("settings/", views.AssistantSettingsView.as_view(), name="settings"),
     path("providers/", views.ProviderListView.as_view(), name="providers"),
     path("providers/new/", views.ProviderCreateView.as_view(), name="provider_create"),
@@ -93,5 +100,35 @@ urlpatterns = [
         "knowledge/documents/<int:pk>/reindex/",
         knowledge_views.DocumentReindexView.as_view(),
         name="knowledge_document_reindex",
+    ),
+    path(
+        "knowledge/documents/<int:pk>/confirm-personal-data/",
+        knowledge_views.DocumentConfirmPIIView.as_view(),
+        name="knowledge_document_confirm_pii",
+    ),
+    path(
+        "knowledge/documents/<int:pk>/check/",
+        knowledge_views.DocumentCheckView.as_view(),
+        name="knowledge_document_check",
+    ),
+    path(
+        "knowledge/ask/",
+        knowledge_views.AnswerDeskView.as_view(),
+        name="knowledge_answer_desk",
+    ),
+    path(
+        "knowledge/gaps/",
+        knowledge_views.GapListView.as_view(),
+        name="knowledge_gaps",
+    ),
+    path(
+        "knowledge/gaps/<int:pk>/resolve/",
+        knowledge_views.GapResolveView.as_view(),
+        name="knowledge_gap_resolve",
+    ),
+    path(
+        "knowledge/gaps/<int:pk>/delete/",
+        knowledge_views.GapDeleteView.as_view(),
+        name="knowledge_gap_delete",
     ),
 ]

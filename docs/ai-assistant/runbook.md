@@ -8,8 +8,10 @@
    server secrets — not in the database, a repository, or a ticket.
 4. Back up the database (see below).
 5. Apply migrations: `python manage.py migrate assistant`. Run `showmigrations assistant` first; the
-   current head is `0004` (K2: knowledge passages and ingest runs). On this workstation `0004` was
-   applied to the local database on 2026-11-18; the two tables were empty afterwards.
+   current head is `0005` (K3: kill switch, console limits, document personal-data fields, knowledge
+   gaps). On this workstation `0005` was already applied by a concurrent tool before the module's own
+   apply gate; it is additive only (see the changelog). `0004` (K2: passages and ingest runs) was
+   applied on 2026-11-18 with the two tables empty afterwards.
 6. Restart web and worker processes. Both need the environment variable.
 7. Sign in as admin → sidebar **AI Assistant** → confirm every switch is off.
 8. Keep `python manage.py qcluster` running. Knowledge reading is a background job; with no worker an
@@ -92,13 +94,23 @@ run with no key configured and never prints a key.
 
 ## Budget hit
 
-The gateway refuses new non-console calls once the month's recorded spend plus a cautious reservation
-would cross `monthly_budget_ksh`, or a provider's own cap. The caller sees a plain "reached its monthly
+The gateway refuses new live calls once the month's recorded spend plus a cautious reservation would
+cross `monthly_budget_ksh`, or a provider's own cap. The caller sees a plain "reached its monthly
 budget" message; the refusal does not call any provider. The admin raises the budget or the USD→KSh
-rate on the settings screen. A budget of 0 blocks all non-console calls by design.
+rate on the settings screen. A budget of 0 blocks all live calls by design.
 
-The admin test console is exempt so a provider can be verified before go-live; its usage is still
-recorded.
+The admin answer desk and test console are separate: exempt from the live switches and the site-wide
+budget, but stopped by the **kill switch**, by `console_daily_limit` (default 50 requests/day across
+both) and by `console_monthly_budget_ksh` (default KSh 500). Their usage is still recorded
+(`profile=console`), and those rows are what the console ceiling counts. Setting either console limit
+to `0` stops the desks.
+
+## Kill switch
+
+**Settings → Stop everything.** It stops live conversations, the answer desk, the test console and
+background reading at once. It is checked before every other switch and limit and always wins. Use it
+when a provider is misbehaving or the bill needs to stop immediately; unlike the live switches, it does
+not leave the desks usable.
 
 ## Public limits
 
@@ -128,7 +140,10 @@ trusted.
   fetched text is stored on the document so an admin can see exactly what was read.
 - **Cost:** each embedding batch writes `UsageEvent(source=ingestion)` rows priced from the provider's
   embedding price. The monthly and per-provider caps apply; the global assistant switch does not have
-  to be on.
+  to be on. The **kill switch does** stop embedding.
+- **Personal data:** every document is scanned when it is added and before it is embedded. A document
+  with findings stays out of service until an admin confirms the wording on the document page. The
+  findings store only kind, heading, passage number and a masked snippet.
 - **Needs re-index** appears when the embedding model changed (or a provider using that model was
   deleted) after indexing. Those documents are ignored until re-read.
 
@@ -154,8 +169,25 @@ same job for one document and is audited.
 | **Could not be read** with "password-protected" | The PDF is encrypted. | Remove the password and upload again. |
 | **Could not be read** with "no readable text" | The PDF is a scan. | Upload a text version; no OCR is built. |
 | **Could not be read** with "too long … more than 60 passages" | One document is too large. | Split it into smaller documents. |
+| **Could not be read** with "Personal data was detected" | The scan found a phone, email, ID-like number or likely name and nobody has confirmed it. | Review the findings on the document page; edit the document, or confirm it, then press **Read it again**. |
 | **Could not be read** with a provider reason | The embedding provider failed permanently or no provider has an embedding model. | Fix the provider or set an embedding model, then press **Read it again**. |
 | **Needs re-index** | The embedding model changed after indexing. | Press **Read it again** or run the command. |
+
+## Answers, the answer desk and gaps
+
+- Retrieval runs in the request that asks: one question embedding (cached 30 days) and one chat call,
+  both through the gateway, so the kill switch, budgets and circuit breaker apply.
+- Answers are cached for one hour. The cache key is a hash of the role, sorted class ids, visible
+  shelves, model signature and knowledge version; every cached citation is re-checked against live
+  scope and effective dates, so an expired document stops being used immediately. To force a fresh
+  answer for everyone, the knowledge version changes when documents change; clearing the cache
+  (`assistant:answer:*`) is safe at any time.
+- An answer is shown only when it cites a valid passage and every figure in it appears in the cited
+  text. Otherwise the reader would receive the fixed refusal; the answer desk shows the admin the raw
+  answer and why it failed.
+- Gaps record only the masked question, role, class ids, language hint, reason, top score and test
+  flag. Test-tool gaps are hidden from the default list. The admin can resolve or delete any gap.
+  Resolved-gap erasure after **90 days** is a DRAFT proposal; no scheduled job runs it.
 
 ## Safeguarding alerts and escalation
 
@@ -217,12 +249,14 @@ approval first.
 
 ## Rollback
 
+`python manage.py migrate assistant 0004` removes the K3 fields and the knowledge gap table while
+keeping the K2 passages and ingest runs; no document, passage or answer text is deleted by it.
 `python manage.py migrate assistant 0003` removes the two K2 tables (passages and ingest runs) and the
 `ingestion` choices, while keeping the knowledge catalogue. `python manage.py migrate assistant 0002`
 removes the four knowledge catalogue tables (documents, versions, question-and-answer pairs and
 collections) while keeping the Module 1 tables. Neither deletes files in `KNOWLEDGE_MEDIA_ROOT`;
 remove those separately if that is what you intend. `python manage.py migrate assistant 0001` removes
 the Step 2 tables and fields while keeping the original three tables and their data.
-`python manage.py migrate assistant zero` removes all twelve tables, including settings, providers,
-usage history and alert records (saved keys are encrypted, but the rows go too). All are destructive;
-take a backup first and only do this deliberately.
+`python manage.py migrate assistant zero` removes all thirteen tables, including settings, providers,
+usage history, gap questions and alert records (saved keys are encrypted, but the rows go too). All are
+destructive; take a backup first and only do this deliberately.

@@ -77,13 +77,16 @@ class GalleryPhotoForm(forms.ModelForm):
 
     class Meta:
         model = GalleryPhoto
-        fields = ["title", "caption", "image", "display_order", "is_published"]
+        fields = ["title", "caption", "category", "image", "display_order", "is_published"]
         widgets = {
             "title": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Sports day, 2026"}
             ),
             "caption": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "One line under the photo"}
+            ),
+            "category": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "e.g. Sports, Arts, Science"}
             ),
             "image": forms.FileInput(attrs={"class": "form-control"}),
             "display_order": forms.NumberInput(attrs={"class": "form-control", "min": "0"}),

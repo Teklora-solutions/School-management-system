@@ -29,7 +29,7 @@ from ..models import (
     UsageEvent,
 )
 from ..providers import registry
-from . import chunking, extraction
+from . import chunking, extraction, personal_data, versions
 
 BATCH_SIZE = 32
 MAX_ATTEMPTS = 3
@@ -83,6 +83,7 @@ def purge(document: KnowledgeDocument, state: str = KnowledgeDocument.IngestionS
                 "updated_at",
             ]
         )
+    versions.bump()
 
 
 def sync_collection(collection) -> None:
@@ -148,6 +149,16 @@ def ingest_document(
             document.body_text = text
             document.save(update_fields=["body_text", "updated_at"])
         passages = chunking.split_text(text)
+        findings = personal_data.scan_passages(passages)
+        personal_data.record_scan(document, findings)
+        if findings and document.pii_confirmed_at is None:
+            message = (
+                "Personal data was detected ("
+                + personal_data.describe(findings)
+                + "). Confirm the document or edit it before it can be used."
+            )
+            _fail(document, run, message)
+            raise IngestionFailed(message)
         vectors, model_name, dimension, tokens = _embed(document, passages, actor)
     except extraction.ExtractionError as exc:
         _fail(document, run, exc.safe_message)
@@ -216,6 +227,7 @@ def ingest_document(
                 "updated_at",
             ]
         )
+    versions.bump()
     return run
 
 

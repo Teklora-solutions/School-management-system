@@ -8,7 +8,12 @@ Business logic lives in services.py.
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.views import PasswordResetView
+from django.contrib.auth.views import (
+    PasswordResetDoneView,
+    PasswordResetConfirmView,
+    PasswordResetCompleteView,
+    PasswordResetView,
+)
 from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -18,6 +23,8 @@ from django.views import View
 from django.views.generic import DetailView, ListView, TemplateView
 
 from apps.core.mixins import AdminRequiredMixin
+
+from apps.public import selectors as pub_selectors
 
 from . import selectors, services
 from .forms import (
@@ -68,6 +75,19 @@ def _safe_next(request, include_post: bool = False) -> str:
     return ""
 
 
+def _pub_ctx(request: object) -> dict:
+    """
+    Public-site context (identity, nav_links, portal_links) for auth pages
+    that extend public/base.html.  Calling pub_selectors directly avoids
+    circular imports and keeps the auth views self-contained.
+    """
+    return {
+        "identity":     pub_selectors.site_identity(request),
+        "nav_links":    pub_selectors.nav_links(request),
+        "portal_links": pub_selectors.portal_links(),
+    }
+
+
 def _add_service_errors(form, exc: ValidationError) -> None:
     """Put a service-layer ``ValidationError`` onto the matching form fields."""
     if hasattr(exc, "message_dict"):
@@ -94,7 +114,7 @@ class PortalChooserView(View):
         return render(
             request,
             self.template_name,
-            {"portals": PORTALS.values(), "next": _safe_next(request)},
+            {"portals": PORTALS.values(), "next": _safe_next(request), **_pub_ctx(request)},
         )
 
 
@@ -136,6 +156,7 @@ class RoleLoginView(View):
             "portal": portal,
             "next": next_url,
             "other_portals": [p for p in PORTALS.values() if p.slug != portal.slug],
+            **_pub_ctx(request),
         }
 
     def get(self, request, *args, **kwargs):
@@ -219,6 +240,40 @@ class StaffBlockedPasswordResetView(PasswordResetView):
         return super().form_valid(form)
 
 
+# ---------------------------------------------------------------------------
+# Public-site wrappers for Django's built-in password-reset continuation views
+# so they also receive identity/nav_links/portal_links and can extend
+# public/base.html.
+# ---------------------------------------------------------------------------
+
+
+class PublicPasswordResetDoneView(PasswordResetDoneView):
+    """Email-sent confirmation — wraps Django's built-in view."""
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_pub_ctx(self.request))
+        return ctx
+
+
+class PublicPasswordResetConfirmView(PasswordResetConfirmView):
+    """Set-new-password form — wraps Django's built-in view."""
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_pub_ctx(self.request))
+        return ctx
+
+
+class PublicPasswordResetCompleteView(PasswordResetCompleteView):
+    """Password-reset success — wraps Django's built-in view."""
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_pub_ctx(self.request))
+        return ctx
+
+
 class DashboardRedirectView(View):
     """
     ``/dashboard/`` — the one address every "Dashboard" link points at.
@@ -250,7 +305,7 @@ class ForcePasswordChangeView(LoginRequiredMixin, View):
         if not request.user.must_change_password:
             return redirect(request.user.get_dashboard_url())
         form = ForcePasswordChangeForm(user=request.user)
-        return render(request, self.template_name, {"form": form})
+        return render(request, self.template_name, {"form": form, **_pub_ctx(request)})
 
     def post(self, request):
         form = ForcePasswordChangeForm(user=request.user, data=request.POST)
@@ -261,7 +316,7 @@ class ForcePasswordChangeView(LoginRequiredMixin, View):
             update_session_auth_hash(request, user)
             messages.success(request, "Password updated successfully. Welcome!")
             return redirect(user.get_dashboard_url())
-        return render(request, self.template_name, {"form": form})
+        return render(request, self.template_name, {"form": form, **_pub_ctx(request)})
 
 
 class ProfileView(LoginRequiredMixin, TemplateView):

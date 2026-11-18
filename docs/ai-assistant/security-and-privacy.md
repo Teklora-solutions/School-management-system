@@ -75,33 +75,66 @@ variable is missing rather than producing a broken call.
 
 ### Today
 
-- What the **admin** sends from the **test console** or the **Test** button, to the provider the admin
-  configured.
+- What the **admin** sends from the **test console**, the **answer desk** or a provider's **Test**
+  button, to the provider the admin configured.
 - **Approved knowledge documents, when they are embedded.** From K2, the text of each passage is sent
   to the configured embedding provider. This is school-approved wording, not pupil records, but it is
   document text leaving the server and the admin should know it: a document marked Private for staff
   is still embedded by a third-party provider. Embedding is skipped entirely while the fake provider
   is the only one configured; the fake adapter runs in-process.
-- No parent, student, teacher or visitor message leaves the server, because there is still no chat
-  screen.
+- **The answer desk's question embedding and answer call.** The masked question is embedded, the top
+  passages and the masked question go to the chat provider, and the answer comes back. The desk is
+  admin-only and its usage is `source=admin_test`.
+- **The per-document check's question embedding.** One embedding call; no answer is generated.
+- **A visitor's question from the public widget**, from CP2, once the public switch is on and the
+  consent wording is approved: the masked question (plus the Public shelves' passages) goes to the
+  chat provider, and the question is embedded first when a real embedding model is configured. The
+  stored message is the masked text. Honeypot and proof-of-work refusals never reach a provider, and a
+  safeguarding hit returns only the fixed safe reply.
+- No parent, student or teacher message leaves the server, because the signed-in chat is Module 4.
 
 If the configured provider is the fake one, nothing leaves the server at all.
 
-**Documents are not PII-masked before embedding.** Masking is built for questions (names, phones,
-emails, ID-like numbers). Applying it to school wording would corrupt the wording and make the text
-unsearchable. The rule is therefore: **do not upload a document containing a person's data**; the
-knowledge base is for general school information. This is repeated in the admin guide.
+### Exactly what ingestion sends
+
+Embedding a document sends, per passage, **only the passage text** and the embedding model name.
+Titles are not sent. File names, the storage path, the shelf, audience, roles, class links, status,
+effective dates, owner, fingerprints and version history are **not** sent. The system prompt and
+house rules are not sent on an embedding call. What is sent is the extracted text, split into passages
+of about 800 characters (with heading paths kept as part of the passage text where chunking produced
+them), batched 32 passages per request.
+
+**Documents are not masked before embedding.** Masking school wording would corrupt it and make it
+unsearchable. Since K3 the rule is enforced by a gate instead:
+
+1. **Scan.** Before anything is embedded, each document's passages are scanned
+   (`knowledge/personal_data.py`) for emails, Kenyan phone numbers, ID/admission-like numbers and
+   likely person names next to pupil/parent/guardian words (including `mwanafunzi`, `mzazi`, `mtoto`).
+   Findings are listed on the document page by kind, heading and passage number, with a **masked**
+   snippet. The scan is a heuristic: unusual spellings, Sheng nicknames and names with no trigger
+   word can be missed, and a harmless number can be flagged.
+2. **Stop.** A document with findings is **not embedded and cannot be approved** until the admin
+   decides.
+3. **Confirm.** The admin records the required confirmation — *“This document contains no personal
+   data of pupils, parents or staff, or I accept that it will be sent to the selected provider”* —
+   and the system stores **who** confirmed, **when**, and the **exact wording**. Only then can it be
+   approved and read.
+4. **Warn.** Every add/edit form for a document carries the warning and says which parts are sent.
+
+The confirmation is the decision point, not the scan: the school is accepting that the document text
+will leave the server, and the record of who accepted it is kept.
 
 ### What a real provider call contains
 
-When a provider is configured and the console is used, the request contains exactly:
+When a provider is configured and the console or answer desk is used, the request contains exactly:
 
 1. the **system prompt** — fixed instructions, the school name and the admin's house rules;
 2. the **masked user question**, inside an explicit data fence (`<user_question>…</user_question>`);
-3. from K3, the retrieved **source passages**, also fenced and labelled.
+3. from K3, the retrieved **source passages**, each inside its own `<source id="S1" title="…">` fence
+   under a `<sources>` block, with a label the answer must cite.
 
-An **embedding** request is different: it carries only the passage text (or, in K3, the masked
-question) and the embedding model name — no system prompt, no conversation history.
+An **embedding** request is different: it carries only the passage text (or, for a question, the
+masked question) and the embedding model name — no system prompt, no conversation history, no title.
 
 It never contains: the API key (sent only as the authentication header), the user's password, other
 users' records, the database, or anything from another conversation.
@@ -136,6 +169,27 @@ names.
 Masking happens **before** the question is put in the prompt, so the unmasked text is never sent to a
 provider. It is also applied to the excerpt stored on a safeguarding alert (capped at 300 characters).
 
+## Answers, citations and the figure check
+
+- **Unknown citation markers are stripped.** If the model invents `[S9]` when only five sources were
+  given, the marker is removed and counted.
+- **The figure check.** Every number, amount, date part and time part in the answer must appear in the
+  text of the passages the answer cited. Commas inside numbers are ignored; numbered list markers are
+  not treated as figures. Any unmatched figure, a missing valid citation, or an empty answer marks the
+  answer **unverified**.
+- **Unverified answers are never shown.** `knowledge/answers.py::deliver()` is the only function a
+  reader-facing screen may use; it returns the fixed refusal (school contact first, English and
+  Kiswahili, **DRAFT**) instead of the answer. The future chat module must call `deliver()`, not read
+  the raw answer. The answer desk shows the admin the raw answer, the warning and the exact figures
+  that failed, plus a panel showing exactly what the reader would receive.
+- **What the check can and cannot catch.** It proves that each cited figure exists in the cited text.
+  It **cannot** prove that a claim without a figure is supported, that the sentence around a figure is
+  a fair summary, or that a true figure was used for the wrong point. It is a guard against invented
+  money and dates, not proof of correctness. Correctness is measured by K4's question set.
+- **Safeguarding runs before everything** in the desk: screen → limits → retrieval → provider →
+  citations. A hit shows the rule, the safe reply and who would be alerted, and sends no alert and no
+  email from a test tool.
+
 ## Knowledge documents
 
 Knowledge files are the school's own wording and are treated as private records, not website assets.
@@ -153,20 +207,28 @@ Knowledge files are the school's own wording and are treated as private records,
 - **Who can read them.** One route: the admin download view. It is admin-only, returns an attachment
   with `Content-Type` fixed from the stored suffix and `X-Content-Type-Options: nosniff`, and writes an
   audit entry naming the document. There is no public URL, no media route and no signed URL.
-- **Audience before ranking.** `knowledge/scope.py::visible_documents()` builds the SQL filter from the
+- **Audience before ranking.** `knowledge/scope.py::scoped_documents()` builds the SQL filter from the
   asker's identity: public documents need an empty role list and no class limit; a signed-in role sees
   public documents plus its own role's documents within its class; drafts, archived rows, documents on
   unapproved shelves and documents outside their effective dates are never candidates. Roles are a
   canonical pipe-wrapped string (`|parent|teacher|`) so the same `LIKE` filter runs on SQLite and
-  PostgreSQL. K3 may rank the surviving rows; it may not widen them.
+  PostgreSQL. Retrieval ranks only the surviving rows; it cannot widen them. The answer desk's role
+  preview calls the same function through `audience_for_preview()`.
 - **The ceiling is checked three times.** In `KnowledgeDocument.clean()`, in the forms (so the error
   lands on the right field), and again in `knowledge/services.py` before writing.
 - **Fingerprints, not copies.** SHA-256 of the pasted text/URL or of the uploaded bytes is kept to flag
   duplicates. It is a fingerprint, not the content, and no fingerprint is sent to a provider.
-- **What leaves the server in K2.** The text of approved documents, in passage-sized batches, to the
-  configured embedding provider — and nothing else. Extraction itself is local; no file is uploaded
-  anywhere. The admin screens make no provider call until a document is approved and the worker reads
-  it, and embedding does not need the assistant's global switch.
+- **What leaves the server at ingestion.** The text of approved documents, in passage-sized batches,
+  to the configured embedding provider — and nothing else (see “Exactly what ingestion sends” above).
+  Extraction itself is local; no file is uploaded anywhere. The admin screens make no provider call
+  until a document is approved, its personal-data scan is resolved, and the worker reads it; embedding
+  does not need the assistant's global switch.
+- **The personal-data record.** Findings store the kind, heading, passage number and a masked snippet;
+  the raw value is never stored. The confirmation stores who confirmed, when, and the exact wording.
+- **Nothing about askers in the cache.** Answer cache keys are hashes over the role, sorted class ids,
+  visible shelves, embedding model and a knowledge version; values hold the answer text, citation
+  ids/titles and scores — not the question, not a user, not an IP. Cached citations are re-checked
+  against live scope and effective dates on every read.
 - **What is kept after fetching a web page.** The page text is stored on the document (`body_text`) so
   an admin can see exactly what was read. Fetching happens in the worker, only for `http(s)` addresses,
   and only when the document is approved.
@@ -218,6 +280,9 @@ The Kiswahili drafts are in the same file. All are proposals for the school to e
   not deleted automatically; deleting a minimal record is a policy decision for the safeguarding lead
   and is not built.
 - Usage rows (tokens, cost, outcome, latency): **12 months**, containing no message text.
+- Knowledge gaps (masked question, role, class signature, language hint, scores): resolved gaps are
+  proposed for erasure **90 days after resolution** (`GAP_RETENTION_DAYS = 90`), **DRAFT**. The admin
+  can delete any gap at any time; no scheduled job deletes anything until the period is approved.
 - Access logs and audit entries: follow the repository's existing audit retention.
 
 Nothing is being retained today beyond what is listed in [data-model.md](data-model.md). The
@@ -275,7 +340,12 @@ the pilot-readiness list.
 | A key committed to git | Key-scan test over assistant code, production settings, docs and `.env.example`. |
 | A non-admin opens the screens | `AdminRequiredMixin` / `RoleRequiredMixin` on every view; teacher/parent 403, visitor login redirect, tested. Alerts are visible to admin and director only. |
 | Prompt injection (user text or a document pretending to be instructions) | Text and sources are fenced; fence markers inside the text are escaped; the system prompt says data is never instructions; house rules cannot override the fixed rules; the console shows the exact outbound text. |
-| PII leaking to a provider | Masking of names, phones, emails and ID-like numbers before sending; limitations documented; consent draft says so. |
+| PII leaking to a provider | Question masking of names, phones, emails and ID-like numbers before sending; document scan + required admin confirmation before any passage is embedded; limitations documented; consent draft says so. |
+| An invented fee amount or date reaching a reader | Unknown citations stripped; every figure must appear in the cited passages; anything unverified is replaced by the fixed refusal through `deliver()`. |
+| A cached answer outliving its audience or an effective end date | Cache key includes role, sorted class ids and visible shelves; every cached citation is re-validated against live scope and dates at read time; a cached refusal carries no passages. |
+| A document with personal data being embedded | Scan before embedding; approval and ingestion blocked until the admin confirms, recording who, when and the exact wording. |
+| Test tools spending without limit | Answer desk and console have their own daily cap (default 50) and monthly ceiling (default KSh 500); the kill switch stops them too. |
+| A test in the answer desk sending a real safeguarding alert | Test tools show the preview only; tests prove no alert row, no notification and no email. |
 | Spending without control | Kill switch, monthly budget and optional per-provider cap checked before every call, with a cautious reservation. New switches default OFF. |
 | Safeguarding disabled by an admin or a database edit | The mandatory pack is code, not rows; no setting reads it; tests prove it always loads. |
 | Alert lost because the worker stopped | Escalation is also checked on every admin/director page load, throttled to once a minute; email failures are recorded and retried with a limit; in-app safety notifications bypass quiet hours. |
@@ -297,9 +367,17 @@ the pilot-readiness list.
 - Extraction is data-only and refuses private addresses, but it is not antivirus and does not scan
   macros; scanned PDFs are not read (no OCR). A page's DNS answer can change between the address check
   and the request; the system never deliberately follows an internal address.
-- Document text is sent to the embedding provider without names/phones/ID masking. The knowledge base
-  must contain general school information, never a pupil's record.
-- Nothing ranks or searches the passages yet (K3), so no answer can be wrong *or* right from them.
+- The personal-data scan for documents is a heuristic (patterns plus a trigger-word rule for names). It
+  can miss unusual spellings, Sheng nicknames and names with no pupil/parent/guardian trigger, and it
+  can flag an innocent number. The admin confirmation, not the scan, is the decision point, and the
+  snippet shown is masked.
+- Document text itself is sent to the embedding provider **unmasked** once the admin has confirmed the
+  document. The knowledge base must contain general school information, never a pupil's record.
+- The figure check proves only that cited figures exist in the cited text; it cannot prove a claim is
+  supported. An answer can pass with a true figure used for the wrong point.
+- Retrieval and answers exist and are exercised by the admin answer desk; no public or signed-in chat
+  screen calls them yet (Module 3/4).
+- The refusal wording and the 90-day gap retention are **DRAFT** for the school's approval.
 - No second-layer model screening for indirect safeguarding phrasing. It is designed (with cost and
   privacy implications) and not built.
 - The consent wording is unapproved, and the 12-month alert retention is a DRAFT proposal.

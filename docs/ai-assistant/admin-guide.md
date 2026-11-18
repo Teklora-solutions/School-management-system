@@ -12,6 +12,8 @@ Sidebar → **AI Assistant**. The tabs across the top are:
 | Settings | `/assistant/settings/` | admin |
 | Providers | `/assistant/providers/` | admin |
 | Knowledge | `/assistant/knowledge/documents/` | admin |
+| Answer desk | `/assistant/knowledge/answer-desk/` | admin |
+| Gaps | `/assistant/knowledge/gaps/` | admin |
 | Safeguarding rules | `/assistant/guardrails/` | admin |
 | Test console | `/assistant/console/` | admin |
 | Alerts | `/assistant/alerts/` | admin and director |
@@ -21,11 +23,13 @@ A thin banner appears at the top of **every** staff page when the safeguarding c
 when an alert is still open, with a link straight to the alerts page. You do not have to remember to
 look.
 
-The assistant is **off** when you first see it. Nothing is sent anywhere until you switch it on, and
-there is still no screen where a parent, student, teacher or visitor can talk to it. This version
-sets up and proves the machinery behind that screen, lets you catalogue the approved documents it will
-answer from, and reads those documents into passages in the background. Nothing searches or answers
-from the passages yet.
+The assistant is **off** when you first see it. Nothing is sent anywhere until you switch it on. A
+visitor to the public website now gets a chat widget once the public switch is on and the consent
+wording is approved and saved with your name and date; while any of those is off, the public pages
+ship no widget at all. There is still no signed-in chat for parents, students or teachers. This
+version lets you catalogue the approved documents the assistant will answer from, reads them into
+passages in the background, and gives you an **answer desk** where you can ask a question as any
+audience and see exactly what a real reader would receive.
 
 ## 1. Set the rules
 
@@ -35,7 +39,8 @@ from the passages yet.
 
 | Switch | What it controls |
 |---|---|
-| **Assistant switched on (global)** | The master switch. Off stops every new conversation immediately. |
+| **Stop everything (kill switch)** | The red switch. Stops the public and signed-in assistant, the answer desk, the test console **and** background reading immediately. It always wins over every other switch. |
+| **Assistant switched on (global)** | The master switch for live conversations. Off stops every new conversation immediately. |
 | **Public assistant on the website** | Visitors with no account. Needs the master switch too. |
 | **Signed-in assistant** | Parents, students, teachers, director and admin. Needs the master switch too. |
 | **Student tutor mode** | A study-help mode for students. Needs the signed-in switch and a named safeguarding contact. |
@@ -62,6 +67,10 @@ The check runs **before** each provider call: this month's recorded spend plus a
 for the call being attempted must fit under the ceiling, or the call is refused with a plain message.
 Each provider can also have its own optional cap on the provider form.
 
+The **answer desk and the test console are separate**: they are exempt from the live switches (so you
+can test before go-live) but have their **own** daily cap and monthly ceiling — see **Limits** below —
+and they are **not** exempt from the kill switch.
+
 ### Limits
 
 | Field | Default | What it does |
@@ -70,6 +79,8 @@ Each provider can also have its own optional cap on the provider form.
 | **Public: questions per visitor per day** | 10 | One visitor is a **signed cookie** on their device. `0` disables the public assistant. |
 | **Public: questions per IP per day** | 30 | A backstop against one device cycling cookies. Must sit above the visitor limit. |
 | **Public: questions per day, whole site** | 300 | The ceiling for the entire public assistant. |
+| **Admin test tools: requests per day** | 50 | Answer desk + test console together, per day. `0` stops the test tools. |
+| **Admin test tools: monthly ceiling (KSh)** | 500 | Their own monthly ceiling, separate from the site-wide budget. `0` stops the test tools. |
 
 Why not per-IP alone: on Kenyan mobile networks thousands of families share one carrier address, so an
 IP-only limit either locks out a whole neighbourhood after a few questions or has to be set so high it
@@ -197,14 +208,17 @@ Testing works even while the assistant is switched off, so you can prove a key b
 **AI Assistant → Test console** runs a question through the same pipeline a real conversation will use,
 without creating alert rows or touching any real person's data:
 
-- the mandatory safeguarding rules run first; a hit shows the fixed safe reply and **does not call the
-  provider**;
+- the mandatory safeguarding rules run first; a hit shows the fixed safe reply, who **would** be
+  alerted and **does not call the provider**. Nothing is sent to the safeguarding contact, the director
+  or anyone else, and no alert row is created;
 - the question is masked (names, phones, emails, ID-like numbers) and the page shows **exactly the text
   that would be sent**, plus how many of each kind were masked;
 - the reply, model, latency and token counts are shown.
 
-The console is exempt from budgets and daily limits so you can verify a provider before switching the
-assistant on. Its usage is still recorded.
+The console works while the assistant is switched off, so you can verify a provider before go-live. It
+is **not** exempt from the kill switch, and it counts against the admin test tools' own daily request
+cap and monthly ceiling (defaults 50 requests/day and KSh 500), not the site-wide budget. Its usage is
+still recorded.
 
 Try a few real questions here before you trust the assistant with parents.
 
@@ -284,8 +298,9 @@ For a **server key rotation**, see [security-and-privacy.md](security-and-privac
 
 ## 9. Knowledge: the documents the assistant may answer from
 
-**AI Assistant → Knowledge** opens the **Knowledge documents** list. Two screens work together:
-**Collections** (the shelves) and **Documents** (the wording itself). Everything here is admin-only.
+**AI Assistant → Knowledge** opens the **Knowledge documents** list. **Collections** (the shelves) and
+**Documents** (the wording itself) organise the base; **Answer desk** and **Gaps** (§9.7–9.9) are where
+you test it and see what is missing. Everything here is admin-only.
 
 A plain-language rule for the whole section: a document is a **source of facts**, never an
 instruction. The assistant will not follow text inside a document; it only quotes and cites it.
@@ -326,6 +341,11 @@ work it out from a combined error at the top of the page.
 | **Paste text** | Wording the school has already checked | Saved as the document's text. At least 20 characters. |
 | **Questions and answers** | Short, exact answers a parent or pupil may ask for | At least one complete question-and-answer pair; blank rows are ignored. |
 
+> **What leaves the server.** When an approved document is read, the **passage text** is sent to the
+> embedding provider so it can be searched. Titles, file names and metadata are not sent. The text is
+> not masked, so the knowledge base is for **general school information** — never a pupil's record, a
+> real invoice or a safeguarding note. Every add screen carries this warning.
+
 Every document starts on the form with status **Draft**. You can change the status before saving if
 the wording is already approved, but the safe habit is: save as Draft, read it on the document page,
 then approve it.
@@ -352,11 +372,18 @@ Clicking a document title shows:
 - **Needs re-index** — a red warning that appears when the embedding model changed after indexing.
   The document is ignored until it is read again.
 - **Saved text and questions and answers** — exactly what was pasted or entered.
+- **Personal data check** — whether the scan found anything, and the list of findings by kind, heading
+  and passage number with a **masked** snippet. A document with findings cannot be approved or read
+  until you press **I have checked this document** and record the confirmation: *“This document
+  contains no personal data of pupils, parents or staff, or I accept that it will be sent to the
+  selected provider.”* Who confirmed and when are kept. See §9.9.
 - **Version history** — every save that changes the title writes a version row with a note, who saved
   it and when. Version 1 is created when the document is added.
 - **Reading and answers** — reading state, passages stored, embedding model, last read time, the last
   error in plain words, a **Read it again** button and the five most recent reads. **Test this
-  document** is visible but disabled until retrieval arrives in K3.
+  document** scores that document's own passages against a question you type — one provider call, the
+  question embedding only, and no answer is generated. It is disabled until the document is ready, and
+  while personal data is unresolved.
 - **Change status** — swap between Draft, Approved and Archived. The change is audited.
 - **Download file** — only for uploaded documents. The download is an attachment, marked
   `X-Content-Type-Options: nosniff`, and written to the audit log. There is no public link to a
@@ -371,10 +398,15 @@ ranking exists.
 
 ### 9.5 Reading and indexing
 
-When you approve a document — and its shelf is approved and inside its dates — the system queues a
-background read. It extracts the text, splits it into passages of about 800 characters, asks the
-provider's **embedding model** to turn each passage into numbers, and stores the passages. Nothing is
-sent to the provider until then, and the assistant's global switch does **not** have to be on.
+When you add a document, it is **scanned for personal data** straight away (emails, Kenyan phone
+numbers, ID/admission-like numbers and likely person names next to pupil/parent words). When you
+approve a document — and its shelf is approved and inside its dates — the system queues a background
+read. It extracts the text, splits it into passages of about 800 characters, asks the provider's
+**embedding model** to turn each passage into numbers, and stores the passages. Nothing is sent to the
+provider until then, and the assistant's global switch does **not** have to be on.
+
+**If the scan found personal data**, the document cannot be approved or read until you decide
+(§9.9). Approving a document whose scan is unresolved is refused with a sentence explaining what to do.
 
 | Where you see it | What it means |
 |---|---|
@@ -407,26 +439,98 @@ indefinitely; nothing on the site breaks, but nothing is searchable later either
 
 ### 9.6 What is honestly not working yet
 
-- Passages exist, but nothing searches them: no question can be answered from them yet (K3).
-- Nothing is shown to a parent, pupil, teacher or visitor.
-- “Test this document” is deliberately disabled until retrieval exists.
+- The answer desk is the only place a question can be asked. Nothing is shown to a parent, pupil,
+  teacher or visitor yet (Modules 3 and 4).
 - Language support is single-language per document: there is no automatic translation.
+- The figure check can only prove that cited figures exist in the cited text; it cannot prove a claim
+  is supported. Use the desk to sanity-check wording.
+- Real calibration is not done: with the fake provider the scores mean nothing. `MIN_SCORE` and the
+  hybrid weighting are deliberately conservative until K4's question set is run on real embeddings.
 - Upload only **demo** documents in this phase — never a real pupil's record, a real invoice or a real
-  safeguarding note. Document text is sent to the embedding provider unmasked.
+  safeguarding note. Document text is sent to the embedding provider once you confirm it.
 
-Reading and indexing are K2, now built; retrieval, citations and refusal are K3; the question set and
-scores are K4, all inside Module 2.
+Reading and indexing are K2; retrieval, the answer desk, citations, the figure check and gaps are K3,
+all built; the question set and scores are K4, inside Module 2.
+
+### 9.7 The answer desk — ask as any audience
+
+**AI Assistant → Answer desk.** This is the place to test before go-live. Choose:
+
+| Field | What it does |
+|---|---|
+| **Question** | What you want to ask. |
+| **Audience** | Visitor, Parent, Student, Teacher, Finance, Director or Admin. |
+| **Class ids** | Optional, to test class scoping (for a Parent or Student). |
+| **Provider** | Optional; empty uses the normal fallback order. |
+
+The desk builds the **same audience object a real reader gets** and runs the same visibility and
+retrieval code. There is no admin shortcut: previewing as Visitor never returns a signed-in or
+staff-only document, and a Parent of class A never sees class B material.
+
+The result card shows:
+
+- **What a reader would receive** — the exact text a person in that audience would get. If the answer
+  could not be verified, this is the fixed refusal, not the raw answer.
+- **Status** — Verified, Unverified, Refused, Safeguarding, or a provider problem.
+- **The retrieval table** — each passage's document, heading, vector score, keyword score and merged
+  score, so you can see *why* something ranked.
+- **Citations** and, for an unverified answer, the raw answer and the exact figures that were not found
+  in the cited passages.
+- **Provider statistics** — provider, model, latency, tokens.
+- **Safeguarding preview** — if a rule fires: the rule, the safe reply and who would be alerted. No
+  alert, notification or email is sent from the desk.
+- **A gap notice** — when nothing reliable was found, or an answer could not be verified, the question
+  is recorded as a **test** gap (§9.8).
+
+The desk is exempt from the live switches so you can test before go-live, but it is **not** exempt from
+the kill switch or the admin test tools' daily cap and monthly ceiling.
+
+**Refusal wording (DRAFT).** The card shows the fixed English and Kiswahili refusal lines with the
+school contact first. They are marked DRAFT for your review.
+
+### 9.8 Gaps — what the school is missing
+
+**AI Assistant → Gaps.** Every question the assistant could not answer reliably is listed with:
+
+- the **masked** question, the audience role and class ids, the language guess and the date;
+- the reason — *nothing relevant was found* or *an answer could not be verified* — and the top score;
+- whether it came from a test tool (hidden by default; tick **Include test runs** to see them).
+
+Nothing about the asker is stored — no name, user, IP or session. Actions:
+
+- **Resolve** with an optional note ("added the fees page") — the gap leaves the open list.
+- **Delete** any gap. A confirmation is asked first.
+
+**DRAFT retention:** resolved gaps are proposed for erasure **90 days after resolution**. That period is
+a proposal awaiting your approval; no scheduled job deletes anything yet, and you can delete at any
+time.
+
+### 9.9 Personal data in documents
+
+Every document is scanned when it is added and again before it is embedded. The scan looks for emails,
+Kenyan phone numbers, ID/admission-like numbers, and likely person names next to pupil/parent words
+(including Kiswahili). It is a **heuristic**: it can miss unusual spellings, nicknames and names with no
+trigger word, and it can flag an innocent number.
+
+- **Clean** — nothing found; it can be approved and read.
+- **Personal data detected** — findings are listed by kind, heading and passage number with a masked
+  snippet. The document **cannot be approved or read** until you either edit the document, or press
+  **I have checked this document** and accept the confirmation wording.
+- **Confirmed** — the document may be approved and read; the system keeps who confirmed, when and the
+  exact wording.
+
+The decision is yours, not the scanner's. Only confirm a document you are content to send to the
+embedding provider.
 
 ## 10. What the admin cannot do yet
 
-- There is no screen where a parent, student, teacher or visitor talks to the assistant.
-- Knowledge is uploaded, organised and read into passages, but nothing retrieves or answers from them
-  yet (Module 2 K3–K4).
-- The public/signed-in switches are recorded decisions; the public widget, handoff rules and human
-  inbox arrive in Module 3, the signed-in screens and record tools in Module 4.
-- Handoff records and routing arrive with those screens. Safeguarding email already sends.
-- Streaming replies are not built; the worker changes needed first are a proposal awaiting approval.
-- The consent wording cannot be shown to anyone, even after approval, until the conversation screen
-  exists.
+- There is no signed-in screen where a parent, student or teacher talks to the assistant. Visitors
+  have the public widget; everyone else can be previewed through the answer desk.
+- The question set, scoring and first real results are Module 2 K4.
+- Handoff rules, routing and the human inbox arrive in Module 3 CP4–CP5; the signed-in screens and
+  record tools in Module 4. Safeguarding email already sends for a real hit.
+- There is no screen yet to read or delete stored conversations and callback requests; those arrive
+  with the inbox and the retention work (CP5–CP6). The retention periods are DRAFT for your review.
+- The refusal wording and the 90-day gap retention are DRAFT for your review.
 
 Each of those arrives in its own module, with this guide updated in the same change.

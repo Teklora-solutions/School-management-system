@@ -935,50 +935,76 @@ them through `context_processors.school_settings`. Writes go through
 
 ---
 
-## 15a. AI Assistant ✅ (pipeline built, no user-facing chat yet)
+## 15a. AI Assistant ✅ (pipeline and answer desk built, no user-facing chat yet)
 
-**Status: Module 1, Steps 1–2, and Module 2 K1–K2 (knowledge catalogue, reading and indexing).** The
-assistant still does not speak to a parent, student, teacher, director or visitor; every switch is
-**off by default** and there is no chat screen. What exists is the whole pipeline behind it, the admin
-and director screens to run it safely, and the private shelves an admin fills with approved wording.
-Approved documents are now read in the background into embedded passages; nothing searches them yet.
-The screens are:
+**Status: Module 1, Steps 1–2, and Module 2 K1–K3 (knowledge catalogue, reading, retrieval and the
+admin answer desk).** The assistant still does not speak to a parent, student, teacher, director or
+visitor; every switch is **off by default** and there is no chat screen. What exists is the whole
+pipeline behind it, the admin and director screens to run it safely, the private shelves an admin
+fills with approved wording, and — new in K3 — a way to ask a question against those shelves and see
+a cited answer, a named refusal, or an **unverified** warning. Nothing a parent or student sees exists
+yet. The screens are:
 
-- `/assistant/settings/` — global/public/signed-in/tutor switches, house rules, default provider,
-  monthly budget and USD→KSh rate, four daily limits (signed-in per user; public per signed cookie,
-  per IP and site-wide), safeguarding contact and escalation window, handoff email, and the **DRAFT**
-  consent gate (flag + approver + date before anything can be shown).
+- `/assistant/settings/` — global/public/signed-in/tutor switches, a **stop-everything kill switch**,
+  house rules, default provider, monthly budget and USD→KSh rate, four daily limits (signed-in per
+  user; public per signed cookie, per IP and site-wide), two **console** limits (daily requests and a
+  monthly ceiling, 50 / KSh 500 by default), safeguarding contact and escalation window, handoff
+  email, and the **DRAFT** consent gate (flag + approver + date before anything can be shown).
 - `/assistant/providers/` — five kinds (fake, OpenAI, DeepSeek, Gemini, generic OpenAI-compatible),
   chat/fast/embedding models, encrypted key with last-four display, timeouts, fallback order, prices,
   optional per-provider cap, data-region note, delete guards and a connection test.
 - `/assistant/knowledge/` — shelves with an audience ceiling (public or signed-in, optional roles and
   classes, status, effective dates) and documents added as a file, a web-page address, pasted text or
   question-and-answer pairs. Files live under `KNOWLEDGE_MEDIA_ROOT`, outside `MEDIA_ROOT`, and are
-  served only through the admin download route. Each document records its audience, status, version
-  and SHA-256 fingerprint; the scope filter that K3 will rank is already built and tested. Approved
-  documents on approved, effective shelves are read by the background worker — extraction (PDF, DOCX,
-  text, pasted, FAQ, and public web pages), ~800-character passages and embeddings — and can be re-read
-  from the document page or `reindex_knowledge`. Retrieval, answers and the question set are K3–K4.
+  served only through the admin download route. Each document records its audience, status, version,
+  SHA-256 fingerprint and a **personal-data scan** result; an admin must confirm the wording carries no
+  pupil, parent or staff data before it can be approved, and the confirmation records who and when.
+  Approved documents on approved, effective shelves are read by the background worker — extraction
+  (PDF, DOCX, text, pasted, FAQ, and public web pages), ~800-character passages and embeddings — and
+  can be re-read from the document page or `reindex_knowledge`. Each document also has a **Test this
+  document** check that retrieves against that one document only; no provider call is made except the
+  question embedding.
+- `/assistant/knowledge/ask/` — the **answer desk**, admin only. A question runs through the real
+  pipeline: safeguarding screen, masking, embedding, **hybrid retrieval** (vector similarity plus a
+  keyword ranking over the same visible passages, merged), a fixed **refusal** when nothing clears the
+  relevance floor, then a fenced prompt, the model's reply, citation cleaning and a **figure check**
+  (every number, amount, date and time in the answer must appear in a cited passage). A role preview
+  (visitor, parent, student, teacher, finance, director) calls the *same* visibility and retrieval code
+  as the real thing, so a preview cannot see more than that person would. A safeguarding hit shows
+  what would happen and sends **no alert to anyone**; the run is marked as a test.
+- `/assistant/knowledge/gaps/` — questions the assistant refused or left unverified, with the asker's
+  role, class signature, language hint and date only (never the raw question or name). Admin can
+  resolve or delete any gap. Retention (DRAFT: 90 days after resolution) is proposed, not active.
 - `/assistant/guardrails/` — the mandatory safeguarding pack (code, cannot be removed) and admin-added
   rules (add-only).
 - `/assistant/alerts/` — admin and director; masked excerpts, acknowledge, escalation state, and a
   close action that requires a recorded outcome. Retention (DRAFT: 12 months after closure) purges only
   the masked excerpt via a dry-run command; the minimal record stays.
 - `/assistant/console/` — a dry run through screening and masking that shows the exact outbound text;
-  the provider is not called on a safeguarding hit.
+  the provider is not called on a safeguarding hit. Like the answer desk it is exempt from the
+  assistant switches (but **not** the kill switch and **not** budgets): it now counts against its own
+  daily limit and monthly console ceiling instead.
 - `/assistant/jobs/` — assistant background failures with reason and attempt count.
 
-The gateway enforces the kill switch, budgets, limits and a per-provider circuit breaker before each
-call; retries and fallback are built; usage is recorded per attempt. Provider API keys are encrypted
-with Fernet before storage; the encryption key lives in `ASSISTANT_ENCRYPTION_KEY` and is never in the
-database. Only the last four characters are shown, error text is redacted, and a test scans the owned
-files for key-like strings. If `ASSISTANT_ENCRYPTION_KEY` is missing while a saved key or an enabled
-assistant needs it, `manage.py check` fails with `assistant.E001` and the app refuses to start.
-Safeguarding detection is mandatory and cannot be switched off; escalation
-is also checked when an admin or director loads any page, so a stopped worker cannot hide an alert.
-Knowledge reading needs the background worker (`manage.py qcluster`); retrieval, record tools, handoff
-records, streaming and the conversation screens are later modules; the consent wording is a draft and
-is shown to nobody.
+The gateway enforces the kill switch (checked first, always wins), budgets, limits and a per-provider
+circuit breaker before each call; retries and fallback are built; usage is recorded per attempt.
+Provider API keys are encrypted with Fernet before storage; the encryption key lives in
+`ASSISTANT_ENCRYPTION_KEY` and is never in the database. Only the last four characters are shown,
+error text is redacted, and a test scans the owned files for key-like strings. If
+`ASSISTANT_ENCRYPTION_KEY` is missing while a saved key or an enabled assistant needs it,
+`manage.py check` fails with `assistant.E001` and the app refuses to start. Safeguarding detection is
+mandatory and cannot be switched off; escalation is also checked when an admin or director loads any
+page, so a stopped worker cannot hide an alert.
+
+Answers are cached for an hour by a hash of audience, question and retrieval constants, and are
+re-checked against current visibility and effective dates when read, so withdrawing approval or letting
+a document expire takes effect immediately. The cache holds answer text and citation ids only — never
+the question. Relevance constants (`TOP_K`, `MIN_SCORE`, `MAX_QUESTION`, the keyword weight) live in
+one place and are meaningless across models; **K4** calibrates them against real embeddings, which the
+fake provider cannot do. Retrieval quality is therefore proven on structure and safety, not on score
+values. Knowledge reading needs the background worker (`manage.py qcluster`); record tools, handoff
+records, streaming and the conversation screens are later modules; the consent wording and the gap
+retention are drafts and are shown to nobody.
 
 Full documentation: [README](ai-assistant/README.md) · [admin guide](ai-assistant/admin-guide.md) ·
 [security and privacy](ai-assistant/security-and-privacy.md) · [architecture](ai-assistant/architecture.md) ·

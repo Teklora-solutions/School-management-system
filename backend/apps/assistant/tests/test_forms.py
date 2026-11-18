@@ -26,6 +26,8 @@ def settings_data(**overrides):
         "public_visitor_daily_limit": "10",
         "public_ip_daily_limit": "30",
         "public_site_daily_limit": "300",
+        "console_daily_limit": "50",
+        "console_monthly_budget_ksh": "500",
         "safeguarding_contact_name": "",
         "safeguarding_contact_phone": "",
         "safeguarding_contact_email": "",
@@ -34,6 +36,15 @@ def settings_data(**overrides):
         "working_hours_end": "17:00",
         "alert_retention_months": "12",
         "handoff_email": "",
+        "widget_max_message_chars": "1000",
+        "sla_normal_minutes": "480",
+        "sla_urgent_minutes": "240",
+        "sla_critical_minutes": "15",
+        "sla_reminder_percent": "75",
+        "conversation_retention_days": "90",
+        "handoff_retention_months": "12",
+        "callback_retention_days": "30",
+        "feedback_reason_retention_days": "90",
         "consent_approved": "",
         "consent_approved_by": "",
         "consent_approved_on": "",
@@ -141,3 +152,40 @@ class ProviderFormTests(TestCase):
         form = ProviderForm(data=self.data())
         self.assertFalse(form.is_valid())
         self.assertIn("api_key", form.errors)
+
+
+class WidgetSettingsFormTests(TestCase):
+    def test_the_widget_cannot_switch_on_without_the_public_switch(self):
+        form = settings_form(widget_enabled="on")
+        self.assertFalse(form.is_valid())
+        self.assertIn("widget_enabled", form.errors)
+
+    def test_the_widget_needs_approved_consent_wording(self):
+        form = settings_form(public_enabled="on", widget_enabled="on")
+        self.assertFalse(form.is_valid())
+        self.assertIn("widget_enabled", form.errors)
+
+    def test_the_widget_can_switch_on_once_public_and_consent_are_in_place(self):
+        form = settings_form(
+            public_enabled="on",
+            widget_enabled="on",
+            consent_approved="on",
+            consent_approved_by="School Director",
+            consent_approved_on="2026-11-18",
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_a_zero_service_level_target_is_refused(self):
+        form = settings_form(sla_critical_minutes="0")
+        self.assertFalse(form.is_valid())
+        self.assertIn("sla_critical_minutes", form.errors)
+
+    def test_a_reminder_percentage_outside_the_range_is_refused(self):
+        form = settings_form(sla_reminder_percent="100")
+        self.assertFalse(form.is_valid())
+        self.assertIn("sla_reminder_percent", form.errors)
+
+    def test_a_very_short_message_limit_is_refused(self):
+        form = settings_form(widget_max_message_chars="10")
+        self.assertFalse(form.is_valid())
+        self.assertIn("widget_max_message_chars", form.errors)

@@ -126,7 +126,7 @@ FIELD_TABS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "Home Hero",
         (
             "hero_eyebrow", "hero_title", "hero_title_highlight",
-            "hero_text", "cta_title", "cta_text",
+            "hero_text", "hero_image", "cta_title", "cta_text",
         ),
     ),
     ("about", "About Page", ("about", "mission", "vision", "values")),
@@ -218,6 +218,7 @@ class SchoolSettingsForm(forms.ModelForm):
             "hero_title",
             "hero_title_highlight",
             "hero_text",
+            "hero_image",
             # ── Home CTA band ─────────────────────────────────────────────
             "cta_title",
             "cta_text",
@@ -264,6 +265,7 @@ class SchoolSettingsForm(forms.ModelForm):
             "hero_title": forms.TextInput(attrs={"class": "form-control"}),
             "hero_title_highlight": forms.TextInput(attrs={"class": "form-control"}),
             "hero_text": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "hero_image": forms.FileInput(attrs={"class": "form-control"}),
             "cta_title": forms.TextInput(attrs={"class": "form-control"}),
             "cta_text": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "theme": forms.Select(

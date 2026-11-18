@@ -22,6 +22,7 @@ from ..models import (
     KnowledgeQAPair,
     KnowledgeStatus,
 )
+from . import personal_data, versions
 
 
 def file_digest(uploaded) -> str:
@@ -100,6 +101,62 @@ def sync_collection_after_save(collection, *, previous_ready: bool) -> None:
     ready = collection.is_approved and collection.effective_on()
     if ready != previous_ready:
         ingest.sync_collection(collection)
+    # The shelf's audience or dates may have changed without changing readiness.
+    versions.bump()
+
+
+def scan_for_personal_data(document: KnowledgeDocument) -> list:
+    """
+    Scan a document's text now, when the text is available without a network
+    call. A failure here is not fatal: reading scans again before embedding.
+    """
+    from . import chunking, extraction
+
+    if document.source_type == KnowledgeDocument.SourceType.URL:
+        return []
+    try:
+        text = extraction.extract_text(document)
+        passages = chunking.split_text(text)
+    except (extraction.ExtractionError, chunking.ChunkingError):
+        return []
+    findings = personal_data.scan_passages(passages)
+    personal_data.record_scan(document, findings)
+    return findings
+
+
+@transaction.atomic
+def confirm_personal_data(document: KnowledgeDocument, *, actor, request=None) -> KnowledgeDocument:
+    """
+    Record the admin's decision to send a document that contains personal data.
+    The exact wording accepted, who accepted it and when are kept.
+    """
+    from django.utils import timezone
+
+    if document.pii_state != KnowledgeDocument.PIIState.FOUND:
+        raise ValidationError("There is no detected personal data to confirm.")
+    document.pii_state = KnowledgeDocument.PIIState.CONFIRMED
+    document.pii_confirmed_by = actor
+    document.pii_confirmed_at = timezone.now()
+    document.pii_confirmation_text = personal_data.CONFIRMATION_TEXT
+    document.save(
+        update_fields=[
+            "pii_state",
+            "pii_confirmed_by",
+            "pii_confirmed_at",
+            "pii_confirmation_text",
+            "updated_at",
+        ]
+    )
+    log_action(
+        actor=actor,
+        action="assistant.knowledge_personal_data_confirmed",
+        content_type="assistant.KnowledgeDocument",
+        object_id=document.pk,
+        change_summary={"title": document.title, "findings": len(document.pii_findings)},
+        request=request,
+    )
+    sync_readiness(document)
+    return document
 
 
 @transaction.atomic
@@ -120,6 +177,7 @@ def create_document(form, *, source_type: str, actor, request) -> KnowledgeDocum
         document.save(update_fields=["duplicate_of", "updated_at"])
 
     snapshot(document, actor=actor, note="First version.", first=True)
+    scan_for_personal_data(document)
     sync_readiness(document)
     log_action(
         actor=actor,
@@ -172,6 +230,11 @@ def update_document_metadata(
 def set_status(document: KnowledgeDocument, status: str, *, actor, request) -> KnowledgeDocument:
     if status not in dict(KnowledgeStatus.choices):
         raise ValidationError("Unknown status.")
+    if status == KnowledgeStatus.APPROVED and document.pii_blocks_embeddings:
+        raise ValidationError(
+            "Personal data was detected in this document. Confirm it may be sent to "
+            "the provider, or edit the document, before approving it."
+        )
     previous = document.status
     document.status = status
     document.save(update_fields=["status", "updated_at"])

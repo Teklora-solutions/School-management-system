@@ -19,6 +19,14 @@
 
 {% include "features/assistant/_tabs.html" %}
 
+{% if settings_row.kill_switch %}
+<div class="alert alert-danger" role="alert">
+  <strong>The stop switch is on.</strong> The test console cannot reach a provider
+  until it is switched off in
+  <a href="{% url 'assistant:settings' %}" class="alert-link">Assistant settings</a>.
+</div>
+{% endif %}
+
 {% if not safeguarding_contact_set %}
 <div class="alert alert-warning" role="alert">
   No safeguarding contact is set, so a triggered test shows the general school
@@ -51,9 +59,14 @@
       </div>
     </div>
     <p class="text-muted-sm mt-2">
-      The console is exempt from the visitor limits and the monthly budget so a
-      provider can be checked before go-live. Its usage is still recorded, and the
-      gateway's retries, timeout and circuit breaker still apply.
+      The console is exempt from the public and signed-in switches so a provider
+      can be checked before go-live. It is <strong>not</strong> exempt from the
+      stop switch or its own limits: {{ console_daily_limit }} requests per day and
+      a monthly ceiling of KSh {{ console_monthly_budget_ksh }}. Those are separate
+      from the site budget and can be changed in
+      <a href="{% url 'assistant:settings' %}">Assistant settings</a>. Its usage is
+      still recorded, and the gateway's retries, timeout and circuit breaker still
+      apply.
     </p>
   </div>
 
@@ -77,6 +90,28 @@
             <strong>Categories:</strong> {{ result.categories|join:", " }}
           </div>
           <div class="border rounded p-3 bg-light" style="white-space:pre-line;">{{ result.safe_reply }}</div>
+          {% if result.alert_preview %}
+          <div class="text-muted-sm mt-2">
+            <strong>This was a test: no alert was sent.</strong>
+            In a live conversation the following would be told:
+            <ul class="mb-1 mt-1">
+              {% if result.alert_preview.name %}
+              <li>{{ result.alert_preview.name }}
+                {% if result.alert_preview.phone %} · {{ result.alert_preview.phone }}{% endif %}
+                {% if result.alert_preview.email %} · {{ result.alert_preview.email }}{% endif %}
+              </li>
+              {% endif %}
+              {% if result.alert_preview.handoff_email %}
+              <li>Handoff email: {{ result.alert_preview.handoff_email }}</li>
+              {% endif %}
+              <li>In-app roles: {{ result.alert_preview.roles|join:", "|default:"—" }}</li>
+            </ul>
+            {% if result.alert_preview.escalation_minutes %}
+            Unacknowledged after {{ result.alert_preview.escalation_minutes }} minutes during
+            working hours, it would escalate to the director and admin.
+            {% endif %}
+          </div>
+          {% endif %}
         </div>
       </div>
       {% endif %}

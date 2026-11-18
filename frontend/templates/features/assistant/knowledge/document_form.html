@@ -30,6 +30,16 @@
       </div>
       {% endif %}
 
+      <div class="alert alert-warning" role="alert">
+        <strong>Personal data in documents.</strong> When this document is read,
+        each passage's text — not its title, file name or metadata — is sent to
+        the embedding provider. The text is scanned first for phone numbers,
+        emails, ID-like numbers and likely names next to pupil or parent words.
+        If anything is found, the document is listed here and <strong>cannot be
+        approved or read</strong> until an admin records a decision or edits the
+        document. The scan is a heuristic and can miss things.
+      </div>
+
       {% if mode == "upload" %}
       <div class="card mb-3">
         <div class="card-body">

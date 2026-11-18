@@ -79,10 +79,12 @@ def estimated_chat_cost(provider, settings_row, prompt_chars: int, max_tokens: i
     return cost_ksh(provider, settings_row, prompt_tokens, max_tokens)
 
 
-def month_spend_ksh(*, provider=None) -> Decimal:
+def month_spend_ksh(*, provider=None, profile=None) -> Decimal:
     rows = UsageEvent.objects.filter(created_at__gte=_month_start())
     if provider is not None:
         rows = rows.filter(provider=provider)
+    if profile is not None:
+        rows = rows.filter(profile=profile)
     total = Decimal("0")
     for value in rows.values_list("estimated_cost_ksh", flat=True):
         total += value or Decimal("0")
@@ -91,8 +93,7 @@ def month_spend_ksh(*, provider=None) -> Decimal:
 
 def check_budget(settings_row, provider, *, profile: str, prompt_chars: int = 800, max_tokens: int = 400) -> Decision:
     if profile == UsageEvent.Profile.CONSOLE:
-        # The admin test console is exempt so a provider can be verified before
-        # the assistant is switched on. Its usage is still recorded.
+        # The admin test tools have their own limits; see check_console_limits.
         return Decision(True)
 
     budget = settings_row.monthly_budget_ksh or Decimal("0")
@@ -107,6 +108,34 @@ def check_budget(settings_row, provider, *, profile: str, prompt_chars: int = 80
         provider_spent = month_spend_ksh(provider=provider)
         if provider_spent + reserve > provider.monthly_budget_ksh:
             return Decision(False, f"“{provider.name}” has reached its own monthly budget.")
+    return Decision(True)
+
+
+def console_requests_today() -> int:
+    return UsageEvent.objects.filter(
+        profile=UsageEvent.Profile.CONSOLE,
+        created_at__gte=_day_start(),
+    ).count()
+
+
+def check_console_limits(settings_row, *, reserve: Decimal = Decimal("0")) -> Decision:
+    """
+    The admin answer desk and test console: separate from the site-wide budget,
+    with their own request cap and monthly ceiling. The stop switch and these
+    limits are the only controls that apply to them.
+    """
+    limit = settings_row.console_daily_limit or 0
+    if limit <= 0:
+        return Decision(False, "The admin test tools are set to 0 requests per day.")
+    if console_requests_today() >= limit:
+        return Decision(False, "The admin test tools have reached today's request limit.")
+
+    ceiling = settings_row.console_monthly_budget_ksh or Decimal("0")
+    if ceiling <= 0:
+        return Decision(False, "The admin test tools have no monthly ceiling set.")
+    spent = month_spend_ksh(profile=UsageEvent.Profile.CONSOLE)
+    if spent + reserve > ceiling:
+        return Decision(False, "The admin test tools have reached their monthly ceiling.")
     return Decision(True)
 
 
@@ -154,14 +183,32 @@ def signed_in_allowed(settings_row, user) -> Decision:
 
 
 def get_visitor_key(request) -> tuple[str, bool]:
-    """(key, is_new). The caller sets the cookie when is_new is True."""
+    """(key, is_new). The caller sets the cookie when is_new is True.
+
+    The key is remembered on the request so that the rate check and the
+    attempt that follows it count the same visitor. Without this, a first-time
+    visitor would be checked and counted under two different random keys.
+    """
+    remembered = getattr(request, "assistant_visitor_key", "")
+    if remembered:
+        return remembered, False
     try:
         key = request.get_signed_cookie(VISITOR_COOKIE, salt=VISITOR_SALT, default="")
     except (BadSignature, SignatureExpired):
         key = ""
     if key:
+        request.assistant_visitor_key = key
         return key, False
-    return secrets.token_hex(16), True
+    key = secrets.token_hex(16)
+    request.assistant_visitor_key = key
+    request.assistant_visitor_is_new = True
+    return key, True
+
+
+def ensure_visitor(request) -> tuple[str, bool]:
+    """(key, is_new) for one request. ``is_new`` stays True once it is set."""
+    key, is_new = get_visitor_key(request)
+    return key, bool(getattr(request, "assistant_visitor_is_new", is_new))
 
 
 def client_ip(request) -> str:
