@@ -13,6 +13,8 @@ Everything is controlled by the admin: provider, model, keys, knowledge, rules, 
 **Module 1 Step 2 — pipeline foundations — built 2026-11-18, migration `0002` applied.**
 **Module 2 K1 — knowledge data model, private storage and admin screens — built 2026-11-18, migration
 `0003` applied after review.**
+**Module 2 K2 — reading, chunking, embeddings and the ingestion worker — built 2026-11-18, migration
+`0004` applied.**
 
 | Piece | Status |
 |---|---|
@@ -33,7 +35,8 @@ Everything is controlled by the admin: provider, model, keys, knowledge, rules, 
 | Assistant job failures recorded and shown to admins | ✅ works |
 | Consent wording | 🚧 DRAFT, gated behind an approval flag; shown to nobody |
 | Knowledge shelves, uploads, audience rules, version history, admin screens | ✅ works (Module 2 K1) |
-| Reading files, chunking, embeddings and the ingestion worker | 🚧 Module 2 K2 |
+| Reading files, web pages and FAQs; chunking; embeddings; ingestion worker | ✅ works (Module 2 K2; needs `qcluster`) |
+| Re-index screen, stale detection and the `reindex_knowledge` command | ✅ works (Module 2 K2) |
 | Retrieval, answers, citations, refusal and the answer cache | 🚧 Module 2 K3 |
 | Question set, scoring, gaps report and first results | 🚧 Module 2 K4 |
 | Public chat widget and screens | 🚧 Module 3 |
@@ -45,8 +48,9 @@ Everything is controlled by the admin: provider, model, keys, knowledge, rules, 
 **The assistant is switched OFF on a fresh install, and there is still no screen where a parent,
 student, teacher or visitor can talk to it.** What exists is the whole machinery behind that screen,
 tested end to end through the admin console and the fake provider, plus the knowledge shelves an
-admin fills with approved wording. Nothing reads those documents yet: reading, search and answers are
-K2–K4.
+admin fills with approved wording. Approved documents are now read in the background and stored as
+embedded passages; nothing searches or answers from those passages yet: retrieval and answers are K3,
+the school's question set and scores K4.
 
 ## The files
 
@@ -72,5 +76,9 @@ K2–K4.
   any ranking, and a document can never be wider than its shelf.
 - Knowledge files live outside `MEDIA_ROOT`, are never given a public URL, and are served only through
   the permission-checked admin download, as an attachment.
+- Reading runs only in the background worker, and only for approved documents on approved, effective
+  shelves. Withdrawing approval removes the stored passages immediately.
+- Embedding a document sends its text to the configured embedding provider. A web page is fetched only
+  over public http(s) addresses; the fetched text is kept so an admin can see what was read.
 - Documents and user messages are data, never instructions.
 - The consent wording is a draft and is gated behind an explicit approval flag with a name and date.

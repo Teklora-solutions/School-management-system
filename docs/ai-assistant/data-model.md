@@ -1,9 +1,11 @@
 # Data model
 
-The `assistant` app owns ten tables. Migration `0001_initial` created the first three; migration
+The `assistant` app owns twelve tables. Migration `0001_initial` created the first three; migration
 `0002` (applied locally on 2026-11-18) adds the fields and tables introduced by Module 1 Step 2;
 migration `0003_knowledge_base` (applied locally on 2026-11-18, after `sqlmigrate` review) adds the
-four knowledge tables in Module 2 K1. No existing table outside the app is changed.
+four knowledge catalogue tables in Module 2 K1; migration `0004_knowledge_ingestion` (applied
+2026-11-18) adds the two K2 tables and the `ingestion` choices. No existing table outside the app is
+changed.
 
 Every table inherits `apps.core.models.BaseModel`, which adds `created_at` (indexed) and `updated_at`.
 
@@ -67,8 +69,8 @@ Ordering is `priority, name`. `has_key` and `masked_key` are properties used by 
 | `provider_id` | FK → provider, nullable, `SET_NULL` | Which provider; snapshot kept in `provider_label`. |
 | `provider_label` | char(100) | Provider name at call time. |
 | `actor_id` | FK → user, nullable, `SET_NULL` | Who triggered the call. |
-| `source` | char(20) | `admin_test` or `chat`. |
-| `profile` | char(20) | `console`, `public` or `signed_in`. |
+| `source` | char(20) | `admin_test`, `chat` or `ingestion`. |
+| `profile` | char(20) | `console`, `public`, `signed_in` or `ingestion`. |
 | `model_name` | char(120), blank | Model used for this attempt. |
 | `tokens_in` / `tokens_out` | positive int, default 0 | From the provider's reply. |
 | `estimated_cost_ksh` | decimal(10,4), default 0 | Price × tokens × USD→KSh rate. |
@@ -96,7 +98,7 @@ or restore can remove them.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `profile` | char(20) | Which assistant profile saw it. |
+| `profile` | char(20) | Which assistant profile saw it (`console`, `public`, `signed_in` or `ingestion`). |
 | `category` | char(40) | Category key. |
 | `rule_id` | char(80), blank | Which rule fired (`M-…` or `CUSTOM-<pk>`). |
 | `excerpt` | char(300), blank | **Masked** excerpt only, never the full message. |
@@ -209,11 +211,42 @@ Ordering: newest first. `unique_together = (document, version)`.
 
 Ordering: `display_order`, then pk.
 
+## `assistant_knowledgechunk` — one row per passage
+
+| Field | Type | Meaning |
+|---|---|---|
+| `document_id` | FK → document, `CASCADE` | The source. Deleting the document deletes its passages. |
+| `ordinal` | positive small int | Position in the document, starting at zero. Unique with the document. |
+| `heading` | char(300), blank | Heading path the passage sits under, e.g. `Fees › Payment plans`. |
+| `text` | text | The passage itself, about 800 characters. |
+| `char_count` | positive int, default 0 | Length of the passage. |
+| `content_sha256` | char(64), blank | Fingerprint of the passage text. |
+| `embedding` | JSON, default `[]` | The vector as a list of numbers — portable across SQLite and PostgreSQL, as decided in K1. |
+| `embedding_model` | char(120), blank | Model that produced the vector. Retrieval may only compare vectors from one model. |
+| `dimension` | positive small int, default 0 | Vector length, recorded so a mismatch is caught rather than compared. |
+| `embedded_at` | datetime, nullable | When the vector was produced. |
+
+Indexes: `(document, ordinal)` and `(embedding_model)`. Ordering: document, ordinal. The table holds
+**no audience or status columns**: scope is always resolved from the parent document on every search,
+so a passage cannot drift away from its document's audience.
+
+## `assistant_knowledgeingestrun` — one row per attempt
+
+| Field | Type | Meaning |
+|---|---|---|
+| `document_id` | FK → document, `CASCADE` | The document being read. |
+| `status` | char(12) | `running`, `ready`, `failed` or `skipped` (the document or shelf is no longer approved). |
+| `attempt` | positive small int, default 1 | Which attempt this was; transient failures retry up to 3. |
+| `started_at` / `finished_at` | datetime | When the read began and ended. |
+| `chunks_written` | positive int, default 0 | Passages stored on success. |
+| `tokens` | positive int, default 0 | Embedding tokens reported by the provider (sum of batches). |
+| `error` | char(300), blank | A plain reason. **Never document text, never a key.** |
+
+Ordering: newest first. The five most recent runs are shown on the document page. Rows are kept as
+the record of what was read and when; they are ordinary history, not an alert or audit trail.
+
 ## What is deliberately absent
 
-- **Chunks and embeddings (Module 2 K2):** no chunk table and no vector column yet. The documents'
-  `ingestion_*` columns are present and idle; they describe work K2 will do. Nothing is compared or
-  scored today.
 - **Conversations and handoffs (Module 3):** no message, transcript, conversation or handoff table.
   They arrive with the public widget and the human inbox, after consent wording and retention are
   approved.

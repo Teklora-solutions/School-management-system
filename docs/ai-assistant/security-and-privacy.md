@@ -75,12 +75,22 @@ variable is missing rather than producing a broken call.
 
 ### Today
 
-Only what the **admin** sends from the **test console** or the **Test** button, and only to the
-provider the admin configured. There is no user-facing chat screen; no parent, student, teacher or
-visitor message leaves the server.
+- What the **admin** sends from the **test console** or the **Test** button, to the provider the admin
+  configured.
+- **Approved knowledge documents, when they are embedded.** From K2, the text of each passage is sent
+  to the configured embedding provider. This is school-approved wording, not pupil records, but it is
+  document text leaving the server and the admin should know it: a document marked Private for staff
+  is still embedded by a third-party provider. Embedding is skipped entirely while the fake provider
+  is the only one configured; the fake adapter runs in-process.
+- No parent, student, teacher or visitor message leaves the server, because there is still no chat
+  screen.
 
-If the configured provider is the fake one, nothing leaves the server at all — the fake adapter runs
-in-process.
+If the configured provider is the fake one, nothing leaves the server at all.
+
+**Documents are not PII-masked before embedding.** Masking is built for questions (names, phones,
+emails, ID-like numbers). Applying it to school wording would corrupt the wording and make the text
+unsearchable. The rule is therefore: **do not upload a document containing a person's data**; the
+knowledge base is for general school information. This is repeated in the admin guide.
 
 ### What a real provider call contains
 
@@ -88,7 +98,10 @@ When a provider is configured and the console is used, the request contains exac
 
 1. the **system prompt** — fixed instructions, the school name and the admin's house rules;
 2. the **masked user question**, inside an explicit data fence (`<user_question>…</user_question>`);
-3. from Module 2 onward, the retrieved **source documents**, also fenced and labelled.
+3. from K3, the retrieved **source passages**, also fenced and labelled.
+
+An **embedding** request is different: it carries only the passage text (or, in K3, the masked
+question) and the embedding model name — no system prompt, no conversation history.
 
 It never contains: the API key (sent only as the authentication header), the user's password, other
 users' records, the database, or anything from another conversation.
@@ -150,8 +163,22 @@ Knowledge files are the school's own wording and are treated as private records,
   lands on the right field), and again in `knowledge/services.py` before writing.
 - **Fingerprints, not copies.** SHA-256 of the pasted text/URL or of the uploaded bytes is kept to flag
   duplicates. It is a fingerprint, not the content, and no fingerprint is sent to a provider.
-- **What leaves the server in K1.** Nothing. The knowledge screens make no provider calls at all;
-  extraction and embeddings (which will call a provider) arrive in K2.
+- **What leaves the server in K2.** The text of approved documents, in passage-sized batches, to the
+  configured embedding provider — and nothing else. Extraction itself is local; no file is uploaded
+  anywhere. The admin screens make no provider call until a document is approved and the worker reads
+  it, and embedding does not need the assistant's global switch.
+- **What is kept after fetching a web page.** The page text is stored on the document (`body_text`) so
+  an admin can see exactly what was read. Fetching happens in the worker, only for `http(s)` addresses,
+  and only when the document is approved.
+- **Why a web page cannot reach the school's network.** Every hop (including redirects) is resolved
+  and refused unless **all** its addresses are public; loopback, private, link-local and reserved ranges
+  are rejected. This is an address check before the request, not a guarantee against DNS changing
+  between the two — the request is still made by the HTTP library, and the system never deliberately
+  follows an internal address.
+- **What the fetched page can cost.** Responses are capped at 10 MB and 15 seconds, and only HTML,
+  XHTML or plain text is accepted. A page is read as data, never executed or rendered.
+- **Extraction safety.** pypdf and python-docx read data only; macros are never run, archives are never
+  unpacked to disk, and a damaged or unsupported file becomes one plain sentence on the document page.
 - **Backups.** The database and the knowledge folder must be backed up together. A restored database
   without the folder leaves rows that correctly report “no file” until the document is uploaded again.
 
@@ -255,7 +282,11 @@ the pilot-readiness list.
 | A public visitor cycling cookies | Signed cookie plus IP backstop plus site-wide ceiling; a tampered cookie is replaced, not trusted. |
 | A visitor guesses a knowledge file address | No URL exists: storage `url()` raises, the folder is outside `MEDIA_ROOT`, and the only read route is the admin-only download. |
 | A malicious or mislabelled file is uploaded | Extension whitelist, 20 MB cap and byte-signature checks; the extension must match the contents; files are never executed or served inline. |
-| A document leaks to a narrower audience | Scope filter in SQL before any ranking; ceiling enforced in model, form and service; a hand-edited row is covered by test. |
+| A document leaks to a narrower audience | Scope filter in SQL before any ranking; ceiling enforced in model, form and service; a hand-edited row is covered by test. Passages carry no audience of their own, so a passage cannot drift away from its document. |
+| A web-page document is used to probe the school's own network | Every hop's host must resolve only to public addresses; credentials in the address are refused; redirects are re-checked; only HTTP text is accepted. |
+| A huge or hostile file exhausts the worker | 20 MB upload cap, 10 MB fetch cap, 60-passage limit, 15-second fetch timeout; reading runs in the worker, never in a request. |
+| A failed re-index leaves old wording answering | The whole passage set is replaced in one transaction after a successful embedding; a failed read leaves the document failed, not half-updated. |
+| A document is unapproved but its passages still answer | Unapproving, drafting or archiving purges the document's passages immediately; readers skip documents that are not approved. |
 | A provider kind with no adapter is configured | The registry refuses it with a clear message and records the failed attempt as a usage error. |
 
 ## Known gaps in this module
@@ -263,8 +294,12 @@ the pilot-readiness list.
 - Masking is heuristic; it cannot guarantee that no name or identifier reaches a provider.
 - Knowledge upload validation is type, size and byte-signature only. There is no antivirus or macro
   scan; files are simply never executed or rendered.
-- Nothing reads, extracts or indexes knowledge content yet. K2 must add extraction that does not run
-  macros, and a web-page fetch that refuses private or internal addresses; neither exists today.
+- Extraction is data-only and refuses private addresses, but it is not antivirus and does not scan
+  macros; scanned PDFs are not read (no OCR). A page's DNS answer can change between the address check
+  and the request; the system never deliberately follows an internal address.
+- Document text is sent to the embedding provider without names/phones/ID masking. The knowledge base
+  must contain general school information, never a pupil's record.
+- Nothing ranks or searches the passages yet (K3), so no answer can be wrong *or* right from them.
 - No second-layer model screening for indirect safeguarding phrasing. It is designed (with cost and
   privacy implications) and not built.
 - The consent wording is unapproved, and the 12-month alert retention is a DRAFT proposal.

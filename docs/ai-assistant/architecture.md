@@ -2,9 +2,10 @@
 
 > **Status: approved design, 2026-11-18.** Module 1 Step 2 (the foundation) is built: model gateway,
 > provider adapters, budgets, limits, guardrails, alerts, admin screens and the test console. Module 2
-> K1 (knowledge data model, private storage and admin screens) is also built. The chat screens,
-> reading/indexing, retrieval and record tools are still planned. This document marks **built** and
-> **planned** throughout; nothing planned is described as if it exists.
+> K1 (knowledge data model, private storage and admin screens) and K2 (reading, chunking, embeddings
+> and the ingestion worker) are also built. The chat screens, retrieval and record tools are still
+> planned. This document marks **built** and **planned** throughout; nothing planned is described as
+> if it exists.
 
 ## 1. Two assistants, one engine
 
@@ -37,7 +38,7 @@ the view **and** the service.
 | Guardrails | `backend/apps/assistant/guardrails/` | mandatory safeguarding pack, admin rules, PII masking, injection fencing, safe reply | built |
 | Alerts | `backend/apps/assistant/alerts.py` + `tasks.py` + `middleware.py` | alert rows, acknowledgement, escalation, email with recorded failures | built |
 | Limits | `backend/apps/assistant/limits.py` | budgets, signed-in daily limit, public visitor + IP + site caps | built |
-| Retrieval | `backend/apps/assistant/knowledge/` + planned `retrieval/` | K1 built: shelves, documents, private files, audience/class scope filter, version history. K2/K3: extraction, chunks, ranking, citations |
+| Retrieval | `backend/apps/assistant/knowledge/` + planned `retrieval/` | K1 built: shelves, documents, private files, audience/class scope filter, version history. K2 built: extraction, chunking, embeddings, ingestion worker, re-index. K3: ranking, citations, refusal |
 | Tools | `backend/apps/assistant/tools/` | read-only record tools wrapping existing services | planned (Module 4) |
 | Policies | `backend/apps/assistant/policies.py` | the two assistant profiles | planned (chat modules) |
 | Selectors | `backend/apps/assistant/selectors.py` | settings, providers, usage, rules, alerts, failures | built |
@@ -120,7 +121,7 @@ error message is replaced with `[key]` before it can be stored.
   No stack trace, no provider detail beyond the plain classification.
 - Every attempt writes a `UsageEvent`, including failed attempts.
 
-## 5. Knowledge and retrieval (Module 2; K1 built, K2/K3 planned)
+## 5. Knowledge and retrieval (Module 2; K1–K2 built, K3 planned)
 
 ### 5.1 Built in K1 — documents, storage and scope
 
@@ -137,7 +138,31 @@ Only **approved documents on approved, effective shelves** are selected. Drafts,
 windows, unapproved shelves and documents above their shelf's audience are excluded in SQL before any
 similarity work exists.
 
-### 5.2 Planned — reading, ranking and answers
+### 5.2 Built in K2 — reading and indexing
+
+| Piece | Where | What it does |
+|---|---|---|
+| Extraction | `knowledge/extraction.py` | PDF (pypdf), DOCX (python-docx, headings and tables kept), UTF-8 text/Markdown, pasted text, active question-and-answer pairs, and web pages. Every failure is one plain sentence; no path or raw library error escapes. |
+| Web pages | `knowledge/extraction.py::fetch_url` | `http`/`https` only; at most 3 redirects, each hop re-checked; the host must resolve only to public addresses; 15 s timeout; 10 MB streamed cap; HTML, XHTML or plain text only. Scripts/styles/navigation are dropped and headings become `#` lines. The fetched text is kept in `body_text`. |
+| Chunking | `knowledge/chunking.py` | ~800 characters, ~120 overlap, cut at paragraph/line/sentence/word boundaries; heading paths (`Fees › Payment plans`); fragments under 40 characters dropped; >60 passages refused with "split this document" wording instead of truncating. |
+| Embedding | `gateway.embed_chain` | Same ordered fallback, retries and circuit breaker as chat; batches of 32; a provider without an embedding model is skipped before the call; one usage row per attempt with `source=ingestion`; never stores passage text on the row. |
+| Worker | `knowledge/ingest.py`, `tasks.py` | Reads only approved documents on approved, effective shelves. The whole passage set is replaced after a successful embedding; withdrawing approval purges it at once. Transient failures retry up to 3 attempts; each attempt leaves a `KnowledgeIngestRun`. |
+| Hooks and re-index | `knowledge/services.py`, `knowledge/views.py`, command `reindex_knowledge` | Saves, status changes and shelf changes queue or purge the right work; a POST-only **Read it again** action and a command re-read one document, the stale ones or all approved ones. |
+
+**Request path.** None of this runs in a request. A save queues work with django-q2 (after commit) and
+the admin sees *waiting* until the background worker finishes. The worker must be running
+(`python manage.py qcluster`); with no worker a document stays "waiting" and nothing fails loudly.
+
+**Cost and budget.** Embedding is priced per million tokens from the provider's embedding price and
+the USD→KSh rate. The same monthly ceiling and optional per-provider cap apply, with a cautious
+reservation before the batch. Ingestion deliberately does **not** require the assistant's global
+switch: an admin can prepare the knowledge base, and prove the pipeline, while chat is off.
+
+**Honest limits.** Scanned PDFs are refused (no OCR); a document over 60 passages must be split;
+extraction quality depends on the file; and the embedding model must stay stable per document —
+changing it flags every affected document **Needs re-index**.
+
+### 5.3 Planned (K3) — ranking and answers
 
 ```
 question
@@ -157,10 +182,10 @@ prompt: numbered SOURCES block, answer must cite [S1], [S2]
 
 Rules:
 - **Scope before ranking.** A chunk the asker may not see never enters the candidate set, however
-  well it would rank.
+  well it would rank. `visible_documents()` still runs first and K3 may not widen its result.
 - **Embedding model is pinned to the chunk.** Every chunk stores its embedding model and dimension.
-  Retrieval only considers chunks embedded with the current model; after a model change the admin is
-  warned that re-indexing is required, and stale chunks are ignored rather than compared.
+  Retrieval only considers chunks embedded with the current model; stale documents are ignored rather
+  than compared.
 - **Portable storage first.** Embeddings are stored as JSON float arrays in the database. Ranking is
   cosine similarity computed in Python. At school scale (thousands, not millions, of chunks) this is
   one to two seconds at worst and needs no new service, no extension and works on SQLite.
@@ -169,8 +194,6 @@ Rules:
   touching services or views.
 - **Citations are mandatory.** If no chunk clears the relevance floor, the assistant says so and does
   not improvise.
-- Extraction, chunking (about 800 characters with overlap) and embedding run in the background worker,
-  never in a request.
 
 ## 6. Tools (Module 4, designed now)
 
@@ -367,9 +390,17 @@ run since 2026-11-11 (heartbeat row), one queued job has sat undequeued, and zer
 recorded. Tasks also swallow their own exceptions, so django-q reports success. The assistant must not
 depend on this queue for anything a user waits for; chat is synchronous with a hard timeout.
 
-**Planned mitigations:** a dedicated assistant queue and worker once knowledge ingestion exists (a
-second `qcluster` process); explicit failure recording instead of swallowed exceptions; idempotent
-tasks (checksums, "already indexed" guards) because a redeploy can redeliver a job.
+**Ingestion now uses this queue.** K2 queues a knowledge read through django-q2 after the save
+commits, retries a transient failure up to 3 attempts, and records every attempt in
+`KnowledgeIngestRun`; a permanent failure writes a plain reason on the document and in
+`AssistantJobFailure`. Without a running `qcluster` the document simply stays "waiting" — the
+knowledge screens are the visible place to see that — and no user-facing request is affected.
+Re-reading is safe: a successful read replaces the document's whole passage set.
+
+**Still planned:** a dedicated assistant queue and worker (a second `qcluster` process) so AI load
+cannot starve credential email and digests; explicit acknowledgement at the queue level rather than
+each task recording its own failure; idempotent tasks (checksums, "already indexed" guards) because a
+redeploy can redeliver a job.
 
 **When this becomes a separate service:** when any of these is true — more than about 20 concurrent
 streams, a knowledge base above roughly 100,000 chunks or retrieval p95 above 2 s, more than one
@@ -399,10 +430,11 @@ Verified 2026-11-18:
 
 ## 14. Data model overview
 
-Built (ten tables, see [data-model.md](data-model.md)): `AssistantSettings`, `ProviderConfig`,
+Built (twelve tables, see [data-model.md](data-model.md)): `AssistantSettings`, `ProviderConfig`,
 `UsageEvent`, `CustomGuardrailRule`, `SafeguardingAlert`, `AssistantJobFailure`, plus the four
-knowledge tables `KnowledgeCollection`, `KnowledgeDocument`, `KnowledgeDocumentVersion` and
-`KnowledgeQAPair`.
+knowledge catalogue tables `KnowledgeCollection`, `KnowledgeDocument`, `KnowledgeDocumentVersion` and
+`KnowledgeQAPair`, and the two K2 tables `KnowledgeChunk` (text, heading path, JSON embedding, model,
+dimension) and `KnowledgeIngestRun` (one row per attempt).
 
 - The **mandatory safeguarding rule pack is not a table** — it lives in
   `guardrails/mandatory.py`, versioned in code, so no admin screen or database edit can weaken it.
@@ -416,9 +448,6 @@ knowledge tables `KnowledgeCollection`, `KnowledgeDocument`, `KnowledgeDocumentV
   PostgreSQL alike.
 
 Planned, in order of module:
-- **Knowledge chunks (Module 2 K2):** a `KnowledgeChunk` table (text, document, heading/section,
-  embedding JSON, embedding model, dimension, checksum, order) plus an ingest-run record for progress
-  and retries.
 - **Conversations and handoffs (Module 3):** `Conversation`, `Message`, `HandoffRule`, `Handoff` and
   inbox fields — only after consent wording and retention are approved.
 
@@ -463,3 +492,14 @@ The user approved the design with the changes below; Module 1 Step 2 builds to t
 | Audience ceiling | A document can never be broader than its shelf; enforced in the model, the forms and the services |
 | Private storage | `KNOWLEDGE_MEDIA_ROOT` outside `MEDIA_ROOT`; UUID filenames; storage `url()` raises; the admin download view is the only read path |
 | Module numbering | Knowledge is **Module 2**; public assistant, handoff rules and human inbox are **Module 3**; signed-in screens and record tools are **Module 4** |
+
+### Module 2 K2 — approved 2026-11-18
+
+| Decision | Ruling |
+|---|---|
+| PDF reading | **pypdf**; encrypted and scan-only PDFs are refused with plain wording, not guessed at |
+| What is indexed | **Approved documents only**, and only while their shelf is approved and inside its effective window. A draft is never read. |
+| Web pages | Fetch the page at read time and **keep the text** in `body_text`; only public `http(s)` addresses, redirects re-checked, 10 MB cap |
+| Embedding storage | JSON float arrays, as decided in K1; no pgvector, no local model |
+| Re-index trigger | Status and shelf saves queue or purge automatically; a provider embedding-model change flags documents **Needs re-index**; a manual action and command are available |
+| Ingestion and switches | Ingestion uses the budget but does **not** require the assistant's global switch, so the base can be prepared before go-live |

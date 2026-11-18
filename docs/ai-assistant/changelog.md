@@ -1,5 +1,77 @@
 # Changelog
 
+## 2026-11-18 — Module 2, K2: reading, chunking, embeddings and the ingestion worker
+
+**Added**
+
+- **Text extraction** (`knowledge/extraction.py`): PDF through **pypdf** (an encrypted or scan-only
+  PDF is refused with plain wording), Word `.docx` through **python-docx** (headings keep their level,
+  tables become rows joined with `|`), UTF-8 text/Markdown, pasted text, question-and-answer pairs, and
+  web pages. Every library failure becomes one plain sentence; no file path or raw exception reaches a
+  screen. Nothing executes macros or renders a file.
+- **Web-page fetching**: `http`/`https` only; every redirect hop (at most 3) is re-checked; the host
+  must resolve only to public addresses (private, loopback, link-local and reserved ranges are
+  refused); 15-second timeout; 10 MB streamed cap; only HTML, XHTML or plain text is accepted.
+  Scripts, styles, navigation, headers, footers, forms, SVG and iframes are dropped; headings become
+  `#` lines. The fetched text is kept in `body_text` so an admin can see what was read.
+- **Chunking** (`knowledge/chunking.py`): about 800 characters per passage with about 120 characters
+  of overlap, cut at paragraph/line/sentence/word boundaries; markdown headings start a section and
+  every passage keeps its heading path (`Fees › Payment plans`); fragments under 40 characters are
+  dropped; more than 60 passages is refused with a message asking the admin to split the document
+  rather than silently truncating it.
+- **Embedding path** (`gateway.embed_chain()`): the same ordered fallback, retries and circuit breaker
+  as chat, in batches of 32 passages; a provider without an embedding model is skipped before it is
+  called; every attempt writes one `UsageEvent` with `source=ingestion`,
+  `profile=ingestion` and the embedding cost from the provider's embedding price; the passage text is
+  never stored on the row. Ingestion uses the monthly budget and optional per-provider cap but does not
+  require the assistant's global switch, so a knowledge base can be prepared before go-live.
+- **Ingestion worker** (`knowledge/ingest.py`, `tasks.py`): only approved documents on approved,
+  effective shelves are read; the whole passage set is replaced after a successful embedding, so a
+  failed re-index can never leave old wording beside new wording; withdrawing approval, drafting or
+  archiving a shelf removes passages immediately. Transient failures (provider unavailable, timeout,
+  rate limit) are retried up to 3 attempts; extraction, chunking and permanent provider failures are
+  recorded once. Each attempt leaves a `KnowledgeIngestRun` row (status, attempt, passages, tokens,
+  plain reason) and a document state of waiting, reading, ready, failed or skipped.
+- **Lifecycle hooks** (`knowledge/services.py`): creating, editing or changing the status of a
+  document and saving a shelf queue or purge the right work. Re-saving an already-approved document
+  does not re-embed it. Changing or deleting a provider's embedding model flags affected documents
+  **Needs re-index**; a stale document is ignored until re-read.
+- **Admin re-index action**: a POST-only **Read it again** button on the document page, refused while
+  the document is being read and audited when accepted; the page shows the state, passage count,
+  embedding model, read time, last error and the five most recent runs.
+- **Command** `reindex_knowledge`: no arguments re-indexes stale documents, positional ids choose
+  documents, `--all` chooses every approved document, `--now` reads immediately instead of queueing.
+  Drafts and archived rows are skipped with a reason.
+- **New tables** (`models.py`, migration `assistant/0004_knowledge_ingestion`): `KnowledgeChunk`
+  (ordinal, heading path, text, character count, SHA-256, JSON embedding, model, dimension,
+  embedded-at) and `KnowledgeIngestRun` (status, attempt, times, passages, tokens, plain error), plus
+  the `ingestion` choices on `UsageEvent.source`, `UsageEvent.profile` and `SafeguardingAlert.profile`,
+  and the widened `KnowledgeDocument.body_text` help text.
+- **Dependencies**: `pypdf`, `python-docx` and `lxml` added to `requirements/base.txt`. No new service
+  and no database extension; vectors are JSON arrays, as decided in K1.
+- **Tests**: 81 across `tests/test_knowledge_extraction.py` (40: files, HTML, URL safety, fetching,
+  chunking) and `tests/test_knowledge_ingestion.py` (41: embedding gateway, ingest, lifecycle, worker
+  retries, re-index screen, command). All provider calls go through the fake adapter or patched HTTP.
+
+**Migration**: `assistant/0004_knowledge_ingestion` adds two tables and three choice lists plus one
+help-text change; no existing data is altered, and on SQLite the choice/help-text operations are
+no-ops. It was generated on 2026-11-18 and reviewed with `sqlmigrate`. A concurrent `migrate` run from
+the other tool working in this folder applied it to the local database the same day (13:49, after
+`core/0021` and alongside `public/0004`), so the checkpoint's own "apply after a fresh backup" gate was
+overtaken; `assistant_knowledgechunk` and `assistant_knowledgeingestrun` were empty after the migration.
+`makemigrations --check` and `manage.py check` are clean.
+
+**Results (2026-11-18)**: `apps/assistant` **309 passed**; full suite **2845 passed, 2 failed**, both
+the known `PromotionTests`. No new failures.
+
+**Not in this step**
+
+- No retrieval, ranking, citations, refusal, confidence or answer cache (K3).
+- No question set or scores (K4).
+- No screen still where a parent, pupil, teacher or visitor asks anything.
+- Nothing reads passages outside the background worker; the request path is untouched.
+- No pgvector, no local model inference, no OCR for scanned PDFs.
+
 ## 2026-11-18 — Module 2, K1: knowledge shelves, private files and admin screens
 
 **Added**

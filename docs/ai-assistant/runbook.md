@@ -8,9 +8,13 @@
    server secrets — not in the database, a repository, or a ticket.
 4. Back up the database (see below).
 5. Apply migrations: `python manage.py migrate assistant`. Run `showmigrations assistant` first; the
-   current head is `0003` (knowledge tables).
+   current head is `0004` (K2: knowledge passages and ingest runs). On this workstation `0004` was
+   applied to the local database on 2026-11-18; the two tables were empty afterwards.
 6. Restart web and worker processes. Both need the environment variable.
 7. Sign in as admin → sidebar **AI Assistant** → confirm every switch is off.
+8. Keep `python manage.py qcluster` running. Knowledge reading is a background job; with no worker an
+   approved document stays **Waiting to be read** and nothing is embedded. The worker does not need
+   the assistant's global switch to be on.
 
 `python manage.py check` must be clean before restarting.
 
@@ -38,6 +42,9 @@ host. This is recorded here as a deployment gap; the module did not edit `compos
   database, on the same schedule. The rows point at random file names in that folder; a database
   restored without it will show documents with no file. The folder is private: never copy it into a
   web-served directory or attach it to a ticket.
+- **Passages and embeddings** live in the database (`assistant_knowledgechunk`), so the database backup
+  already carries them. Text fetched from a web page is stored in the document row for the same reason.
+  Re-reading a restored document is safe and replaces its passages.
 
 ## Restore
 
@@ -105,12 +112,50 @@ trusted.
 
 - Files are stored under `KNOWLEDGE_MEDIA_ROOT` (default `backend/private_knowledge`), outside
   `MEDIA_ROOT`. Do not add a web-server route for it and do not move it under `media/`.
-- In K1 nothing reads the files. `ingestion_state` stays `pending`; the admin download is the only
-  access path and every download is audited.
-- When K2 arrives, extraction, chunking and embedding run in the worker — never in a request. Until
-  then, a large upload costs nothing and blocks nothing.
-- A document flagged **Needs re-index** means the embedding model changed after it was indexed. It is
-  ignored until re-indexed (K2 builds the re-index action).
+- Reading is a **background job** (`python manage.py qcluster`): extraction, chunking and embedding
+  never run in a request. A save queues the job after the database transaction commits.
+- Only approved documents on approved, effective shelves are read. Drafts, archived rows and documents
+  on a draft/archived shelf are skipped. Withdrawing approval or drafting a shelf **deletes the
+  document's passages immediately**.
+- A successful read replaces the whole passage set in one transaction, so a failed re-index leaves the
+  previous passages out of service rather than mixing old and new wording. The document page shows the
+  state, passage count, model, time and the plain error.
+- **Passages** are about 800 characters with about 120 characters of overlap; a document with more than
+  60 passages is refused with a "split this document" message. Scanned PDFs are refused — there is no
+  OCR.
+- **Web pages:** only public `http(s)` addresses. Redirects (at most 3) are re-checked, the host must
+  resolve only to public addresses, and the response must be HTML or plain text under 10 MB. The
+  fetched text is stored on the document so an admin can see exactly what was read.
+- **Cost:** each embedding batch writes `UsageEvent(source=ingestion)` rows priced from the provider's
+  embedding price. The monthly and per-provider caps apply; the global assistant switch does not have
+  to be on.
+- **Needs re-index** appears when the embedding model changed (or a provider using that model was
+  deleted) after indexing. Those documents are ignored until re-read.
+
+### Re-index
+
+```
+cd backend
+python manage.py reindex_knowledge                 # only documents flagged Needs re-index
+python manage.py reindex_knowledge 12 15           # these document ids
+python manage.py reindex_knowledge --all           # every approved document
+python manage.py reindex_knowledge --all --now     # read now, ignoring the queue
+```
+
+Without `--now` the command queues work and needs a running `qcluster`. It refuses drafts/archived rows
+with a reason and never prints document text. The document page's **Read it again** button queues the
+same job for one document and is audited.
+
+### When reading fails
+
+| What the document page says | Meaning | What to do |
+|---|---|---|
+| **Waiting to be read** | Queued; the worker has not picked it up. | Confirm `qcluster` is running. |
+| **Could not be read** with "password-protected" | The PDF is encrypted. | Remove the password and upload again. |
+| **Could not be read** with "no readable text" | The PDF is a scan. | Upload a text version; no OCR is built. |
+| **Could not be read** with "too long … more than 60 passages" | One document is too large. | Split it into smaller documents. |
+| **Could not be read** with a provider reason | The embedding provider failed permanently or no provider has an embedding model. | Fix the provider or set an embedding model, then press **Read it again**. |
+| **Needs re-index** | The embedding model changed after indexing. | Press **Read it again** or run the command. |
 
 ## Safeguarding alerts and escalation
 
@@ -172,10 +217,12 @@ approval first.
 
 ## Rollback
 
-`python manage.py migrate assistant 0002` removes the four knowledge tables (documents, versions,
-question-and-answer pairs and collections) while keeping the Module 1 tables. It does **not** delete
-files in `KNOWLEDGE_MEDIA_ROOT`; remove those separately if that is what you intend.
-`python manage.py migrate assistant 0001` removes the Step 2 tables and fields while keeping the
-original three tables and their data. `python manage.py migrate assistant zero` removes all ten tables,
-including settings, providers, usage history and alert records (saved keys are encrypted, but the rows
-go too). All are destructive; take a backup first and only do this deliberately.
+`python manage.py migrate assistant 0003` removes the two K2 tables (passages and ingest runs) and the
+`ingestion` choices, while keeping the knowledge catalogue. `python manage.py migrate assistant 0002`
+removes the four knowledge catalogue tables (documents, versions, question-and-answer pairs and
+collections) while keeping the Module 1 tables. Neither deletes files in `KNOWLEDGE_MEDIA_ROOT`;
+remove those separately if that is what you intend. `python manage.py migrate assistant 0001` removes
+the Step 2 tables and fields while keeping the original three tables and their data.
+`python manage.py migrate assistant zero` removes all twelve tables, including settings, providers,
+usage history and alert records (saved keys are encrypted, but the rows go too). All are destructive;
+take a backup first and only do this deliberately.

@@ -1,7 +1,7 @@
 # Evaluation
 
-Evaluation has two parts: the automated suite (exists now) and the school's own question set
-(arrives with retrieval, Module 2 K4).
+Evaluation has two parts: the automated suite (exists now) and the school's own question set (arrives
+after retrieval, Module 2 K4).
 
 ## Automated suite
 
@@ -12,7 +12,7 @@ python -m pytest apps/assistant -q
 python -m pytest -q
 ```
 
-228 test methods across 14 files. All provider calls in the suite go through **patched HTTP** or the
+309 test methods across 16 files. All provider calls in the suite go through **patched HTTP** or the
 **fake adapter**; no test needs a real key or touches a real provider.
 
 | File | Tests | What it proves |
@@ -31,11 +31,15 @@ python -m pytest -q
 | `test_key_scan.py` | 3 | no `sk-…` or `AIza…` key-like strings in assistant code, production settings, docs or `.env.example`; no literal Fernet key assigned to the environment setting |
 | `test_knowledge.py` | 32 | audience ceiling (shelf and document); canonical role storage; anonymous, signed-in, role and class visibility; parent/child and teacher homeroom scope; drafts, archived rows, draft shelves and effective-date boundaries excluded; a hand-edited public document is refused; visitor shortcut; upload validation (PDF/DOCX/text, renamed executable, size, wrong extension) |
 | `test_knowledge_views.py` | 21 | every knowledge screen is admin-only (teacher/parent 403, visitor redirected); shelf create and ceiling errors; paste, upload, URL and FAQ creation; zero-pair FAQ refused; private storage (`file.url` raises); duplicate detection; detail page never prints a storage path; edit rename writes a version; edit cannot widen the audience; status change audited; download is an attachment with `nosniff`, admin-only, and audited; teacher and no-file downloads refused |
+| `test_knowledge_extraction.py` | 40 | PDF/DOCX/text extraction, encrypted and blank PDFs refused with plain wording, headings and tables preserved, FAQ pairing; HTML pruning and block separation; URL scheme, credentials, private address, redirect and content-type refusals; fetch size cap, timeout and failure wording; chunk sizes, overlap, heading paths, short-fragment drop and the 60-passage limit |
+| `test_knowledge_ingestion.py` | 41 | embedding gateway (budget, fallback, circuit, usage shape, no text stored, malformed vector refusal); ingest states (ready, failed, skipped, draft/purged); whole-set replacement; model-change stale flag; retry limits in the task; re-index screen permissions, audit and guards; command selection (`--stale`, ids, `--all`, `--now`) and draft skips |
 
 ### Latest results
 
 | Date | Scope | Result |
 |---|---|---|
+| 2026-11-18 | `apps/assistant` (after K2; migration `0004` applied) | **309 passed, 0 failed** |
+| 2026-11-18 | Full suite (after K2; migration `0004` applied) | **2845 passed, 2 failed** — the two known `PromotionTests`; no new failures |
 | 2026-11-18 | `apps/assistant` (after migration `0003`) | **228 passed, 0 failed** |
 | 2026-11-18 | Full suite (after migration `0003`) | **2764 passed, 2 failed** — the two known `PromotionTests`; no new failures |
 | 2026-11-18 | `apps/assistant` (after migration `0002`) | **175 passed, 0 failed** |
@@ -60,7 +64,10 @@ from. Scoring will be:
 The set will also include attempts to extract another pupil's data and prompt-injection attempts;
 those are scored as pass only when the assistant refuses.
 
-This section will carry the first real scores after Module 2 K4.
+Retrieval and answers arrive in K3; this section will carry the first real scores after K4.
+
+Reading is tested but not scored here: the suite proves passages are extracted and stored, not that
+they are the *right* passages. That is what the school's set will measure.
 
 ## Safeguarding trigger review
 

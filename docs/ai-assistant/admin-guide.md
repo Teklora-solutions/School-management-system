@@ -23,8 +23,9 @@ look.
 
 The assistant is **off** when you first see it. Nothing is sent anywhere until you switch it on, and
 there is still no screen where a parent, student, teacher or visitor can talk to it. This version
-sets up and proves the machinery behind that screen, and lets you catalogue the approved documents it
-will answer from. Nothing reads those documents yet.
+sets up and proves the machinery behind that screen, lets you catalogue the approved documents it will
+answer from, and reads those documents into passages in the background. Nothing searches or answers
+from the passages yet.
 
 ## 1. Set the rules
 
@@ -321,7 +322,7 @@ work it out from a combined error at the top of the page.
 | Card | For | What happens now |
 |---|---|---|
 | **Upload a file** | PDF, Word (.docx), plain text or Markdown | Stored privately under a random name. 20 MB limit. The file's first bytes must match its extension (a renamed program is refused). |
-| **Add a web page** | Wording that lives on the school website or another public page | Only the address is saved. Nothing is fetched until reading arrives (K2). The link must be `http`/`https` and cannot contain a username or password. |
+| **Add a web page** | Wording that lives on the school website or another public page | Only the address is saved at first. The page is fetched when the approved document is read, and its text is kept on the document so you can see what was read. The link must be public `http`/`https`, cannot contain a username or password, and cannot point at a private network address. |
 | **Paste text** | Wording the school has already checked | Saved as the document's text. At least 20 characters. |
 | **Questions and answers** | Short, exact answers a parent or pupil may ask for | At least one complete question-and-answer pair; blank rows are ignored. |
 
@@ -348,15 +349,14 @@ Clicking a document title shows:
 - **Possible duplicate** — an amber warning linking to an earlier document with the same file bytes or
   the same pasted text. The system does not merge them; keep one so the same wording is not cited
   twice.
-- **Needs re-index** — a red warning that appears when the embedding model changed after indexing
-  (relevant from K2 onward).
+- **Needs re-index** — a red warning that appears when the embedding model changed after indexing.
+  The document is ignored until it is read again.
 - **Saved text and questions and answers** — exactly what was pasted or entered.
 - **Version history** — every save that changes the title writes a version row with a note, who saved
   it and when. Version 1 is created when the document is added.
-- **Reading and answers** — reading state, chunks stored, embedding model and last indexing time. In
-  this build the state stays “Waiting to be read” and the chunk count stays 0. **Test this document**
-  is visible but disabled, with the reason written underneath: reading and embeddings arrive in K2,
-  testing with retrieval in K3.
+- **Reading and answers** — reading state, passages stored, embedding model, last read time, the last
+  error in plain words, a **Read it again** button and the five most recent reads. **Test this
+  document** is visible but disabled until retrieval arrives in K3.
 - **Change status** — swap between Draft, Approved and Archived. The change is audited.
 - **Download file** — only for uploaded documents. The download is an attachment, marked
   `X-Content-Type-Options: nosniff`, and written to the audit log. There is no public link to a
@@ -369,22 +369,59 @@ documents, and repeats the rule: **only approved documents on approved shelves, 
 dates, are ever used.** That rule is enforced in the database query that selects candidates, before any
 ranking exists.
 
-### 9.5 What is honestly not working yet
+### 9.5 Reading and indexing
 
-- Nothing reads the files or pasted text yet: no extraction, no chunking, no embeddings.
-- No question can be answered from them, and nothing is shown to a parent, pupil, teacher or visitor.
-- “Test this document” is deliberately disabled.
+When you approve a document — and its shelf is approved and inside its dates — the system queues a
+background read. It extracts the text, splits it into passages of about 800 characters, asks the
+provider's **embedding model** to turn each passage into numbers, and stores the passages. Nothing is
+sent to the provider until then, and the assistant's global switch does **not** have to be on.
+
+| Where you see it | What it means |
+|---|---|
+| **Waiting to be read** | Queued. The background worker has not picked it up. If it stays here, the worker is not running. |
+| **Reading now** | The worker is working on it. |
+| **Ready** | Passages are stored. The count, model and time are shown. |
+| **Could not be read** | A plain reason is shown under the state (encrypted PDF, a scan with no text, too long, provider failure). Fix the cause and press **Read it again**. |
+| **Not read** | The document or its shelf is a draft/archived, so no passages are kept. |
+| **Needs re-index** | The embedding model changed after this document was read. It is ignored until read again. |
+
+Things that queue a read automatically:
+
+- approving a document, or saving an edit to an approved document;
+- approving a shelf that has approved documents.
+
+Things that remove passages immediately:
+
+- setting a document or its shelf to Draft or Archived;
+- an effective date window that means the shelf is not in force.
+
+**Read it again** (on the document page) queues one document and is written to the audit log. It is
+refused while the document is already being read, or when the document or shelf is not approved.
+
+A document with **more than 60 passages** is refused with a message asking you to split it. A scanned
+PDF is refused because there is no OCR — upload a text version instead. A re-read replaces the whole
+passage set, so old wording never sits beside new wording.
+
+The background worker must be running (`python manage.py qcluster`). Without it, documents wait
+indefinitely; nothing on the site breaks, but nothing is searchable later either.
+
+### 9.6 What is honestly not working yet
+
+- Passages exist, but nothing searches them: no question can be answered from them yet (K3).
+- Nothing is shown to a parent, pupil, teacher or visitor.
+- “Test this document” is deliberately disabled until retrieval exists.
+- Language support is single-language per document: there is no automatic translation.
 - Upload only **demo** documents in this phase — never a real pupil's record, a real invoice or a real
-  safeguarding note.
+  safeguarding note. Document text is sent to the embedding provider unmasked.
 
-Reading and indexing are K2; retrieval, citations and refusal are K3; the question set and scores are
-K4, all inside Module 2.
+Reading and indexing are K2, now built; retrieval, citations and refusal are K3; the question set and
+scores are K4, all inside Module 2.
 
 ## 10. What the admin cannot do yet
 
 - There is no screen where a parent, student, teacher or visitor talks to the assistant.
-- Knowledge can be uploaded and organised, but nothing reads it yet: no extraction, embeddings,
-  retrieval or answers (Module 2 K2–K4).
+- Knowledge is uploaded, organised and read into passages, but nothing retrieves or answers from them
+  yet (Module 2 K3–K4).
 - The public/signed-in switches are recorded decisions; the public widget, handoff rules and human
   inbox arrive in Module 3, the signed-in screens and record tools in Module 4.
 - Handoff records and routing arrive with those screens. Safeguarding email already sends.

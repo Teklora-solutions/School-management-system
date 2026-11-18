@@ -937,11 +937,12 @@ them through `context_processors.school_settings`. Writes go through
 
 ## 15a. AI Assistant ✅ (pipeline built, no user-facing chat yet)
 
-**Status: Module 1, Steps 1–2, and Module 2 K1 (knowledge catalogue).** The assistant still does not
-speak to a parent, student, teacher, director or visitor; every switch is **off by default** and there
-is no chat screen. What exists is the whole pipeline behind it, the admin and director screens to run
-it safely, and the private shelves an admin fills with approved wording (nothing reads those
-documents yet). The screens are:
+**Status: Module 1, Steps 1–2, and Module 2 K1–K2 (knowledge catalogue, reading and indexing).** The
+assistant still does not speak to a parent, student, teacher, director or visitor; every switch is
+**off by default** and there is no chat screen. What exists is the whole pipeline behind it, the admin
+and director screens to run it safely, and the private shelves an admin fills with approved wording.
+Approved documents are now read in the background into embedded passages; nothing searches them yet.
+The screens are:
 
 - `/assistant/settings/` — global/public/signed-in/tutor switches, house rules, default provider,
   monthly budget and USD→KSh rate, four daily limits (signed-in per user; public per signed cookie,
@@ -954,8 +955,10 @@ documents yet). The screens are:
   classes, status, effective dates) and documents added as a file, a web-page address, pasted text or
   question-and-answer pairs. Files live under `KNOWLEDGE_MEDIA_ROOT`, outside `MEDIA_ROOT`, and are
   served only through the admin download route. Each document records its audience, status, version
-  and SHA-256 fingerprint; the scope filter that K3 will rank is already built and tested. Reading,
-  embeddings, retrieval and answers are K2–K4.
+  and SHA-256 fingerprint; the scope filter that K3 will rank is already built and tested. Approved
+  documents on approved, effective shelves are read by the background worker — extraction (PDF, DOCX,
+  text, pasted, FAQ, and public web pages), ~800-character passages and embeddings — and can be re-read
+  from the document page or `reindex_knowledge`. Retrieval, answers and the question set are K3–K4.
 - `/assistant/guardrails/` — the mandatory safeguarding pack (code, cannot be removed) and admin-added
   rules (add-only).
 - `/assistant/alerts/` — admin and director; masked excerpts, acknowledge, escalation state, and a
@@ -973,8 +976,9 @@ files for key-like strings. If `ASSISTANT_ENCRYPTION_KEY` is missing while a sav
 assistant needs it, `manage.py check` fails with `assistant.E001` and the app refuses to start.
 Safeguarding detection is mandatory and cannot be switched off; escalation
 is also checked when an admin or director loads any page, so a stopped worker cannot hide an alert.
-Knowledge reading, indexing, retrieval, record tools, handoff records, streaming and the conversation
-screens are later modules; the consent wording is a draft and is shown to nobody.
+Knowledge reading needs the background worker (`manage.py qcluster`); retrieval, record tools, handoff
+records, streaming and the conversation screens are later modules; the consent wording is a draft and
+is shown to nobody.
 
 Full documentation: [README](ai-assistant/README.md) · [admin guide](ai-assistant/admin-guide.md) ·
 [security and privacy](ai-assistant/security-and-privacy.md) · [architecture](ai-assistant/architecture.md) ·
@@ -1056,7 +1060,7 @@ this hardware.
 
 ---
 
-## 19. What the ~2,500 tests protect
+## 19. What the ~2,850 tests protect
 
 ```
 cd backend && python -m pytest -q
@@ -1103,8 +1107,9 @@ the test fails if the list grows.
 6. **Teacher and Finance home pages are placeholders** — hard-coded "–" stat cards and "Phase 5" text even
    though the views pass real context.
 7. **Director KPI cache is not invalidated** by invoice posting, waivers, expenses or attendance (§17).
-8. **Queued jobs need `qcluster`** — credential emails and the fee-reminder task sit silently if the
-   worker is not running. The class-feed digest has its own daily `DigestSchedule`.
+8. **Queued jobs need `qcluster`** — credential emails, the fee-reminder task and knowledge reading sit
+   silently if the worker is not running (a document stays *Waiting to be read*). The class-feed digest
+   has its own daily `DigestSchedule`.
 9. **Deferred by explicit decision**: Director balance sheet, presentation mode, signed expiring
    attachment links; attendance screens (Checkpoint E), virtual labs (Checkpoint G) and the leaderboard
    (Checkpoint H) are queued LMS work. Live classes & calendar (Checkpoint D), class polls, the teacher
