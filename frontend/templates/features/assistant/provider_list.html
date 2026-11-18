@@ -1,28 +1,25 @@
 {% extends base_template %}
 
-{% block title %}Assistant Providers | {{ SCHOOL_NAME }}{% endblock %}
+{% block title %}Assistant providers | {{ SCHOOL_NAME }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
     <h1 class="page-title">
       <i class="bi bi-hdd-network me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
-      Assistant Providers
+      Assistant providers
     </h1>
     <p class="page-subtitle">
-      The services that answer for the assistant. Only the fake provider is
-      available in this version; it never leaves this server.
+      The services that can answer, in the order they are tried. A saved key is
+      encrypted and shown only by its last four characters.
     </p>
   </div>
-  <div class="d-flex gap-2">
-    <a href="{% url 'assistant:settings' %}" class="btn btn-outline-secondary">
-      <i class="bi bi-gear me-1" aria-hidden="true"></i>Settings
-    </a>
-    <a href="{% url 'assistant:provider_create' %}" class="btn btn-primary">
-      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add provider
-    </a>
-  </div>
+  <a href="{% url 'assistant:provider_create' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add provider
+  </a>
 </div>
+
+{% include "features/assistant/_tabs.html" %}
 
 {% if not crypto_configured %}
 <div class="alert alert-warning" role="alert">
@@ -41,8 +38,10 @@
           <tr>
             <th scope="col">Name</th>
             <th scope="col">Kind</th>
-            <th scope="col">Model</th>
-            <th scope="col">API key</th>
+            <th scope="col">Models</th>
+            <th scope="col">Key</th>
+            <th scope="col">Price (USD / 1M)</th>
+            <th scope="col">Order</th>
             <th scope="col">Available</th>
             <th scope="col" class="text-end">Actions</th>
           </tr>
@@ -55,10 +54,25 @@
               {% if provider.pk == default_provider_id %}
               <span class="badge bg-primary ms-1">Default</span>
               {% endif %}
+              {% if provider.region_note %}
+              <div class="text-muted-sm">Processes data in: {{ provider.region_note }}</div>
+              {% endif %}
             </td>
             <td>{{ provider.get_kind_display }}</td>
-            <td>{{ provider.model_name|default:"—" }}</td>
+            <td class="small">
+              <div>{{ provider.model_name|default:"—" }}</div>
+              {% if provider.fast_model_name %}<div class="text-muted-sm">Fast: {{ provider.fast_model_name }}</div>{% endif %}
+              {% if provider.embedding_model_name %}<div class="text-muted-sm">Embed: {{ provider.embedding_model_name }}</div>{% endif %}
+            </td>
             <td class="font-monospace small">{{ provider.masked_key }}</td>
+            <td class="small">
+              <div>In {{ provider.input_usd_per_1m }}</div>
+              <div>Out {{ provider.output_usd_per_1m }}</div>
+              {% if provider.monthly_budget_ksh is not None %}
+              <div class="text-muted-sm">Cap KSh {{ provider.monthly_budget_ksh }}</div>
+              {% endif %}
+            </td>
+            <td>{{ provider.priority }}</td>
             <td>
               {% if provider.is_active %}
               <span class="badge bg-success-subtle text-success-emphasis">On</span>
@@ -67,7 +81,7 @@
               {% endif %}
             </td>
             <td class="text-end">
-              <div class="d-inline-flex gap-1">
+              <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
                 <form method="post" action="{% url 'assistant:provider_test' provider.pk %}">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-sm btn-outline-primary"
@@ -80,6 +94,13 @@
                    class="btn btn-sm btn-outline-secondary">
                   <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
                 </a>
+                <form method="post" action="{% url 'assistant:provider_delete' provider.pk %}"
+                      onsubmit="return confirm('Delete this provider? Saved conversations that used it are kept.');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
+                  </button>
+                </form>
               </div>
             </td>
           </tr>
@@ -95,8 +116,8 @@
     <i class="bi bi-hdd-network fs-1 text-muted" aria-hidden="true"></i>
     <p class="mt-3 mb-1 fw-600">No providers yet</p>
     <p class="text-muted-sm mb-3">
-      Add the fake provider to prove the gateway works; real providers arrive with
-      the knowledge module.
+      Add the fake provider to prove the gateway works without sending anything
+      anywhere. Real providers are configured the same way.
     </p>
     <a href="{% url 'assistant:provider_create' %}" class="btn btn-primary">
       <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add provider

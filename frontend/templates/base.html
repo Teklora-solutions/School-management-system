@@ -123,6 +123,7 @@
     {# ── Main content ──────────────────────────────────────────────────── #}
     <main class="app-main" id="main-content" role="main">
       {% include "partials/_messages.html" %}
+      {% include "features/assistant/_notice.html" %}
       {% block content %}{% endblock %}
       {% block footer %}{% include "partials/_footer_base.html" %}{% endblock %}
     </main>

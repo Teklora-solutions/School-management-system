@@ -1,0 +1,59 @@
+{% comment %}
+Shared navigation for the assistant's admin screens. Links are hidden from
+directors for pages their role cannot open; the views enforce the same rule.
+{% endcomment %}
+{% with role=request.user.role %}
+{% if role == "admin" or request.user.is_superuser and not role or role == "director" %}
+<ul class="nav nav-pills flex-wrap gap-1 mb-3 assistant-tabs">
+  {% if role == "admin" or request.user.is_superuser and not role %}
+  <li class="nav-item">
+    <a class="nav-link{% if request.resolver_match.url_name == 'settings' %} active{% endif %}"
+       href="{% url 'assistant:settings' %}">
+      <i class="bi bi-sliders me-1" aria-hidden="true"></i>Settings
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link{% if 'provider' in request.resolver_match.url_name %} active{% endif %}"
+       href="{% url 'assistant:providers' %}">
+      <i class="bi bi-hdd-network me-1" aria-hidden="true"></i>Providers
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link{% if 'knowledge' in request.resolver_match.url_name %} active{% endif %}"
+       href="{% url 'assistant:knowledge_documents' %}">
+      <i class="bi bi-journal-bookmark me-1" aria-hidden="true"></i>Knowledge
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link{% if 'guardrail' in request.resolver_match.url_name %} active{% endif %}"
+       href="{% url 'assistant:guardrails' %}">
+      <i class="bi bi-shield-check me-1" aria-hidden="true"></i>Safeguarding rules
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link{% if request.resolver_match.url_name == 'console' %} active{% endif %}"
+       href="{% url 'assistant:console' %}">
+      <i class="bi bi-terminal me-1" aria-hidden="true"></i>Test console
+    </a>
+  </li>
+  {% endif %}
+  <li class="nav-item">
+    <a class="nav-link{% if 'alert' in request.resolver_match.url_name %} active{% endif %}"
+       href="{% url 'assistant:alerts' %}">
+      <i class="bi bi-bell me-1" aria-hidden="true"></i>Alerts
+      {% if assistant_open_alert_count %}
+      <span class="badge rounded-pill bg-danger ms-1">{{ assistant_open_alert_count }}</span>
+      {% endif %}
+    </a>
+  </li>
+  {% if role == "admin" or request.user.is_superuser and not role %}
+  <li class="nav-item">
+    <a class="nav-link{% if 'job' in request.resolver_match.url_name %} active{% endif %}"
+       href="{% url 'assistant:jobs' %}">
+      <i class="bi bi-exclamation-diamond me-1" aria-hidden="true"></i>Failed jobs
+    </a>
+  </li>
+  {% endif %}
+</ul>
+{% endif %}
+{% endwith %}

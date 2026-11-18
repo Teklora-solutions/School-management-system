@@ -178,19 +178,22 @@ class DirectorHomeViewQueryBudgetTest(TestCase):
     This catches regressions in context processors, middleware, and view code.
 
     Actual counts measured:
-      Cold (cache miss): 18 queries — session(1) + user(1) + current_term(1) +
+      Cold (cache miss): 21 queries — session(1) + user(1) + current_term(1) +
         school_kpis(10) + class_fee_summary(3) + announcements(1) +
-        unread notifications COUNT(1)
+        unread notifications COUNT(1), plus 2 for the assistant banner
+        (settings + open-alert count; the escalation check shares them).
       Warm (cache hit):  10 queries — session(1) + user(1) + current_term(1) +
         class_fee_summary(3) + announcements(1) + SAVEPOINT/RELEASE(2) +
-        unread notifications COUNT(1)
+        unread notifications COUNT(1); the assistant banner is cached for 60 s
+        and costs no query.
 
     The notifications COUNT is the navbar bell badge, which every signed-in
     page pays once. Budgets set at measured + 3 headroom to absorb minor
-    middleware variance.
+    middleware variance, except the cold budget carries the assistant's two
+    banner queries on top.
     """
 
-    VIEW_QUERY_BUDGET = 21  # cold cache: 18 measured + 3 headroom
+    VIEW_QUERY_BUDGET = 24  # cold cache: 21 measured + 3 headroom
     CACHED_QUERY_BUDGET = 13  # warm cache: 10 measured + 3 headroom
 
     def setUp(self):

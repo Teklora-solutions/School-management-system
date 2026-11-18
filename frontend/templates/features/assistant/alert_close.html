@@ -1,0 +1,88 @@
+{% extends base_template %}
+
+{% block title %}Close safeguarding alert | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-clipboard-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Close alert
+    </h1>
+    <p class="page-subtitle">
+      Closing records that the school's safeguarding process has finished with this
+      alert. The record is kept; only the masked excerpt is erased later, under the
+      proposed retention period.
+    </p>
+  </div>
+</div>
+
+{% include "features/assistant/_tabs.html" %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-sm-4">
+        <div class="text-muted-sm">Category</div>
+        <div class="fw-600">{{ alert.category_label }}</div>
+        {% if alert.rule_id %}<div class="text-muted-sm font-monospace">{{ alert.rule_id }}</div>{% endif %}
+      </div>
+      <div class="col-sm-4">
+        <div class="text-muted-sm">Raised</div>
+        <div>{{ alert.created_at|date:"d M Y H:i" }}</div>
+      </div>
+      <div class="col-sm-4">
+        <div class="text-muted-sm">Where</div>
+        <div>{{ alert.get_profile_display }}</div>
+        {% if alert.user %}<div class="text-muted-sm">{{ alert.user.full_name }}</div>{% endif %}
+        {% if alert.ip_address %}<div class="text-muted-sm font-monospace">{{ alert.ip_address }}</div>{% endif %}
+      </div>
+      <div class="col-12">
+        <div class="text-muted-sm">Excerpt (masked)</div>
+        <div class="border rounded p-2 mt-1">{{ alert.excerpt|default:"—" }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label for="{{ form.outcome.id_for_label }}" class="form-label fw-600">
+          {{ form.outcome.label }}
+        </label>
+        {{ form.outcome }}
+        <div class="text-muted-sm mt-1">
+          Required. Do not copy a child's name or contact details here; say who was
+          informed and what happened.
+        </div>
+        {% for e in form.outcome.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="alert alert-warning" role="note">
+        <span class="badge bg-warning-subtle text-warning-emphasis">DRAFT</span>
+        Proposed retention: the masked excerpt is erased
+        <strong>{{ retention_months }} month{{ retention_months|pluralize }}</strong>
+        after closure, and the minimal record stays. This number is awaiting approval;
+        the erasure command is not scheduled.
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check2 me-1" aria-hidden="true"></i>Close alert and record outcome
+        </button>
+        <a href="{% url 'assistant:alerts' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

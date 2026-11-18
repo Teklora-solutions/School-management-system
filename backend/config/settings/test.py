@@ -12,6 +12,8 @@ Key changes from dev.py:
   - Use in-memory SQLite (TEST block) via pytest-django.
 """
 
+from cryptography.fernet import Fernet
+
 from .dev import *
 from .dev import INSTALLED_APPS, MIDDLEWARE
 
@@ -30,9 +32,9 @@ CACHES = {
     }
 }
 
-# ── AI assistant — a fixed throwaway key, never a real one ───────────────────
-# Base64 of 32 zero bytes: valid Fernet material and obviously a test value.
-ASSISTANT_ENCRYPTION_KEY = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
+# ── AI assistant — a throwaway key generated per test process ────────────────
+# Never persisted, never a real key, and no key literal exists in this file.
+ASSISTANT_ENCRYPTION_KEY = Fernet.generate_key().decode()
 
 # ── Axes — disable lockouts during tests ─────────────────────────────────────
 AXES_ENABLED = False

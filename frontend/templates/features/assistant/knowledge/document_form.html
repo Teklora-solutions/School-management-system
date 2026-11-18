@@ -1,0 +1,195 @@
+{% extends base_template %}
+
+{% block title %}{{ title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-file-earmark-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ title }}
+    </h1>
+    <p class="page-subtitle">
+      A document can be narrower than its collection, never broader. Only
+      Approved documents are ever used to answer.
+    </p>
+  </div>
+  <a href="{% if mode == 'edit' %}{% url 'assistant:knowledge_document' object.pk %}{% else %}{% url 'assistant:knowledge_documents' %}{% endif %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back
+  </a>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <form method="post" {% if multipart %}enctype="multipart/form-data"{% endif %} novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+      {% endif %}
+
+      {% if mode == "upload" %}
+      <div class="card mb-3">
+        <div class="card-body">
+          <label for="{{ form.file.id_for_label }}" class="form-label fw-600">{{ form.file.label }}</label>
+          {{ form.file }}
+          <div class="text-muted-sm mt-1">{{ form.file.help_text }}</div>
+          {% for e in form.file.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          <div class="alert alert-info mt-3 mb-0" role="note">
+            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+            The file is stored privately. Text is read from it in K2; until then
+            the document is listed but cannot answer questions.
+          </div>
+        </div>
+      </div>
+      {% elif mode == "url" %}
+      <div class="card mb-3">
+        <div class="card-body">
+          <label for="{{ form.source_url.id_for_label }}" class="form-label fw-600">{{ form.source_url.label }}</label>
+          {{ form.source_url }}
+          <div class="text-muted-sm mt-1">{{ form.source_url.help_text }}</div>
+          {% for e in form.source_url.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          <div class="alert alert-info mt-3 mb-0" role="note">
+            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+            Nothing is fetched now. K2 adds the fetch, with checks that the
+            address is a public web page.
+          </div>
+        </div>
+      </div>
+      {% elif mode == "paste" %}
+      <div class="card mb-3">
+        <div class="card-body">
+          <label for="{{ form.body_text.id_for_label }}" class="form-label fw-600">{{ form.body_text.label }}</label>
+          {{ form.body_text }}
+          <div class="text-muted-sm mt-1">{{ form.body_text.help_text }}</div>
+          {% for e in form.body_text.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+      {% elif mode == "faq" %}
+      <div class="card mb-3">
+        <div class="card-body">
+          <label for="{{ form.body_text.id_for_label }}" class="form-label fw-600">{{ form.body_text.label }}</label>
+          {{ form.body_text }}
+          <div class="text-muted-sm mt-1">{{ form.body_text.help_text }}</div>
+          {% for e in form.body_text.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-600 mb-3">Where it lives and who may read it</h2>
+
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label for="{{ form.collection.id_for_label }}" class="form-label fw-600">{{ form.collection.label }}</label>
+              {{ form.collection }}
+              {% for e in form.collection.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label for="{{ form.language.id_for_label }}" class="form-label fw-600">{{ form.language.label }}</label>
+              {{ form.language }}
+              {% for e in form.language.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label for="{{ form.title.id_for_label }}" class="form-label fw-600">{{ form.title.label }}</label>
+            {{ form.title }}
+            <div class="text-muted-sm mt-1">Shown in citations, so make it recognisable.</div>
+            {% for e in form.title.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mt-3">
+            <label for="{{ form.audience.id_for_label }}" class="form-label fw-600">{{ form.audience.label }}</label>
+            {{ form.audience }}
+            {% for e in form.audience.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mt-3">
+            <span class="form-label fw-600 d-block">{{ form.roles.label }}</span>
+            <div class="border rounded p-2">{{ form.roles }}</div>
+            <div class="text-muted-sm mt-1">{{ form.roles.help_text }}</div>
+            {% for e in form.roles.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mt-3">
+            <label for="{{ form.classes.id_for_label }}" class="form-label fw-600">{{ form.classes.label }}</label>
+            {{ form.classes }}
+            <div class="text-muted-sm mt-1">{{ form.classes.help_text }}</div>
+            {% for e in form.classes.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+
+      {% if formset %}
+      <div class="card mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-600 mb-1">Questions and answers</h2>
+          <p class="text-muted-sm">Add at least one complete pair. Blank rows are ignored.</p>
+          {{ formset.management_form }}
+          {% for pair in formset %}
+          <div class="border rounded p-3 mb-2">
+            {{ pair.id }}
+            <label class="form-label small fw-600" for="{{ pair.question.id_for_label }}">Question</label>
+            {{ pair.question }}
+            {% for e in pair.question.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            <label class="form-label small fw-600 mt-2" for="{{ pair.answer.id_for_label }}">Answer</label>
+            {{ pair.answer }}
+            {% for e in pair.answer.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            {% if pair.DELETE %}
+            <div class="form-check mt-2">
+              {{ pair.DELETE }}
+              <label class="form-check-label small" for="{{ pair.DELETE.id_for_label }}">Remove this pair</label>
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% for e in formset.non_form_errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-600 mb-3">Availability</h2>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label for="{{ form.status.id_for_label }}" class="form-label fw-600">{{ form.status.label }}</label>
+              {{ form.status }}
+              {% for e in form.status.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label for="{{ form.effective_from.id_for_label }}" class="form-label fw-600">Effective from</label>
+              {{ form.effective_from }}
+              {% for e in form.effective_from.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label for="{{ form.effective_to.id_for_label }}" class="form-label fw-600">Effective to</label>
+              {{ form.effective_to }}
+              {% for e in form.effective_to.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+          {% if mode == "edit" %}
+          <div class="mt-3">
+            <label for="{{ form.change_note.id_for_label }}" class="form-label fw-600">{{ form.change_note.label }}</label>
+            {{ form.change_note }}
+            <div class="text-muted-sm mt-1">{{ form.change_note.help_text }}</div>
+            {% for e in form.change_note.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check2 me-1" aria-hidden="true"></i>{% if mode == "edit" %}Save changes{% else %}Add document{% endif %}
+        </button>
+        <a href="{% if mode == 'edit' %}{% url 'assistant:knowledge_document' object.pk %}{% else %}{% url 'assistant:knowledge_documents' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

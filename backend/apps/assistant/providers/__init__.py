@@ -1,12 +1,22 @@
-"""Provider adapters. Framework-free: they take strings and return strings."""
+"""Provider adapters and the registry. Framework-free except the registry."""
 
-from .base import ChatMessage, Provider, ProviderReply, ProviderUnavailable
-from .registry import build_provider
+from .base import (
+    ChatMessage,
+    EmbeddingReply,
+    ErrorKind,
+    Provider,
+    ProviderError,
+    ProviderReply,
+)
+from .registry import build, model_for
 
 __all__ = [
     "ChatMessage",
+    "EmbeddingReply",
+    "ErrorKind",
     "Provider",
+    "ProviderError",
     "ProviderReply",
-    "ProviderUnavailable",
-    "build_provider",
+    "build",
+    "model_for",
 ]

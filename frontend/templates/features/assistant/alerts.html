@@ -1,0 +1,122 @@
+{% extends base_template %}
+
+{% block title %}Safeguarding alerts | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-bell me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Safeguarding alerts
+    </h1>
+    <p class="page-subtitle">
+      Acknowledge when someone takes it on; close it when the safeguarding process
+      has finished, recording what was done. An unacknowledged alert escalates to
+      the director and admin again — it is never dropped.
+    </p>
+  </div>
+</div>
+
+{% include "features/assistant/_tabs.html" %}
+
+<div class="alert alert-warning" role="note">
+  <strong>{{ open_count }} open alert{{ open_count|pluralize }}.</strong>
+  The excerpt is masked: names, phone numbers, emails and ID-like numbers are
+  replaced, and the full message is not stored here.
+</div>
+
+{% if alerts %}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">Category</th>
+            <th scope="col">Where</th>
+            <th scope="col">Excerpt (masked)</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for alert in alerts %}
+          <tr>
+            <td class="small">
+              <div>{{ alert.created_at|date:"d M Y" }}</div>
+              <div class="text-muted-sm">{{ alert.created_at|date:"H:i" }}</div>
+            </td>
+            <td>
+              <div class="fw-600">{{ alert.category_label }}</div>
+              {% if alert.rule_id %}<div class="text-muted-sm font-monospace">{{ alert.rule_id }}</div>{% endif %}
+            </td>
+            <td class="small">
+              <div>{{ alert.get_profile_display }}</div>
+              {% if alert.user %}<div class="text-muted-sm">{{ alert.user.full_name }}</div>{% endif %}
+              {% if alert.ip_address %}<div class="text-muted-sm font-monospace">{{ alert.ip_address }}</div>{% endif %}
+            </td>
+            <td class="small" style="max-width:22rem;">{{ alert.excerpt|default:"—" }}</td>
+            <td>
+              {% if alert.is_open %}
+              <span class="badge bg-danger-subtle text-danger-emphasis">Open</span>
+              {% elif alert.is_closed %}
+              <span class="badge bg-secondary-subtle text-secondary-emphasis">Closed</span>
+              <div class="text-muted-sm">
+                {{ alert.closed_by.full_name|default:"—" }}<br>
+                {{ alert.closed_at|date:"d M H:i" }}
+              </div>
+              {% else %}
+              <span class="badge bg-success-subtle text-success-emphasis">Acknowledged</span>
+              <div class="text-muted-sm">
+                {{ alert.acknowledged_by.full_name|default:"—" }}<br>
+                {{ alert.acknowledged_at|date:"d M H:i" }}
+              </div>
+              {% endif %}
+              {% if alert.outcome %}
+              <div class="text-muted-sm mt-1"><strong>Outcome:</strong> {{ alert.outcome|truncatechars:90 }}</div>
+              {% endif %}
+              {% if alert.excerpt_erased_at %}
+              <div class="text-muted-sm mt-1">Excerpt erased {{ alert.excerpt_erased_at|date:"d M Y" }}</div>
+              {% endif %}
+              {% if alert.escalated_at %}
+              <div class="text-muted-sm mt-1">Escalated {{ alert.escalated_at|date:"d M H:i" }}</div>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <div class="d-inline-flex flex-column gap-1">
+                {% if alert.is_open %}
+                <form method="post" action="{% url 'assistant:alert_acknowledge' alert.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-primary w-100">
+                    <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Acknowledge
+                  </button>
+                </form>
+                {% endif %}
+                {% if not alert.is_closed %}
+                <a href="{% url 'assistant:alert_close' alert.pk %}" class="btn btn-sm btn-outline-secondary">
+                  Close…
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-shield-check fs-1 text-muted" aria-hidden="true"></i>
+    <p class="mt-3 mb-1 fw-600">No alerts</p>
+    <p class="text-muted-sm mb-0">
+      Nothing has triggered the safeguarding rules. Alerts will appear here and on
+      the admin and director dashboards.
+    </p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

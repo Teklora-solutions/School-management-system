@@ -1,0 +1,104 @@
+{% extends base_template %}
+
+{% block title %}Knowledge collections | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-journal-bookmark me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Knowledge
+    </h1>
+    <p class="page-subtitle">
+      The documents the assistant may answer from, grouped into collections.
+      A collection sets the widest audience its documents can have.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'assistant:knowledge_documents' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-files me-1" aria-hidden="true"></i>All documents
+    </a>
+    <a href="{% url 'assistant:knowledge_collection_create' %}" class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a collection
+    </a>
+  </div>
+</div>
+
+{% include "features/assistant/_tabs.html" %}
+
+<div class="alert alert-info" role="note">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  Only <strong>Approved</strong> documents in <strong>Approved</strong> collections,
+  inside their effective dates, are ever used to answer. Reading the files and
+  answering from them arrive in the next two steps (K2 and K3); until then this
+  page is the catalogue.
+</div>
+
+<div class="card">
+  <div class="card-body">
+    {% if collections %}
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Collection</th>
+            <th scope="col">Audience</th>
+            <th scope="col">Status</th>
+            <th scope="col">Effective</th>
+            <th scope="col" class="text-end">Documents</th>
+            <th scope="col" class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for collection in collections %}
+          <tr>
+            <td>
+              <a href="{% url 'assistant:knowledge_documents' %}?collection={{ collection.pk }}" class="fw-600">
+                {{ collection.name }}
+              </a>
+              {% if collection.description %}
+              <div class="text-muted-sm">{{ collection.description|truncatechars:90 }}</div>
+              {% endif %}
+            </td>
+            <td class="small">{{ collection.audience_summary }}</td>
+            <td>
+              {% if collection.status == "approved" %}
+              <span class="badge bg-success-subtle text-success-emphasis">Approved</span>
+              {% elif collection.status == "archived" %}
+              <span class="badge bg-secondary-subtle text-secondary-emphasis">Archived</span>
+              {% else %}
+              <span class="badge bg-warning-subtle text-warning-emphasis">Draft</span>
+              {% endif %}
+            </td>
+            <td class="small text-muted">
+              {% if collection.effective_from or collection.effective_to %}
+                {{ collection.effective_from|date:"j M Y"|default:"always" }} – {{ collection.effective_to|date:"j M Y"|default:"open" }}
+              {% else %}
+                Always
+              {% endif %}
+            </td>
+            <td class="text-end small">
+              {{ collection.approved_count }} approved / {{ collection.document_count }}
+            </td>
+            <td class="text-end">
+              <a href="{% url 'assistant:knowledge_collection_update' collection.pk %}" class="btn btn-sm btn-outline-secondary">
+                Edit
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted-sm mb-3">
+      No collections yet. Start with one shelf — for example Admissions, Fees or
+      the Parent Guide — then add documents to it.
+    </p>
+    <a href="{% url 'assistant:knowledge_collection_create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add the first collection
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

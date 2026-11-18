@@ -1,31 +1,58 @@
 """
 apps/assistant/providers/fake.py
 --------------------------------
-The only provider in this build, and the one every test uses.
+The provider every test and local development uses. No network, no key.
 
-It never touches the network. Its reply is deterministic, so screens and tests
-can prove the gateway and its bookkeeping work without a key or a bill.
+Error modes are selected by the model name, so the gateway's timeout, rate
+limit, malformed-reply and fallback paths can be tested deterministically:
+
+    fake                 normal reply
+    fake-timeout         raises a retryable timeout
+    fake-rate-limit      raises a retryable rate-limit error
+    fake-server          raises a retryable server error
+    fake-auth            raises a non-retryable auth error
+    fake-malformed       raises a malformed-reply error
+    fake-blocked         raises a content-blocked error
 """
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
 
-from .base import ChatMessage, ProviderReply
+from .base import ChatMessage, EmbeddingReply, ErrorKind, ProviderError, ProviderReply
 
 REPLY_PREFIX = "Fake assistant reply. No outside provider was contacted."
+EMBEDDING_DIMENSION = 8
 
 
 class FakeProvider:
     def __init__(self, model_name: str = "") -> None:
-        self.model_name = model_name or "fake-1"
+        self.model = model_name or "fake"
+        self.mode = self.model[len("fake-") :] if self.model.startswith("fake-") else ""
 
-    def generate(
+    def _raise_for_mode(self) -> None:
+        mapping = {
+            "timeout": (ErrorKind.TIMEOUT, "Fake timeout."),
+            "rate-limit": (ErrorKind.RATE_LIMIT, "Fake rate limit."),
+            "server": (ErrorKind.SERVER, "Fake server error."),
+            "auth": (ErrorKind.AUTH, "Fake invalid key."),
+            "malformed": (ErrorKind.MALFORMED, "Fake malformed reply."),
+            "blocked": (ErrorKind.CONTENT_BLOCKED, "Fake safety block."),
+        }
+        if self.mode in mapping:
+            kind, detail = mapping[self.mode]
+            raise ProviderError(kind, detail)
+
+    def chat(
         self,
         messages: Sequence[ChatMessage],
         *,
-        max_output_tokens: int = 400,
+        model: str | None = None,
+        timeout: int | None = None,
+        max_tokens: int = 400,
     ) -> ProviderReply:
+        self._raise_for_mode()
         last_user = ""
         for message in reversed(messages):
             if message.role == "user":
@@ -38,5 +65,22 @@ class FakeProvider:
             text=text,
             tokens_in=tokens_in,
             tokens_out=len(text.split()),
-            model=self.model_name,
+            model=model or self.model,
+        )
+
+    def embed(
+        self, texts: Sequence[str], *, model: str | None = None, timeout: int | None = None
+    ) -> EmbeddingReply:
+        self._raise_for_mode()
+        vectors = []
+        for text in texts:
+            digest = hashlib.sha256(text.encode("utf-8")).digest()
+            vectors.append(
+                [round((digest[i] / 255.0) * 2 - 1, 6) for i in range(EMBEDDING_DIMENSION)]
+            )
+        return EmbeddingReply(
+            vectors=vectors,
+            tokens=sum(len(text.split()) for text in texts),
+            model=model or self.model,
+            dimension=EMBEDDING_DIMENSION,
         )

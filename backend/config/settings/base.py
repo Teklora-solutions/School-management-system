@@ -96,6 +96,7 @@ MIDDLEWARE = [
     "axes.middleware.AxesMiddleware",
     "apps.core.middleware.RequestIDMiddleware",
     "apps.core.middleware.RequestTimingMiddleware",
+    "apps.assistant.middleware.EscalationCheckMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -118,6 +119,7 @@ TEMPLATES = [
                 "apps.core.context_processors.parent_children",
                 "apps.core.context_processors.unread_count",
                 "apps.core.context_processors.unread_notifications",
+                "apps.assistant.context_processors.assistant_notices",
             ],
         },
     },
@@ -187,6 +189,13 @@ MEDIA_ROOT = Path(env("MEDIA_ROOT", default=str(BASE_DIR / "media")))
 # permission-checked view in apps.learning.views.
 FEED_MEDIA_ROOT = Path(
     env("FEED_MEDIA_ROOT", default=str(BASE_DIR / "private_feed"))
+)
+
+# Knowledge documents (the assistant's source files) live outside MEDIA_ROOT
+# too. Every read goes through the admin download view in
+# apps.assistant.knowledge; url() raises so no template can print a direct link.
+KNOWLEDGE_MEDIA_ROOT = Path(
+    env("KNOWLEDGE_MEDIA_ROOT", default=str(BASE_DIR / "private_knowledge"))
 )
 
 # ─── AI Assistant ─────────────────────────────────────────────────────────────

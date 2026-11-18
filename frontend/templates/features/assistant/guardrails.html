@@ -1,0 +1,127 @@
+{% extends base_template %}
+
+{% block title %}Safeguarding rules | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-shield-check me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Safeguarding rules
+    </h1>
+    <p class="page-subtitle">
+      The mandatory rules below live in the code. They cannot be edited, switched
+      off or deleted from any screen. You can add extra rules for phrases your
+      school hears.
+    </p>
+  </div>
+  <a href="{% url 'assistant:guardrail_create' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a rule
+  </a>
+</div>
+
+{% include "features/assistant/_tabs.html" %}
+
+<div class="alert alert-info" role="note">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  Detection here is phrase-based: English, Kiswahili and common Sheng. It is a
+  floor, not a classifier — indirect phrasing can slip past it. A second,
+  model-based layer is designed but not built.
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <h2 class="h6 fw-600 mb-0">Mandatory rules</h2>
+      <span class="badge bg-secondary">{{ mandatory_count }}</span>
+      <span class="badge bg-danger-subtle text-danger-emphasis">Cannot be removed</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Rule</th>
+            <th scope="col">Category</th>
+            <th scope="col">Severity</th>
+            <th scope="col">Example phrases</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rule in mandatory_rules %}
+          <tr>
+            <td>
+              <div class="fw-600">{{ rule.label }}</div>
+              <div class="text-muted-sm font-monospace">{{ rule.id }}</div>
+            </td>
+            <td class="small">{{ rule.category }}</td>
+            <td>
+              {% if rule.severity == "urgent" %}
+              <span class="badge bg-danger-subtle text-danger-emphasis">Urgent</span>
+              {% else %}
+              <span class="badge bg-warning-subtle text-warning-emphasis">Concern</span>
+              {% endif %}
+            </td>
+            <td class="small text-muted">{{ rule.patterns|slice:":4"|join:", " }}{% if rule.patterns|length > 4 %} …{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h6 fw-600 mb-3">Rules your school added</h2>
+    {% if custom_rules %}
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Category</th>
+            <th scope="col">Phrases</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rule in custom_rules %}
+          <tr>
+            <td>
+              <div class="fw-600">{{ rule.name }}</div>
+              {% if rule.note %}<div class="text-muted-sm">{{ rule.note }}</div>{% endif %}
+            </td>
+            <td class="small">{{ rule.get_category_display }}</td>
+            <td class="small">{{ rule.pattern_list|join:", " }}</td>
+            <td>
+              {% if rule.is_active %}
+              <span class="badge bg-success-subtle text-success-emphasis">On</span>
+              {% else %}
+              <span class="badge bg-secondary-subtle text-secondary-emphasis">Off</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <form method="post" action="{% url 'assistant:guardrail_toggle' rule.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                  {% if rule.is_active %}Switch off{% else %}Switch on{% endif %}
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted-sm mb-3">
+      No extra rules yet. The mandatory rules above always apply.
+    </p>
+    {% endif %}
+    <a href="{% url 'assistant:guardrail_create' %}" class="btn btn-outline-primary btn-sm mt-3">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a rule
+    </a>
+  </div>
+</div>
+{% endblock %}

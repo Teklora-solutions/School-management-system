@@ -1,0 +1,104 @@
+{% extends base_template %}
+
+{% block title %}{% if object %}Edit collection{% else %}Add a collection{% endif %} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-journal-bookmark me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {% if object %}Edit “{{ object.name }}”{% else %}Add a collection{% endif %}
+    </h1>
+    <p class="page-subtitle">
+      The audience here is a ceiling. Documents on this shelf can be narrower,
+      never broader.
+    </p>
+  </div>
+  <a href="{% url 'assistant:knowledge_collections' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to knowledge
+  </a>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="card-body">
+          <div class="mb-3">
+            <label for="{{ form.name.id_for_label }}" class="form-label fw-600">{{ form.name.label }}</label>
+            {{ form.name }}
+            {% for e in form.name.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.slug.id_for_label }}" class="form-label fw-600">{{ form.slug.label }}</label>
+            {{ form.slug }}
+            <div class="text-muted-sm mt-1">Leave blank to make one from the name.</div>
+            {% for e in form.slug.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.description.id_for_label }}" class="form-label fw-600">{{ form.description.label }}</label>
+            {{ form.description }}
+            {% for e in form.description.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.audience.id_for_label }}" class="form-label fw-600">{{ form.audience.label }}</label>
+            {{ form.audience }}
+            <div class="text-muted-sm mt-1">A document cannot be public on a signed-in shelf.</div>
+            {% for e in form.audience.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <span class="form-label fw-600 d-block">{{ form.roles.label }}</span>
+            <div class="border rounded p-2">{{ form.roles }}</div>
+            <div class="text-muted-sm mt-1">{{ form.roles.help_text }}</div>
+            {% for e in form.roles.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.classes.id_for_label }}" class="form-label fw-600">{{ form.classes.label }}</label>
+            {{ form.classes }}
+            <div class="text-muted-sm mt-1">{{ form.classes.help_text }}</div>
+            {% for e in form.classes.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label for="{{ form.status.id_for_label }}" class="form-label fw-600">{{ form.status.label }}</label>
+              {{ form.status }}
+              {% for e in form.status.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label for="{{ form.effective_from.id_for_label }}" class="form-label fw-600">Effective from</label>
+              {{ form.effective_from }}
+              {% for e in form.effective_from.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label for="{{ form.effective_to.id_for_label }}" class="form-label fw-600">Effective to</label>
+              {{ form.effective_to }}
+              {% for e in form.effective_to.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check2 me-1" aria-hidden="true"></i>Save collection
+        </button>
+        <a href="{% url 'assistant:knowledge_collections' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

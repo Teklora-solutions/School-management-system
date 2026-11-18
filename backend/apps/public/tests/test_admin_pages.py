@@ -423,9 +423,11 @@ class WebsitePageQueryBudgetTests(TestCase):
     measured count plus two — the same rule the public pages keep.
     """
 
-    #: Measured against the fixture below: gallery 6, enquiries 8 — most of
+    #: Measured against the fixture below: gallery 7, enquiries 9 — most of
     #: which is the shared admin shell rather than the table being listed.
-    CEILINGS = {"public_admin:gallery_list": 8, "public_admin:enquiry_list": 10}
+    #: Two more are the assistant banner (settings + open-alert count, cached
+    #: for 60 s, shared with the escalation check).
+    CEILINGS = {"public_admin:gallery_list": 10, "public_admin:enquiry_list": 12}
 
     @classmethod
     def setUpTestData(cls):

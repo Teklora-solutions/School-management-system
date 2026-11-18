@@ -1,0 +1,133 @@
+{% extends base_template %}
+
+{% block title %}Knowledge documents | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-files me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Knowledge documents
+    </h1>
+    <p class="page-subtitle">
+      {{ approved_total }} approved of {{ documents_total }} document{{ documents_total|pluralize }}.
+      Only approved documents on approved shelves answer questions.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'assistant:knowledge_collections' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-journal-bookmark me-1" aria-hidden="true"></i>Collections
+    </a>
+    <a href="{% url 'assistant:knowledge_document_new' %}" class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a document
+    </a>
+  </div>
+</div>
+
+{% include "features/assistant/_tabs.html" %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label for="q" class="form-label small fw-600">Search title</label>
+        <input type="search" id="q" name="q" value="{{ filters.q }}" class="form-control">
+      </div>
+      <div class="col-6 col-md-3">
+        <label for="collection" class="form-label small fw-600">Collection</label>
+        <select id="collection" name="collection" class="form-select">
+          <option value="">All collections</option>
+          {% for c in collections %}
+          <option value="{{ c.pk }}"{% if filters.collection == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label for="status" class="form-label small fw-600">Status</label>
+        <select id="status" name="status" class="form-select">
+          <option value="">Any</option>
+          {% for value, label in statuses %}
+          <option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label for="type" class="form-label small fw-600">Type</label>
+        <select id="type" name="type" class="form-select">
+          <option value="">Any</option>
+          {% for value, label in source_types %}
+          <option value="{{ value }}"{% if filters.type == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-1 d-grid">
+        <button type="submit" class="btn btn-outline-primary">Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    {% if documents %}
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Document</th>
+            <th scope="col">Collection</th>
+            <th scope="col">Audience</th>
+            <th scope="col">Status</th>
+            <th scope="col">Reading</th>
+            <th scope="col" class="text-end">Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for document in documents %}
+          <tr>
+            <td>
+              <a href="{% url 'assistant:knowledge_document' document.pk %}" class="fw-600">{{ document.title }}</a>
+              <div class="text-muted-sm">
+                {{ document.get_source_type_display }}
+                {% if document.duplicate_of %}
+                · <span class="badge bg-warning-subtle text-warning-emphasis">Possible duplicate</span>
+                {% endif %}
+                {% if document.is_stale %}
+                · <span class="badge bg-danger-subtle text-danger-emphasis">Needs re-index</span>
+                {% endif %}
+              </div>
+            </td>
+            <td class="small">{{ document.collection.name }}</td>
+            <td class="small">{{ document.audience_summary }}</td>
+            <td>
+              {% if document.status == "approved" %}
+              <span class="badge bg-success-subtle text-success-emphasis">Approved</span>
+              {% elif document.status == "archived" %}
+              <span class="badge bg-secondary-subtle text-secondary-emphasis">Archived</span>
+              {% else %}
+              <span class="badge bg-warning-subtle text-warning-emphasis">Draft</span>
+              {% endif %}
+            </td>
+            <td class="small text-muted">{{ document.get_ingestion_state_display }}</td>
+            <td class="text-end small text-muted">{{ document.updated_at|date:"j M Y" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted-sm mb-3">
+      {% if filters.q or filters.status or filters.type or filters.collection %}
+      No documents match these filters.
+      {% else %}
+      No documents yet. Add a PDF, a web page, pasted text or a set of questions
+      and answers.
+      {% endif %}
+    </p>
+    <a href="{% url 'assistant:knowledge_document_new' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a document
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

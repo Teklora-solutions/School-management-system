@@ -7,11 +7,13 @@ key; audit entries by field name; usage rows with no prompt text.
 
 from __future__ import annotations
 
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 
-from apps.assistant import crypto, services
+from apps.assistant import crypto, gateway, services
 from apps.assistant.models import AssistantSettings, ProviderConfig, UsageEvent
-from apps.assistant.providers import ProviderUnavailable
+from apps.assistant.providers import registry
+from apps.assistant.providers.base import ErrorKind, ProviderError
 from apps.assistant.services import (
     create_provider,
     update_assistant_settings,
@@ -91,6 +93,25 @@ class ProviderStorageTests(TestCase):
         self.assertFalse(provider.has_key)
         self.assertEqual(provider.masked_key, "Not set")
 
+    def test_a_database_dump_alone_cannot_reveal_the_key(self):
+        provider = create_provider(cleaned_data=provider_data(api_key=API_KEY))
+        dump = str(list(ProviderConfig.objects.values()))
+        self.assertNotIn(API_KEY, dump)
+        self.assertIn("wxyz", dump)
+        with self.settings(ASSISTANT_ENCRYPTION_KEY=""):
+            with self.assertRaises(crypto.EncryptionUnavailable):
+                crypto.decrypt(provider.api_key_ciphertext)
+
+    def test_using_a_saved_key_without_a_server_key_says_why(self):
+        provider = create_provider(
+            cleaned_data=provider_data(kind=ProviderConfig.Kind.OPENAI, api_key=API_KEY)
+        )
+        with self.settings(ASSISTANT_ENCRYPTION_KEY=""):
+            with self.assertRaises(ProviderError) as caught:
+                registry.build(provider)
+        self.assertEqual(caught.exception.kind, ErrorKind.CONFIG)
+        self.assertIn("ASSISTANT_ENCRYPTION_KEY", caught.exception.safe_message)
+
 
 class SettingsTests(TestCase):
     def setUp(self):
@@ -125,6 +146,7 @@ class SettingsTests(TestCase):
 
 class TestProviderTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.admin = make_user("admin", username="assistant_admin")
 
     def test_testing_the_fake_provider_records_usage_and_audit(self):
@@ -149,7 +171,7 @@ class TestProviderTests(TestCase):
         # Bypass the form's choices to prove the registry guard, not the widget.
         ProviderConfig.objects.filter(pk=provider.pk).update(kind="openai")
         provider.refresh_from_db()
-        with self.assertRaises(ProviderUnavailable):
+        with self.assertRaises(gateway.AllProvidersUnavailable):
             services.test_provider(provider=provider, actor=self.admin)
         usage = UsageEvent.objects.get(source=UsageEvent.Source.ADMIN_TEST)
         self.assertEqual(usage.outcome, UsageEvent.Outcome.ERROR)

@@ -1,0 +1,78 @@
+{% extends base_template %}
+
+{% block title %}Assistant job failures | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-exclamation-diamond me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Assistant job failures
+    </h1>
+    <p class="page-subtitle">
+      Background assistant jobs that failed, with the reason. User-facing work
+      never depends on the worker, so a failure here does not hide an alert — but
+      it must still be seen and resolved.
+    </p>
+  </div>
+</div>
+
+{% include "features/assistant/_tabs.html" %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h6 fw-600 mb-3">Unresolved</h2>
+    {% if failures %}
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">Job</th>
+            <th scope="col">Reason</th>
+            <th scope="col">Attempts</th>
+            <th scope="col" class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for failure in failures %}
+          <tr>
+            <td class="small">{{ failure.created_at|date:"d M Y H:i" }}</td>
+            <td class="font-monospace small">{{ failure.task_name }}</td>
+            <td class="small">{{ failure.reason }}</td>
+            <td>{{ failure.attempts }}</td>
+            <td class="text-end">
+              <form method="post" action="{% url 'assistant:job_resolve' failure.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-primary">Mark resolved</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted-sm mb-0">No unresolved failures.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h6 fw-600 mb-3">Recently resolved</h2>
+    {% if resolved %}
+    <ul class="list-unstyled mb-0">
+      {% for failure in resolved %}
+      <li class="d-flex justify-content-between gap-3 border-bottom py-2">
+        <span class="font-monospace small">{{ failure.task_name }}</span>
+        <span class="text-muted-sm">{{ failure.created_at|date:"d M Y H:i" }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted-sm mb-0">Nothing resolved yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

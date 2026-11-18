@@ -10,8 +10,8 @@
       {% if object %}Edit provider{% else %}Add provider{% endif %}
     </h1>
     <p class="page-subtitle">
-      A saved API key is encrypted; after saving, only its last four characters are
-      ever shown again.
+      A saved API key is encrypted. After saving, only its last four characters are
+      ever shown again — not even to an admin.
     </p>
   </div>
   <a href="{% url 'assistant:providers' %}" class="btn btn-outline-secondary">
@@ -19,8 +19,16 @@
   </a>
 </div>
 
+{% if not crypto_configured %}
+<div class="alert alert-warning" role="alert">
+  <strong>No encryption key is configured on this server.</strong>
+  You can save the other fields, but a key cannot be stored until your developer
+  sets <code>ASSISTANT_ENCRYPTION_KEY</code>.
+</div>
+{% endif %}
+
 <div class="row justify-content-center">
-  <div class="col-lg-7">
+  <div class="col-lg-8">
     <form method="post" novalidate>
       {% csrf_token %}
 
@@ -30,27 +38,25 @@
       </div>
       {% endif %}
 
-      <div class="card">
+      <div class="card mb-3">
         <div class="card-body">
+          <h2 class="h6 fw-600 mb-3">Connection</h2>
+
           <div class="mb-3">
             <label for="{{ form.name.id_for_label }}" class="form-label fw-600">{{ form.name.label }}</label>
             {{ form.name }}
-            <div class="text-muted-sm mt-1">A label you will recognise, e.g. “Fake provider”.</div>
+            <div class="text-muted-sm mt-1">A label you will recognise, e.g. “Main provider”.</div>
             {% for e in form.name.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
           </div>
 
           <div class="mb-3">
             <label for="{{ form.kind.id_for_label }}" class="form-label fw-600">{{ form.kind.label }}</label>
             {{ form.kind }}
-            <div class="text-muted-sm mt-1">Which adapter answers. Real providers arrive later.</div>
+            <div class="text-muted-sm mt-1">
+              Fake answers locally and is the only provider tests use. The others send
+              the masked request to that company.
+            </div>
             {% for e in form.kind.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
-          </div>
-
-          <div class="mb-3">
-            <label for="{{ form.model_name.id_for_label }}" class="form-label fw-600">{{ form.model_name.label }}</label>
-            {{ form.model_name }}
-            {% if form.model_name.help_text %}<div class="text-muted-sm mt-1">{{ form.model_name.help_text }}</div>{% endif %}
-            {% for e in form.model_name.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
           </div>
 
           <div class="mb-3">
@@ -60,21 +66,88 @@
             {% for e in form.base_url.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
           </div>
 
-          <div class="mb-3">
+          <div class="mb-0">
             <label for="{{ form.api_key.id_for_label }}" class="form-label fw-600">{{ form.api_key.label }}</label>
             {{ form.api_key }}
             <div class="text-muted-sm mt-1">{{ form.api_key.help_text }}</div>
             {% for e in form.api_key.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
           </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-600 mb-3">Models</h2>
+
+          <div class="mb-3">
+            <label for="{{ form.model_name.id_for_label }}" class="form-label fw-600">{{ form.model_name.label }}</label>
+            {{ form.model_name }}
+            <div class="text-muted-sm mt-1">Required for every real provider. Copy the exact name the provider publishes.</div>
+            {% for e in form.model_name.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.fast_model_name.id_for_label }}" class="form-label fw-600">{{ form.fast_model_name.label }}</label>
+            {{ form.fast_model_name }}
+            <div class="text-muted-sm mt-1">Optional. A cheaper model for the public assistant.</div>
+            {% for e in form.fast_model_name.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-0">
+            <label for="{{ form.embedding_model_name.id_for_label }}" class="form-label fw-600">{{ form.embedding_model_name.label }}</label>
+            {{ form.embedding_model_name }}
+            <div class="text-muted-sm mt-1">{{ form.embedding_model_name.help_text }}</div>
+            {% for e in form.embedding_model_name.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-600 mb-3">Cost and order</h2>
 
           <div class="row g-3">
             <div class="col-sm-6">
+              <label for="{{ form.input_usd_per_1m.id_for_label }}" class="form-label fw-600">{{ form.input_usd_per_1m.label }}</label>
+              {{ form.input_usd_per_1m }}
+              {% for e in form.input_usd_per_1m.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.output_usd_per_1m.id_for_label }}" class="form-label fw-600">{{ form.output_usd_per_1m.label }}</label>
+              {{ form.output_usd_per_1m }}
+              {% for e in form.output_usd_per_1m.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.embedding_usd_per_1m.id_for_label }}" class="form-label fw-600">{{ form.embedding_usd_per_1m.label }}</label>
+              {{ form.embedding_usd_per_1m }}
+              {% for e in form.embedding_usd_per_1m.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.monthly_budget_ksh.id_for_label }}" class="form-label fw-600">{{ form.monthly_budget_ksh.label }}</label>
+              {{ form.monthly_budget_ksh }}
+              <div class="text-muted-sm mt-1">Blank means only the site-wide budget applies.</div>
+              {% for e in form.monthly_budget_ksh.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-sm-6">
+              <label for="{{ form.priority.id_for_label }}" class="form-label fw-600">{{ form.priority.label }}</label>
+              {{ form.priority }}
+              <div class="text-muted-sm mt-1">Lower numbers are tried first when the default fails.</div>
+              {% for e in form.priority.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-sm-6">
               <label for="{{ form.timeout_seconds.id_for_label }}" class="form-label fw-600">{{ form.timeout_seconds.label }}</label>
               {{ form.timeout_seconds }}
+              <div class="text-muted-sm mt-1">How long to wait before trying the next provider.</div>
               {% for e in form.timeout_seconds.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
             </div>
-            <div class="col-sm-6 d-flex align-items-center">
-              <div class="form-check mt-4">
+            <div class="col-12">
+              <label for="{{ form.region_note.id_for_label }}" class="form-label fw-600">{{ form.region_note.label }}</label>
+              {{ form.region_note }}
+              <div class="text-muted-sm mt-1">{{ form.region_note.help_text }}</div>
+              {% for e in form.region_note.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-12">
+              <div class="form-check mt-1">
                 {{ form.is_active }}
                 <label class="form-check-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
               </div>
@@ -84,7 +157,7 @@
         </div>
       </div>
 
-      <div class="d-flex gap-2 mt-3">
+      <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-check2 me-1" aria-hidden="true"></i>Save provider
         </button>

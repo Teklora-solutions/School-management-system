@@ -1,0 +1,27 @@
+{% comment %}
+Persistent assistant notices shown on every dashboard page to admins and
+directors. Driven by apps.assistant.context_processors.assistant_notices.
+The safeguarding-contact warning cannot be dismissed from here: the only way
+to clear it is to save a named contact in Assistant settings.
+{% endcomment %}
+{% if assistant_admin_warning %}
+<div class="alert alert-danger d-flex gap-2 align-items-start" role="alert">
+  <i class="bi bi-exclamation-octagon-fill mt-1" aria-hidden="true"></i>
+  <div>
+    <strong>Safeguarding contact missing.</strong>
+    The signed-in assistant or student tutor is switched on, but no named
+    safeguarding contact is set. Switch those modes off or add the contact now.
+    <a href="{% url 'assistant:settings' %}" class="alert-link">Open Assistant settings</a>
+  </div>
+</div>
+{% endif %}
+{% if assistant_open_alert_count %}
+<div class="alert alert-warning d-flex gap-2 align-items-start" role="alert">
+  <i class="bi bi-shield-exclamation mt-1" aria-hidden="true"></i>
+  <div>
+    <strong>{{ assistant_open_alert_count }} safeguarding alert{{ assistant_open_alert_count|pluralize }} waiting.</strong>
+    Acknowledge {{ assistant_open_alert_count|pluralize:"it,them" }} so escalation stops.
+    <a href="{% url 'assistant:alerts' %}" class="alert-link">Review alerts</a>
+  </div>
+</div>
+{% endif %}

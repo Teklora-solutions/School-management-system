@@ -1,6 +1,6 @@
 {% extends base_template %}
 
-{% block title %}AI Assistant | {{ SCHOOL_NAME }}{% endblock %}
+{% block title %}AI Assistant settings | {{ SCHOOL_NAME }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -11,13 +11,12 @@
     </h1>
     <p class="page-subtitle">
       Who answers, with what rules, within what budget — and who takes over when a
-      conversation needs a person.
+      conversation needs a person. Every switch starts off.
     </p>
   </div>
-  <a href="{% url 'assistant:providers' %}" class="btn btn-outline-secondary">
-    <i class="bi bi-hdd-network me-1" aria-hidden="true"></i>Providers
-  </a>
 </div>
+
+{% include "features/assistant/_tabs.html" %}
 
 {% if not crypto_configured %}
 <div class="alert alert-warning" role="alert">
@@ -27,117 +26,319 @@
 </div>
 {% endif %}
 
-{% if not form.instance.enabled %}
-<div class="alert alert-secondary" role="status">
-  <i class="bi bi-power me-1" aria-hidden="true"></i>
-  The assistant is <strong>switched off</strong>. Nothing is sent to any provider;
-  the only provider available in this version is the fake one used for testing.
+{% if not form.instance.has_safeguarding_contact and form.instance.signed_in_enabled or not form.instance.has_safeguarding_contact and form.instance.student_tutor_enabled %}
+<div class="alert alert-danger" role="alert">
+  <strong>The signed-in assistant or student tutor is on without a named safeguarding contact.</strong>
+  Add the contact below, or switch those modes off. This warning stays on every
+  dashboard page for admins until it is fixed.
 </div>
 {% endif %}
 
-<div class="row justify-content-center">
-  <div class="col-lg-8">
-    <form method="post" novalidate>
-      {% csrf_token %}
+<form method="post" novalidate>
+  {% csrf_token %}
 
-      {% if form.non_field_errors %}
-      <div class="alert alert-danger" role="alert">
-        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
-      </div>
-      {% endif %}
-
-      <div class="card mb-3">
-        <div class="card-body">
-          <div class="form-check form-switch mb-2">
-            {{ form.enabled }}
-            <label class="form-check-label fw-600" for="{{ form.enabled.id_for_label }}">
-              {{ form.enabled.label }}
-            </label>
-          </div>
-          <div class="text-muted-sm">
-            Off is the safe default. Switching this on only becomes meaningful once a
-            conversation screen exists; until then it records the school's decision.
-          </div>
-          {% for e in form.enabled.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-body">
-          <h2 class="h6 fw-600 mb-3">Provider</h2>
-
-          <div class="mb-3">
-            <label for="{{ form.default_provider.id_for_label }}" class="form-label fw-600">
-              {{ form.default_provider.label }}
-            </label>
-            {{ form.default_provider }}
-            <div class="text-muted-sm mt-1">
-              {% if provider_count %}
-                The provider new conversations would use.
-              {% else %}
-                No providers yet — <a href="{% url 'assistant:provider_create' %}">add one</a>.
-              {% endif %}
-            </div>
-            {% for e in form.default_provider.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
-          </div>
-
-          <div class="mb-0">
-            <label for="{{ form.house_rules.id_for_label }}" class="form-label fw-600">
-              {{ form.house_rules.label }}
-            </label>
-            {{ form.house_rules }}
-            <div class="text-muted-sm mt-1">
-              Tone, language, and things the assistant must never say. These are rules,
-              not knowledge — documents are added in a later module.
-            </div>
-            {% for e in form.house_rules.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-body">
-          <h2 class="h6 fw-600 mb-3">Limits and handoff</h2>
-
-          <div class="row g-3">
-            <div class="col-sm-6">
-              <label for="{{ form.monthly_budget_ksh.id_for_label }}" class="form-label fw-600">
-                {{ form.monthly_budget_ksh.label }}
-              </label>
-              {{ form.monthly_budget_ksh }}
-              <div class="text-muted-sm mt-1">0 means no spending at all.</div>
-              {% for e in form.monthly_budget_ksh.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
-            </div>
-            <div class="col-sm-6">
-              <label for="{{ form.daily_message_limit.id_for_label }}" class="form-label fw-600">
-                {{ form.daily_message_limit.label }}
-              </label>
-              {{ form.daily_message_limit }}
-              <div class="text-muted-sm mt-1">0 means no messages at all.</div>
-              {% for e in form.daily_message_limit.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
-            </div>
-            <div class="col-12">
-              <label for="{{ form.handoff_email.id_for_label }}" class="form-label fw-600">
-                {{ form.handoff_email.label }}
-              </label>
-              {{ form.handoff_email }}
-              <div class="text-muted-sm mt-1">
-                Where conversations that need a person are sent. Used once handoff is
-                built; safeguarding escalation can never be switched off.
-              </div>
-              {% for e in form.handoff_email.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">
-          <i class="bi bi-check2 me-1" aria-hidden="true"></i>Save settings
-        </button>
-        <a href="{% url 'accounts:dashboard_redirect' %}" class="btn btn-outline-secondary">Cancel</a>
-      </div>
-    </form>
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger" role="alert">
+    {% for error in form.non_field_errors %}{{ error }}{% endfor %}
   </div>
-</div>
+  {% endif %}
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h2 class="h6 fw-600 mb-3">Switches</h2>
+
+      <div class="form-check form-switch mb-1">
+        {{ form.enabled }}
+        <label class="form-check-label fw-600" for="{{ form.enabled.id_for_label }}">
+          {{ form.enabled.label }}
+        </label>
+      </div>
+      <div class="text-muted-sm mb-3">
+        The master kill switch. Off means nothing reaches a provider, whatever the
+        other switches say.
+      </div>
+      {% for e in form.enabled.errors %}<div class="text-danger small mb-2">{{ e }}</div>{% endfor %}
+
+      <div class="form-check form-switch mb-1">
+        {{ form.public_enabled }}
+        <label class="form-check-label" for="{{ form.public_enabled.id_for_label }}">
+          {{ form.public_enabled.label }}
+        </label>
+      </div>
+      <div class="text-muted-sm mb-3">
+        For people who are not signed in. Limited per visitor and per network, with a
+        daily site-wide ceiling.
+      </div>
+      {% for e in form.public_enabled.errors %}<div class="text-danger small mb-2">{{ e }}</div>{% endfor %}
+
+      <div class="form-check form-switch mb-1">
+        {{ form.signed_in_enabled }}
+        <label class="form-check-label" for="{{ form.signed_in_enabled.id_for_label }}">
+          {{ form.signed_in_enabled.label }}
+        </label>
+      </div>
+      <div class="text-muted-sm mb-3">
+        For parents, students and staff who have signed in. <strong>Requires a named
+        safeguarding contact.</strong>
+      </div>
+      {% for e in form.signed_in_enabled.errors %}<div class="text-danger small mb-2">{{ e }}</div>{% endfor %}
+
+      <div class="form-check form-switch mb-1">
+        {{ form.student_tutor_enabled }}
+        <label class="form-check-label" for="{{ form.student_tutor_enabled.id_for_label }}">
+          {{ form.student_tutor_enabled.label }}
+        </label>
+      </div>
+      <div class="text-muted-sm">
+        A study helper for students. Requires the signed-in switch and the safeguarding
+        contact.
+      </div>
+      {% for e in form.student_tutor_enabled.errors %}<div class="text-danger small mt-2">{{ e }}</div>{% endfor %}
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h2 class="h6 fw-600 mb-3">Provider and house rules</h2>
+
+      <div class="mb-3">
+        <label for="{{ form.default_provider.id_for_label }}" class="form-label fw-600">
+          {{ form.default_provider.label }}
+        </label>
+        {{ form.default_provider }}
+        <div class="text-muted-sm mt-1">
+          {% if provider_count %}
+            Tried first; the other providers follow in fallback order.
+          {% else %}
+            No providers yet — <a href="{% url 'assistant:provider_create' %}">add one</a>.
+          {% endif %}
+        </div>
+        {% for e in form.default_provider.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="mb-0">
+        <label for="{{ form.house_rules.id_for_label }}" class="form-label fw-600">
+          {{ form.house_rules.label }}
+        </label>
+        {{ form.house_rules }}
+        <div class="text-muted-sm mt-1">
+          Tone, language, and things the assistant must never say. These are rules,
+          not knowledge — approved documents come in a later module.
+        </div>
+        {% for e in form.house_rules.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h2 class="h6 fw-600 mb-3">Safeguarding contact and escalation</h2>
+      <p class="text-muted-sm">
+        When a message suggests a child may be in danger, the assistant replies with
+        this contact first, then the emergency numbers. The mandatory rules that
+        detect this are built into the code and cannot be switched off here.
+      </p>
+
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <label for="{{ form.safeguarding_contact_name.id_for_label }}" class="form-label fw-600">
+            {{ form.safeguarding_contact_name.label }}
+          </label>
+          {{ form.safeguarding_contact_name }}
+          {% for e in form.safeguarding_contact_name.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.safeguarding_contact_phone.id_for_label }}" class="form-label fw-600">
+            {{ form.safeguarding_contact_phone.label }}
+          </label>
+          {{ form.safeguarding_contact_phone }}
+          {% for e in form.safeguarding_contact_phone.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.safeguarding_contact_email.id_for_label }}" class="form-label fw-600">
+            {{ form.safeguarding_contact_email.label }}
+          </label>
+          {{ form.safeguarding_contact_email }}
+          <div class="text-muted-sm mt-1">Phone or email is enough, but one is required.</div>
+          {% for e in form.safeguarding_contact_email.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.escalation_minutes.id_for_label }}" class="form-label fw-600">
+            {{ form.escalation_minutes.label }}
+          </label>
+          {{ form.escalation_minutes }}
+          <div class="text-muted-sm mt-1">
+            During working hours. An unacknowledged alert is sent to the director and
+            admin again — it is never silently dropped.
+          </div>
+          {% for e in form.escalation_minutes.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.working_hours_start.id_for_label }}" class="form-label fw-600">
+            {{ form.working_hours_start.label }}
+          </label>
+          {{ form.working_hours_start }}
+          {% for e in form.working_hours_start.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.working_hours_end.id_for_label }}" class="form-label fw-600">
+            {{ form.working_hours_end.label }}
+          </label>
+          {{ form.working_hours_end }}
+          {% for e in form.working_hours_end.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.alert_retention_months.id_for_label }}" class="form-label fw-600">
+            {{ form.alert_retention_months.label }}
+            <span class="badge bg-warning-subtle text-warning-emphasis">DRAFT</span>
+          </label>
+          {{ form.alert_retention_months }}
+          <div class="text-muted-sm mt-1">
+            A proposal, not agreed policy. After an alert is closed, its masked excerpt is
+            erased after this many months; the minimal record (category, dates, outcome)
+            stays. 0 keeps excerpts indefinitely.
+          </div>
+          {% for e in form.alert_retention_months.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h2 class="h6 fw-600 mb-3">Budget and limits</h2>
+
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <label for="{{ form.monthly_budget_ksh.id_for_label }}" class="form-label fw-600">
+            {{ form.monthly_budget_ksh.label }}
+          </label>
+          {{ form.monthly_budget_ksh }}
+          <div class="text-muted-sm mt-1">0 means no spending at all.</div>
+          {% for e in form.monthly_budget_ksh.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.usd_to_ksh.id_for_label }}" class="form-label fw-600">
+            {{ form.usd_to_ksh.label }}
+          </label>
+          {{ form.usd_to_ksh }}
+          <div class="text-muted-sm mt-1">
+            Provider prices are published in USD; this rate turns them into the KSh
+            budget. Required before a positive budget can be tracked.
+          </div>
+          {% for e in form.usd_to_ksh.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="col-sm-6">
+          <label for="{{ form.daily_message_limit.id_for_label }}" class="form-label fw-600">
+            {{ form.daily_message_limit.label }}
+          </label>
+          {{ form.daily_message_limit }}
+          <div class="text-muted-sm mt-1">0 means no messages at all.</div>
+          {% for e in form.daily_message_limit.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.public_visitor_daily_limit.id_for_label }}" class="form-label fw-600">
+            {{ form.public_visitor_daily_limit.label }}
+          </label>
+          {{ form.public_visitor_daily_limit }}
+          <div class="text-muted-sm mt-1">
+            Counted with a signed cookie in the visitor's browser, so one person on a
+            shared school network still has their own allowance.
+          </div>
+          {% for e in form.public_visitor_daily_limit.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.public_ip_daily_limit.id_for_label }}" class="form-label fw-600">
+            {{ form.public_ip_daily_limit.label }}
+          </label>
+          {{ form.public_ip_daily_limit }}
+          <div class="text-muted-sm mt-1">
+            A backstop for someone clearing their cookie. A whole school can share one
+            address, so keep this well above the visitor limit.
+          </div>
+          {% for e in form.public_ip_daily_limit.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.public_site_daily_limit.id_for_label }}" class="form-label fw-600">
+            {{ form.public_site_daily_limit.label }}
+          </label>
+          {{ form.public_site_daily_limit }}
+          <div class="text-muted-sm mt-1">
+            The real safety net for cost: once the site reaches this many public
+            questions, the public assistant stops for the day.
+          </div>
+          {% for e in form.public_site_daily_limit.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-12">
+          <label for="{{ form.handoff_email.id_for_label }}" class="form-label fw-600">
+            {{ form.handoff_email.label }}
+          </label>
+          {{ form.handoff_email }}
+          <div class="text-muted-sm mt-1">
+            Where conversations that need a person are sent. Used once handoff is
+            built; safeguarding escalation can never be switched off.
+          </div>
+          {% for e in form.handoff_email.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <h2 class="h6 fw-600 mb-0">Consent wording</h2>
+        <span class="badge bg-warning-subtle text-warning-emphasis">DRAFT</span>
+      </div>
+      <p class="text-muted-sm">
+        This wording is a <strong>draft</strong>. No visitor or signed-in person sees it
+        until an admin ticks “Consent wording approved” and records who approved it and
+        when. The retention periods are proposals, not agreed policy.
+        {{ consent_status }}
+      </p>
+
+      <details class="mb-3">
+        <summary class="fw-600">Draft in English</summary>
+        <div class="border rounded p-3 mt-2 text-muted-sm" style="white-space:pre-line;">{{ consent_draft_en }}</div>
+      </details>
+      <details class="mb-3">
+        <summary class="fw-600">Draft in Kiswahili</summary>
+        <div class="border rounded p-3 mt-2 text-muted-sm" style="white-space:pre-line;">{{ consent_draft_sw }}</div>
+      </details>
+
+      <div class="form-check form-switch mb-1">
+        {{ form.consent_approved }}
+        <label class="form-check-label" for="{{ form.consent_approved.id_for_label }}">
+          {{ form.consent_approved.label }}
+        </label>
+      </div>
+      {% for e in form.consent_approved.errors %}<div class="text-danger small mb-2">{{ e }}</div>{% endfor %}
+
+      <div class="row g-3 mt-1">
+        <div class="col-sm-6">
+          <label for="{{ form.consent_approved_by.id_for_label }}" class="form-label fw-600">
+            {{ form.consent_approved_by.label }}
+          </label>
+          {{ form.consent_approved_by }}
+          {% for e in form.consent_approved_by.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-sm-6">
+          <label for="{{ form.consent_approved_on.id_for_label }}" class="form-label fw-600">
+            {{ form.consent_approved_on.label }}
+          </label>
+          {{ form.consent_approved_on }}
+          {% for e in form.consent_approved_on.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-check2 me-1" aria-hidden="true"></i>Save settings
+    </button>
+    <a href="{% url 'accounts:dashboard_redirect' %}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
 {% endblock %}
