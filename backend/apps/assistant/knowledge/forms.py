@@ -203,7 +203,7 @@ class KnowledgeUrlForm(KnowledgeDocumentForm):
         label="Web page address",
         max_length=500,
         widget=forms.URLInput(attrs={"class": "form-control", "placeholder": "https://"}),
-        help_text="The page is fetched when indexing arrives (K2). Nothing is fetched now.",
+        help_text="The page is fetched when the approved document is read, and its text is kept.",
     )
 
     class Meta(KnowledgeDocumentForm.Meta):

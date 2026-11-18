@@ -1,8 +1,9 @@
 """
 Write paths for the knowledge base.
 
-K1 stores documents and keeps a version snapshot. Extracting text, chunking and
-writing embeddings are K2; answering from the documents is K3.
+K1 stores documents and keeps a version snapshot. K2 adds reading: approving a
+document queues text extraction, chunking and embeddings; leaving Approved or
+Archived removes its passages immediately. Answering is K3.
 """
 
 from __future__ import annotations
@@ -75,6 +76,32 @@ def _scope_or_raise(document: KnowledgeDocument) -> None:
         raise ValidationError(problems)
 
 
+def sync_readiness(document: KnowledgeDocument) -> None:
+    """
+    Queue reading for a document that may answer; remove passages at once for
+    one that may not. The queue runs after the surrounding save commits.
+    """
+    from . import ingest
+
+    if (
+        document.is_approved
+        and document.collection.is_approved
+        and document.collection.effective_on()
+    ):
+        ingest.request_ingestion(document)
+    else:
+        ingest.purge(document, KnowledgeDocument.IngestionState.SKIPPED)
+
+
+def sync_collection_after_save(collection, *, previous_ready: bool) -> None:
+    """Only touch a shelf's documents when the shelf starts or stops answering."""
+    from . import ingest
+
+    ready = collection.is_approved and collection.effective_on()
+    if ready != previous_ready:
+        ingest.sync_collection(collection)
+
+
 @transaction.atomic
 def create_document(form, *, source_type: str, actor, request) -> KnowledgeDocument:
     document = form.save(commit=False)
@@ -93,6 +120,7 @@ def create_document(form, *, source_type: str, actor, request) -> KnowledgeDocum
         document.save(update_fields=["duplicate_of", "updated_at"])
 
     snapshot(document, actor=actor, note="First version.", first=True)
+    sync_readiness(document)
     log_action(
         actor=actor,
         action="assistant.knowledge_document_added",
@@ -123,6 +151,7 @@ def update_document_metadata(
 
     if document.title != previous_title:
         snapshot(document, actor=actor, note=change_note or "Title changed.")
+    sync_readiness(document)
     log_action(
         actor=actor,
         action="assistant.knowledge_document_changed",
@@ -143,8 +172,11 @@ def update_document_metadata(
 def set_status(document: KnowledgeDocument, status: str, *, actor, request) -> KnowledgeDocument:
     if status not in dict(KnowledgeStatus.choices):
         raise ValidationError("Unknown status.")
+    previous = document.status
     document.status = status
     document.save(update_fields=["status", "updated_at"])
+    if status != previous:
+        sync_readiness(document)
     log_action(
         actor=actor,
         action="assistant.knowledge_document_status",

@@ -32,14 +32,31 @@ ALL_DOWN_MESSAGE = (
 
 
 class AllProvidersUnavailable(RuntimeError):
-    def __init__(self, message: str = ALL_DOWN_MESSAGE, *, detail: str = "") -> None:
+    def __init__(
+        self,
+        message: str = ALL_DOWN_MESSAGE,
+        *,
+        detail: str = "",
+        retryable: bool = True,
+    ) -> None:
         self.safe_message = message
         self.detail = detail
+        self.retryable = retryable
         super().__init__(message)
 
 
 @dataclass
 class GatewayResult:
+    reply: object
+    provider: object
+    attempts: int = 1
+    latency_ms: int = 0
+    used_fallback: bool = False
+    skipped: list[str] = field(default_factory=list)
+
+
+@dataclass
+class EmbeddingResult:
     reply: object
     provider: object
     attempts: int = 1
@@ -100,6 +117,34 @@ def _record_usage(
         latency_ms=max(0, int(latency_ms)),
         outcome=UsageEvent.Outcome.ERROR if error else UsageEvent.Outcome.SUCCESS,
         detail=(str(error.safe_message) if error else detail)[:200],
+    )
+
+
+def _record_embedding_usage(
+    *,
+    provider,
+    actor,
+    profile,
+    model_name,
+    reply=None,
+    error: ProviderError | None = None,
+    latency_ms=0,
+):
+    settings_row = _settings_row()
+    tokens = getattr(reply, "tokens", 0) if reply else 0
+    UsageEvent.objects.create(
+        provider=provider,
+        provider_label=getattr(provider, "name", "") or "",
+        actor=actor,
+        source=UsageEvent.Source.INGESTION,
+        profile=profile,
+        model_name=model_name or "",
+        tokens_in=tokens,
+        tokens_out=0,
+        estimated_cost_ksh=limits.embedding_cost_ksh(provider, settings_row, tokens),
+        latency_ms=max(0, int(latency_ms)),
+        outcome=UsageEvent.Outcome.ERROR if error else UsageEvent.Outcome.SUCCESS,
+        detail=(str(error.safe_message) if error else "Embedding written.")[:200],
     )
 
 
@@ -223,3 +268,135 @@ def call_chain(
         # Users get one fixed message; the admin screens read ``detail``.
         raise AllProvidersUnavailable(detail=last_error.safe_message)
     raise AllProvidersUnavailable()
+
+
+def embed_chain(
+    providers,
+    texts: list[str],
+    *,
+    actor=None,
+    profile: str = UsageEvent.Profile.INGESTION,
+    retries: int = DEFAULT_RETRIES,
+    sleep=time.sleep,
+) -> EmbeddingResult:
+    """
+    Embed a batch through the same ordered fallback as chat.
+
+    Ingestion is never in a request path, so a slow retry is acceptable; a
+    provider without an embedding model is skipped before it is called.
+    """
+    if not texts:
+        raise ValueError("There is no text to embed.")
+
+    skipped: list[str] = []
+    settings_row = _settings_row()
+    last_error: ProviderError | None = None
+    candidates = [p for p in providers if registry.model_for(p, "embed")]
+    budget_provider = candidates[0] if candidates else (providers[0] if providers else None)
+
+    budget = limits.check_embedding_budget(
+        settings_row,
+        budget_provider,
+        prompt_chars=sum(len(text) for text in texts),
+    )
+    if not budget.allowed:
+        raise AllProvidersUnavailable(budget.reason, retryable=False)
+
+    for index, provider in enumerate(providers):
+        label = getattr(provider, "name", "provider")
+        model_name = registry.model_for(provider, "embed")
+        if not model_name:
+            skipped.append(f"{label}: no embedding model")
+            continue
+        if breaker_is_open(provider):
+            skipped.append(f"{label}: circuit open")
+            continue
+        if limits.provider_over_budget(settings_row, provider):
+            skipped.append(f"{label}: provider budget reached")
+            continue
+
+        for attempt in range(retries + 1):
+            started = time.monotonic()
+            try:
+                adapter = registry.build(provider, purpose="embed")
+                reply = adapter.embed(
+                    texts,
+                    model=model_name,
+                    timeout=provider.timeout_seconds or 30,
+                )
+                _check_vectors(reply, expected=len(texts))
+            except ProviderError as exc:
+                elapsed = (time.monotonic() - started) * 1000
+                _record_embedding_usage(
+                    provider=provider,
+                    actor=actor,
+                    profile=profile,
+                    model_name=model_name,
+                    error=exc,
+                    latency_ms=elapsed,
+                )
+                last_error = exc
+                breaker_record_failure(provider)
+                if exc.retryable and attempt < retries:
+                    sleep(BACKOFF_SECONDS[min(attempt, len(BACKOFF_SECONDS) - 1)])
+                    continue
+                break
+            except Exception:  # defensive: adapters should only raise ProviderError
+                elapsed = (time.monotonic() - started) * 1000
+                error = ProviderError(ErrorKind.MALFORMED)
+                _record_embedding_usage(
+                    provider=provider,
+                    actor=actor,
+                    profile=profile,
+                    model_name=model_name,
+                    error=error,
+                    latency_ms=elapsed,
+                )
+                last_error = error
+                breaker_record_failure(provider)
+                break
+            else:
+                elapsed = (time.monotonic() - started) * 1000
+                breaker_record_success(provider)
+                _record_embedding_usage(
+                    provider=provider,
+                    actor=actor,
+                    profile=profile,
+                    model_name=model_name,
+                    reply=reply,
+                    latency_ms=elapsed,
+                )
+                return EmbeddingResult(
+                    reply=reply,
+                    provider=provider,
+                    attempts=attempt + 1,
+                    latency_ms=int(elapsed),
+                    used_fallback=index > 0,
+                    skipped=skipped,
+                )
+
+    if last_error is not None:
+        raise AllProvidersUnavailable(detail=last_error.safe_message)
+    reason = (
+        "; ".join(skipped)
+        if skipped
+        else "No active provider has an embedding model."
+    )
+    raise AllProvidersUnavailable(reason, detail=reason)
+
+
+def _check_vectors(reply, *, expected: int) -> None:
+    vectors = getattr(reply, "vectors", None) or []
+    dimension = getattr(reply, "dimension", 0) or 0
+    if len(vectors) != expected:
+        raise ProviderError(
+            ErrorKind.MALFORMED,
+            "The provider returned the wrong number of vectors.",
+        )
+    if not dimension and vectors:
+        dimension = len(vectors[0])
+    if dimension <= 0 or any(len(vector) != dimension for vector in vectors):
+        raise ProviderError(
+            ErrorKind.MALFORMED,
+            "The provider returned vectors of an unexpected size.",
+        )

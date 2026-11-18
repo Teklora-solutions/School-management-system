@@ -59,6 +59,20 @@ def cost_ksh(provider, settings_row, tokens_in: int, tokens_out: int) -> Decimal
     return ((in_usd + out_usd) * rate).quantize(Decimal("0.0001"))
 
 
+def embedding_cost_ksh(provider, settings_row, tokens: int) -> Decimal:
+    """Embedding prices are per million tokens, like chat prices."""
+    if provider is None:
+        return Decimal("0")
+    usd = Decimal(tokens or 0) / Decimal(1_000_000) * (provider.embedding_usd_per_1m or 0)
+    rate = settings_row.usd_to_ksh or 0
+    return (usd * rate).quantize(Decimal("0.0001"))
+
+
+def estimated_embedding_cost(provider, settings_row, prompt_chars: int) -> Decimal:
+    tokens = max(1, prompt_chars // 4)
+    return embedding_cost_ksh(provider, settings_row, tokens)
+
+
 def estimated_chat_cost(provider, settings_row, prompt_chars: int, max_tokens: int) -> Decimal:
     """A cautious pre-call reservation so a budget cannot be blown by one call."""
     prompt_tokens = max(1, prompt_chars // 4)
@@ -100,6 +114,26 @@ def provider_over_budget(settings_row, provider) -> bool:
     if provider is None or provider.monthly_budget_ksh is None:
         return False
     return month_spend_ksh(provider=provider) >= provider.monthly_budget_ksh
+
+
+def check_embedding_budget(settings_row, provider, *, prompt_chars: int = 800) -> Decision:
+    """
+    Ingestion pays the same budget. It does not require the assistant to be
+    switched on: an admin may prepare the base before go-live.
+    """
+    budget = settings_row.monthly_budget_ksh or Decimal("0")
+    if budget <= 0:
+        return Decision(False, "The assistant has no spending budget set.")
+    spent = month_spend_ksh()
+    reserve = estimated_embedding_cost(provider, settings_row, prompt_chars)
+    if spent + reserve > budget:
+        return Decision(False, "The assistant has reached its monthly budget.")
+
+    if provider is not None and provider.monthly_budget_ksh is not None:
+        provider_spent = month_spend_ksh(provider=provider)
+        if provider_spent + reserve > provider.monthly_budget_ksh:
+            return Decision(False, f"“{provider.name}” has reached its own monthly budget.")
+    return Decision(True)
 
 
 def signed_in_allowed(settings_row, user) -> Decision:

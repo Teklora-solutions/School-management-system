@@ -162,6 +162,8 @@ def update_provider(
             },
             request=request,
         )
+    if {"embedding_model_name", "is_active"} & set(changed):
+        _mark_stale_embeddings()
     return instance
 
 
@@ -182,6 +184,18 @@ def delete_provider(*, provider: ProviderConfig, actor=None, request=None) -> No
         change_summary={"name": name},
         request=request,
     )
+    _mark_stale_embeddings()
+
+
+def _mark_stale_embeddings() -> None:
+    """Flag passages embedded by a model that is no longer in service."""
+    from .knowledge import ingest as knowledge_ingest
+
+    models = {
+        (provider.embedding_model_name or "").strip()
+        for provider in ProviderConfig.objects.filter(is_active=True)
+    }
+    knowledge_ingest.mark_stale_for_models({model for model in models if model})
 
 
 def test_provider(*, provider: ProviderConfig, actor=None, request=None):

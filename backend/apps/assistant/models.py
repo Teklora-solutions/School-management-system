@@ -31,6 +31,10 @@ Knowledge base (Module 2)
   KnowledgeDocumentVersion  a snapshot taken when the title or source changes.
   KnowledgeQAPair     one question and its approved answer inside a FAQ
                       document.
+  KnowledgeChunk      one readable passage of an Approved document, with its
+                      embedding. Replaced as a set; never edited in place.
+  KnowledgeIngestRun  one reading attempt of a document: what happened, how
+                      many chunks and tokens, and the plain reason if it failed.
 """
 
 from __future__ import annotations
@@ -267,6 +271,7 @@ class UsageEvent(BaseModel):
     class Source(models.TextChoices):
         ADMIN_TEST = "admin_test", "Admin connection test or test console"
         CHAT = "chat", "Assistant conversation"
+        INGESTION = "ingestion", "Knowledge document reading"
 
     class Outcome(models.TextChoices):
         SUCCESS = "success", "Success"
@@ -277,6 +282,7 @@ class UsageEvent(BaseModel):
         CONSOLE = "console", "Admin test console"
         PUBLIC = "public", "Public assistant"
         SIGNED_IN = "signed_in", "Signed-in assistant"
+        INGESTION = "ingestion", "Knowledge ingestion"
 
     provider = models.ForeignKey(
         ProviderConfig,
@@ -585,7 +591,10 @@ class KnowledgeDocument(BaseModel):
     source_url = models.URLField(blank=True)
     body_text = models.TextField(
         blank=True,
-        help_text="Pasted text, or the introductory text of a FAQ document.",
+        help_text=(
+            "Pasted text, the introduction of a questions-and-answers document, "
+            "or the text fetched from a web page."
+        ),
     )
     language = models.CharField(
         max_length=8, choices=Language.choices, default=Language.ENGLISH
@@ -792,3 +801,77 @@ class KnowledgeQAPair(BaseModel):
 
     def __str__(self) -> str:
         return self.question
+
+
+class KnowledgeChunk(BaseModel):
+    """
+    One passage of a document and its embedding.
+
+    The whole set is replaced together after a successful read, so a failed
+    re-index never leaves a mix of old and new passages.
+    """
+
+    document = models.ForeignKey(
+        KnowledgeDocument, on_delete=models.CASCADE, related_name="chunks"
+    )
+    ordinal = models.PositiveSmallIntegerField(
+        help_text="Position in the document, starting at zero."
+    )
+    heading = models.CharField(
+        max_length=300,
+        blank=True,
+        help_text="The heading path this passage sits under, if any.",
+    )
+    text = models.TextField()
+    char_count = models.PositiveIntegerField(default=0)
+    content_sha256 = models.CharField(max_length=64, blank=True)
+    embedding = models.JSONField(
+        default=list,
+        help_text="The vector as a list of numbers. Portable across SQLite and PostgreSQL.",
+    )
+    embedding_model = models.CharField(max_length=120, blank=True)
+    dimension = models.PositiveSmallIntegerField(default=0)
+    embedded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["document", "ordinal"]
+        unique_together = [("document", "ordinal")]
+        indexes = [
+            models.Index(fields=["document", "ordinal"]),
+            models.Index(fields=["embedding_model"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.document_id} #{self.ordinal}"
+
+
+class KnowledgeIngestRun(BaseModel):
+    """One attempt to read a document, kept so an admin can see what happened."""
+
+    class Status(models.TextChoices):
+        RUNNING = "running", "Reading now"
+        READY = "ready", "Read successfully"
+        FAILED = "failed", "Could not be read"
+        SKIPPED = "skipped", "Not read (draft or archived)"
+
+    document = models.ForeignKey(
+        KnowledgeDocument, on_delete=models.CASCADE, related_name="ingest_runs"
+    )
+    status = models.CharField(max_length=12, choices=Status.choices)
+    attempt = models.PositiveSmallIntegerField(default=1)
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    chunks_written = models.PositiveIntegerField(default=0)
+    tokens = models.PositiveIntegerField(default=0)
+    error = models.CharField(
+        max_length=300,
+        blank=True,
+        help_text="A plain-language reason. Never document text or a key.",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["document", "-created_at"])]
+
+    def __str__(self) -> str:
+        return f"{self.document_id} / {self.status}"

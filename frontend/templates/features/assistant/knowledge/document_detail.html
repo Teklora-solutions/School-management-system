@@ -41,8 +41,8 @@
 {% if document.is_stale %}
 <div class="alert alert-danger" role="alert">
   <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
-  The embedding model changed after this document was indexed. Re-index it
-  before it is used again; re-indexing arrives in K2.
+  The embedding model changed after this document was read. Read it again
+  before it is used; the old passages are flagged and will not be trusted.
 </div>
 {% endif %}
 
@@ -175,25 +175,75 @@
         <h2 class="h6 fw-600 mb-2">Reading and answers</h2>
         <dl class="row mb-2 small">
           <dt class="col-6">Reading state</dt>
-          <dd class="col-6">{{ document.get_ingestion_state_display }}</dd>
-          <dt class="col-6">Chunks stored</dt>
+          <dd class="col-6">
+            {% if document.ingestion_state == "ready" %}
+            <span class="badge bg-success-subtle text-success-emphasis">Ready to answer from</span>
+            {% elif document.ingestion_state == "failed" %}
+            <span class="badge bg-danger-subtle text-danger-emphasis">Could not be read</span>
+            {% elif document.ingestion_state == "running" %}
+            <span class="badge bg-info-subtle text-info-emphasis">Reading now</span>
+            {% elif document.ingestion_state == "pending" %}
+            <span class="badge bg-warning-subtle text-warning-emphasis">Waiting to be read</span>
+            {% else %}
+            <span class="badge bg-secondary-subtle text-secondary-emphasis">Not read</span>
+            {% endif %}
+          </dd>
+          <dt class="col-6">Passages stored</dt>
           <dd class="col-6">{{ document.chunk_count }}</dd>
           <dt class="col-6">Embedding model</dt>
           <dd class="col-6 text-break">{{ document.indexed_model|default:"Not indexed" }}</dd>
-          <dt class="col-6">Indexed at</dt>
+          <dt class="col-6">Read at</dt>
           <dd class="col-6">{{ document.indexed_at|date:"j M Y, H:i"|default:"Never" }}</dd>
         </dl>
         {% if document.last_error %}
         <div class="alert alert-danger small mb-2" role="alert">{{ document.last_error }}</div>
         {% endif %}
-        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
-          <i class="bi bi-search me-1" aria-hidden="true"></i>Test this document
-        </button>
-        <div class="text-muted-sm mt-2">
-          Testing arrives with retrieval (K3). Text reading and embeddings
-          arrive in K2 — a document added now is stored and reviewed, but cannot
-          answer yet.
+        <div class="d-flex flex-wrap gap-2">
+          <form method="post" action="{% url 'assistant:knowledge_document_reindex' document.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-primary btn-sm"{% if not document.is_approved or not collection_approved %} disabled{% endif %}>
+              <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Read it again
+            </button>
+          </form>
+          <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+            <i class="bi bi-search me-1" aria-hidden="true"></i>Test this document
+          </button>
         </div>
+        <div class="text-muted-sm mt-2">
+          Reading happens in the background: text is extracted, split into
+          passages and embedded. Approving starts a read; archiving removes the
+          passages immediately. Testing a search arrives with retrieval (K3).
+        </div>
+
+        {% if ingest_runs %}
+        <hr>
+        <h2 class="h6 fw-600 mb-2">Recent reads</h2>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th scope="col">Try</th>
+                <th scope="col">Result</th>
+                <th scope="col">Passages</th>
+                <th scope="col" class="text-end">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for run in ingest_runs %}
+              <tr>
+                <td>{{ run.attempt }}</td>
+                <td class="small">
+                  {{ run.get_status_display }}
+                  {% if run.error %}<div class="text-danger">{{ run.error }}</div>{% endif %}
+                </td>
+                <td>{{ run.chunks_written }}</td>
+                <td class="text-end small text-muted">{{ run.started_at|date:"j M Y, H:i" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
       </div>
     </div>
 

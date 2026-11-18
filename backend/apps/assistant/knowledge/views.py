@@ -2,8 +2,8 @@
 Admin screens for the knowledge base.
 
 K1 shows what exists and lets an admin add, edit, approve, archive and download
-documents. Reading the documents, chunking them and answering from them are
-K2/K3; the screens say so where it matters instead of implying more.
+documents. K2 reads an approved document in the background and lets an admin
+ask for a fresh read. Answering from the passages is K3.
 """
 
 from __future__ import annotations
@@ -76,6 +76,7 @@ class CollectionCreateView(AdminRequiredMixin, CreateView):
             request=self.request,
         )
         messages.success(self.request, f"Collection “{self.object.name}” added.")
+        services.sync_collection_after_save(self.object, previous_ready=False)
         return redirect("assistant:knowledge_collections")
 
 
@@ -87,6 +88,8 @@ class CollectionUpdateView(AdminRequiredMixin, UpdateView):
         return KnowledgeCollection.objects.all()
 
     def form_valid(self, form):
+        previous = KnowledgeCollection.objects.get(pk=form.instance.pk)
+        previous_ready = previous.is_approved and previous.effective_on()
         self.object = form.save(commit=False)
         if not self.object.owner_id:
             self.object.owner = self.request.user
@@ -104,6 +107,7 @@ class CollectionUpdateView(AdminRequiredMixin, UpdateView):
             },
             request=self.request,
         )
+        services.sync_collection_after_save(self.object, previous_ready=previous_ready)
         messages.success(self.request, f"Collection “{self.object.name}” saved.")
         return redirect("assistant:knowledge_collections")
 
@@ -285,6 +289,7 @@ class DocumentDetailView(AdminRequiredMixin, View):
                 "document": document,
                 "versions": document.versions.select_related("created_by"),
                 "qa_pairs": document.qa_pairs.all(),
+                "ingest_runs": document.ingest_runs.all()[:5],
                 "status_form": knowledge_forms.KnowledgeStatusForm(
                     initial={"status": document.status}
                 ),
@@ -331,6 +336,42 @@ class DocumentStatusView(AdminRequiredMixin, View):
         )
         messages.success(
             request, f"“{document.title}” is now {document.get_status_display().lower()}."
+        )
+        return redirect("assistant:knowledge_document", pk=document.pk)
+
+
+class DocumentReindexView(AdminRequiredMixin, View):
+    """Queue a fresh read of an approved document."""
+
+    def post(self, request, pk):
+        from . import ingest
+
+        document = get_object_or_404(
+            KnowledgeDocument.objects.select_related("collection"), pk=pk
+        )
+        if not (document.is_approved and document.collection.is_approved):
+            messages.error(
+                request,
+                "Approve this document and its collection before it can be read.",
+            )
+            return redirect("assistant:knowledge_document", pk=document.pk)
+        if document.ingestion_state == KnowledgeDocument.IngestionState.RUNNING:
+            messages.info(request, f"“{document.title}” is already being read.")
+            return redirect("assistant:knowledge_document", pk=document.pk)
+
+        ingest.request_ingestion(document)
+        log_action(
+            actor=request.user,
+            action="assistant.knowledge_document_reindex",
+            content_type="assistant.KnowledgeDocument",
+            object_id=document.pk,
+            change_summary={"title": document.title},
+            request=request,
+        )
+        messages.success(
+            request,
+            f"Reading of “{document.title}” is queued. Passages appear when the "
+            "background worker finishes.",
         )
         return redirect("assistant:knowledge_document", pk=document.pk)
 

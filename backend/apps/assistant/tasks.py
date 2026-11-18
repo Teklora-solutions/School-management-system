@@ -142,3 +142,31 @@ def send_alert_email_task(alert_id: int, attempt: int) -> None:
             async_task("apps.assistant.tasks.send_alert_email_task", alert_id, attempt + 1)
             return
         raise
+
+
+def ingest_knowledge_document_task(document_id: int, attempt: int = 1) -> None:
+    """
+    Read one knowledge document. The document and ingest-run rows already hold
+    the plain reason, so this returns after recording it rather than raising;
+    a retry is queued only for temporary failures (provider outages).
+    """
+    from .knowledge import ingest
+    from .models import KnowledgeDocument
+
+    try:
+        ingest.ingest_document(document_id, attempt=attempt)
+    except KnowledgeDocument.DoesNotExist:
+        return
+    except ingest.IngestionFailed as exc:
+        _record_failure(ingest.TASK_NAME, str(exc), attempt)
+        if exc.retryable and attempt < ingest.MAX_ATTEMPTS:
+            try:
+                from django_q.tasks import async_task
+
+                async_task(ingest.TASK_PATH, document_id, attempt + 1)
+            except Exception as queue_exc:  # worker unavailable
+                _record_failure(
+                    ingest.TASK_NAME,
+                    f"Could not queue retry: {queue_exc}",
+                    attempt,
+                )

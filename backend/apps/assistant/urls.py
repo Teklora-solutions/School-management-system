@@ -89,4 +89,9 @@ urlpatterns = [
         knowledge_views.DocumentDownloadView.as_view(),
         name="knowledge_document_download",
     ),
+    path(
+        "knowledge/documents/<int:pk>/reindex/",
+        knowledge_views.DocumentReindexView.as_view(),
+        name="knowledge_document_reindex",
+    ),
 ]
