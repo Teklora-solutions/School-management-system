@@ -935,16 +935,46 @@ them through `context_processors.school_settings`. Writes go through
 
 ---
 
-## 15a. AI Assistant ✅ (admin configuration only)
+## 15a. AI Assistant ✅ (pipeline built, no user-facing chat yet)
 
-**Status: Module 1 of 6.** The assistant itself does not speak to anyone yet. What exists is the
-admin's control panel: `/assistant/settings/` (switch — **off by default**, house rules, default
-provider, budget, daily limit, handoff email) and `/assistant/providers/` (add/edit a provider, test
-the gateway). Provider API keys are encrypted with Fernet before storage; the encryption key lives in
-`ASSISTANT_ENCRYPTION_KEY` and is never in the database. Only the last four characters of a provider
-key are ever shown, and none appear in logs or audit entries. The only adapter in this build is a fake
-provider that runs in-process, so nothing leaves the server. Budget fields are recorded, not enforced;
-knowledge, retrieval, record tools, safeguarding and handoff are later modules.
+**Status: Module 1, Steps 1–2, and Module 2 K1 (knowledge catalogue).** The assistant still does not
+speak to a parent, student, teacher, director or visitor; every switch is **off by default** and there
+is no chat screen. What exists is the whole pipeline behind it, the admin and director screens to run
+it safely, and the private shelves an admin fills with approved wording (nothing reads those
+documents yet). The screens are:
+
+- `/assistant/settings/` — global/public/signed-in/tutor switches, house rules, default provider,
+  monthly budget and USD→KSh rate, four daily limits (signed-in per user; public per signed cookie,
+  per IP and site-wide), safeguarding contact and escalation window, handoff email, and the **DRAFT**
+  consent gate (flag + approver + date before anything can be shown).
+- `/assistant/providers/` — five kinds (fake, OpenAI, DeepSeek, Gemini, generic OpenAI-compatible),
+  chat/fast/embedding models, encrypted key with last-four display, timeouts, fallback order, prices,
+  optional per-provider cap, data-region note, delete guards and a connection test.
+- `/assistant/knowledge/` — shelves with an audience ceiling (public or signed-in, optional roles and
+  classes, status, effective dates) and documents added as a file, a web-page address, pasted text or
+  question-and-answer pairs. Files live under `KNOWLEDGE_MEDIA_ROOT`, outside `MEDIA_ROOT`, and are
+  served only through the admin download route. Each document records its audience, status, version
+  and SHA-256 fingerprint; the scope filter that K3 will rank is already built and tested. Reading,
+  embeddings, retrieval and answers are K2–K4.
+- `/assistant/guardrails/` — the mandatory safeguarding pack (code, cannot be removed) and admin-added
+  rules (add-only).
+- `/assistant/alerts/` — admin and director; masked excerpts, acknowledge, escalation state, and a
+  close action that requires a recorded outcome. Retention (DRAFT: 12 months after closure) purges only
+  the masked excerpt via a dry-run command; the minimal record stays.
+- `/assistant/console/` — a dry run through screening and masking that shows the exact outbound text;
+  the provider is not called on a safeguarding hit.
+- `/assistant/jobs/` — assistant background failures with reason and attempt count.
+
+The gateway enforces the kill switch, budgets, limits and a per-provider circuit breaker before each
+call; retries and fallback are built; usage is recorded per attempt. Provider API keys are encrypted
+with Fernet before storage; the encryption key lives in `ASSISTANT_ENCRYPTION_KEY` and is never in the
+database. Only the last four characters are shown, error text is redacted, and a test scans the owned
+files for key-like strings. If `ASSISTANT_ENCRYPTION_KEY` is missing while a saved key or an enabled
+assistant needs it, `manage.py check` fails with `assistant.E001` and the app refuses to start.
+Safeguarding detection is mandatory and cannot be switched off; escalation
+is also checked when an admin or director loads any page, so a stopped worker cannot hide an alert.
+Knowledge reading, indexing, retrieval, record tools, handoff records, streaming and the conversation
+screens are later modules; the consent wording is a draft and is shown to nobody.
 
 Full documentation: [README](ai-assistant/README.md) · [admin guide](ai-assistant/admin-guide.md) ·
 [security and privacy](ai-assistant/security-and-privacy.md) · [architecture](ai-assistant/architecture.md) ·
