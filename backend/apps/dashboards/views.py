@@ -80,6 +80,28 @@ class TeacherHomeView(TeacherRequiredMixin, TemplateView):
             )
         )
         ctx["recent_announcements"] = announcements_for_user(user=self.request.user)[:5]
+
+        # Classrooms list — powers the "Schedule Live Class" shortcut on the dashboard.
+        ctx["live_classes_enabled"] = feature_enabled("live_classes")
+        if ctx["live_classes_enabled"]:
+            from apps.learning.selectors import classrooms_for_teacher
+            result = classrooms_for_teacher(teacher_user_id=self.request.user.pk)
+            ctx["teacher_classrooms"] = result.get("classrooms", [])
+        else:
+            ctx["teacher_classrooms"] = []
+
+        # Homeroom class — powers the "Class Marksheet" quick action.
+        from apps.academics.models import SchoolClass
+        from apps.academics.selectors import get_current_year
+        year = get_current_year()
+        ctx["homeroom_class"] = (
+            SchoolClass.objects.filter(
+                academic_year=year,
+                class_teacher=self.request.user,
+            ).first()
+            if year else None
+        )
+
         return ctx
 
 
@@ -112,8 +134,14 @@ class StudentHomeView(StudentRequiredMixin, TemplateView):
             ctx["fees_disabled_message"] = feature_disabled_message("fees")
 
         hw_list = []
+        pending_hw_count = 0
         if student.current_class_id and current_term:
-            from apps.homework.selectors import homework_due_soon, mark_new
+            from apps.homework.selectors import (
+                homework_due_soon,
+                homework_for_student,
+                mark_new,
+            )
+            from apps.homework.models import HomeworkSubmission
 
             hw_list = mark_new(
                 list(
@@ -125,7 +153,54 @@ class StudentHomeView(StudentRequiredMixin, TemplateView):
                     )
                 )
             )
+            # Count pending (not yet submitted) homework in the current term
+            all_hw_ids = list(
+                homework_for_student(
+                    school_class_id=student.current_class_id,
+                    stream_id=student.current_stream_id,
+                    term_id=current_term.pk,
+                ).values_list("id", flat=True)
+            )
+            submitted_ids = set(
+                HomeworkSubmission.objects.filter(
+                    homework_id__in=all_hw_ids,
+                    student=student,
+                ).values_list("homework_id", flat=True)
+            )
+            pending_hw_count = len(set(all_hw_ids) - submitted_ids)
+
         ctx["homework_due_soon"] = hw_list
+        ctx["pending_hw_count"] = pending_hw_count
+
+        # ── Upcoming / live online classes ───────────────────────────────────
+        ctx["live_classes_enabled"] = feature_enabled("live_classes")
+        ctx["upcoming_live_sessions"] = []
+        if ctx["live_classes_enabled"] and student.current_class_id:
+            from apps.learning.live_class_selectors import (
+                get_upcoming_sessions_for_student,
+            )
+
+            ctx["upcoming_live_sessions"] = get_upcoming_sessions_for_student(
+                student, limit=5
+            )
+
+        # ── Attendance summary (last 30 days) ────────────────────────────────
+        import datetime
+        from apps.attendance.selectors import student_history
+        from apps.attendance.models import AttendanceEntry
+
+        today = datetime.date.today()
+        date_from = today - datetime.timedelta(days=30)
+        history = list(student_history(student=student, date_from=date_from, date_to=today))
+        total_marked = len(history)
+        present_count = sum(
+            1 for e in history if e.status in AttendanceEntry.ATTENDED_STATUSES
+        )
+        ctx["attendance_total"] = total_marked
+        ctx["attendance_present"] = present_count
+        ctx["attendance_pct"] = (
+            round((present_count / total_marked) * 100) if total_marked else None
+        )
 
         from apps.communications.selectors import (
             announcements_for_user,

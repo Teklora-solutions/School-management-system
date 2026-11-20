@@ -37,8 +37,12 @@
 
       {# Brand #}
       <a class="navbar-brand" href="{% url 'accounts:dashboard_redirect' %}">
-        <span class="brand-dot"></span>
-        {{ SCHOOL_NAME }}
+        {% if SCHOOL_LOGO_URL %}
+          <img class="navbar-logo" src="{{ SCHOOL_LOGO_URL }}" alt="{{ SCHOOL_NAME }} logo">
+        {% else %}
+          <span class="brand-dot"></span>
+        {% endif %}
+        <span class="navbar-brand__name">{{ SCHOOL_NAME }}</span>
       </a>
 
       {% comment %}

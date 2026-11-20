@@ -22,7 +22,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views.generic import TemplateView, View
 
 from apps.academics.models import AcademicYear
-from apps.core.mixins import AdminRequiredMixin, RoleRequiredMixin
+from apps.core.mixins import AdminRequiredMixin, RoleRequiredMixin, TeacherRequiredMixin
 
 from . import selectors, services
 from .forms import (
@@ -147,6 +147,38 @@ class StudentResultsView(StudentOrParentMixin, TemplateView):
         if term_id:
             selected_term = terms.filter(pk=term_id).first()
 
+        # ── Merge gradebook CA data when available ────────────────────────
+        # Build a map of subject_id → gradebook result for the selected term
+        # so the template can show CA score alongside the result sheet mark.
+        gradebook_data: dict[int, dict] = {}
+        if term_id and hasattr(student, "current_class_id") and student.current_class_id:
+            try:
+                from apps.gradebook.selectors import family_releases
+                from apps.gradebook.services import BUCKETS
+
+                gb_releases = family_releases(student)
+                for entry in gb_releases:
+                    if entry["setup"].term_id != term_id:
+                        continue
+                    result = entry["result"]
+                    bucket_pcts = result.bucket_pcts or {}
+                    subject_id = entry["setup"].subject_id
+                    gradebook_data[subject_id] = {
+                        "overall_pct": result.overall_pct,
+                        "buckets": [
+                            {"key": k, "label": lbl, "pct": bucket_pcts.get(k)}
+                            for k, lbl, _ in BUCKETS
+                            if k in bucket_pcts
+                        ],
+                        "missing_count": result.missing_count,
+                        "excused_count": result.excused_count,
+                        "release_version": entry["release"].version,
+                        "release_date": entry["release"].created_at,
+                        "exam_sheet_linked": entry["setup"].exam_sheet_id is not None,
+                    }
+            except Exception:  # noqa: BLE001 — gradebook feature may be disabled
+                gradebook_data = {}
+
         ctx.update(
             {
                 "student": student,
@@ -156,6 +188,8 @@ class StudentResultsView(StudentOrParentMixin, TemplateView):
                 "summary": summary,
                 "selected_term": selected_term,
                 "selected_term_id": term_id,
+                "gradebook_data": gradebook_data,
+                "has_gradebook": bool(gradebook_data),
             }
         )
         return ctx
@@ -360,6 +394,98 @@ class ClassBroadsheetView(AdminRequiredMixin, TemplateView):
                     scope["broadsheet"]
                 ),
                 "identity": selectors.result_identity(request=self.request),
+            }
+        )
+        return ctx
+
+
+class ClassTeacherBroadsheetView(TeacherRequiredMixin, TemplateView):
+    """
+    Class teacher read-only broadsheet.
+
+    A teacher who is the homeroom/class teacher of a class may view the
+    full marksheet for that class only.  Subject teachers who are not the
+    class teacher are denied access.
+    """
+
+    template_name = "features/results/broadsheet.html"
+
+    def _homeroom_class(self):
+        """The class this teacher is the class teacher of, or None."""
+        from apps.academics.models import SchoolClass
+        from apps.academics.selectors import get_current_year
+        year = get_current_year()
+        if year is None:
+            return None
+        return (
+            SchoolClass.objects.filter(
+                academic_year=year,
+                class_teacher=self.request.user,
+            )
+            .select_related("academic_year")
+            .first()
+        )
+
+    def dispatch(self, request, *args, **kwargs):
+        response = super().dispatch(request, *args, **kwargs)
+        # super() may return a redirect if not authenticated / wrong role
+        if hasattr(response, "status_code") and response.status_code != 200:
+            return response
+        if self._homeroom_class() is None:
+            raise PermissionDenied(
+                "Only the class teacher of a class can view its full marksheet."
+            )
+        return response
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        homeroom = self._homeroom_class()
+
+        from apps.academics.models import Term
+        from apps.academics.selectors import get_current_year
+
+        year = homeroom.academic_year
+        years = [year]  # teacher sees only their own class's year
+
+        # Class options locked to the homeroom class
+        class_options = [homeroom]
+
+        term_options = list(Term.objects.filter(academic_year=year).order_by("name"))
+        wanted_term = _get_int(self.request, "term")
+        term = next((t for t in term_options if t.pk == wanted_term), None)
+        if term is None:
+            term = next(
+                (t for t in term_options if t.is_current),
+                term_options[0] if term_options else None,
+            )
+
+        exam_options = []
+        exam = None
+        broadsheet = None
+
+        if term is not None:
+            exam_options = services.ensure_exams_for_term(term)
+            exam = _pick(exam_options, "exam", self.request)
+
+        if term is not None and exam is not None:
+            broadsheet = selectors.exam_broadsheet(
+                school_class=homeroom, term=term, exam=exam
+            )
+
+        ctx.update(
+            {
+                "years": years,
+                "selected_year": year,
+                "class_options": class_options,
+                "selected_class": homeroom,
+                "term_options": term_options,
+                "selected_term": term,
+                "exam_options": exam_options,
+                "selected_exam": exam,
+                "broadsheet": broadsheet,
+                "ranked_students": _ranked_broadsheet_students(broadsheet),
+                "identity": selectors.result_identity(request=self.request),
+                "is_class_teacher_view": True,  # hides the year/class selectors in template
             }
         )
         return ctx

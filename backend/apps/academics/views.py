@@ -275,6 +275,25 @@ class ClassDetailView(AdminRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["class_subjects"] = selectors.class_subject_list(class_id=self.object.pk)
+        from apps.accounts.models import User
+        from apps.academics.models import SchoolClass
+
+        # Teachers already appointed as class teacher for another class in
+        # the same academic year are excluded from the dropdown.
+        # The current class's own teacher is kept so they remain selected.
+        already_assigned_ids = set(
+            SchoolClass.objects.filter(
+                academic_year=self.object.academic_year,
+                class_teacher__isnull=False,
+            )
+            .exclude(pk=self.object.pk)   # allow re-selecting for this class
+            .values_list("class_teacher_id", flat=True)
+        )
+        ctx["teachers"] = (
+            User.objects.filter(role="teacher", is_active=True)
+            .exclude(pk__in=already_assigned_ids)
+            .order_by("last_name", "first_name")
+        )
         return ctx
 
 

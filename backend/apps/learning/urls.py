@@ -441,4 +441,9 @@ urlpatterns = [
         live_class_views.ClassCalendarView.as_view(),
         name="class_calendar",
     ),
+    path(
+        "live/",
+        live_class_views.StudentAllLiveSessionsView.as_view(),
+        name="student_all_live",
+    ),
 ]

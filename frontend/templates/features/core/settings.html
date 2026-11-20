@@ -646,3 +646,42 @@
   </div>
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+(function () {
+  // Map pane id → tab button id
+  const TAB_MAP = {
+    'pane-identity':   'tab-identity',
+    'pane-hero':       'tab-hero',
+    'pane-about':      'tab-about',
+    'pane-appearance': 'tab-appearance',
+    'pane-social':     'tab-social',
+    'pane-modules':    'tab-modules',
+  };
+
+  // On every tab click, write the pane id into the URL hash without
+  // triggering a scroll (replaceState keeps the page still).
+  document.querySelectorAll('#settingsTabs .nav-link').forEach(function (btn) {
+    btn.addEventListener('shown.bs.tab', function (e) {
+      var paneId = e.target.getAttribute('data-bs-target').replace('#', '');
+      history.replaceState(null, '', '#' + paneId);
+    });
+  });
+
+  // On load (or refresh), if the URL hash matches a known pane, activate it.
+  var hash = window.location.hash.replace('#', '');
+  if (hash && TAB_MAP[hash]) {
+    var tabBtn = document.getElementById(TAB_MAP[hash]);
+    if (tabBtn) {
+      // Use Bootstrap's Tab API if available, otherwise fall back to click.
+      if (window.bootstrap && bootstrap.Tab) {
+        bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+      } else {
+        tabBtn.click();
+      }
+    }
+  }
+})();
+</script>
+{% endblock extra_js %}

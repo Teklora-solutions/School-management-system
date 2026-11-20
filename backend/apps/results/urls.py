@@ -23,6 +23,11 @@ urlpatterns = [
         views.BroadsheetPdfView.as_view(),
         name="broadsheet_pdf",
     ),
+    path(
+        "my-class/marksheet/",
+        views.ClassTeacherBroadsheetView.as_view(),
+        name="teacher_marksheet",
+    ),
     path("sheets/", views.ResultSheetListView.as_view(), name="sheet_list"),
     path(
         "sheets/<int:pk>/", views.ResultSheetDetailView.as_view(), name="sheet_detail"

@@ -118,6 +118,24 @@ def set_class_teacher(
 ) -> SchoolClass:
     if teacher_user is not None and teacher_user.role != "teacher":
         raise ValidationError("Class teacher must have the teacher role.")
+
+    # One teacher can only be class teacher for one class per academic year.
+    if teacher_user is not None:
+        from apps.academics.models import SchoolClass as _SchoolClass
+        conflict = (
+            _SchoolClass.objects.filter(
+                academic_year=school_class.academic_year,
+                class_teacher=teacher_user,
+            )
+            .exclude(pk=school_class.pk)
+            .first()
+        )
+        if conflict:
+            raise ValidationError(
+                f"{teacher_user.get_full_name()} is already the class teacher "
+                f"of {conflict.name}. A teacher can only be class teacher for "
+                f"one class per academic year."
+            )
     school_class.class_teacher = teacher_user
     school_class.save(update_fields=["class_teacher", "updated_at"])
     log_action(

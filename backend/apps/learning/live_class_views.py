@@ -413,6 +413,35 @@ class StudentJoinLiveClassView(RoleRequiredMixin, LiveClassesEnabledMixin, View)
         return redirect(session.meeting_url)
 
 
+class StudentAllLiveSessionsView(StudentOrParentMixin, LiveClassesEnabledMixin, View):
+    """All scheduled live sessions for the student's class, across all subjects."""
+
+    template_name = "features/learning/student_all_live_sessions.html"
+
+    def get(self, request):
+        student = _resolve_student(request)
+        sessions = []
+        if student.current_class_id:
+            from apps.learning.models import LiveClassSession
+            sessions = (
+                LiveClassSession.objects
+                .filter(
+                    school_class_id=student.current_class_id,
+                )
+                .exclude(status=LiveClassSession.Status.CANCELLED)
+                .select_related("subject", "teacher", "school_class")
+                .order_by("scheduled_start")
+            )
+        return render(
+            request,
+            self.template_name,
+            {
+                "sessions": sessions,
+                "student": student,
+            },
+        )
+
+
 # ── Calendar view ─────────────────────────────────────────────────────────
 
 

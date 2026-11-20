@@ -136,6 +136,20 @@ NAVIGATION: dict[str, list[dict]] = {
             "icon": "bi-table",
             "url_name": "gradebook:admin_locks",
             "feature": "gradebook",
+            "children": [
+                {
+                    "label": "Term Locks",
+                    "icon": "bi-lock",
+                    "url_name": "gradebook:admin_locks",
+                    "feature": "gradebook",
+                },
+                {
+                    "label": "Link Result Sheets",
+                    "icon": "bi-link-45deg",
+                    "url_name": "gradebook:admin_setup_link",
+                    "feature": "gradebook",
+                },
+            ],
         },
         {"label": "Finance", "icon": "bi-cash-stack", "url_name": "finance:overview"},
         {
@@ -420,6 +434,19 @@ NAVIGATION: dict[str, list[dict]] = {
                     "feature": "live_classes",
                 },
                 {
+                    "label": "Schedule Virtual Class",
+                    "icon": "bi-camera-video-fill",
+                    "url_name": "dashboards:teacher_home",
+                    "url_hash": "#virtual-classes",
+                    "feature": "live_classes",
+                },
+                {
+                    "label": "Class Calendar",
+                    "icon": "bi-calendar3",
+                    "url_name": "learning:teacher_classrooms",
+                    "feature": "live_classes",
+                },
+                {
                     "label": "Class Progress",
                     "icon": "bi-graph-up",
                     "url_name": "learning:teacher_classrooms",
@@ -450,6 +477,11 @@ NAVIGATION: dict[str, list[dict]] = {
             "url_name": "teachers:marks_list",
         },
         {
+            "label": "Class Marksheet",
+            "icon": "bi-grid-3x3-gap",
+            "url_name": "results:teacher_marksheet",
+        },
+        {
             "label": "Announcements",
             "icon": "bi-megaphone",
             "url_name": "communications:list",
@@ -474,6 +506,18 @@ NAVIGATION: dict[str, list[dict]] = {
             "feature": "learning",
             "children": [
                 {
+                    "label": "My Classes",
+                    "icon": "bi-collection-play",
+                    "url_name": "learning:classrooms",
+                    "feature": "learning",
+                },
+                {
+                    "label": "Live Classes",
+                    "icon": "bi-broadcast",
+                    "url_name": "learning:student_all_live",
+                    "feature": "live_classes",
+                },
+                {
                     "label": "Class Feed",
                     "icon": "bi-megaphone",
                     "url_name": "learning:feed_home",
@@ -490,12 +534,6 @@ NAVIGATION: dict[str, list[dict]] = {
                     "icon": "bi-award",
                     "url_name": "learning:student_badges",
                     "feature": "engagement",
-                },
-                {
-                    "label": "Class Calendar",
-                    "icon": "bi-calendar3",
-                    "url_name": "learning:classrooms",
-                    "feature": "live_classes",
                 },
             ],
         },

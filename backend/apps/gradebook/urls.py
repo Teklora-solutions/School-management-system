@@ -18,6 +18,11 @@ urlpatterns = [
     path("", views.TeacherGradebookListView.as_view(), name="teacher_list"),
     path("locks/", admin_views.AdminGradebookLockView.as_view(), name="admin_locks"),
     path(
+        "admin/setups/",
+        admin_views.AdminGradebookSetupListView.as_view(),
+        name="admin_setup_link",
+    ),
+    path(
         "my/",
         family_views.MyGradebookView.as_view(),
         name="my_gradebook",

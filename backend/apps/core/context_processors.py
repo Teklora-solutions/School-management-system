@@ -57,6 +57,18 @@ def school_settings(request: HttpRequest) -> dict:
     from .selectors import school_settings_values
 
     values = school_settings_values(request)
+
+    # Logo URL — served relative so it works on any host
+    logo_url = ""
+    try:
+        from .models import SchoolSettings
+        row = SchoolSettings.objects.filter(pk=SchoolSettings.SINGLETON_PK).first()
+        logo = getattr(row, "logo", None) if row else None
+        if logo:
+            logo_url = logo.url
+    except Exception:  # noqa: BLE001
+        pass
+
     return {
         "SCHOOL_NAME": values["name"] or "My School",
         "SCHOOL_MOTTO": values["motto"],
@@ -64,6 +76,7 @@ def school_settings(request: HttpRequest) -> dict:
         "SCHOOL_EMAIL": values["email"],
         "SCHOOL_CURRENCY": values["currency"],
         "SCHOOL_SHOW_POSITIONS": values["show_positions"],
+        "SCHOOL_LOGO_URL": logo_url,
     }
 
 
@@ -105,6 +118,10 @@ def _resolve_nav_item(
         href = reverse(url_name, args=url_args, kwargs=url_kwargs)
     except NoReverseMatch:
         href = "#"
+    # Optional fragment appended after the path (e.g. "#virtual-classes")
+    url_hash = item.get("url_hash", "")
+    if url_hash and href != "#":
+        href = href + url_hash
     resolved["href"] = href
     resolved["active"] = _is_active_path(current_path, href)
     # Recurse into children

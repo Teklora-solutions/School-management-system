@@ -146,8 +146,10 @@ a:hover { color: #fff; }
   align-items: center;
   padding: 0 1.25rem;
   gap: 1rem;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 1040;
   backdrop-filter: blur(12px);
 }
@@ -161,6 +163,8 @@ a:hover { color: #fff; }
   font-weight: 700;
   color: #fff !important;
   flex-shrink: 0;
+  min-width: 0;
+  text-decoration: none;
 }
 
 .navbar-brand .brand-dot {
@@ -169,6 +173,15 @@ a:hover { color: #fff; }
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
+  flex-shrink: 0;
+}
+
+/* School logo in the navbar */
+.navbar-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 4px;
   flex-shrink: 0;
 }
 
@@ -399,6 +412,7 @@ a:hover { color: #fff; }
   grid-row: 2;
   padding: 1.75rem 2rem;
   overflow-x: hidden;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - var(--navbar-h));
@@ -1048,12 +1062,31 @@ a:hover { color: #fff; }
 }
 
 /* ─── Responsive ────────────────────────────────────────────────────────────  */
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — tablet & phone
+   Three breakpoints:
+     ≤ 991px  : sidebar collapses to drawer, layout goes single-column
+     ≤ 575px  : phone — further scale-down, role badge hidden, name hidden
+     ≤ 374px  : very small phones (320px) — micro adjustments
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tablet and below (≤ 991px) ────────────────────────────────────────────── */
 @media (max-width: 991.98px) {
+
+  /* Layout: collapse the 2-column grid to a single column */
   .app-wrapper {
     grid-template-columns: 1fr;
     grid-template-rows: var(--navbar-h) 1fr;
   }
 
+  /* Prevent the page from ever being wider than the viewport */
+  .app-wrapper,
+  .app-main {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Sidebar becomes a fixed off-canvas drawer */
   .app-sidebar {
     position: fixed;
     top: 0;
@@ -1064,17 +1097,18 @@ a:hover { color: #fff; }
     transition: transform var(--trans-slow);
     width: min(var(--sidebar-w), 85vw);
   }
-
   .app-sidebar.open {
     transform: translateX(0);
     box-shadow: 4px 0 40px rgba(0,0,0,0.6);
   }
 
+  /* Main content spans the full single column */
   .app-main {
     grid-column: 1;
-    padding: 1.25rem;
+    padding: 1rem;
   }
 
+  /* Overlay dims page when sidebar is open */
   .sidebar-overlay {
     display: none;
     position: fixed;
@@ -1084,8 +1118,168 @@ a:hover { color: #fff; }
     backdrop-filter: blur(2px);
   }
   .sidebar-overlay.show { display: block; }
+
+  /* Page header: stack title / subtitle vertically, allow wrapping */
+  .page-header {
+    margin-bottom: 1rem;
+  }
+  .page-title    { font-size: 1.2rem; }
+  .page-subtitle {
+    font-size: 0.8rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* Stat cards: compact */
+  .stat-card  { padding: 0.9rem; gap: 0.75rem; }
+  .stat-icon  { width: 40px; height: 40px; font-size: 1.1rem; }
+  .stat-value { font-size: 1.5rem; }
+  .stat-label { font-size: 0.775rem; }
+
+  /* Cards: tighter padding */
+  .card-header { padding: 0.75rem 1rem; }
+  .card-body   { padding: 0.875rem !important; }
+
+  /* Tables: always scrollable on tablet and below */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ensure forms inside cards don't overflow */
+  .card .row { margin-inline: 0; }
+  .card .row > [class*="col-"] { padding-inline: 0.5rem; }
+
+  /* Flex wrapping helpers */
+  .flex-nowrap-sm { flex-wrap: wrap !important; }
 }
 
+/* ── Phone (≤ 575px) ────────────────────────────────────────────────────────── */
+@media (max-width: 575.98px) {
+
+  /* ── Navbar ────────────────────────────────────────── */
+
+  /* School name hidden — only the accent dot / logo stays visible */
+  .navbar-brand__name { display: none; }
+
+  /* Dot becomes larger so it reads as a logo */
+  .navbar-brand .brand-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--accent);
+  }
+
+  /* Logo image: same size as dot on mobile */
+  .navbar-logo { width: 30px; height: 30px; }
+
+  /* Role badge hidden on phone — saves ~56px of navbar space */
+  .badge-role { display: none !important; }
+
+  /* Navbar: tighter gaps so toggle + dot + bell + avatar all fit */
+  .app-navbar { gap: 0.5rem; padding: 0 0.75rem; }
+  .navbar-actions { gap: 0.35rem; }
+
+  /* ── Layout ─────────────────────────────────────────── */
+  .app-main { padding: 0.75rem; }
+
+  /* Page header */
+  .page-title {
+    font-size: 1rem;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  .page-subtitle {
+    font-size: 0.75rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* ── Stat cards: 2-per-row ──────────────────────────── */
+  .stat-card {
+    padding: 0.65rem 0.6rem;
+    gap: 0.45rem;
+    border-radius: var(--radius-sm);
+    min-width: 0;
+    overflow: hidden;
+  }
+  .stat-card::after { display: none; }   /* hide decorative glow bubble */
+  .stat-icon  { width: 32px; height: 32px; font-size: 0.9rem; flex-shrink: 0; }
+  .stat-body  { min-width: 0; overflow: hidden; }
+  .stat-value { font-size: 1.15rem; line-height: 1.1; white-space: nowrap; }
+  .stat-label {
+    font-size: 0.68rem;
+    margin-top: 0.1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── Cards ──────────────────────────────────────────── */
+  .card-header {
+    padding: 0.6rem 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .card-title  { font-size: 0.875rem; }
+  .card-body   { padding: 0.75rem !important; }
+
+  /* Card header actions: allow buttons to wrap below the title */
+  .card-header .btn { font-size: 0.75rem; padding: 0.3rem 0.6rem; }
+
+  /* ── List items ─────────────────────────────────────── */
+  .list-group-item { padding: 0.55rem 0.75rem !important; }
+
+  /* ── Tables ─────────────────────────────────────────── */
+  /* Ensure the table wrapper never bleeds outside the card */
+  .table-responsive { max-width: 100%; }
+  .table { font-size: 0.8rem; }
+  .table th, .table td { padding: 0.4rem 0.5rem; }
+
+  /* ── Row gutters ────────────────────────────────────── */
+  .row { --bs-gutter-x: 0.5rem; --bs-gutter-y: 0.5rem; }
+  .mt-1  { margin-top: 0.4rem !important; }
+  .mt-2  { margin-top: 0.6rem !important; }
+  .mb-3  { margin-bottom: 0.75rem !important; }
+
+  /* ── Buttons ────────────────────────────────────────── */
+  .d-grid.gap-2 { gap: 0.35rem !important; }
+  .d-grid .btn  { font-size: 0.8rem; padding: 0.4rem 0.75rem; }
+
+  /* Full-width buttons in flex toolbars on phone */
+  .btn-toolbar-mobile .btn { width: 100%; justify-content: center; }
+
+  /* ── Forms ──────────────────────────────────────────── */
+  .form-select,
+  .form-control {
+    font-size: 0.875rem;
+  }
+
+  /* ── Page-header d-flex rows: always stack on phone ─── */
+  .page-header .d-flex,
+  .page-header .d-flex.align-items-start {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.5rem;
+  }
+
+  /* Alert text: allow wrap */
+  .alert { font-size: 0.85rem; overflow-wrap: anywhere; word-break: break-word; }
+}
+
+/* ── Very small phones (≤ 374px) ───────────────────────────────────────────── */
+@media (max-width: 374px) {
+  .app-main { padding: 0.5rem; }
+  .stat-value { font-size: 1rem; }
+  .stat-icon  { width: 28px; height: 28px; font-size: 0.8rem; }
+  .card-title { font-size: 0.8rem; }
+  .table      { font-size: 0.75rem; }
+}
+
+/* ── Desktop-only rules ─────────────────────────────────────────────────────── */
 @media (min-width: 992px) {
   .sidebar-toggle { display: none !important; }
 }
@@ -1126,8 +1320,9 @@ a:hover { color: #fff; }
 .toast-close { background: none; border: none; color: var(--color-muted); cursor: pointer; padding: 0; line-height: 1; }
 
 /* ── Classroom menu ───────────────────────────────────────────────────────
-   A native <details> dropdown, so the links still work with JavaScript off.
-   Used on the teacher and student classroom pages. */
+   Mobile/tablet (< 992px): native <details> dropdown — works without JS.
+   Desktop (≥ 992px): summary button hidden; panel rendered as a flat
+   inline pill-nav row alongside the "All Subjects" button. */
 .classroom-menu { position: relative; }
 .classroom-menu > summary {
   display: inline-flex;
@@ -1138,6 +1333,8 @@ a:hover { color: #fff; }
 .classroom-menu > summary::-webkit-details-marker { display: none; }
 .classroom-menu__chevron { transition: transform 0.15s ease; }
 .classroom-menu[open] .classroom-menu__chevron { transform: rotate(180deg); }
+
+/* ── Dropdown panel (mobile default) ── */
 .classroom-menu__panel {
   position: absolute;
   right: 0;
@@ -1168,3 +1365,87 @@ a:hover { color: #fff; }
   text-align: center;
   color: var(--accent-light);
 }
+
+/* ── Desktop override: flat inline nav ≥ 992px ── */
+@media (min-width: 992px) {
+  /* Hide the toggle button — panel is always shown */
+  .classroom-menu > summary { display: none !important; }
+
+  /* Pull the element out of positioned flow so it sits inline */
+  .classroom-menu { position: static; }
+
+  /* Force the panel visible and lay it out as a flex row of pills */
+  .classroom-menu__panel {
+    position: static;
+    display: flex !important;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    z-index: auto;
+    top: auto;
+    right: auto;
+  }
+
+  /* Shrink items into compact pill buttons */
+  .classroom-menu__item {
+    min-height: auto;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.8125rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-2);
+    white-space: nowrap;
+    gap: 0.4rem;
+  }
+  .classroom-menu__item:hover,
+  .classroom-menu__item:focus-visible {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: #fff;
+  }
+}
+
+/* ─── Bootstrap nav-tabs: dark theme override ───────────────────────────────
+   Bootstrap ships nav-tabs with a white active-tab background and near-black
+   text, which is unreadable on the dark surface. Override every token. */
+.nav-tabs {
+  --bs-nav-tabs-border-color:            var(--color-border);
+  --bs-nav-tabs-link-hover-border-color: var(--color-border);
+  --bs-nav-tabs-link-active-color:       #fff;
+  --bs-nav-tabs-link-active-bg:          var(--color-surface-2);
+  --bs-nav-tabs-link-active-border-color: var(--color-border) var(--color-border) var(--color-surface-2);
+  border-bottom-color: var(--color-border);
+}
+
+.nav-tabs .nav-link {
+  color: var(--color-muted);
+  background: transparent;
+  border-color: transparent;
+  transition: color var(--trans), background var(--trans), border-color var(--trans);
+}
+
+.nav-tabs .nav-link:hover,
+.nav-tabs .nav-link:focus {
+  color: var(--color-text);
+  border-color: var(--color-border) var(--color-border) transparent;
+  background: var(--color-surface-2);
+  isolation: isolate;
+}
+
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link {
+  color: #fff !important;
+  background: var(--color-surface-2) !important;
+  border-color: var(--color-border) var(--color-border) var(--color-surface-2) !important;
+  font-weight: 600;
+}
+
+/* Tab content pane — keep it on the dark surface */
+.tab-content { color: var(--color-text); }

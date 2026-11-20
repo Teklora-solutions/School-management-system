@@ -32,10 +32,12 @@
              href="{% url 'learning:class_calendar' classroom.school_class.pk %}">
             <i class="bi bi-calendar3" aria-hidden="true"></i>Class Calendar
           </a>
+          {% if classroom.school_class.class_teacher_id == request.user.pk %}
           <a class="classroom-menu__item"
              href="{% url 'learning:class_feed' classroom.school_class.pk %}">
             <i class="bi bi-megaphone" aria-hidden="true"></i>Class Feed
           </a>
+          {% endif %}
           <a class="classroom-menu__item"
              href="{% url 'learning:teacher_class_progress' classroom.school_class.pk classroom.subject.pk %}">
             <i class="bi bi-graph-up" aria-hidden="true"></i>Class Progress

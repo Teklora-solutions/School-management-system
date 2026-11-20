@@ -89,6 +89,9 @@
         <thead style="border-bottom:1px solid var(--color-border);">
           <tr style="color:var(--color-muted);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">
             <th scope="col" class="ps-3">Subject</th>
+            {% if has_gradebook %}
+            <th scope="col" class="text-center" title="Continuous Assessment score from gradebook">CA Score</th>
+            {% endif %}
             <th scope="col" class="text-center">Total</th>
             <th scope="col" class="text-center">Grade</th>
             <th scope="col" class="text-center">Remark</th>
@@ -99,6 +102,26 @@
           {% for entry in entries %}
           <tr>
             <td class="ps-3 fw-600">{{ entry.result_sheet.subject.name }}</td>
+            {% if has_gradebook %}
+            <td class="text-center">
+              {% with gb_row=gradebook_data|default_if_none:None %}
+                {# Look up this entry's subject in the gradebook_data dict #}
+                {% for sid, row in gradebook_data.items %}{% if sid == entry.result_sheet.subject_id %}
+                  {% if row.overall_pct is not None %}
+                    <span class="badge
+                      {% if row.overall_pct >= 80 %}bg-success
+                      {% elif row.overall_pct >= 60 %}bg-primary
+                      {% elif row.overall_pct >= 50 %}bg-warning text-dark
+                      {% else %}bg-danger{% endif %}">
+                      {{ row.overall_pct|floatformat:1 }}%
+                    </span>
+                  {% else %}
+                    <span class="text-muted-sm">—</span>
+                  {% endif %}
+                {% endif %}{% endfor %}
+              {% endwith %}
+            </td>
+            {% endif %}
             <td class="text-center">
               {% if entry.total is not None %}
                 <span class="badge
@@ -115,19 +138,13 @@
             </td>
             <td class="text-center text-muted-sm">{{ entry.remark|default:"—" }}</td>
             <td class="text-center">
-              {% with pos=positions|default_if_none:None %}
-                {% if positions %}
-                  {% with p=positions|dictsortreversed:"pk"|first %}
-                    {# Use template filter workaround: access via forloop var #}
-                  {% endwith %}
-                  {# Inline position lookup via custom approach #}
-                  {% for k, v in positions.items %}
-                    {% if k == entry.pk %}
-                      <span class="text-muted-sm">{{ v.position }}/{{ v.total_in_class }}</span>
-                    {% endif %}
-                  {% endfor %}
-                {% else %}—{% endif %}
-              {% endwith %}
+              {% if positions %}
+                {% for k, v in positions.items %}
+                  {% if k == entry.pk %}
+                    <span class="text-muted-sm">{{ v.position }}/{{ v.total_in_class }}</span>
+                  {% endif %}
+                {% endfor %}
+              {% else %}—{% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -136,6 +153,22 @@
     </div>
   </div>
 </div>
+
+{% if has_gradebook %}
+<div class="card mt-2" style="border-color:var(--color-info);background:rgba(59,130,246,0.07);">
+  <div class="card-body py-2 d-flex gap-2 align-items-start" style="font-size:0.85rem;">
+    <i class="bi bi-info-circle-fill flex-shrink-0 mt-1" style="color:var(--color-info);" aria-hidden="true"></i>
+    <span style="color:var(--color-text);">
+      <strong>CA Score</strong> is your Continuous Assessment average from the gradebook
+      (homework, quizzes, labs and class tests).
+      {% for subj_id, gb_row in gradebook_data.items %}{% if gb_row.exam_sheet_linked %}
+      Where the teacher has linked the gradebook to the final exam sheet, your
+      <strong>Total</strong> already includes the weighted CA score.
+      {% endif %}{% endfor %}
+    </span>
+  </div>
+</div>
+{% endif %}
 
 {% elif terms %}
 <div class="card">

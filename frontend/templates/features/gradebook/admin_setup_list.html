@@ -1,0 +1,131 @@
+{% extends base_template %}
+{% block title %}Link Result Sheets to Gradebook | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-link-45deg me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Link Result Sheets to Gradebook
+    </h1>
+    <p class="page-subtitle">
+      Choose which exam result sheet feeds the exam component of each gradebook.
+      When linked, students see both their CA score and their exam mark together.
+    </p>
+  </div>
+  <a href="{% url 'gradebook:admin_locks' %}" class="btn btn-outline-secondary btn-sm mt-1">
+    <i class="bi bi-arrow-left me-1"></i>Back to Gradebook Admin
+  </a>
+</div>
+
+{# Term selector #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex align-items-center flex-wrap gap-2">
+      <span class="text-muted-sm"><i class="bi bi-calendar3 me-1"></i>Term:</span>
+      {% for term in terms %}
+      <a href="?term={{ term.pk }}"
+         class="btn btn-sm {% if selected_term and selected_term.pk == term.pk %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        {{ term.get_name_display }} ({{ term.academic_year.name }})
+      </a>
+      {% endfor %}
+    </form>
+  </div>
+</div>
+
+{% if not rows %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted-sm">
+    <i class="bi bi-table fs-1 d-block mb-2"></i>
+    No gradebook setups exist for this term. Teachers create setups when they open their gradebook.
+  </div>
+</div>
+{% else %}
+
+<div class="card mb-3" style="border-color:var(--color-info);background:rgba(59,130,246,0.07);">
+  <div class="card-body py-2 d-flex gap-2 align-items-start" style="font-size:0.85rem;">
+    <i class="bi bi-info-circle-fill flex-shrink-0 mt-1" style="color:var(--color-info);" aria-hidden="true"></i>
+    <div style="color:var(--color-text);">
+      <strong>Without a link</strong>: students see their CA gradebook score on My Results, but it is separate from the exam mark. The exam bucket in the gradebook has no data.<br>
+      <strong>With a link</strong>: the exam result sheet feeds the exam bucket of the gradebook. The weighted gradebook score can then be pushed to the report card via the teacher's "Send to report card" action.
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      Gradebook Setups
+      {% if selected_term %}
+      <span class="text-muted-sm fw-400 ms-1">— {{ selected_term.get_name_display }} ({{ selected_term.academic_year.name }})</span>
+      {% endif %}
+    </h2>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0"
+           style="--bs-table-bg:transparent;--bs-table-hover-bg:rgba(255,255,255,0.03);color:var(--color-text);">
+      <thead style="border-bottom:1px solid var(--color-border);">
+        <tr style="color:var(--color-muted);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">
+          <th scope="col" class="ps-3">Class</th>
+          <th scope="col">Subject</th>
+          <th scope="col">Weights</th>
+          <th scope="col">Linked Sheet</th>
+          <th scope="col" class="text-end pe-3">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="ps-3 fw-600">
+            {{ row.setup.school_class.name }}
+            {% if row.setup.stream %}
+            <span class="badge bg-secondary-subtle text-muted ms-1" style="font-size:0.65rem;">{{ row.setup.stream.name }}</span>
+            {% endif %}
+          </td>
+          <td>{{ row.setup.subject.name }}</td>
+          <td class="text-muted-sm">
+            HW {{ row.setup.homework_weight }}% &bull;
+            QZ {{ row.setup.quiz_weight }}% &bull;
+            Lab {{ row.setup.lab_weight }}% &bull;
+            Exam {{ row.setup.exam_weight }}%
+          </td>
+          <td>
+            {% if row.setup.exam_sheet %}
+              <span class="badge bg-success" style="font-size:0.75rem;">
+                <i class="bi bi-link-45deg me-1"></i>{{ row.setup.exam_sheet.exam.name|default:"Sheet #"|add:row.setup.exam_sheet.pk|stringformat:"s" }}
+              </span>
+            {% else %}
+              <span class="badge bg-secondary" style="font-size:0.75rem;">Not linked</span>
+            {% endif %}
+          </td>
+          <td class="text-end pe-3">
+            {% if row.candidates %}
+            <form method="post" class="d-inline-flex align-items-center gap-2">
+              {% csrf_token %}
+              <input type="hidden" name="setup_id" value="{{ row.setup.pk }}">
+              <select name="exam_sheet" class="form-select form-select-sm"
+                      style="width:auto;min-width:160px;background:var(--color-surface-2);color:var(--color-text);border-color:var(--color-border);">
+                <option value="">— Remove link —</option>
+                {% for sheet in row.candidates %}
+                <option value="{{ sheet.pk }}"
+                        {% if row.setup.exam_sheet_id == sheet.pk %}selected{% endif %}>
+                  {{ sheet.exam.name|default:"Sheet" }} ({{ sheet.get_status_display }})
+                </option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-save me-1"></i>Save
+              </button>
+            </form>
+            {% else %}
+            <span class="text-muted-sm" style="font-size:0.8rem;">No result sheets for this class/subject/term yet</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

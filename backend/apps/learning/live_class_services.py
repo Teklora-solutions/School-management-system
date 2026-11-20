@@ -159,6 +159,30 @@ def schedule_live_session(
         status=LiveClassSession.Status.SCHEDULED,
     )
 
+    # Notify all students currently enrolled in this class
+    try:
+        from django.urls import reverse
+        from apps.core.notifications import notify_many
+        from apps.accounts.models import User
+
+        enrolled_users = User.objects.filter(
+            student_profile__current_class=school_class,
+            is_active=True,
+        )
+        session_url = reverse(
+            "learning:live_session_detail", kwargs={"session_id": session.pk}
+        )
+        start_str = timezone.localtime(scheduled_start).strftime("%d %b %Y, %H:%M")
+        notify_many(
+            recipients=enrolled_users,
+            title=f"New live class: {title}",
+            message=f"{subject.name} — {start_str}",
+            link=session_url,
+            category="live_class",
+        )
+    except Exception:  # noqa: BLE001 — never let a notification failure abort the transaction
+        pass
+
     log_action(
         actor=actor or teacher,
         action="live_class.session_scheduled",

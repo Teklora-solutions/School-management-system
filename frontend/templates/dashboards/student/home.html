@@ -8,7 +8,7 @@
   <div>
     <h1 class="page-title">
       <i class="bi bi-backpack-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
-      Welcome, {{ request.user.first_name|default:request.user.username }}
+      Welcome back, {{ request.user.first_name|default:request.user.username }}!
     </h1>
     <p class="page-subtitle">
       {% if student.current_class %}{{ student.current_class.name }}{% endif %}
@@ -17,27 +17,27 @@
   </div>
 </div>
 
-{# ── Stat cards ──────────────────────────────────────────────────── #}
-<div class="row g-3">
+{# ── Stat cards row ───────────────────────────────────────────────────────── #}
+<div class="row g-2 g-md-3">
 
-  {# Latest average #}
-  <div class="col-sm-6 col-xl-3">
+  {# Average score #}
+  <div class="col-6 col-xl-3">
     <div class="stat-card">
       <div class="stat-icon"><i class="bi bi-bar-chart-fill" aria-hidden="true"></i></div>
       <div class="stat-body">
         {% if result_summary %}
           <div class="stat-value">{{ result_summary.average }}%</div>
-          <div class="stat-label">Avg. Score &mdash; {{ result_summary.term }}</div>
+          <div class="stat-label">Avg &mdash; {{ result_summary.term }}</div>
         {% else %}
           <div class="stat-value">—</div>
-          <div class="stat-label">No published results yet</div>
+          <div class="stat-label">No results yet</div>
         {% endif %}
       </div>
     </div>
   </div>
 
   {# Class position #}
-  <div class="col-sm-6 col-xl-3">
+  <div class="col-6 col-xl-3">
     <div class="stat-card">
       <div class="stat-icon"><i class="bi bi-trophy-fill" aria-hidden="true"></i></div>
       <div class="stat-body">
@@ -52,11 +52,31 @@
     </div>
   </div>
 
+  {# Attendance rate #}
+  <div class="col-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(16,185,129,0.15);color:var(--color-success);">
+        <i class="bi bi-person-check-fill" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        {% if attendance_pct is not None %}
+          <div class="stat-value {% if attendance_pct < 75 %}text-danger{% elif attendance_pct < 90 %}text-warning{% else %}text-success{% endif %}">{{ attendance_pct }}%</div>
+          <div class="stat-label">Attendance (30 days)</div>
+        {% else %}
+          <div class="stat-value">—</div>
+          <div class="stat-label">No attendance records</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
   {# Fee balance #}
-  <div class="col-sm-6 col-xl-3">
+  <div class="col-6 col-xl-3">
     {% if not fees_enabled %}
-      <div class="stat-card" style="display:flex;">
-        <div class="stat-icon"><i class="bi bi-receipt" aria-hidden="true"></i></div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(99,102,241,0.15);color:#a78bfa;">
+          <i class="bi bi-receipt" aria-hidden="true"></i>
+        </div>
         <div class="stat-body">
           <div class="stat-value">—</div>
           <div class="stat-label">{{ fees_disabled_message }}</div>
@@ -64,13 +84,15 @@
       </div>
     {% else %}
       <a href="{% url 'finance:student_statement_self' %}" class="stat-card text-decoration-none" style="display:flex;">
-        <div class="stat-icon"><i class="bi bi-receipt" aria-hidden="true"></i></div>
+        <div class="stat-icon" style="background:rgba(99,102,241,0.15);color:#a78bfa;">
+          <i class="bi bi-receipt" aria-hidden="true"></i>
+        </div>
         <div class="stat-body">
           {% if fee_balance is not None %}
             <div class="stat-value {% if fee_balance > 0 %}text-danger{% else %}text-success{% endif %}">
               {{ fee_balance|floatformat:2|intcomma }}
             </div>
-            <div class="stat-label">{% if fee_balance > 0 %}Balance Due{% else %}Balance (Clear){% endif %}</div>
+            <div class="stat-label">{% if fee_balance > 0 %}Balance Due{% else %}Fees Clear{% endif %}</div>
           {% else %}
             <div class="stat-value">—</div>
             <div class="stat-label">Fee Balance</div>
@@ -80,29 +102,94 @@
     {% endif %}
   </div>
 
+</div>{# /stat cards row #}
+
+{# ── Second stat row: homework + live classes ────────────────────────────── #}
+<div class="row g-2 g-md-3 mt-0 mt-md-1">
+
   {# Homework due soon #}
-  <div class="col-sm-6 col-xl-3">
+  <div class="col-6 col-xl-3">
     <a href="{% url 'homework:list' %}" class="stat-card text-decoration-none" style="display:flex;">
-      <div class="stat-icon"><i class="bi bi-journal-bookmark-fill" aria-hidden="true"></i></div>
+      <div class="stat-icon" style="background:rgba(245,158,11,0.15);color:var(--accent-light);">
+        <i class="bi bi-journal-bookmark-fill" aria-hidden="true"></i>
+      </div>
       <div class="stat-body">
         <div class="stat-value">{{ homework_due_soon|length }}</div>
-        <div class="stat-label">Homework Due (7 days)</div>
+        <div class="stat-label">Due This Week</div>
       </div>
     </a>
   </div>
 
-</div>{# /row #}
+  {# Pending assignments (not submitted) #}
+  <div class="col-6 col-xl-3">
+    <a href="{% url 'homework:list' %}" class="stat-card text-decoration-none" style="display:flex;">
+      <div class="stat-icon" style="background:rgba(239,68,68,0.15);color:var(--color-danger);">
+        <i class="bi bi-clipboard2-x-fill" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value {% if pending_hw_count > 0 %}text-danger{% else %}text-success{% endif %}">{{ pending_hw_count }}</div>
+        <div class="stat-label">Pending Submissions</div>
+      </div>
+    </a>
+  </div>
 
-{# ── Body grid ───────────────────────────────────────────────────── #}
+  {# Upcoming live classes #}
+  <div class="col-6 col-xl-3">
+    {% if live_classes_enabled %}
+      <a href="{% url 'learning:classrooms' %}" class="stat-card text-decoration-none" style="display:flex;">
+        <div class="stat-icon" style="background:rgba(59,130,246,0.15);color:var(--color-info);">
+          <i class="bi bi-broadcast" aria-hidden="true"></i>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value">{{ upcoming_live_sessions|length }}</div>
+          <div class="stat-label">
+            {% with upcoming_live_sessions as sessions %}
+              {% for s in sessions %}{% if s.is_live %}{% if forloop.first %}🔴 Live Now{% endif %}{% endif %}{% endfor %}
+              {% if not upcoming_live_sessions %}No Classes Scheduled{% else %}Upcoming Classes{% endif %}
+            {% endwith %}
+          </div>
+        </div>
+      </a>
+    {% else %}
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(59,130,246,0.15);color:var(--color-info);">
+          <i class="bi bi-broadcast" aria-hidden="true"></i>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value">—</div>
+          <div class="stat-label">Live Classes</div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {# Unread announcements #}
+  <div class="col-6 col-xl-3">
+    <a href="{% url 'communications:list' %}" class="stat-card text-decoration-none" style="display:flex;">
+      <div class="stat-icon" style="background:rgba(236,72,153,0.15);color:#f472b6;">
+        <i class="bi bi-megaphone-fill" aria-hidden="true"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value {% if unread_announcements %}text-danger{% endif %}">{{ unread_announcements|default:"0" }}</div>
+        <div class="stat-label">Unread Notices</div>
+      </div>
+    </a>
+  </div>
+
+</div>{# /second stat row #}
+
+{# ── Main body grid ──────────────────────────────────────────────────────── #}
 <div class="row g-3 mt-1">
 
-  {# Homework due soon list #}
-  <div class="col-lg-6">
-    <div class="card h-100">
+  {# LEFT column — upcoming homework + live sessions #}
+  <div class="col-lg-8">
+
+    {# Upcoming homework #}
+    <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h2 class="card-title mb-0">
           <i class="bi bi-journal-bookmark me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
-          Upcoming Homework
+          Upcoming Assignments
         </h2>
         <a href="{% url 'homework:list' %}" class="btn btn-outline-primary btn-sm">View all</a>
       </div>
@@ -111,15 +198,20 @@
         <ul class="list-group list-group-flush" style="background:transparent;">
           {% for hw in homework_due_soon %}
           <li class="list-group-item" style="background:transparent;border-color:var(--color-border);color:var(--color-text);">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <div class="fw-600" style="font-size:0.9rem;">
-                  {% if hw.is_new %}<span class="badge bg-danger me-1" style="font-size:0.6rem;vertical-align:middle;">NEW</span>{% endif %}
-                  <a href="{% url 'homework:detail' hw.pk %}" class="text-decoration-none" style="color:inherit;">{{ hw.title }}</a>
+            <div class="d-flex justify-content-between align-items-center gap-2">
+              <div class="d-flex align-items-center gap-2 min-w-0">
+                <div class="hw-subject-dot" style="
+                  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+                  background:var(--accent);"></div>
+                <div class="min-w-0">
+                  <div class="fw-600" style="font-size:0.875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                    {% if hw.is_new %}<span class="badge bg-danger me-1" style="font-size:0.6rem;vertical-align:middle;">NEW</span>{% endif %}
+                    <a href="{% url 'homework:detail' hw.pk %}" class="text-decoration-none" style="color:inherit;">{{ hw.title }}</a>
+                  </div>
+                  <div class="text-muted-sm">{{ hw.subject.name }}</div>
                 </div>
-                <div class="text-muted-sm">{{ hw.subject.name }}</div>
               </div>
-              <span class="badge {% if hw.is_overdue %}bg-danger{% else %}bg-warning text-dark{% endif %} ms-2" style="white-space:nowrap;">
+              <span class="badge {% if hw.is_overdue %}bg-danger{% else %}bg-warning text-dark{% endif %} ms-2 flex-shrink-0">
                 {{ hw.due_date|date:"M j" }}
               </span>
             </div>
@@ -127,42 +219,108 @@
           {% endfor %}
         </ul>
         {% else %}
-        <div class="p-3 text-muted-sm text-center">No homework due in the next 7 days.</div>
+        <div class="p-4 text-center">
+          <i class="bi bi-check2-circle" style="font-size:2rem;color:var(--color-success);"></i>
+          <p class="text-muted-sm mt-2 mb-0">You're all caught up — no homework due in 7 days.</p>
+        </div>
         {% endif %}
       </div>
     </div>
-  </div>
 
-  {# Announcements #}
-  <div class="col-lg-6">
-    <div class="card h-100">
+    {# Upcoming live / online classes #}
+    {% if live_classes_enabled %}
+    <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h2 class="card-title mb-0">
+          <i class="bi bi-broadcast me-2" style="color:var(--color-info);" aria-hidden="true"></i>
+          Online Classes
+          {% for s in upcoming_live_sessions %}{% if s.is_live and forloop.first %}
+            <span class="badge bg-danger ms-1" style="font-size:0.65rem;animation:pulse 1.5s infinite;">LIVE</span>
+          {% endif %}{% endfor %}
+        </h2>
+        <a href="{% url 'learning:classrooms' %}" class="btn btn-outline-primary btn-sm">My Classes</a>
+      </div>
+      <div class="card-body p-0">
+        {% if upcoming_live_sessions %}
+        <ul class="list-group list-group-flush" style="background:transparent;">
+          {% for session in upcoming_live_sessions %}
+          <li class="list-group-item {% if session.is_live %}live-session-row{% endif %}"
+              style="background:transparent;border-color:var(--color-border);color:var(--color-text);">
+            <div class="d-flex justify-content-between align-items-center gap-2">
+              <div class="d-flex align-items-center gap-2 min-w-0">
+                <div class="stat-icon flex-shrink-0" style="
+                  width:36px;height:36px;border-radius:var(--radius-sm);font-size:1rem;
+                  background:{% if session.is_live %}rgba(239,68,68,0.15){% else %}rgba(59,130,246,0.15){% endif %};
+                  color:{% if session.is_live %}var(--color-danger){% else %}var(--color-info){% endif %};">
+                  <i class="bi {% if session.is_live %}bi-broadcast{% else %}bi-camera-video{% endif %}"></i>
+                </div>
+                <div class="min-w-0">
+                  <div class="fw-600" style="font-size:0.875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                    {{ session.title }}
+                  </div>
+                  <div class="text-muted-sm">{{ session.subject.name }} &bull; {{ session.get_platform_display }}</div>
+                </div>
+              </div>
+              <div class="text-end flex-shrink-0">
+                {% if session.is_live %}
+                  <a href="{% url 'learning:live_session_detail' session_id=session.pk %}" class="btn btn-danger btn-sm">
+                    <i class="bi bi-broadcast me-1"></i>Join
+                  </a>
+                {% else %}
+                  <div class="text-muted-sm">{{ session.scheduled_start|date:"M j" }}</div>
+                  <div style="font-size:0.75rem;color:var(--color-muted);">{{ session.scheduled_start|date:"H:i" }}</div>
+                {% endif %}
+              </div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="p-4 text-center">
+          <i class="bi bi-camera-video-off" style="font-size:2rem;color:var(--color-muted);"></i>
+          <p class="text-muted-sm mt-2 mb-0">No upcoming online classes scheduled.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>{# /LEFT #}
+
+  {# RIGHT column — announcements + quick actions #}
+  <div class="col-lg-4">
+
+    {# Announcements #}
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="card-title mb-0" style="font-size:0.95rem;">
           <i class="bi bi-megaphone-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
           Announcements
           {% if unread_announcements %}
-            <span class="badge bg-danger ms-1" style="font-size:0.7rem;">{{ unread_announcements }}</span>
+            <span class="badge bg-danger ms-1" style="font-size:0.65rem;">{{ unread_announcements }}</span>
           {% endif %}
         </h2>
-        <a href="{% url 'communications:list' %}" class="btn btn-outline-primary btn-sm">View all</a>
+        <a href="{% url 'communications:list' %}" class="btn btn-outline-primary btn-sm">All</a>
       </div>
       <div class="card-body p-0">
         {% if recent_announcements %}
         <ul class="list-group list-group-flush" style="background:transparent;">
           {% for ann in recent_announcements %}
-          <li class="list-group-item {% if not ann.is_read %}fw-600{% endif %}"
-              style="background:transparent;border-color:var(--color-border);color:var(--color-text);">
+          <li class="list-group-item {% if not ann.is_read %}announcement-unread{% endif %}"
+              style="background:transparent;border-color:var(--color-border);color:var(--color-text);padding:0.65rem 0.875rem;">
             <div class="d-flex justify-content-between align-items-start gap-2">
-              <div>
-                {% if not ann.is_read %}<span class="badge bg-danger me-1" style="font-size:0.6rem;vertical-align:middle;">NEW</span>{% endif %}
-                <span style="font-size:0.9rem;">{{ ann.title }}</span>
-                <div class="text-muted-sm">{{ ann.created_at|date:"M j, Y" }}</div>
+              <div class="min-w-0">
+                {% if not ann.is_read %}<span class="badge bg-danger me-1" style="font-size:0.55rem;vertical-align:middle;">NEW</span>{% endif %}
+                <span style="font-size:0.85rem;font-weight:{% if not ann.is_read %}600{% else %}400{% endif %};">{{ ann.title }}</span>
+                <div class="text-muted-sm">{{ ann.created_at|date:"M j" }}</div>
               </div>
               {% if not ann.is_read %}
               <form method="post" action="{% url 'communications:announcement_read' ann.pk %}">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.path }}">
-                <button type="submit" class="btn btn-outline-secondary btn-sm" style="white-space:nowrap;font-size:0.75rem;">Mark read</button>
+                <button type="submit" class="btn btn-outline-secondary btn-sm flex-shrink-0" style="font-size:0.7rem;padding:0.15rem 0.4rem;white-space:nowrap;">
+                  <i class="bi bi-check2"></i>
+                </button>
               </form>
               {% endif %}
             </div>
@@ -174,42 +332,64 @@
         {% endif %}
       </div>
     </div>
-  </div>
 
-</div>{# /row #}
-
-{# ── Quick actions ───────────────────────────────────────────────── #}
-<div class="row g-3 mt-1">
-  <div class="col-12">
+    {# Quick actions #}
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">
+        <h2 class="card-title" style="font-size:0.95rem;">
           <i class="bi bi-lightning-fill me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
           Quick Actions
         </h2>
       </div>
-      <div class="card-body">
-        <div class="d-flex flex-wrap gap-2">
-          <a href="{% url 'results:student_results' %}" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-bar-chart me-1"></i>My Results
+      <div class="card-body p-2">
+        <div class="d-grid gap-2">
+          <a href="{% url 'results:student_results' %}" class="btn btn-outline-primary btn-sm text-start">
+            <i class="bi bi-bar-chart me-2"></i>My Results
           </a>
-          {% if fees_enabled %}
-          <a href="{% url 'finance:student_statement_self' %}" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-receipt me-1"></i>Fee Statement
+          <a href="{% url 'homework:list' %}" class="btn btn-outline-primary btn-sm text-start">
+            <i class="bi bi-journal-bookmark me-2"></i>All Assignments
+          </a>
+          {% if live_classes_enabled %}
+          <a href="{% url 'learning:classrooms' %}" class="btn btn-outline-primary btn-sm text-start">
+            <i class="bi bi-collection-play me-2"></i>My Classes
           </a>
           {% endif %}
-          <a href="{% url 'homework:list' %}" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-journal-bookmark me-1"></i>Homework
+          {% if fees_enabled %}
+          <a href="{% url 'finance:student_statement_self' %}" class="btn btn-outline-primary btn-sm text-start">
+            <i class="bi bi-receipt me-2"></i>Fee Statement
           </a>
-          <a href="{% url 'communications:complaint_create' %}" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-chat-square-text me-1"></i>Send a Message
+          {% endif %}
+          <a href="{% url 'communications:complaint_create' %}" class="btn btn-outline-secondary btn-sm text-start">
+            <i class="bi bi-chat-square-text me-2"></i>Send a Message
           </a>
-          <a href="{% url 'accounts:profile' %}" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-person me-1"></i>Profile
+          <a href="{% url 'accounts:profile' %}" class="btn btn-outline-secondary btn-sm text-start">
+            <i class="bi bi-person me-2"></i>My Profile
           </a>
         </div>
       </div>
     </div>
-  </div>
-</div>
+
+  </div>{# /RIGHT #}
+
+</div>{# /main body grid #}
+
+<style>
+/* ── Live session pulse badge ─────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ── Live session row highlight ───────────────────────── */
+.live-session-row {
+  border-left: 3px solid var(--color-danger) !important;
+  background: rgba(239,68,68,0.06) !important;
+}
+
+/* ── Unread announcement highlight ───────────────────── */
+.announcement-unread {
+  border-left: 3px solid var(--accent) !important;
+  background: var(--accent-glow) !important;
+}
+</style>
 {% endblock content %}

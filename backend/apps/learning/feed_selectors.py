@@ -341,18 +341,9 @@ def can_view_feed(user, school_class) -> bool:
     if role in ("admin", "director"):
         return True
     if role == "teacher":
-        from apps.teachers.models import TeacherAssignment
-        from apps.academics.selectors import get_current_year
-        year = get_current_year()
-        if year is None:
-            return False
-        assigned = TeacherAssignment.objects.filter(
-            teacher__user=user,
-            school_class=school_class,
-            academic_year=year,
-        ).exists()
-        is_class_teacher = school_class.class_teacher_id == user.pk
-        return assigned or is_class_teacher
+        # Only the class teacher of this specific class may view its feed.
+        # Subject-only teachers who are not the homeroom teacher are excluded.
+        return school_class.class_teacher_id == user.pk
     if role == "student":
         student = getattr(user, "student_profile", None)
         return student is not None and student.current_class_id == school_class.pk
@@ -429,14 +420,9 @@ def classrooms_for_feed(user) -> list:
     if role == "teacher":
         if year is None:
             return []
-        from apps.teachers.models import TeacherAssignment
-
+        # Only return classes where this teacher is the homeroom/class teacher.
+        # Subject-only teachers do not have access to any class feed.
         ids = set(
-            TeacherAssignment.objects.filter(
-                teacher__user=user, academic_year=year
-            ).values_list("school_class_id", flat=True)
-        )
-        ids |= set(
             SchoolClass.objects.filter(
                 academic_year=year, class_teacher=user
             ).values_list("pk", flat=True)
