@@ -1,0 +1,116 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Handoff Rules | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-signpost-split me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Handoff Rules
+    </h1>
+    <p class="page-subtitle">Rules that route a conversation to a human. Required (safeguarding) rules cannot be deleted or switched off.</p>
+  </div>
+  <div class="d-flex gap-2 mt-1 flex-wrap">
+    <form method="post" action="{% url 'assistant:handoff_seed' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-secondary btn-sm"
+              onclick="return confirm('Seed the Kenyan starter rules? Existing required rules will not be changed.')">
+        <i class="bi bi-magic me-1"></i>Seed starter rules
+      </button>
+    </form>
+    <a href="{% url 'assistant:handoff_teams' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-people me-1"></i>Teams
+    </a>
+    <a href="{% url 'assistant:handoff_rule_create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-circle me-1"></i>Add rule
+    </a>
+  </div>
+</div>
+
+{% if not has_safeguarding_rule %}
+<div class="alert alert-danger d-flex gap-2 align-items-start mb-3" role="alert">
+  <i class="bi bi-shield-exclamation-fill flex-shrink-0 mt-1" aria-hidden="true"></i>
+  <div>
+    <strong>No enabled safeguarding rule.</strong>
+    The assistant cannot route safeguarding concerns to a named contact.
+    Use <em>Seed starter rules</em> to add one, then configure it.
+  </div>
+</div>
+{% endif %}
+
+{% if rules %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0"
+           style="--bs-table-bg:transparent;--bs-table-hover-bg:rgba(255,255,255,0.03);color:var(--color-text);">
+      <thead style="border-bottom:1px solid var(--color-border);">
+        <tr style="color:var(--color-muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.04em;">
+          <th class="ps-3">Rule</th>
+          <th>Priority</th>
+          <th>Destination</th>
+          <th>Triggers</th>
+          <th>Status</th>
+          <th class="text-end pe-3">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rule in rules %}
+        <tr {% if not rule.enabled %}style="opacity:0.5;"{% endif %}>
+          <td class="ps-3">
+            <div class="fw-600" style="font-size:0.875rem;">
+              {{ rule.name }}
+              {% if rule.is_required %}
+              <span class="badge ms-1" style="background:rgba(239,68,68,0.2);color:#ef4444;font-size:0.65rem;">Required</span>
+              {% endif %}
+            </div>
+            {% if rule.description %}<div class="text-muted-sm">{{ rule.description|truncatechars:70 }}</div>{% endif %}
+          </td>
+          <td>
+            <span class="badge {% if rule.priority == 'critical' %}bg-danger{% elif rule.priority == 'urgent' %}bg-warning text-dark{% else %}bg-secondary{% endif %}" style="font-size:0.72rem;">
+              {{ rule.get_priority_display }}
+            </span>
+          </td>
+          <td class="text-muted-sm" style="font-size:0.8rem;">{{ rule.destination_label }}</td>
+          <td style="font-size:0.78rem;">
+            {% for t in rule.topic_codes %}<span class="badge bg-secondary-subtle text-muted me-1" style="font-size:0.68rem;">{{ t }}</span>{% endfor %}
+            {% for s in rule.signal_codes %}<span class="badge bg-info-subtle text-info me-1" style="font-size:0.68rem;">{{ s }}</span>{% endfor %}
+          </td>
+          <td>
+            {% if rule.enabled %}
+              <span class="badge" style="background:var(--color-success);color:#fff;font-size:0.7rem;">On</span>
+            {% else %}
+              <span class="badge bg-secondary" style="font-size:0.7rem;">Off</span>
+            {% endif %}
+          </td>
+          <td class="text-end pe-3">
+            <div class="d-flex gap-1 justify-content-end flex-wrap">
+              <a href="{% url 'assistant:handoff_rule_update' rule.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+              {% if not rule.is_required %}
+              <form method="post" action="{% url 'assistant:handoff_rule_toggle' rule.pk %}" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-secondary" type="submit">{% if rule.enabled %}Disable{% else %}Enable{% endif %}</button>
+              </form>
+              <form method="post" action="{% url 'assistant:handoff_rule_delete' rule.pk %}" class="d-inline"
+                    onsubmit="return confirm('Delete this rule? Handoffs already created are kept.')">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-signpost" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm mb-3">No rules yet. Use <strong>Seed starter rules</strong> to add a Kenyan school starter set.</p>
+    <a href="{% url 'assistant:handoff_rule_create' %}" class="btn btn-primary btn-sm">Add first rule</a>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

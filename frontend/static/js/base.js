@@ -60,6 +60,22 @@
     }
   });
 
+  /* ── Sidebar scroll position persistence ────────────────────────────────
+     The admin menu is taller than the viewport; without this the sidebar
+     jumps back to the top on every refresh/navigation. */
+  const SIDEBAR_SCROLL_KEY = "sidebarScrollTop";
+  if (sidebar) {
+    const saved = parseInt(sessionStorage.getItem(SIDEBAR_SCROLL_KEY) || "0", 10);
+    if (saved > 0) sidebar.scrollTop = saved;
+    let scrollTimer = null;
+    sidebar.addEventListener("scroll", () => {
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(sidebar.scrollTop));
+      }, 100);
+    });
+  }
+
   /* ── Toast auto-dismiss ───────────────────────────────────────────────── */
   document.querySelectorAll(".toast-msg").forEach((toast) => {
     const closeBtn = toast.querySelector(".toast-close");
@@ -114,6 +130,36 @@
           /* storage blocked — the draft simply remains on this device */
         }
       });
+    });
+  }
+
+  /* ── Desktop sidebar collapse toggle ──────────────────────────────────── */
+  const desktopToggle = document.getElementById("sidebar-desktop-toggle");
+  const wrapper       = document.querySelector(".app-wrapper");
+  const COLLAPSE_KEY  = "sidebarCollapsed";
+
+  function applySidebarState(collapsed) {
+    if (!wrapper) return;
+    if (collapsed) {
+      wrapper.classList.add("sidebar-collapsed");
+      desktopToggle?.setAttribute("aria-label", "Expand sidebar");
+      desktopToggle?.setAttribute("title", "Expand sidebar");
+    } else {
+      wrapper.classList.remove("sidebar-collapsed");
+      desktopToggle?.setAttribute("aria-label", "Collapse sidebar");
+      desktopToggle?.setAttribute("title", "Collapse sidebar");
+    }
+  }
+
+  // Restore from localStorage on load
+  if (desktopToggle) {
+    const stored = localStorage.getItem(COLLAPSE_KEY);
+    if (stored === "1") applySidebarState(true);
+
+    desktopToggle.addEventListener("click", () => {
+      const isNowCollapsed = !wrapper.classList.contains("sidebar-collapsed");
+      applySidebarState(isNowCollapsed);
+      localStorage.setItem(COLLAPSE_KEY, isNowCollapsed ? "1" : "0");
     });
   }
 

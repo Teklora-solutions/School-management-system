@@ -1279,6 +1279,29 @@ a:hover { color: #fff; }
   .table      { font-size: 0.75rem; }
 }
 
+/* ── Desktop sidebar collapse ────────────────────────────────────────────────  */
+/* When sidebar is collapsed: 0-width sidebar, content spans full grid */
+.app-wrapper.sidebar-collapsed {
+  grid-template-columns: 0 1fr;
+}
+.app-wrapper.sidebar-collapsed .app-sidebar {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  border-right: none;
+}
+.app-wrapper.sidebar-collapsed .app-main {
+  grid-column: 1 / -1;
+}
+
+/* Smooth transition for collapse/expand */
+.app-sidebar {
+  transition: width var(--trans-slow), padding var(--trans-slow);
+}
+.app-wrapper {
+  transition: grid-template-columns var(--trans-slow);
+}
+
 /* ── Desktop-only rules ─────────────────────────────────────────────────────── */
 @media (min-width: 992px) {
   .sidebar-toggle { display: none !important; }

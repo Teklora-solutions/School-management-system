@@ -31,8 +31,16 @@
     {% block navbar %}
     <nav class="app-navbar" role="navigation" aria-label="Main navigation">
       {# Mobile sidebar toggle #}
+      {# Mobile sidebar toggle (shown only on small screens) #}
       <button class="navbar-icon-btn sidebar-toggle d-lg-none" aria-label="Open menu" aria-expanded="false">
         <i class="bi bi-list" aria-hidden="true"></i>
+      </button>
+      {# Desktop sidebar collapse toggle (shown only on large screens) #}
+      <button class="navbar-icon-btn sidebar-desktop-toggle d-none d-lg-flex"
+              id="sidebar-desktop-toggle"
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar">
+        <i class="bi bi-layout-sidebar" aria-hidden="true"></i>
       </button>
 
       {# Brand #}
@@ -140,5 +148,9 @@
   {# Our JS #}
   <script src="{% static_v 'js/base.js' %}"></script>
   {% block extra_js %}{% endblock %}
+  {# Floating assistant button — signed-in dashboards only #}
+  {% if request.user.is_authenticated %}
+  {% include "features/assistant/_floating_chat_btn.html" %}
+  {% endif %}
 </body>
 </html>

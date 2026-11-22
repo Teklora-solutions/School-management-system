@@ -205,15 +205,78 @@ NAVIGATION: dict[str, list[dict]] = {
             "label": "AI Assistant",
             "icon": "bi-robot",
             "url_name": "assistant:settings",
+            "children": [
+                {
+                    "label": "Setup guide",
+                    "icon": "bi-book",
+                    "url_name": "assistant:guide",
+                },
+                {
+                    "label": "Settings",
+                    "icon": "bi-gear",
+                    "url_name": "assistant:settings",
+                },
+                {
+                    "label": "Knowledge Base",
+                    "icon": "bi-journals",
+                    "url_name": "assistant:knowledge_collections",
+                    "feature": "learning",
+                },
+                {
+                    "label": "Handoff Rules",
+                    "icon": "bi-signpost-split",
+                    "url_name": "assistant:handoff_rules",
+                },
+                {
+                    "label": "Inbox",
+                    "icon": "bi-inbox",
+                    "url_name": "assistant:inbox",
+                },
+                {
+                    "label": "Alerts",
+                    "icon": "bi-shield-exclamation",
+                    "url_name": "assistant:alerts",
+                },
+            ],
         },
         {
             "label": "Website",
             "icon": "bi-globe",
-            "url_name": "public_admin:gallery_list",
+            "url_name": "public_admin:overview",
             "children": [
                 {
-                    "label": "Gallery",
+                    "label": "Home Page Editor",
+                    "icon": "bi-house-gear",
+                    "url_name": "public_admin:editor_home",
+                },
+                {
+                    "label": "About Page Editor",
+                    "icon": "bi-person-lines-fill",
+                    "url_name": "public_admin:editor_about",
+                },
+                {
+                    "label": "Academics Editor",
+                    "icon": "bi-mortarboard",
+                    "url_name": "public_admin:editor_academics",
+                },
+                {
+                    "label": "Gallery Editor",
                     "icon": "bi-images",
+                    "url_name": "public_admin:editor_gallery",
+                },
+                {
+                    "label": "Contact Editor",
+                    "icon": "bi-telephone",
+                    "url_name": "public_admin:editor_contact",
+                },
+                {
+                    "label": "All Sections",
+                    "icon": "bi-layout-text-window",
+                    "url_name": "public_admin:overview",
+                },
+                {
+                    "label": "Gallery Photos",
+                    "icon": "bi-card-image",
                     "url_name": "public_admin:gallery_list",
                 },
                 {
@@ -267,6 +330,12 @@ NAVIGATION: dict[str, list[dict]] = {
                 },
             ],
         },
+        {
+            "label": "Assistant Chat",
+            "icon": "bi-robot",
+            "url_name": "assistant:me_page",
+        },
+
     ],
     "director": [
         {
@@ -407,6 +476,12 @@ NAVIGATION: dict[str, list[dict]] = {
                 },
             ],
         },
+        {
+            "label": "Assistant Chat",
+            "icon": "bi-robot",
+            "url_name": "assistant:me_page",
+        },
+
     ],
     "teacher": [
         {
@@ -487,6 +562,16 @@ NAVIGATION: dict[str, list[dict]] = {
             "url_name": "communications:list",
         },
         {
+            "label": "Inbox",
+            "icon": "bi-inbox",
+            "url_name": "assistant:inbox",
+        },
+        {
+            "label": "Assistant Chat",
+            "icon": "bi-robot",
+            "url_name": "assistant:me_page",
+        },
+        {
             "label": "Community",
             "icon": "bi-people-fill",
             "url_name": "community:home",
@@ -494,11 +579,6 @@ NAVIGATION: dict[str, list[dict]] = {
         },
     ],
     "student": [
-        {
-            "label": "Dashboard",
-            "icon": "bi-speedometer2",
-            "url_name": "accounts:dashboard_redirect",
-        },
         {
             "label": "My Learning",
             "icon": "bi-bookshelf",
@@ -588,6 +668,11 @@ NAVIGATION: dict[str, list[dict]] = {
             "url_name": "communications:list",
         },
         {"label": "Profile", "icon": "bi-person", "url_name": "accounts:profile"},
+        {
+            "label": "Assistant Chat",
+            "icon": "bi-robot",
+            "url_name": "assistant:me_page",
+        },
         {
             "label": "Community",
             "icon": "bi-people-fill",
@@ -680,6 +765,12 @@ NAVIGATION: dict[str, list[dict]] = {
             "icon": "bi-megaphone",
             "url_name": "communications:list",
         },
+        {
+            "label": "Assistant Chat",
+            "icon": "bi-robot",
+            "url_name": "assistant:me_page",
+        },
+
     ],
     "parent": [
         {
@@ -769,6 +860,11 @@ NAVIGATION: dict[str, list[dict]] = {
             "url_name": "communications:list",
         },
         {"label": "Profile", "icon": "bi-person", "url_name": "accounts:profile"},
+        {
+            "label": "Assistant Chat",
+            "icon": "bi-robot",
+            "url_name": "assistant:me_page",
+        },
         {
             "label": "Community",
             "icon": "bi-people-fill",

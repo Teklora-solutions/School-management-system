@@ -319,6 +319,7 @@ def answer_question(
     record_gaps: bool = True,
     is_test: bool = False,
     on_date=None,
+    context_lines: str = "",
 ) -> Answer:
     question = (question or "").strip()[:MAX_QUESTION_CHARS]
     settings_row = AssistantSettings.read()
@@ -419,6 +420,7 @@ def answer_question(
         house_rules=settings_row.house_rules,
         question=masked.text,
         sources=prompt_sources,
+        context_lines=context_lines,
     )
 
     try:

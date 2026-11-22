@@ -1,0 +1,70 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Canned Replies | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-chat-square-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Canned Replies
+    </h1>
+    <p class="page-subtitle">Pre-written replies staff can insert with one click when handling a conversation.</p>
+  </div>
+  <a href="{% url 'assistant:canned_reply_create' %}" class="btn btn-primary btn-sm mt-1">
+    <i class="bi bi-plus-circle me-1"></i>Add reply
+  </a>
+</div>
+
+{% if replies %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0"
+           style="--bs-table-bg:transparent;color:var(--color-text);">
+      <thead style="border-bottom:1px solid var(--color-border);">
+        <tr style="color:var(--color-muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.04em;">
+          <th class="ps-3">Title</th>
+          <th>Category</th>
+          <th>Preview</th>
+          <th>Status</th>
+          <th class="text-end pe-3">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for reply in replies %}
+        <tr {% if not reply.is_active %}style="opacity:0.5;"{% endif %}>
+          <td class="ps-3 fw-600" style="font-size:0.875rem;">{{ reply.title }}</td>
+          <td class="text-muted-sm">{{ reply.category|default:"—" }}</td>
+          <td class="text-muted-sm" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ reply.body|truncatechars:80 }}</td>
+          <td>
+            {% if reply.is_active %}
+              <span class="badge" style="background:var(--color-success);color:#fff;font-size:0.7rem;">Active</span>
+            {% else %}
+              <span class="badge bg-secondary" style="font-size:0.7rem;">Inactive</span>
+            {% endif %}
+          </td>
+          <td class="text-end pe-3">
+            <div class="d-flex gap-1 justify-content-end">
+              <a href="{% url 'assistant:canned_reply_update' reply.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post" action="{% url 'assistant:canned_reply_delete' reply.pk %}" class="d-inline"
+                    onsubmit="return confirm('Delete this canned reply?')">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-chat-square-dots" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm">No canned replies yet.</p>
+    <a href="{% url 'assistant:canned_reply_create' %}" class="btn btn-primary btn-sm">Add first reply</a>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

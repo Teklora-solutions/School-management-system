@@ -53,7 +53,7 @@ migration. Switched off by default, so a fresh install renders nothing.**
 | Public chat backend: state, send, new, feedback, callback; per-visitor/IP/site limits; PoW; consent gate | ✅ works (Module 3 CP2) |
 | Public chat widget on every public page (phone-first, EN/SW, streaming, feedback, callback) | ✅ works (Module 3 CP3); OFF by default, ships nothing while off |
 | Handoff rules, safeguarding routing and the human inbox | 🚧 Module 3 CP4–CP5 |
-| Signed-in chat screens and permission-checked record tools | 🚧 Module 4 |
+| Signed-in chat screens and permission-checked record tools | ✅ built (Module 4): chat page + floating button for every role, 33 role-scoped tools, model-selected calls with keyword fallback, tutor mode with graded-work refusal, confirm-to-save announcement drafts, memory controls, EN/SW toggle |
 | Streaming replies | ✅ built (Module 3 CP2–CP3): SSE, only after the whole answer is verified |
 | Model second-layer safeguarding detection | 🚧 designed only, not built |
 

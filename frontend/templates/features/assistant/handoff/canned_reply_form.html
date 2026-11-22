@@ -1,0 +1,40 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}{{ title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div><h1 class="page-title"><i class="bi bi-chat-square-text me-2" style="color:var(--accent-light);" aria-hidden="true"></i>{{ title }}</h1></div>
+  <a href="{% url 'assistant:canned_replies' %}" class="btn btn-outline-secondary btn-sm mt-1">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+
+<form method="post" class="row g-3">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="col-12"><div class="alert alert-danger">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div></div>{% endif %}
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-body">
+        {% include "features/assistant/handoff/_field.html" with field=form.title %}
+        {% include "features/assistant/handoff/_field.html" with field=form.body %}
+        {% include "features/assistant/handoff/_field.html" with field=form.category %}
+        <div class="row g-2">
+          <div class="col-sm-6">{% include "features/assistant/handoff/_field.html" with field=form.display_order %}</div>
+        </div>
+        <div class="form-check form-switch mt-2">
+          {{ form.is_active }}
+          <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active</label>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-body">
+        <button type="submit" class="btn btn-primary w-100 mb-2"><i class="bi bi-check2 me-1"></i>Save</button>
+        <a href="{% url 'assistant:canned_replies' %}" class="btn btn-outline-secondary w-100">Cancel</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock content %}

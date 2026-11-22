@@ -1,0 +1,477 @@
+{% extends base_template %}
+{% block title %}Ask the Assistant | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/assistant_signed_in.css">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-robot me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Ask the Assistant
+    </h1>
+    <p class="page-subtitle">
+      Answers from the school's approved information &mdash; always says when it doesn't know.
+    </p>
+  </div>
+</div>
+
+{% if off_reason %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-robot" style="font-size:2.5rem;color:var(--color-muted);"></i>
+    <p class="mt-3 text-muted-sm">{{ off_reason }}</p>
+    {% if request.user.role == 'admin' %}
+    <a href="{% url 'assistant:settings' %}" class="btn btn-outline-primary btn-sm mt-2">
+      Open assistant settings
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+
+<div class="si-chat" id="si-chat"
+     data-state-url="{{ state_url }}"
+     data-send-url="{{ send_url }}"
+     data-new-url="{{ new_url }}"
+     data-history-url="{{ history_url }}"
+     data-child-url="{{ child_url }}"
+     data-memory-url="{{ memory_url }}"
+     data-delete-url="{{ delete_url }}"
+     data-role="{{ role }}"
+     data-tutor="{{ tutor_enabled|yesno:'true,false' }}">
+
+  {# ── Loading state ── #}
+  <div class="si-loading" id="si-loading">
+    <i class="bi bi-arrow-repeat si-spinner" aria-hidden="true"></i>
+    <span class="text-muted-sm ms-2">Loading&hellip;</span>
+  </div>
+
+  {# ── Main chat area ── #}
+  <div class="si-layout" id="si-layout" hidden>
+
+    {# Left: conversation #}
+    <div class="si-left">
+
+      {# Parent child switcher #}
+      {% if role == 'parent' %}
+      <div class="si-child-bar" id="si-child-bar" hidden>
+        <span class="text-muted-sm" style="font-size:0.8rem;">
+          <i class="bi bi-person-fill me-1" aria-hidden="true"></i>
+          Talking about:
+        </span>
+        <select id="si-child-select" class="form-select form-select-sm"
+                style="width:auto;min-width:160px;background:var(--color-surface-2);
+                       color:var(--color-text);border-color:var(--color-border);">
+        </select>
+      </div>
+      {% endif %}
+
+      {# AI notice bar #}
+      <div class="si-notice">
+        <i class="bi bi-robot" aria-hidden="true"></i>
+        AI assistant &mdash; not a person &mdash;
+        answers from approved school documents.
+        <button type="button" class="si-link" id="si-talk-person-btn">Talk to a person</button>
+      </div>
+
+      {# Suggested questions #}
+      <div class="si-suggestions" id="si-suggestions"></div>
+
+      {# Messages #}
+      <div class="si-messages" id="si-messages" role="log" aria-live="polite" aria-label="Conversation">
+      </div>
+
+      {# Composer #}
+      <div class="si-composer">
+        <label class="visually-hidden" for="si-input">Your question</label>
+        <textarea id="si-input" class="si-input"
+                  rows="2" maxlength="4000"
+                  placeholder="Ask a question about the school&hellip;"
+                  aria-label="Your question"></textarea>
+        <div class="si-composer-actions">
+          {% if tutor_enabled %}
+          <div class="si-tutor-toggle form-check form-switch me-auto mb-0">
+            <input class="form-check-input" type="checkbox" id="si-tutor-mode"
+                   role="switch">
+            <label class="form-check-label text-muted-sm" for="si-tutor-mode"
+                   style="font-size:0.78rem;">Tutor mode</label>
+          </div>
+          {% endif %}
+          <div class="btn-group btn-group-sm me-1" role="group" aria-label="Language">
+            <button type="button" class="btn btn-outline-secondary si-lang-btn" data-lang="en">EN</button>
+            <button type="button" class="btn btn-outline-secondary si-lang-btn" data-lang="sw">SW</button>
+          </div>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="si-new-btn"
+                  title="Start a new conversation">
+            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" id="si-send-btn"
+                  aria-label="Send question">
+            <i class="bi bi-send" aria-hidden="true"></i> Send
+          </button>
+        </div>
+      </div>
+
+    </div>{# /si-left #}
+
+    {# Right: memory panel (collapsible) #}
+    <aside class="si-right" id="si-right">
+      <div class="si-right-header">
+        <span class="si-right-title">
+          <i class="bi bi-lightbulb me-1" aria-hidden="true"></i> Personalisation
+        </span>
+        <button type="button" class="si-right-close" id="si-mem-close"
+                aria-label="Close panel">&times;</button>
+      </div>
+      <div class="si-right-body" id="si-mem-body">
+        <p class="text-muted-sm" style="font-size:0.8rem;">
+          The assistant can remember your preferred language and a short note
+          about recurring topics. It never stores names, fees, marks or
+          health details.
+        </p>
+        <div id="si-mem-status"></div>
+        <div class="d-grid gap-2 mt-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="si-mem-optin-btn">
+            Turn on memory
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm" id="si-mem-forget-btn"
+                  hidden>
+            Forget everything
+          </button>
+        </div>
+        <hr style="border-color:var(--color-border);">
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="si-delete-hist-btn">
+            <i class="bi bi-trash3 me-1"></i>Delete my conversation history
+          </button>
+        </div>
+      </div>
+    </aside>
+
+  </div>{# /si-layout #}
+
+</div>{# /si-chat #}
+
+
+
+<script>
+(function() {
+  'use strict';
+
+  var root   = document.getElementById('si-chat');
+  var layout = document.getElementById('si-layout');
+  var loading = document.getElementById('si-loading');
+  if (!root) return;
+
+  var URLS = {
+    state:   root.getAttribute('data-state-url'),
+    send:    root.getAttribute('data-send-url'),
+    newConv: root.getAttribute('data-new-url'),
+    history: root.getAttribute('data-history-url'),
+    child:   root.getAttribute('data-child-url'),
+    memory:  root.getAttribute('data-memory-url'),
+    deleteh: root.getAttribute('data-delete-url'),
+  };
+  var ROLE       = root.getAttribute('data-role');
+  var TUTOR_ON   = root.getAttribute('data-tutor') === 'true';
+  var CSRF_TOKEN = '';
+
+  // ── Helpers ───────────────────────────────────────────────────────────
+  function csrfToken() {
+    if (CSRF_TOKEN) return CSRF_TOKEN;
+    var cookie = document.cookie.split(';');
+    for (var i = 0; i < cookie.length; i++) {
+      var part = cookie[i].trim();
+      if (part.startsWith('csrftoken=')) {
+        CSRF_TOKEN = part.substring('csrftoken='.length);
+        return CSRF_TOKEN;
+      }
+    }
+    return '';
+  }
+
+  function post(url, data) {
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken(),
+      },
+      body: JSON.stringify(data),
+    }).then(function(r) { return r.json(); });
+  }
+
+  function get(url) {
+    return fetch(url).then(function(r) { return r.json(); });
+  }
+
+  function el(id) { return document.getElementById(id); }
+  function msgBox() { return el('si-messages'); }
+
+  // ── Render a single message ────────────────────────────────────────────
+  function renderMessage(role, body, extras) {
+    extras = extras || {};
+    var wrap = document.createElement('div');
+    wrap.className = 'si-msg si-msg--' + role;
+
+    var av = document.createElement('div');
+    av.className = 'si-msg__avatar';
+    av.setAttribute('aria-hidden', 'true');
+    av.textContent = role === 'user' ? '👤' : role === 'assistant' ? '🤖' : '⚙';
+
+    var bd = document.createElement('div');
+    bd.className = 'si-msg__body';
+    bd.textContent = body;
+
+    if (extras.citations && extras.citations.length) {
+      var src = document.createElement('div');
+      src.className = 'si-msg__sources';
+      src.textContent = 'Sources: ' + extras.citations.map(function(c) {
+        return c.document_title || '';
+      }).filter(Boolean).join(', ');
+      bd.appendChild(src);
+    }
+
+    if (extras.tool_summary && extras.tool_summary.length) {
+      var tools = extras.tool_summary.filter(function(t) { return t.ok; });
+      if (tools.length) {
+        var tl = document.createElement('div');
+        tl.className = 'si-msg__tool';
+        tl.textContent = 'Live data: ' + tools.map(function(t) {
+          return t.name.replace(/_/g, ' ');
+        }).join(', ');
+        bd.appendChild(tl);
+      }
+    }
+
+    if (role !== 'system') wrap.appendChild(av);
+    wrap.appendChild(bd);
+    return wrap;
+  }
+
+  function appendMessage(role, body, extras) {
+    var box = msgBox();
+    var node = renderMessage(role, body, extras);
+    box.appendChild(node);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function showThinking() {
+    var box = msgBox();
+    var el_ = document.createElement('p');
+    el_.className = 'si-thinking';
+    el_.id = 'si-thinking';
+    el_.textContent = 'The assistant is answering…';
+    box.appendChild(el_);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function hideThinking() {
+    var t = el('si-thinking');
+    if (t) t.remove();
+  }
+
+  // ── Load initial state ─────────────────────────────────────────────────
+  get(URLS.state).then(function(state) {
+    loading.hidden = true;
+    if (!state.enabled) {
+      var msg = document.createElement('p');
+      msg.className = 'text-muted-sm text-center mt-4';
+      msg.textContent = state.reason || 'The assistant is not available.';
+      root.appendChild(msg);
+      return;
+    }
+
+    layout.hidden = false;
+
+    // Child switcher
+    if (ROLE === 'parent' && state.children && state.children.length) {
+      var bar = el('si-child-bar');
+      var sel = el('si-child-select');
+      if (bar && sel) {
+        bar.hidden = false;
+        state.children.forEach(function(c) {
+          var opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name + (c.class_name ? ' (' + c.class_name + ')' : '');
+          if (c.is_active) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener('change', function() {
+          post(URLS.child, {child_id: parseInt(sel.value)});
+        });
+      }
+    }
+
+    // Existing messages
+    var conv = state.conversation || {};
+    var msgs = conv.messages || [];
+    if (msgs.length) {
+      msgs.forEach(function(m) {
+        if (m.role === 'system') return;
+        appendMessage(m.role, m.body, m);
+      });
+    }
+
+    // Memory panel
+    loadMemory();
+
+  }).catch(function() {
+    loading.hidden = true;
+    var msg = document.createElement('p');
+    msg.className = 'text-muted-sm text-center mt-4';
+    msg.textContent = 'Could not connect to the assistant. Please try again.';
+    root.appendChild(msg);
+  });
+
+  // ── Send ──────────────────────────────────────────────────────────────
+  function sendMessage() {
+    var input = el('si-input');
+    var text  = (input.value || '').trim();
+    if (!text) return;
+    input.value = '';
+    input.style.height = '';
+
+    var tutorMode = TUTOR_ON && el('si-tutor-mode') && el('si-tutor-mode').checked;
+    appendMessage('user', text);
+    showThinking();
+
+    post(URLS.send, {message: text, tutor_mode: tutorMode ? '1' : '0'})
+      .then(function(resp) {
+        hideThinking();
+        if (resp.ok && resp.reply) {
+          appendMessage('assistant', resp.reply.body, resp.reply);
+        } else {
+          appendMessage('assistant', resp.message || 'Something went wrong. Please try again.');
+        }
+      })
+      .catch(function() {
+        hideThinking();
+        appendMessage('assistant', 'Could not reach the school. Check your connection.');
+      });
+  }
+
+  var sendBtn = el('si-send-btn');
+  if (sendBtn) {
+    sendBtn.addEventListener('click', sendMessage);
+  }
+
+  var input = el('si-input');
+  if (input) {
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    // Auto-grow
+    input.addEventListener('input', function() {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    });
+  }
+
+  // ── New conversation ──────────────────────────────────────────────────
+  var newBtn = el('si-new-btn');
+  if (newBtn) {
+    newBtn.addEventListener('click', function() {
+      if (!confirm('Start a new conversation? The current one will be closed.')) return;
+      post(URLS.newConv, {}).then(function() {
+        msgBox().innerHTML = '';
+        appendMessage('system', 'New conversation started.');
+      });
+    });
+  }
+
+  // ── Talk to a person ──────────────────────────────────────────────────
+  var talkBtn = el('si-talk-person-btn');
+  if (talkBtn) {
+    talkBtn.addEventListener('click', function() {
+      appendMessage('user', 'I would like to talk to a person.');
+      showThinking();
+      post(URLS.send, {message: 'I would like to talk to a person.'})
+        .then(function(resp) {
+          hideThinking();
+          if (resp.ok && resp.reply) {
+            appendMessage('assistant', resp.reply.body, resp.reply);
+          }
+        }).catch(function() { hideThinking(); });
+    });
+  }
+
+  // ── Memory panel ──────────────────────────────────────────────────────
+  function loadMemory() {
+    get(URLS.memory).then(function(data) {
+      var status = el('si-mem-status');
+      var optBtn = el('si-mem-optin-btn');
+      var forgetBtn = el('si-mem-forget-btn');
+      if (!status) return;
+      if (data.opted_in) {
+        status.innerHTML = '<p class="text-muted-sm" style="font-size:0.78rem;">' +
+          'Memory is <strong style="color:var(--color-success);">on</strong>. ' +
+          (data.prefer_language === 'sw' ? 'Language: Kiswahili. ' : 'Language: English. ') +
+          (data.recurring_summary ? 'Note: ' + data.recurring_summary : '') +
+          '</p>';
+        if (optBtn) optBtn.textContent = 'Turn off memory';
+        if (forgetBtn) forgetBtn.hidden = false;
+      } else {
+        status.innerHTML = '<p class="text-muted-sm" style="font-size:0.78rem;">Memory is <strong>off</strong>.</p>';
+        if (optBtn) optBtn.textContent = 'Turn on memory';
+        if (forgetBtn) forgetBtn.hidden = true;
+      }
+    });
+  }
+
+  var optBtn = el('si-mem-optin-btn');
+  if (optBtn) {
+    optBtn.addEventListener('click', function() {
+      var currentlyOn = optBtn.textContent.includes('off');
+      post(URLS.memory, {opted_in: currentlyOn ? 'false' : 'true'})
+        .then(function() { loadMemory(); });
+    });
+  }
+
+  var forgetBtn = el('si-mem-forget-btn');
+  if (forgetBtn) {
+    forgetBtn.addEventListener('click', function() {
+      if (!confirm('Forget everything? This clears your preferences and topic summary.')) return;
+      post(URLS.memory, {action: 'forget'}).then(function() { loadMemory(); });
+    });
+  }
+
+  var delHistBtn = el('si-delete-hist-btn');
+  if (delHistBtn) {
+    delHistBtn.addEventListener('click', function() {
+      if (!confirm('Delete all your conversation history? This cannot be undone.')) return;
+      post(URLS.deleteh, {}).then(function(resp) {
+        if (resp.ok) {
+          msgBox().innerHTML = '';
+          appendMessage('system', 'Conversation history deleted.');
+        }
+      });
+    });
+  }
+
+  // ── Language toggle (saves preference to memory) ─────────────────────
+  document.querySelectorAll('.si-lang-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var lang = btn.getAttribute('data-lang');
+      post(URLS.memory, {prefer_language: lang}).then(function(resp) {
+        if (resp && resp.ok) {
+          document.querySelectorAll('.si-lang-btn').forEach(function(b) {
+            b.classList.toggle('btn-primary', b === btn);
+            b.classList.toggle('btn-outline-secondary', b !== btn);
+          });
+          appendMessage('system', lang === 'sw' ? 'Nitakujibu kwa Kiswahili.' : 'I will reply in English.');
+        }
+      });
+    });
+  });
+
+})();
+</script>
+{% endif %}
+{% endblock content %}

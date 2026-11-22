@@ -293,6 +293,34 @@ def complete(turn: Turn, *, streamed: bool = False) -> Turn:
     turn.reply_text = reply.body
     turn.citations = citations
     turn.blocked_reason = blocked
+
+    # ── CP4: evaluate handoff triggers ───────────────────────────────────────
+    # Only check if the conversation doesn't already have an open handoff.
+    try:
+        from .handoff.routing import create_handoff, detect_topics, should_handoff
+        from .models import Handoff
+
+        already_handed_off = Handoff.objects.filter(
+            conversation=turn.conversation,
+        ).exclude(status=Handoff.Status.RESOLVED).exists()
+
+        if not already_handed_off:
+            # Build turn_state so trigger signals can be evaluated
+            turn_state = {
+                "top_vector": answer.top_vector if answer else 1.0,
+                "topics": detect_topics(question),
+                "unhelpful_count": ChatMessage.objects.filter(
+                    conversation=turn.conversation,
+                    role=ChatMessage.Role.ASSISTANT,
+                    blocked_reason__in=["no_match", "unverified"],
+                ).count(),
+            }
+            rule = should_handoff(question, turn_state)
+            if rule is not None:
+                create_handoff(turn.conversation, rule, row)
+    except Exception:  # noqa: BLE001 — routing failure must never break the chat reply
+        log.exception("Handoff routing check failed for conversation %s", turn.conversation.pk)
+
     return turn
 
 

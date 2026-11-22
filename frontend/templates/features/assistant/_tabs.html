@@ -7,6 +7,12 @@ directors for pages their role cannot open; the views enforce the same rule.
 <ul class="nav nav-pills flex-wrap gap-1 mb-3 assistant-tabs">
   {% if role == "admin" or request.user.is_superuser and not role %}
   <li class="nav-item">
+    <a class="nav-link{% if request.resolver_match.url_name == 'guide' %} active{% endif %}"
+       href="{% url 'assistant:guide' %}">
+      <i class="bi bi-book me-1" aria-hidden="true"></i>Setup guide
+    </a>
+  </li>
+  <li class="nav-item">
     <a class="nav-link{% if request.resolver_match.url_name == 'settings' %} active{% endif %}"
        href="{% url 'assistant:settings' %}">
       <i class="bi bi-sliders me-1" aria-hidden="true"></i>Settings

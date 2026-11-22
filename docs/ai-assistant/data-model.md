@@ -286,3 +286,16 @@ approved.
   approved.
 
 Each arrives in its own additive migration, so an unbuilt feature has no half-empty table.
+
+## Module 4 tables (migrations `0006`–`0009`)
+
+- `assistant_signed_in_conversation` — one row per user chat session; role/class-id snapshots,
+  `active_child_id` for parents, `is_test` flag.
+- `assistant_signed_in_message` — one turn; `body`/`body_masked`, citations, `tool_summary`
+  (field names only), `blocked_reason`, `is_tutor` (migration `0009`).
+- `assistant_memory` — opt-in per-user memory: `prefer_language` (en/sw), `prefer_tone`,
+  `recurring_summary` (≤200 chars, non-sensitive). `forget()` clears all.
+- `assistant_tool_call_log` — audit-only tool calls: tool name, actor, outcome, field names,
+  latency; never result values.
+- `assistant_handoff*` — handoff rules, canned replies, team members, conversations and the
+  human inbox (Module 3 CP4–CP5).

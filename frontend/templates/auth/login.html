@@ -3,6 +3,7 @@
 
 {% block title %}{{ portal.heading }} Sign In | {{ identity.name|default:SCHOOL_NAME }}{% endblock %}
 {% block meta_description %}Sign in to the {{ portal.heading }} at {{ identity.name|default:SCHOOL_NAME }}.{% endblock %}
+{% block body_class %}auth-layout{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/1.11.3/bootstrap-icons.min.css' %}">

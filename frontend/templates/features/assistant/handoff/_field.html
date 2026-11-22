@@ -1,0 +1,9 @@
+{% comment %}Renders one form field with label, widget and error.{% endcomment %}
+<div class="mb-3">
+  <label class="form-label fw-600" for="{{ field.id_for_label }}">
+    {{ field.label }}{% if field.field.required %} <span class="text-danger" aria-hidden="true">*</span>{% endif %}
+  </label>
+  {{ field }}
+  {% if field.help_text %}<div class="text-muted-sm mt-1">{{ field.help_text }}</div>{% endif %}
+  {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+</div>

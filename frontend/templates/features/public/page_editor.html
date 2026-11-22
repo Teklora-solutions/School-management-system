@@ -1,0 +1,877 @@
+{% extends "dashboards/admin/base.html" %}
+{% load static %}
+
+{% block title %}
+  {% if page_key == "home" %}Home
+  {% elif page_key == "about" %}About
+  {% elif page_key == "gallery" %}Gallery
+  {% elif page_key == "contact" %}Contact
+  {% elif page_key == "academics" %}Academics
+  {% endif %}
+  Page Editor | {{ SCHOOL_NAME }}
+{% endblock %}
+
+{% block wrapper_class %}page-editor-wrapper{% endblock %}
+
+{% block content %}
+{# ── Top bar ──────────────────────────────────────────────────────────────── #}
+<div class="pe-topbar">
+  <div class="pe-topbar__left">
+    <a href="{% url 'public_admin:overview' %}" class="pe-topbar__back">
+      <i class="bi bi-arrow-left" aria-hidden="true"></i>
+    </a>
+    <span class="pe-topbar__title">
+      <i class="bi bi-pencil-square me-1" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Editing:
+      <strong>
+        {% if page_key == "home" %}Home Page
+        {% elif page_key == "about" %}About Page
+        {% elif page_key == "gallery" %}Gallery Page
+        {% elif page_key == "contact" %}Contact Page
+        {% elif page_key == "academics" %}Academics Page
+        {% endif %}
+      </strong>
+    </span>
+  </div>
+  <div class="pe-topbar__pages">
+    <a href="{% url 'public_admin:editor_home' %}"
+       class="pe-page-btn {% if page_key == 'home' %}active{% endif %}">Home</a>
+    <a href="{% url 'public_admin:editor_about' %}"
+       class="pe-page-btn {% if page_key == 'about' %}active{% endif %}">About</a>
+    <a href="{% url 'public_admin:editor_academics' %}"
+       class="pe-page-btn {% if page_key == 'academics' %}active{% endif %}">Academics</a>
+    <a href="{% url 'public_admin:editor_gallery' %}"
+       class="pe-page-btn {% if page_key == 'gallery' %}active{% endif %}">Gallery</a>
+    <a href="{% url 'public_admin:editor_contact' %}"
+       class="pe-page-btn {% if page_key == 'contact' %}active{% endif %}">Contact</a>
+  </div>
+  <div class="pe-topbar__right">
+    <a href="{{ public_url }}" target="_blank" rel="noopener" class="pe-topbar__live">
+      <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>View live
+    </a>
+  </div>
+</div>
+
+{# ── Split layout ─────────────────────────────────────────────────────────── #}
+<div class="pe-split">
+
+  {# LEFT — live iframe preview #}
+  <div class="pe-preview" id="pe-preview">
+    <div class="pe-preview__bar">
+      <span class="pe-preview__label">
+        <i class="bi bi-eye me-1" aria-hidden="true"></i>Live preview
+      </span>
+      <div class="pe-preview__device-btns" role="group" aria-label="Preview size">
+        <button type="button" class="pe-dev-btn active" data-width="100%" title="Desktop">
+          <i class="bi bi-display" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="pe-dev-btn" data-width="768px" title="Tablet">
+          <i class="bi bi-tablet" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="pe-dev-btn" data-width="390px" title="Mobile">
+          <i class="bi bi-phone" aria-hidden="true"></i>
+        </button>
+      </div>
+      <button type="button" class="pe-preview__refresh" id="pe-refresh" title="Refresh preview">
+        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="pe-preview__stage" id="pe-stage">
+      <iframe id="pe-iframe"
+              src="{{ public_url }}"
+              title="Live preview of the {{ page_key }} page"
+              loading="lazy"></iframe>
+    </div>
+  </div>
+
+  {# RIGHT — edit panel #}
+  <div class="pe-panel" id="pe-panel">
+    <div class="pe-panel__header">
+      <span class="pe-panel__title">
+        <i class="bi bi-sliders me-1" aria-hidden="true"></i>Edit Sections
+      </span>
+      <button type="button" class="pe-panel__collapse" id="pe-collapse" title="Collapse panel"
+              aria-expanded="true">
+        <i class="bi bi-layout-sidebar-reverse" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="pe-panel__body" id="pe-panel-body">
+
+      {% if messages %}
+      <div class="mb-2">
+        {% for m in messages %}
+        <div class="alert alert-{{ m.tags|default:'info' }} py-2 mb-1" style="font-size:0.85rem;">
+          <i class="bi bi-check2-circle me-1"></i>{{ m }}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# ═══════════════ HOME PAGE SECTIONS ══════════════════════════════════ #}
+      {% if page_key == "home" %}
+
+      {# Hero section #}
+      {% include "features/public/_editor_section.html" with section_id="hero" section_title="Hero Section" section_icon="bi-image" expanded=True %}
+        <form method="post" enctype="multipart/form-data" class="pe-section-form">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="hero">
+          {% include "features/public/_editor_field.html" with field_name="hero_eyebrow" field_label="Eyebrow text" field_type="text" field_value=settings_form.hero_eyebrow.value placeholder="e.g. Welcome to Nairobi Academy" %}
+          {% include "features/public/_editor_field.html" with field_name="hero_title" field_label="Main title" field_type="text" field_value=settings_form.hero_title.value placeholder="e.g. Where Curiosity Meets" %}
+          {% include "features/public/_editor_field.html" with field_name="hero_title_highlight" field_label="Title highlight (accent word)" field_type="text" field_value=settings_form.hero_title_highlight.value placeholder="e.g. Opportunity" %}
+          {% include "features/public/_editor_field.html" with field_name="hero_text" field_label="Hero paragraph" field_type="textarea" field_value=settings_form.hero_text.value %}
+          {% include "features/public/_editor_field.html" with field_name="hero_image" field_label="Background image" field_type="file" %}
+          <button type="submit" class="pe-save-btn">
+            <i class="bi bi-check2 me-1"></i>Save Hero
+          </button>
+        </form>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Hero slides #}
+      {% include "features/public/_editor_section.html" with section_id="slides" section_title="Carousel Slides" section_icon="bi-collection" %}
+        <div class="pe-items-list">
+          {% for slide in hero_slides %}
+          <div class="pe-item">
+            <img src="{{ slide.image.url }}" alt="{{ slide.title }}" class="pe-item__thumb">
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ slide.title }}</div>
+              <div class="pe-item__meta">{{ slide.caption|default:"No caption"|truncatechars:40 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:hero_edit' slide.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+              <form method="post" action="{% url 'public_admin:hero_toggle' slide.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="{% if slide.is_active %}deactivate{% else %}activate{% endif %}">
+                <button type="submit" class="pe-item-btn {% if not slide.is_active %}pe-item-btn--muted{% endif %}" title="{% if slide.is_active %}Hide{% else %}Show{% endif %}">
+                  <i class="bi bi-{% if slide.is_active %}eye{% else %}eye-slash{% endif %}" aria-hidden="true"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No slides yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:hero_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add slide
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Why Choose Us #}
+      {% include "features/public/_editor_section.html" with section_id="features" section_title="Why Choose Us Cards" section_icon="bi-card-checklist" %}
+        <div class="pe-items-list">
+          {% for card in feature_cards %}
+          <div class="pe-item">
+            <div class="pe-item__icon-badge" style="background:var(--accent-glow);color:var(--accent-light);width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+              {% if card.icon %}{{ card.icon }}{% else %}<i class="bi bi-card-text"></i>{% endif %}
+            </div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ card.title }}</div>
+              <div class="pe-item__meta">{{ card.text|truncatechars:50 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:feature_edit' card.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No cards yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:feature_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add card
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Testimonials #}
+      {% include "features/public/_editor_section.html" with section_id="testimonials" section_title="Testimonials" section_icon="bi-chat-quote" %}
+        <div class="pe-items-list">
+          {% for t in testimonials %}
+          <div class="pe-item">
+            {% if t.avatar %}
+            <img src="{{ t.avatar.url }}" alt="{{ t.author_name }}" class="pe-item__thumb pe-item__thumb--round">
+            {% else %}
+            <div class="pe-item__avatar">{{ t.author_name|first }}</div>
+            {% endif %}
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ t.author_name }}</div>
+              <div class="pe-item__meta">{{ t.quote|truncatechars:50 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:testimonial_edit' t.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No testimonials yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:testimonial_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add testimonial
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Events #}
+      {% include "features/public/_editor_section.html" with section_id="events" section_title="Events Preview" section_icon="bi-calendar-event" %}
+        <div class="pe-items-list">
+          {% for ev in event_items %}
+          <div class="pe-item">
+            <div class="pe-item__date-badge">
+              <span class="pe-item__date-day">{{ ev.day }}</span>
+              <span class="pe-item__date-month">{{ ev.month }}</span>
+            </div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ ev.title }}</div>
+              {% if ev.description %}<div class="pe-item__meta">{{ ev.description|truncatechars:50 }}</div>{% endif %}
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:event_edit' ev.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No events yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:event_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add event
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# CTA Band #}
+      {% include "features/public/_editor_section.html" with section_id="cta" section_title="Call-to-Action Band" section_icon="bi-megaphone" %}
+        <form method="post" class="pe-section-form">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="cta">
+          {% include "features/public/_editor_field.html" with field_name="cta_title" field_label="CTA title" field_type="text" field_value=settings_form.cta_title.value %}
+          {% include "features/public/_editor_field.html" with field_name="cta_text" field_label="CTA text" field_type="textarea" field_value=settings_form.cta_text.value %}
+          <button type="submit" class="pe-save-btn">
+            <i class="bi bi-check2 me-1"></i>Save CTA
+          </button>
+        </form>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# ═══════════════ ABOUT PAGE SECTIONS ═════════════════════════════════ #}
+      {% elif page_key == "about" %}
+
+      {# Story #}
+      {% include "features/public/_editor_section.html" with section_id="story" section_title="School Story" section_icon="bi-book" expanded=True %}
+        <form method="post" class="pe-section-form">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="story">
+          {% include "features/public/_editor_field.html" with field_name="about" field_label="About the school" field_type="textarea" field_value=settings_form.about.value rows=5 %}
+          {% include "features/public/_editor_field.html" with field_name="mission" field_label="Mission statement" field_type="textarea" field_value=settings_form.mission.value rows=3 %}
+          {% include "features/public/_editor_field.html" with field_name="vision" field_label="Vision statement" field_type="textarea" field_value=settings_form.vision.value rows=3 %}
+          {% include "features/public/_editor_field.html" with field_name="values" field_label="School values" field_type="textarea" field_value=settings_form.values.value rows=3 %}
+          <button type="submit" class="pe-save-btn">
+            <i class="bi bi-check2 me-1"></i>Save Story
+          </button>
+        </form>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Team Members #}
+      {% include "features/public/_editor_section.html" with section_id="team" section_title="Leadership Team" section_icon="bi-people" %}
+        <div class="pe-items-list">
+          {% for m in team_members %}
+          <div class="pe-item">
+            {% if m.photo %}
+            <img src="{{ m.photo.url }}" alt="{{ m.name }}" class="pe-item__thumb pe-item__thumb--round">
+            {% else %}
+            <div class="pe-item__avatar">{{ m.name|first }}</div>
+            {% endif %}
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ m.name }}</div>
+              <div class="pe-item__meta">{{ m.role }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:team_edit' m.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No team members yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:team_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add member
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Timeline #}
+      {% include "features/public/_editor_section.html" with section_id="timeline" section_title="History Timeline" section_icon="bi-clock-history" %}
+        <div class="pe-items-list">
+          {% for ev in timeline_events %}
+          <div class="pe-item">
+            <div class="pe-item__year-badge">{{ ev.year_label }}</div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ ev.title }}</div>
+              <div class="pe-item__meta">{{ ev.text|truncatechars:50 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:timeline_edit' ev.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No timeline events yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:timeline_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add event
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# ═══════════════ GALLERY PAGE SECTIONS ═══════════════════════════════ #}
+      {% elif page_key == "gallery" %}
+
+      {% include "features/public/_editor_section.html" with section_id="photos" section_title="Gallery Photos" section_icon="bi-images" expanded=True %}
+        <div class="pe-photo-grid">
+          {% for photo in photos %}
+          <div class="pe-photo-item {% if not photo.is_published %}pe-photo-item--hidden{% endif %}">
+            <img src="{{ photo.image.url }}" alt="{{ photo.title }}" loading="lazy">
+            <div class="pe-photo-overlay">
+              <a href="{% url 'public_admin:gallery_edit' photo.pk %}" class="pe-item-btn pe-item-btn--sm" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+              <form method="post" action="{% url 'public_admin:gallery_publish' photo.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="{% if photo.is_published %}unpublish{% else %}publish{% endif %}">
+                <button type="submit" class="pe-item-btn pe-item-btn--sm" title="{% if photo.is_published %}Hide{% else %}Publish{% endif %}">
+                  <i class="bi bi-{% if photo.is_published %}eye{% else %}eye-slash{% endif %}" aria-hidden="true"></i>
+                </button>
+              </form>
+            </div>
+            <div class="pe-photo-title">{{ photo.title|truncatechars:20 }}</div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No photos yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:gallery_add' %}" class="pe-add-btn mt-2">
+          <i class="bi bi-plus-circle me-1"></i>Add photo
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Events on gallery page #}
+      {% include "features/public/_editor_section.html" with section_id="gallery_events" section_title="Upcoming Events" section_icon="bi-calendar-event" %}
+        <div class="pe-items-list">
+          {% for ev in event_items %}
+          <div class="pe-item">
+            <div class="pe-item__date-badge">
+              <span class="pe-item__date-day">{{ ev.day }}</span>
+              <span class="pe-item__date-month">{{ ev.month }}</span>
+            </div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ ev.title }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:event_edit' ev.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No events yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:event_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add event
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# ═══════════════ CONTACT PAGE SECTIONS ═══════════════════════════════ #}
+      {% elif page_key == "contact" %}
+
+      {# Contact details #}
+      {% include "features/public/_editor_section.html" with section_id="contact_details" section_title="Contact Details" section_icon="bi-telephone" expanded=True %}
+        <form method="post" class="pe-section-form">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="contact_details">
+          {% include "features/public/_editor_field.html" with field_name="address" field_label="Address" field_type="textarea" field_value=settings_form.address.value rows=3 %}
+          {% include "features/public/_editor_field.html" with field_name="admissions_email" field_label="Admissions email" field_type="email" field_value=settings_form.admissions_email.value %}
+          {% include "features/public/_editor_field.html" with field_name="office_hours" field_label="Office hours" field_type="text" field_value=settings_form.office_hours.value placeholder="e.g. Mon–Fri, 8am–5pm" %}
+          {% include "features/public/_editor_field.html" with field_name="map_embed_url" field_label="Google Maps embed URL" field_type="url" field_value=settings_form.map_embed_url.value %}
+          <button type="submit" class="pe-save-btn">
+            <i class="bi bi-check2 me-1"></i>Save Details
+          </button>
+        </form>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Admission Steps #}
+      {% include "features/public/_editor_section.html" with section_id="admission_steps" section_title="Admission Steps" section_icon="bi-list-ol" %}
+        <div class="pe-items-list">
+          {% for step in admission_steps %}
+          <div class="pe-item">
+            <div class="pe-item__step-badge">{{ step.step_number }}</div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ step.title }}</div>
+              <div class="pe-item__meta">{{ step.text|truncatechars:50 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:admission_edit' step.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No steps yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:admission_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add step
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# FAQs #}
+      {% include "features/public/_editor_section.html" with section_id="faqs" section_title="FAQs" section_icon="bi-question-circle" %}
+        <div class="pe-items-list">
+          {% for faq in faqs %}
+          <div class="pe-item">
+            <i class="bi bi-question-circle pe-item__icon" aria-hidden="true"></i>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ faq.question|truncatechars:60 }}</div>
+              <div class="pe-item__meta">{{ faq.answer|truncatechars:50 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:faq_edit' faq.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No FAQs yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:faq_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add FAQ
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Key Dates #}
+      {% include "features/public/_editor_section.html" with section_id="key_dates" section_title="Key Dates" section_icon="bi-calendar-check" %}
+        <div class="pe-items-list">
+          {% for kd in key_dates %}
+          <div class="pe-item">
+            <div class="pe-item__date-badge">
+              <span class="pe-item__date-day">{{ kd.day }}</span>
+              <span class="pe-item__date-month">{{ kd.month }}</span>
+            </div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ kd.title }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:keydate_edit' kd.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No key dates yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:keydate_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add key date
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# ═══════════════ ACADEMICS PAGE SECTIONS ═════════════════════════════ #}
+      {% elif page_key == "academics" %}
+
+      {% include "features/public/_editor_section.html" with section_id="live_data" section_title="Live Academic Data" section_icon="bi-mortarboard" expanded=True %}
+        <div class="pe-info-box">
+          <i class="bi bi-info-circle me-1" style="color:var(--color-info);" aria-hidden="true"></i>
+          The Academics page pulls live data from the school database. It updates automatically when you add classes, subjects or terms in the Academics section.
+        </div>
+        <div class="pe-items-list mt-2">
+          {% for year in academic_years %}
+          <div class="pe-item">
+            <i class="bi bi-calendar3 pe-item__icon" aria-hidden="true"></i>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ year.name }}</div>
+              <div class="pe-item__meta">{{ year.start_date|date:"M Y" }} – {{ year.end_date|date:"M Y" }}</div>
+            </div>
+            <a href="{% url 'academics:year_detail' year.pk %}" class="pe-item-btn" title="Manage" target="_blank">
+              <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+            </a>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No academic years found.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'academics:year_list' %}" class="pe-add-btn" target="_blank">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Manage in Academics
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {% endif %}
+
+    </div>{# /pe-panel__body #}
+  </div>{# /pe-panel #}
+</div>{# /pe-split #}
+
+<style>
+/* ── Page Editor Layout ───────────────────────────────────────── */
+/* ── Page Editor: hide sidebar, go full-width ─────────────────── */
+.page-editor-wrapper .app-sidebar { display: none !important; }
+.page-editor-wrapper {
+  grid-template-columns: 1fr !important;
+}
+.page-editor-wrapper .app-main {
+  grid-column: 1 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  max-height: calc(100vh - var(--navbar-h));
+}
+
+.pe-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 48px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 1rem;
+  position: sticky;
+  top: var(--navbar-h);
+  z-index: 100;
+  flex-shrink: 0;
+}
+.pe-topbar__left  { display: flex; align-items: center; gap: 0.5rem; }
+.pe-topbar__right { margin-left: auto; }
+.pe-topbar__back  {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 8px;
+  color: var(--color-muted); text-decoration: none;
+  transition: background var(--trans), color var(--trans);
+}
+.pe-topbar__back:hover { background: var(--color-surface-2); color: #fff; }
+.pe-topbar__title { font-size: 0.875rem; color: var(--color-text); }
+.pe-topbar__pages { display: flex; gap: 0.25rem; }
+.pe-page-btn {
+  padding: 0.2rem 0.65rem; border-radius: 6px; font-size: 0.8rem;
+  color: var(--color-muted); text-decoration: none;
+  transition: background var(--trans), color var(--trans);
+  white-space: nowrap;
+}
+.pe-page-btn:hover { background: var(--color-surface-2); color: #fff; }
+.pe-page-btn.active { background: var(--accent-glow); color: var(--accent-light); font-weight: 600; }
+.pe-topbar__live {
+  font-size: 0.8rem; color: var(--accent-light); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.25rem 0.65rem; border-radius: 6px; border: 1px solid var(--color-border);
+  transition: background var(--trans);
+}
+.pe-topbar__live:hover { background: var(--accent-glow); border-color: var(--accent); }
+
+.pe-split {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  height: calc(100vh - var(--navbar-h) - 48px);
+  overflow: hidden;
+}
+
+/* ── Preview pane ─────────────────────────────────────────────── */
+.pe-preview {
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--color-border);
+  overflow: hidden;
+}
+.pe-preview__bar {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.pe-preview__label { font-size: 0.75rem; color: var(--color-muted); flex: 1; }
+.pe-preview__device-btns { display: flex; gap: 0.2rem; }
+.pe-dev-btn {
+  width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--color-border);
+  background: transparent; color: var(--color-muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; transition: all var(--trans);
+}
+.pe-dev-btn:hover, .pe-dev-btn.active {
+  background: var(--accent-glow); border-color: var(--accent); color: var(--accent-light);
+}
+.pe-preview__refresh {
+  width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--color-border);
+  background: transparent; color: var(--color-muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; transition: all var(--trans);
+}
+.pe-preview__refresh:hover { background: var(--accent-glow); color: var(--accent-light); }
+.pe-preview__stage {
+  flex: 1; overflow: hidden;
+  display: flex; align-items: stretch; justify-content: center;
+  background: #0a0c10; padding: 0.5rem;
+  transition: all var(--trans);
+}
+#pe-iframe {
+  width: 100%; border: none; border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+  transition: width var(--trans-slow);
+}
+
+/* ── Edit panel ───────────────────────────────────────────────── */
+.pe-panel {
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  transition: width var(--trans-slow);
+}
+.pe-panel--collapsed { width: 0; overflow: hidden; }
+.pe-panel__header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.pe-panel__title { font-size: 0.8125rem; font-weight: 600; color: #fff; }
+.pe-panel__collapse {
+  background: transparent; border: none; color: var(--color-muted);
+  cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 6px;
+  font-size: 0.95rem; transition: color var(--trans), background var(--trans);
+}
+.pe-panel__collapse:hover { color: #fff; background: var(--color-surface-2); }
+.pe-panel__body {
+  flex: 1; overflow-y: auto; padding: 0.5rem;
+}
+
+/* ── Editor sections (accordion) ─────────────────────────────── */
+.pe-section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+.pe-section__header {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--color-surface-2);
+  cursor: pointer; user-select: none;
+  font-size: 0.8125rem; font-weight: 600; color: var(--color-text);
+  list-style: none;
+}
+.pe-section__header::-webkit-details-marker { display: none; }
+.pe-section__header i { color: var(--accent-light); font-size: 0.875rem; }
+.pe-section__header .pe-section__chevron {
+  margin-left: auto; color: var(--color-muted);
+  transition: transform var(--trans); font-size: 0.75rem;
+}
+.pe-section[open] .pe-section__chevron { transform: rotate(180deg); }
+.pe-section__body { padding: 0.65rem 0.75rem; }
+
+/* ── Section form fields ──────────────────────────────────────── */
+.pe-field { margin-bottom: 0.65rem; }
+.pe-field label {
+  display: block; font-size: 0.75rem; color: var(--color-muted);
+  margin-bottom: 0.25rem; font-weight: 500;
+}
+.pe-field input[type="text"],
+.pe-field input[type="email"],
+.pe-field input[type="url"],
+.pe-field input[type="file"],
+.pe-field textarea,
+.pe-field select {
+  width: 100%;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  transition: border-color var(--trans);
+  box-sizing: border-box;
+}
+.pe-field input:focus, .pe-field textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow);
+}
+.pe-field textarea { resize: vertical; min-height: 60px; }
+
+.pe-save-btn {
+  display: inline-flex; align-items: center;
+  padding: 0.4rem 1rem; border-radius: var(--radius-sm);
+  background: var(--accent); border: none; color: #fff;
+  font-size: 0.8125rem; font-weight: 600; cursor: pointer;
+  transition: background var(--trans);
+  margin-top: 0.25rem;
+}
+.pe-save-btn:hover { background: var(--accent-dark); }
+
+/* ── Item lists ───────────────────────────────────────────────── */
+.pe-items-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.pe-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+.pe-item__thumb {
+  width: 44px; height: 32px; object-fit: cover;
+  border-radius: 4px; flex-shrink: 0;
+}
+.pe-item__thumb--round { border-radius: 50%; width: 32px; height: 32px; }
+.pe-item__avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent-glow); color: var(--accent-light);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.875rem;
+}
+.pe-item__icon { flex-shrink: 0; color: var(--accent-light); font-size: 1rem; }
+.pe-item__info { flex: 1; min-width: 0; }
+.pe-item__title { font-size: 0.8rem; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-item__meta  { font-size: 0.72rem; color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-item__actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
+.pe-item__date-badge {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 6px;
+  background: var(--accent-glow); flex-shrink: 0;
+}
+.pe-item__date-day   { font-size: 0.75rem; font-weight: 700; color: var(--accent-light); line-height: 1; }
+.pe-item__date-month { font-size: 0.6rem; color: var(--accent-light); text-transform: uppercase; }
+.pe-item__year-badge {
+  padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700;
+  background: var(--accent-glow); color: var(--accent-light); flex-shrink: 0; white-space: nowrap;
+}
+.pe-item__step-badge {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700;
+}
+
+.pe-item-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--color-border);
+  background: transparent; color: var(--color-muted); cursor: pointer;
+  font-size: 0.8rem; text-decoration: none;
+  transition: all var(--trans);
+}
+.pe-item-btn:hover { border-color: var(--accent); color: var(--accent-light); background: var(--accent-glow); }
+.pe-item-btn--muted { opacity: 0.45; }
+.pe-item-btn--sm { width: 24px; height: 24px; font-size: 0.72rem; }
+
+.pe-add-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.3rem 0.75rem; border-radius: var(--radius-sm);
+  font-size: 0.78rem; color: var(--accent-light); text-decoration: none;
+  border: 1px dashed var(--accent); background: var(--accent-glow);
+  transition: all var(--trans); margin-top: 0.35rem;
+}
+.pe-add-btn:hover { background: rgba(var(--accent-rgb, 245,158,11),.35); color: #fff; }
+
+.pe-empty { font-size: 0.78rem; color: var(--color-muted); padding: 0.4rem 0; }
+
+/* ── Photo grid (gallery) ─────────────────────────────────────── */
+.pe-photo-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem;
+}
+.pe-photo-item {
+  position: relative; border-radius: 6px; overflow: hidden;
+  aspect-ratio: 1/1; background: var(--color-surface-2);
+}
+.pe-photo-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pe-photo-item--hidden img { opacity: 0.35; }
+.pe-photo-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center; gap: 0.25rem;
+  opacity: 0; transition: opacity var(--trans);
+}
+.pe-photo-item:hover .pe-photo-overlay { opacity: 1; }
+.pe-photo-title {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  font-size: 0.65rem; padding: 0.2rem 0.3rem;
+  background: rgba(0,0,0,0.6); color: #fff;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── Info box ─────────────────────────────────────────────────── */
+.pe-info-box {
+  font-size: 0.8rem; padding: 0.6rem 0.75rem;
+  background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3);
+  border-radius: var(--radius-sm); color: var(--color-text); line-height: 1.5;
+}
+
+/* ── Section form ─────────────────────────────────────────────── */
+.pe-section-form { display: flex; flex-direction: column; gap: 0.1rem; }
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 991.98px) {
+  .pe-split { grid-template-columns: 1fr; grid-template-rows: 55vh 1fr; }
+  .pe-topbar__pages { display: none; }
+}
+</style>
+
+{% block extra_js %}
+<script>
+(function () {
+  var iframe = document.getElementById('pe-iframe');
+  var stage  = document.getElementById('pe-stage');
+
+  /* ── Device size switcher ── */
+  document.querySelectorAll('.pe-dev-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.pe-dev-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var w = btn.getAttribute('data-width');
+      if (w === '100%') {
+        iframe.style.width = '100%';
+        stage.style.padding = '0.5rem';
+      } else {
+        iframe.style.width = w;
+        stage.style.padding = '0.75rem';
+      }
+    });
+  });
+
+  /* ── Refresh button ── */
+  document.getElementById('pe-refresh').addEventListener('click', function () {
+    iframe.src = iframe.src;
+  });
+
+  /* ── Collapse/expand panel ── */
+  var collapseBtn  = document.getElementById('pe-collapse');
+  var panel        = document.querySelector('.pe-panel');
+  var split        = document.querySelector('.pe-split');
+  var panelVisible = true;
+
+  collapseBtn.addEventListener('click', function () {
+    panelVisible = !panelVisible;
+    if (panelVisible) {
+      split.style.gridTemplateColumns = '1fr 380px';
+      collapseBtn.setAttribute('aria-expanded', 'true');
+    } else {
+      split.style.gridTemplateColumns = '1fr 0px';
+      collapseBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  /* ── Reload iframe after any form save ── */
+  document.querySelectorAll('.pe-section-form').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      /* give the server 800ms to save, then reload the iframe */
+      setTimeout(function () { iframe.src = iframe.src; }, 900);
+    });
+  });
+
+  /* ── Also reload after toggle/publish form submits ── */
+  document.querySelectorAll('.pe-item form').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      setTimeout(function () { iframe.src = iframe.src; }, 900);
+    });
+  });
+})();
+</script>
+{% endblock %}
+
+{% endblock content %}

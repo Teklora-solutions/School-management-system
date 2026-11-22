@@ -1,0 +1,147 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}{{ title }} | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-signpost-split me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      {{ title }}
+    </h1>
+  </div>
+  <a href="{% url 'assistant:handoff_rules' %}" class="btn btn-outline-secondary btn-sm mt-1">
+    <i class="bi bi-arrow-left me-1"></i>Back to rules
+  </a>
+</div>
+
+{% if rule and rule.is_required %}
+<div class="alert alert-warning d-flex gap-2 align-items-start mb-3" role="alert">
+  <i class="bi bi-lock-fill flex-shrink-0 mt-1"></i>
+  <div>This is a <strong>required safeguarding rule</strong>. You can edit the destination and wording, but it cannot be disabled or deleted.</div>
+</div>
+{% endif %}
+
+<form method="post" class="row g-3">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+  <div class="col-12">
+    <div class="alert alert-danger">
+      {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="col-md-8">
+
+    {# Basic info #}
+    <div class="card mb-3">
+      <div class="card-header"><h2 class="card-title">Basic information</h2></div>
+      <div class="card-body">
+        {% include "features/assistant/handoff/_field.html" with field=form.name %}
+        {% include "features/assistant/handoff/_field.html" with field=form.description %}
+        <div class="row g-2">
+          <div class="col-sm-6">{% include "features/assistant/handoff/_field.html" with field=form.priority %}</div>
+          <div class="col-sm-6">{% include "features/assistant/handoff/_field.html" with field=form.order %}</div>
+        </div>
+        {% if not rule or not rule.is_required %}
+        <div class="form-check form-switch mt-2">
+          {{ form.enabled }}
+          <label class="form-check-label" for="{{ form.enabled.id_for_label }}">{{ form.enabled.label }}</label>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Triggers #}
+    <div class="card mb-3">
+      <div class="card-header">
+        <h2 class="card-title">Triggers — the rule fires when any of these match</h2>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label fw-600">Topics</label>
+          <div class="row g-1">
+            {% for checkbox in form.topics %}
+            <div class="col-sm-6">
+              <div class="form-check">
+                {{ checkbox.tag }}
+                <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% if form.topics.errors %}<div class="text-danger small mt-1">{{ form.topics.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-600">Signals</label>
+          <div class="row g-1">
+            {% for checkbox in form.signals %}
+            <div class="col-sm-6">
+              <div class="form-check">
+                {{ checkbox.tag }}
+                <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% if form.signals.errors %}<div class="text-danger small mt-1">{{ form.signals.errors.0 }}</div>{% endif %}
+        </div>
+        {% include "features/assistant/handoff/_field.html" with field=form.keywords %}
+        <div class="form-check form-switch mt-2">
+          {{ form.any_director }}
+          <label class="form-check-label" for="{{ form.any_director.id_for_label }}">{{ form.any_director.label }}</label>
+        </div>
+        {% include "features/assistant/handoff/_field.html" with field=form.specific_roles %}
+      </div>
+    </div>
+
+    {# Destination #}
+    <div class="card mb-3">
+      <div class="card-header"><h2 class="card-title">Destination</h2></div>
+      <div class="card-body">
+        {% include "features/assistant/handoff/_field.html" with field=form.destination_type %}
+        <div class="row g-2">
+          <div class="col-sm-4">{% include "features/assistant/handoff/_field.html" with field=form.destination_user %}</div>
+          <div class="col-sm-4">{% include "features/assistant/handoff/_field.html" with field=form.destination_team %}</div>
+          <div class="col-sm-4">{% include "features/assistant/handoff/_field.html" with field=form.destination_role %}</div>
+        </div>
+        <div class="text-muted-sm mt-1">Fallback (used when the primary is unavailable or unset):</div>
+        <div class="row g-2 mt-1">
+          <div class="col-sm-4">{% include "features/assistant/handoff/_field.html" with field=form.fallback_user %}</div>
+          <div class="col-sm-4">{% include "features/assistant/handoff/_field.html" with field=form.fallback_team %}</div>
+          <div class="col-sm-4">{% include "features/assistant/handoff/_field.html" with field=form.fallback_role %}</div>
+        </div>
+      </div>
+    </div>
+
+    {# Hours and wording #}
+    <div class="card mb-3">
+      <div class="card-header"><h2 class="card-title">Working hours and wording</h2></div>
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-sm-6">{% include "features/assistant/handoff/_field.html" with field=form.working_hours_start %}</div>
+          <div class="col-sm-6">{% include "features/assistant/handoff/_field.html" with field=form.working_hours_end %}</div>
+        </div>
+        <div class="text-muted-sm mt-1 mb-2">Set start = end (e.g. both 00:00) to mean "always outside hours".</div>
+        {% include "features/assistant/handoff/_field.html" with field=form.outside_hours_message_en %}
+        {% include "features/assistant/handoff/_field.html" with field=form.outside_hours_message_sw %}
+        {% include "features/assistant/handoff/_field.html" with field=form.response_target_minutes %}
+        <div class="text-muted-sm">Minutes before this handoff is flagged overdue. 0 uses the priority default.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="col-md-4">
+    <div class="card sticky-top" style="top: calc(var(--navbar-h) + 1rem);">
+      <div class="card-body">
+        <button type="submit" class="btn btn-primary w-100 mb-2">
+          <i class="bi bi-check2 me-1"></i>Save rule
+        </button>
+        <a href="{% url 'assistant:handoff_rules' %}" class="btn btn-outline-secondary w-100">Cancel</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock content %}

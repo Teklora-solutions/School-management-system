@@ -1,0 +1,33 @@
+{% comment %}
+Renders a single labelled field inside an editor section form.
+Usage: {% include "_editor_field.html" with field_name="hero_title" field_label="Main title" field_type="text" field_value=settings_form.hero_title.value placeholder="e.g. ..." %}
+{% endcomment %}
+<div class="pe-field">
+  <label for="pe-{{ field_name }}">{{ field_label }}</label>
+  {% if field_type == "textarea" %}
+    <textarea id="pe-{{ field_name }}" name="{{ field_name }}"
+              rows="{{ rows|default:3 }}"
+              placeholder="{{ placeholder|default:'' }}"
+    >{{ field_value|default:'' }}</textarea>
+  {% elif field_type == "file" %}
+    <input type="file" id="pe-{{ field_name }}" name="{{ field_name }}"
+           accept="image/*">
+    {% if field_value %}
+    <div style="font-size:0.7rem;color:var(--color-muted);margin-top:0.2rem;">
+      Current: <a href="{{ field_value }}" target="_blank" style="color:var(--accent-light);">view</a>
+    </div>
+    {% endif %}
+  {% elif field_type == "email" %}
+    <input type="email" id="pe-{{ field_name }}" name="{{ field_name }}"
+           value="{{ field_value|default:'' }}"
+           placeholder="{{ placeholder|default:'' }}">
+  {% elif field_type == "url" %}
+    <input type="url" id="pe-{{ field_name }}" name="{{ field_name }}"
+           value="{{ field_value|default:'' }}"
+           placeholder="{{ placeholder|default:'https://' }}">
+  {% else %}
+    <input type="text" id="pe-{{ field_name }}" name="{{ field_name }}"
+           value="{{ field_value|default:'' }}"
+           placeholder="{{ placeholder|default:'' }}">
+  {% endif %}
+</div>

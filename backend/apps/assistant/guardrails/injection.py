@@ -70,11 +70,14 @@ def build_messages(
     house_rules: str,
     question: str,
     sources=(),
+    context_lines: str = "",
 ) -> list[ChatMessage]:
     system = (
         SYSTEM_PROMPT.replace("{school_name}", school_name or "the school")
         .replace("{house_rules}", (house_rules or "(none)").strip())
     )
+    if context_lines.strip():
+        system += "\n\n" + context_lines.strip()
     user = (
         f"{fence_sources(sources)}\n\n"
         "<user_question>\n"

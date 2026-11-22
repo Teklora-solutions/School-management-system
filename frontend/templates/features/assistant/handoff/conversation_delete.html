@@ -1,0 +1,50 @@
+{% extends "dashboards/admin/base.html" %}
+{% block title %}Delete Conversation | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="bi bi-trash3 me-2" style="color:var(--color-danger);" aria-hidden="true"></i>
+    Delete Conversation
+  </h1>
+</div>
+
+<div class="card border-danger" style="max-width:560px;">
+  <div class="card-body">
+    <div class="alert alert-danger d-flex gap-2 align-items-start mb-3">
+      <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+      <div>
+        <strong>This action is permanent and cannot be undone.</strong><br>
+        All messages, notes, feedback, and attachments for conversation #{{ conversation.pk }} will be deleted.
+        This is for subject-access or right-to-be-forgotten requests.
+      </div>
+    </div>
+
+    <dl class="row g-1 mb-3" style="font-size:0.85rem;">
+      <dt class="col-5 text-muted-sm">Conversation ID</dt>
+      <dd class="col-7">#{{ conversation.pk }}</dd>
+      <dt class="col-5 text-muted-sm">Messages</dt>
+      <dd class="col-7">{{ conversation.message_count }}</dd>
+      <dt class="col-5 text-muted-sm">Last activity</dt>
+      <dd class="col-7">{{ conversation.last_activity_at|date:"M j, Y H:i" }}</dd>
+      <dt class="col-5 text-muted-sm">Status</dt>
+      <dd class="col-7">{{ conversation.get_status_display }}</dd>
+    </dl>
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label fw-600" for="id-reason">Reason for deletion (required for audit log)</label>
+        <textarea class="form-control" id="id-reason" name="reason" rows="2"
+                  placeholder="e.g. Subject access request received 2026-11-20" required></textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-danger">
+          <i class="bi bi-trash3 me-1"></i>Delete permanently
+        </button>
+        <a href="{% url 'assistant:inbox' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock content %}

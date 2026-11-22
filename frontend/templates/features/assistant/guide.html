@@ -1,0 +1,527 @@
+{% extends base_template %}
+{% block title %}AI Assistant Setup Guide | {{ SCHOOL_NAME }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Guide-specific styles */
+.guide-section { margin-bottom: 2.5rem; }
+.guide-section h2 {
+  font-size: 1.1rem; font-weight: 700; color: #fff;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.5rem; margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.guide-section h2 i { color: var(--accent-light); }
+.guide-section h3 { font-size: 0.9375rem; font-weight: 600; color: var(--color-text); margin: 1rem 0 0.4rem; }
+.guide-step {
+  display: flex; gap: 1rem; align-items: flex-start;
+  padding: 0.75rem; margin-bottom: 0.5rem;
+  background: var(--color-surface-2); border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent);
+}
+.guide-step__num {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.8rem;
+}
+.guide-step__body { flex: 1; min-width: 0; }
+.guide-step__title { font-weight: 600; color: var(--color-text); font-size: 0.9rem; }
+.guide-step__desc { color: var(--color-muted); font-size: 0.8125rem; margin-top: 0.2rem; line-height: 1.5; }
+.guide-step__link { color: var(--accent-light); text-decoration: none; }
+.guide-step__link:hover { color: #fff; }
+.guide-warn {
+  background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.35);
+  border-radius: var(--radius-sm); padding: 0.65rem 0.875rem;
+  font-size: 0.8125rem; color: var(--color-text); margin-bottom: 0.75rem;
+  display: flex; gap: 0.5rem; align-items: flex-start;
+}
+.guide-info {
+  background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3);
+  border-radius: var(--radius-sm); padding: 0.65rem 0.875rem;
+  font-size: 0.8125rem; color: var(--color-text); margin-bottom: 0.75rem;
+  display: flex; gap: 0.5rem; align-items: flex-start;
+}
+.guide-ok {
+  background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3);
+  border-radius: var(--radius-sm); padding: 0.65rem 0.875rem;
+  font-size: 0.8125rem; color: var(--color-text); margin-bottom: 0.75rem;
+  display: flex; gap: 0.5rem; align-items: flex-start;
+}
+.guide-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.guide-table th { text-align: left; color: var(--color-muted); font-weight: 600;
+  padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--color-border);
+  text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.72rem; }
+.guide-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--color-border);
+  color: var(--color-text); vertical-align: top; }
+.guide-table tr:last-child td { border-bottom: none; }
+.guide-table td code { background: var(--color-surface-2); padding: 0.1rem 0.4rem;
+  border-radius: 4px; font-size: 0.78rem; color: var(--accent-light); }
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.dot-on  { background: var(--color-success); }
+.dot-off { background: var(--color-muted); }
+.dot-warn{ background: var(--color-warning); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-book me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      AI Assistant — Setup Guide
+    </h1>
+    <p class="page-subtitle">Everything you need to configure, test and go live safely.</p>
+  </div>
+  <a href="{% url 'assistant:settings' %}" class="btn btn-primary btn-sm mt-1">
+    <i class="bi bi-sliders me-1"></i>Open Settings
+  </a>
+</div>
+
+{% include "features/assistant/_tabs.html" %}
+
+{# ── Status snapshot ──────────────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">
+    <h2 class="card-title mb-0">
+      <i class="bi bi-activity me-2" style="color:var(--accent-light);" aria-hidden="true"></i>
+      Current status
+    </h2>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-sm-6 col-lg-3">
+        <div class="p-3" style="background:var(--color-surface-2);border-radius:var(--radius-sm);">
+          <div class="text-muted-sm mb-1" style="font-size:0.75rem;">Global switch</div>
+          <div class="fw-600">
+            {% if settings.enabled %}
+              <span class="status-dot dot-on"></span>On
+            {% else %}
+              <span class="status-dot dot-off"></span>Off
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="p-3" style="background:var(--color-surface-2);border-radius:var(--radius-sm);">
+          <div class="text-muted-sm mb-1" style="font-size:0.75rem;">Public widget</div>
+          <div class="fw-600">
+            {% if settings.public_enabled and settings.widget_enabled %}
+              <span class="status-dot dot-on"></span>On
+            {% elif settings.public_enabled %}
+              <span class="status-dot dot-warn"></span>Partial
+            {% else %}
+              <span class="status-dot dot-off"></span>Off
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="p-3" style="background:var(--color-surface-2);border-radius:var(--radius-sm);">
+          <div class="text-muted-sm mb-1" style="font-size:0.75rem;">Signed-in assistant</div>
+          <div class="fw-600">
+            {% if settings.signed_in_enabled %}
+              <span class="status-dot dot-on"></span>On
+            {% else %}
+              <span class="status-dot dot-off"></span>Off
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="p-3" style="background:var(--color-surface-2);border-radius:var(--radius-sm);">
+          <div class="text-muted-sm mb-1" style="font-size:0.75rem;">Active providers</div>
+          <div class="fw-600">
+            {% if provider_count %}
+              <span class="status-dot dot-on"></span>{{ provider_count }} configured
+            {% else %}
+              <span class="status-dot dot-warn"></span>None — add one first
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% if not settings.has_safeguarding_contact %}
+    <div class="guide-warn mt-3">
+      <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" style="color:var(--color-danger);"></i>
+      <div><strong>Safeguarding contact not set.</strong> You must add a named safeguarding contact before turning on the signed-in assistant or student tutor mode. <a href="{% url 'assistant:settings' %}" class="guide-step__link">Set it in Settings</a>.</div>
+    </div>
+    {% endif %}
+    {% if settings.kill_switch %}
+    <div class="guide-warn mt-3">
+      <i class="bi bi-stop-circle-fill flex-shrink-0 mt-1" style="color:var(--color-danger);"></i>
+      <div><strong>Stop switch is ON.</strong> Everything is paused — no answers, no background reading, no test tools. <a href="{% url 'assistant:settings' %}" class="guide-step__link">Turn it off in Settings</a> when you are ready.</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── How it works ─────────────────────────────────────────────────────────── #}
+<div class="guide-section">
+  <h2><i class="bi bi-diagram-3" aria-hidden="true"></i>How the assistant works</h2>
+
+  <div class="guide-info">
+    <i class="bi bi-info-circle-fill flex-shrink-0 mt-1" style="color:var(--color-info);"></i>
+    <div>The assistant <strong>only answers from documents you approve</strong>. It cannot invent fees, dates or policies. If it cannot find a good answer it says so plainly and directs the person to the school office.</div>
+  </div>
+
+  <p class="text-muted-sm mb-3">Every question goes through this pipeline in order. No step can be skipped:</p>
+
+  <div class="guide-step">
+    <div class="guide-step__num">1</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Safeguarding screen</div>
+      <div class="guide-step__desc">Every message is checked against a mandatory safeguarding rule set before anything else. A hit never reaches the AI — the person gets a kind, brief reply with the school's safeguarding contact and emergency numbers. An alert is immediately sent to admin and director. This cannot be switched off.</div>
+    </div>
+  </div>
+  <div class="guide-step">
+    <div class="guide-step__num">2</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Rate limit &amp; budget check</div>
+      <div class="guide-step__desc">The kill switch, per-user daily limit and monthly KSh budget are checked. If any is exceeded the assistant declines with a plain message — no provider call is made and nothing is charged.</div>
+    </div>
+  </div>
+  <div class="guide-step">
+    <div class="guide-step__num">3</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Knowledge retrieval (scope filter first)</div>
+      <div class="guide-step__desc">The question is matched against your <strong>approved knowledge documents</strong> using hybrid search (keyword + vector). Only documents the asker is allowed to see are searched — a visitor never retrieves staff-only content. If nothing relevant is found, the assistant refuses without calling the AI provider.</div>
+    </div>
+  </div>
+  <div class="guide-step">
+    <div class="guide-step__num">4</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Live data tools (signed-in users only)</div>
+      <div class="guide-step__desc">For signed-in parents, students, teachers and staff, the assistant can fetch live data (attendance, homework, fees, etc.) from the school's own database. Each tool is permission-checked — a parent only sees their own children.</div>
+    </div>
+  </div>
+  <div class="guide-step">
+    <div class="guide-step__num">5</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Answer generation</div>
+      <div class="guide-step__desc">The retrieved passages and tool results are wrapped in a secure data fence and sent to your AI provider. The system prompt instructs the assistant to cite only what it was given and never invent facts. All PII is stripped before anything leaves the server.</div>
+    </div>
+  </div>
+  <div class="guide-step">
+    <div class="guide-step__num">6</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Output check</div>
+      <div class="guide-step__desc">Every number, fee amount and date in the reply must exist in the cited passage. If a figure cannot be verified, the answer is discarded and replaced with a plain refusal. The user never sees an unverified answer.</div>
+    </div>
+  </div>
+  <div class="guide-step">
+    <div class="guide-step__num">7</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Handoff check</div>
+      <div class="guide-step__desc">After each reply, the message is checked against your handoff rules. If a rule fires (e.g. fee dispute, complaint, "talk to a person"), the conversation is routed to the inbox and the person is told honestly what is happening.</div>
+    </div>
+  </div>
+</div>
+
+{# ── Setup checklist ──────────────────────────────────────────────────────── #}
+<div class="guide-section">
+  <h2><i class="bi bi-check2-square" aria-hidden="true"></i>Setup checklist — do these in order</h2>
+
+  <h3>Before anything is live</h3>
+
+  <div class="guide-step" style="border-color:var(--color-info);">
+    <div class="guide-step__num" style="background:var(--color-info);">A</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Set the encryption key on the server</div>
+      <div class="guide-step__desc">Your developer must set <code>ASSISTANT_ENCRYPTION_KEY</code> in the server environment before an AI provider key can be stored safely. Run <code>python manage.py assistant_make_key</code> to generate one. Without this, provider keys cannot be saved.</div>
+    </div>
+  </div>
+
+  <div class="guide-step" style="border-color:var(--color-info);">
+    <div class="guide-step__num" style="background:var(--color-info);">B</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Add an AI provider</div>
+      <div class="guide-step__desc">
+        Go to <a href="{% url 'assistant:providers' %}" class="guide-step__link">Providers</a> → Add provider. Choose OpenAI, Google Gemini, DeepSeek or a compatible server. You will need an API key from the provider. The key is encrypted and stored safely — it is never shown in full again, only its last 4 characters.
+        <br><br>
+        <strong>Supported providers:</strong>
+        <table class="guide-table mt-2">
+          <thead><tr><th>Provider</th><th>Embedding</th><th>Chat</th><th>Cost</th></tr></thead>
+          <tbody>
+            <tr><td>OpenAI (GPT-4o, GPT-4o-mini)</td><td>✓</td><td>✓</td><td>Pay-per-token</td></tr>
+            <tr><td>Google Gemini (1.5 Flash, 2.0)</td><td>✓</td><td>✓</td><td>Pay-per-token</td></tr>
+            <tr><td>DeepSeek (V3, R1)</td><td>✗</td><td>✓</td><td>Low cost</td></tr>
+            <tr><td>Any OpenAI-compatible server</td><td>Varies</td><td>✓</td><td>Varies</td></tr>
+          </tbody>
+        </table>
+        After adding a provider, use the <strong>Test connection</strong> button to verify the key works.
+      </div>
+    </div>
+  </div>
+
+  <div class="guide-step" style="border-color:var(--color-info);">
+    <div class="guide-step__num" style="background:var(--color-info);">C</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Set the monthly budget</div>
+      <div class="guide-step__desc">In <a href="{% url 'assistant:settings' %}" class="guide-step__link">Settings → Money</a>, set the <strong>Monthly budget (KSh)</strong> and the <strong>USD to KSh rate</strong>. The assistant refuses all calls if the budget is 0 or unset. Start with a small amount (e.g. KSh 500) while testing.</div>
+    </div>
+  </div>
+
+  <div class="guide-step" style="border-color:var(--color-info);">
+    <div class="guide-step__num" style="background:var(--color-info);">D</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Add and approve knowledge documents</div>
+      <div class="guide-step__desc">
+        Go to <a href="{% url 'assistant:knowledge_documents' %}" class="guide-step__link">Knowledge</a> → Add document. You can upload PDFs, Word files, plain text, paste FAQ text, or add Q&amp;A pairs directly.
+        <br><br>
+        <strong>Important:</strong> Documents must be in an <strong>Approved</strong> collection and their status set to <strong>Approved</strong> before the assistant can use them. Draft documents are never shown to users.
+        <br><br>
+        After approving, the background worker reads and embeds the document automatically. The document status changes to <strong>Ready</strong> when done. You must have <code>python manage.py qcluster</code> running.
+        <br><br>
+        <strong>Suggested starting documents:</strong>
+        <ul style="font-size:0.8125rem;margin-top:0.4rem;padding-left:1.25rem;color:var(--color-muted);">
+          <li>Admission requirements and process</li>
+          <li>Fee structure (current term/year)</li>
+          <li>Term dates and school calendar</li>
+          <li>School rules and uniform policy</li>
+          <li>Portal how-to guide for parents</li>
+          <li>FAQ about the school</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="guide-step" style="border-color:var(--color-info);">
+    <div class="guide-step__num" style="background:var(--color-info);">E</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Set the safeguarding contact</div>
+      <div class="guide-step__desc">In <a href="{% url 'assistant:settings' %}" class="guide-step__link">Settings → Safeguarding</a>, enter the <strong>name, phone and email</strong> of your named safeguarding lead. This contact appears in every safeguarding reply and receives immediate alerts. Required before the signed-in assistant or student tutor can be switched on.</div>
+    </div>
+  </div>
+
+  <div class="guide-step" style="border-color:var(--color-info);">
+    <div class="guide-step__num" style="background:var(--color-info);">F</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Approve the consent wording</div>
+      <div class="guide-step__desc">In <a href="{% url 'assistant:settings' %}" class="guide-step__link">Settings → Public widget</a>, read the consent text and tick the approval checkbox, then enter your name and today's date. The public widget will not appear on the website until this is done.</div>
+    </div>
+  </div>
+
+  <div class="guide-step" style="border-color:var(--color-info);">
+    <div class="guide-step__num" style="background:var(--color-info);">G</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Test before going live</div>
+      <div class="guide-step__desc">Use the <a href="{% url 'assistant:console' %}" class="guide-step__link">Test console</a> to ask questions and see exactly what the assistant retrieves and answers. Use the <a href="{% url 'assistant:knowledge_answer_desk' %}" class="guide-step__link">Answer desk</a> to test as a specific role (Visitor, Parent, Student, Teacher). Both tools have their own daily limit and budget and do not count against the live assistant. The stop switch does NOT block them — only the console limits do.</div>
+    </div>
+  </div>
+
+  <h3>Going live</h3>
+
+  <div class="guide-step">
+    <div class="guide-step__num">1</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Turn on the global switch</div>
+      <div class="guide-step__desc"><a href="{% url 'assistant:settings' %}" class="guide-step__link">Settings</a> → turn on <strong>Global switch (enabled)</strong>. This alone does nothing — it is the master gate. The specific switches below control who can actually use the assistant.</div>
+    </div>
+  </div>
+  <div class="guide-step">
+    <div class="guide-step__num">2</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Turn on the public widget (optional)</div>
+      <div class="guide-step__desc">Turn on <strong>Public assistant</strong> then <strong>Website chat widget</strong>. The chat bubble will appear on all five public pages (Home, About, Academics, Gallery, Contact). Visitors can ask questions from approved public documents only.</div>
+    </div>
+  </div>
+  <div class="guide-step">
+    <div class="guide-step__num">3</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Turn on the signed-in assistant (optional)</div>
+      <div class="guide-step__desc">Turn on <strong>Signed-in assistant</strong>. Parents, students, teachers and staff get an "Ask the Assistant" link in their sidebar and a floating button on dashboard pages. They can ask about their own records (attendance, homework, fees, etc.).</div>
+    </div>
+  </div>
+  <div class="guide-step">
+    <div class="guide-step__num">4</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Turn on student tutor mode (optional)</div>
+      <div class="guide-step__desc">Turn on <strong>Student tutor mode</strong>. Students get a "Tutor mode" toggle in their assistant. The tutor guides with questions and hints rather than giving answers directly. It <strong>will not</strong> complete assessed work (quizzes, exams, homework marked as graded). Requires the signed-in switch and a safeguarding contact.</div>
+    </div>
+  </div>
+  <div class="guide-step">
+    <div class="guide-step__num">5</div>
+    <div class="guide-step__body">
+      <div class="guide-step__title">Set up handoff rules</div>
+      <div class="guide-step__desc">Go to <a href="{% url 'assistant:handoff_rules' %}" class="guide-step__link">Handoff Rules</a> → click <strong>Seed starter rules</strong> to add a Kenyan school starter set. Review the <strong>Safeguarding rule</strong> (marked Required — cannot be removed). Edit each rule's destination to point to the right person or team. This is how fee disputes, complaints and "talk to a person" requests are routed to your staff inbox.</div>
+    </div>
+  </div>
+</div>
+
+{# ── Emergency stop ───────────────────────────────────────────────────────── #}
+<div class="guide-section">
+  <h2><i class="bi bi-stop-circle" aria-hidden="true"></i>Emergency stop</h2>
+  <div class="guide-warn">
+    <i class="bi bi-stop-circle-fill flex-shrink-0 mt-1" style="color:var(--color-danger);"></i>
+    <div>
+      If anything goes wrong, go to <a href="{% url 'assistant:settings' %}" class="guide-step__link">Settings</a> and turn on the <strong>Stop switch</strong>. This immediately pauses <em>everything</em> — the public widget, the signed-in assistant, the answer desk, the test console and background document reading. In-flight calls are allowed to finish; no new calls start. It always wins over every other switch.
+    </div>
+  </div>
+  <p class="text-muted-sm">Turn the stop switch <em>off</em> again to resume. Nothing is lost — conversations, documents and settings are unchanged.</p>
+</div>
+
+{# ── What each role can ask ──────────────────────────────────────────────── #}
+<div class="guide-section">
+  <h2><i class="bi bi-people" aria-hidden="true"></i>What each role can ask</h2>
+  <p class="text-muted-sm">Once the signed-in assistant is on, every signed-in user gets an "Ask the Assistant" link and a floating button. Answers use only that person's own records — a parent never sees another family's data, and a student never sees another student's.</p>
+  <table class="guide-table">
+    <thead>
+      <tr><th>Role</th><th>Example questions</th><th>What it can do</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Parent</strong></td>
+        <td>"How is Amara's attendance?" · "When are fees next due?" · "Summarise her week" · "What is her timetable?"</td>
+        <td>Attendance, homework due/overdue, released marks, fee balance and next due date, live classes, timetable, next lesson, week summary, school events, announcements — always about the child chosen in the child switcher. Tutor-usage counts for own children.</td>
+      </tr>
+      <tr>
+        <td><strong>Student</strong></td>
+        <td>"What do I have due?" · "What is my next lesson?" · "Show me my class notes"</td>
+        <td>Due work, progress summary, timetable, next lesson, class materials, upcoming live classes, points and badges, announcements. <strong>Tutor mode</strong> (when enabled) guides with hints and refuses graded work kindly.</td>
+      </tr>
+      <tr>
+        <td><strong>Teacher</strong></td>
+        <td>"Who hasn't submitted homework?" · "What classes today?" · "How is the tutor used in my classes?"</td>
+        <td>Unmarked work, unanswered class questions, today's classes, unfinished submissions (respects stream targeting), class progress, tutor-usage counts for own classes. Can request AI drafts (lesson outline, quiz questions in CSV import format, rubric, feedback) — always marked as drafts for review.</td>
+      </tr>
+      <tr>
+        <td><strong>Director</strong></td>
+        <td>"How many students?" · "Attendance trend?" · "Is the community queue clear?"</td>
+        <td>Read-only aggregates: school summary, 7-day attendance and engagement trends, community moderation backlog, unanswered class questions, handoff queue health.</td>
+      </tr>
+      <tr>
+        <td><strong>Admin</strong></td>
+        <td>"What is the assistant spending?" · "Any documents waiting?" · "System health?"</td>
+        <td>Everything the director gets, plus assistant usage/cost, knowledge gaps, pending document approvals, job failures and open safeguarding alerts. Can save an AI-drafted announcement as an <strong>unpublished draft</strong> for review.</td>
+      </tr>
+      <tr>
+        <td><strong>Finance</strong></td>
+        <td>"Any announcements?"</td>
+        <td>Announcements and approved knowledge documents only — no record tools.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="text-muted-sm mt-2">Every live-data answer states when it was fetched (e.g. "Attendance as of today 09:10"). Users can opt into memory (language, tone, a short non-sensitive topic note) and delete it or their whole history at any time from the chat page's Personalisation panel.</p>
+</div>
+
+{# ── Switches reference ───────────────────────────────────────────────────── #}
+<div class="guide-section">
+  <h2><i class="bi bi-toggles" aria-hidden="true"></i>All switches explained</h2>
+  <table class="guide-table">
+    <thead>
+      <tr>
+        <th>Switch</th>
+        <th>What it controls</th>
+        <th>Default</th>
+        <th>Requires</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Stop switch</strong></td>
+        <td>Pauses everything immediately. Use in an emergency.</td>
+        <td>Off</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><strong>Global switch</strong></td>
+        <td>Master gate. The public and signed-in switches do nothing while this is off.</td>
+        <td>Off</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><strong>Public assistant</strong></td>
+        <td>Enables the visitor-facing assistant on the public website.</td>
+        <td>Off</td>
+        <td>Global switch on, provider added, budget set</td>
+      </tr>
+      <tr>
+        <td><strong>Website chat widget</strong></td>
+        <td>Shows the chat bubble on the five public pages.</td>
+        <td>Off</td>
+        <td>Public assistant on, consent approved</td>
+      </tr>
+      <tr>
+        <td><strong>Signed-in assistant</strong></td>
+        <td>Gives parents, students, teachers and staff a personal assistant with live data tools.</td>
+        <td>Off</td>
+        <td>Global switch on, safeguarding contact set</td>
+      </tr>
+      <tr>
+        <td><strong>Student tutor mode</strong></td>
+        <td>Adds a tutor toggle for students — guiding questions, refuses assessed work.</td>
+        <td>Off</td>
+        <td>Signed-in on, safeguarding contact set</td>
+      </tr>
+      <tr>
+        <td><strong>Widget feedback</strong></td>
+        <td>Shows helpful/not helpful buttons after each public answer.</td>
+        <td>On</td>
+        <td>Widget on</td>
+      </tr>
+      <tr>
+        <td><strong>Proof-of-work</strong></td>
+        <td>A lightweight bot check when the public widget starts (invisible to real phones).</td>
+        <td>On</td>
+        <td>Widget on</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+{# ── Knowledge collections ─────────────────────────────────────────────────── #}
+<div class="guide-section">
+  <h2><i class="bi bi-journals" aria-hidden="true"></i>Organising knowledge documents</h2>
+
+  <p class="text-muted-sm mb-3">Documents live in <strong>collections</strong>. A collection has an audience — Public, Signed-in, or restricted to specific roles or classes. A document can be narrower than its collection but never broader.</p>
+
+  <table class="guide-table">
+    <thead><tr><th>Audience</th><th>Who can see it</th><th>Use for</th></tr></thead>
+    <tbody>
+      <tr><td><code>Public</code></td><td>Everyone including website visitors</td><td>Admissions, fees, term dates, school rules, FAQs</td></tr>
+      <tr><td><code>Signed-in</code></td><td>Any logged-in user (parent, student, teacher, staff)</td><td>Portal how-to guides, parent handbooks</td></tr>
+      <tr><td>Role-scoped</td><td>Only the specified roles</td><td>Staff policies (teacher + admin only), finance procedures</td></tr>
+      <tr><td>Class-scoped</td><td>Students and parents of specific classes</td><td>Subject notes, class-specific timetables</td></tr>
+    </tbody>
+  </table>
+
+  <div class="guide-info mt-3">
+    <i class="bi bi-info-circle-fill flex-shrink-0 mt-1" style="color:var(--color-info);"></i>
+    <div><strong>Document status flow:</strong> Draft → Approved → (the background worker reads it) → Ready. Only <strong>Ready</strong> documents are searchable. Set a document to <strong>Archived</strong> to remove it from search immediately without deleting it.</div>
+  </div>
+</div>
+
+{# ── Background worker ─────────────────────────────────────────────────────── #}
+<div class="guide-section">
+  <h2><i class="bi bi-gear-wide-connected" aria-hidden="true"></i>Background worker (qcluster)</h2>
+  <div class="guide-warn">
+    <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" style="color:var(--color-warning);"></i>
+    <div>The background worker <strong>must be running</strong> for documents to be read and embedded. Without it, approved documents stay in <em>Waiting</em> state and are never searchable.</div>
+  </div>
+  <p class="text-muted-sm">Ask your developer to run this in a separate process:</p>
+  <pre style="background:var(--color-surface-2);padding:0.75rem;border-radius:var(--radius-sm);font-size:0.8rem;color:var(--accent-light);overflow-x:auto;">python manage.py qcluster</pre>
+  <p class="text-muted-sm mt-2">In production this should run as a service (systemd, supervisor, or a Docker container). Check <a href="{% url 'assistant:jobs' %}" class="guide-step__link">Failed jobs</a> if documents are not being processed.</p>
+</div>
+
+{# ── Useful links ─────────────────────────────────────────────────────────── #}
+<div class="guide-section">
+  <h2><i class="bi bi-link-45deg" aria-hidden="true"></i>Quick links</h2>
+  <div class="row g-2">
+    {% with links="settings|bi-sliders|Settings,providers|bi-hdd-network|Providers,knowledge_documents|bi-journals|Knowledge documents,knowledge_answer_desk|bi-chat-left-text|Answer desk,knowledge_gaps|bi-question-diamond|Knowledge gaps,handoff_rules|bi-signpost-split|Handoff rules,inbox|bi-inbox|Staff inbox,alerts|bi-bell|Safeguarding alerts,console|bi-terminal|Test console,jobs|bi-exclamation-diamond|Failed jobs" %}
+    {% for link in links|slice:":" %}{% endfor %}
+    {% endwith %}
+    {% for item in quick_links %}
+    <div class="col-6 col-sm-4 col-lg-3">
+      <a href="{% url item.url_name %}" class="card text-decoration-none h-100">
+        <div class="card-body py-2 px-3 d-flex align-items-center gap-2">
+          <i class="bi {{ item.icon }}" style="color:var(--accent-light);font-size:1.1rem;" aria-hidden="true"></i>
+          <span style="font-size:0.8rem;font-weight:600;color:var(--color-text);">{{ item.label }}</span>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock content %}

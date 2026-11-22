@@ -93,4 +93,11 @@ urlpatterns = [
     path("keydates/<int:pk>/edit/", views_admin.KeyDateEditView.as_view(), name="keydate_edit"),
     path("keydates/<int:pk>/toggle/", views_admin.KeyDateToggleView.as_view(), name="keydate_toggle"),
     path("keydates/<int:pk>/delete/", views_admin.KeyDateDeleteView.as_view(), name="keydate_delete"),
+
+    # ── Visual Page Editors ────────────────────────────────────────────────────
+    path("editor/home/", views_admin.HomePageEditorView.as_view(), name="editor_home"),
+    path("editor/about/", views_admin.AboutPageEditorView.as_view(), name="editor_about"),
+    path("editor/gallery/", views_admin.GalleryPageEditorView.as_view(), name="editor_gallery"),
+    path("editor/contact/", views_admin.ContactPageEditorView.as_view(), name="editor_contact"),
+    path("editor/academics/", views_admin.AcademicsPageEditorView.as_view(), name="editor_academics"),
 ]

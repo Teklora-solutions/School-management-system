@@ -644,3 +644,137 @@ The user approved the design with the changes below; Module 1 Step 2 builds to t
 | Console exemption | The answer desk and provider console are exempt from the live switches but **not** from the kill switch or their own daily cap (default 50) and monthly ceiling (default KSh 500), both admin-editable. This changed the existing provider console's behaviour: it was previously exempt from budgets |
 | Safeguarding in test tools | Show the rule, safe reply and who would be alerted; send **no** real alert or email; mark created gaps as tests |
 | Personal data in documents | Scan before embedding, list findings with heading/passage and a masked snippet, require an admin confirmation (who, when, wording) before approval or embedding, warn on the upload screen |
+
+
+---
+
+## Module 4 — Signed-in assistant, tools and memory (built)
+
+### New models (migration `0007` + `0008`)
+
+| Model | Table | Purpose |
+|---|---|---|
+| `SignedInConversation` | `assistant_signed_in_conversation` | One session per user; stores role and class-id snapshots so retrieval caches are consistent; tracks active child for parents |
+| `SignedInMessage` | `assistant_signed_in_message` | One turn; stores body (masked), citations, tool summary (field names only, never values), latency |
+| `AssistantMemory` | `assistant_memory` | Per-user opt-in memory: language preference, tone, 200-char non-sensitive recurring summary |
+| `ToolCallLog` | `assistant_tool_call_log` | Audit-only: tool name, outcome, field names returned, latency; never stores result values |
+
+### Policies (`policies.py`)
+
+Two profiles — code, not admin-editable:
+
+| Profile | Audience | Tools | Retention |
+|---|---|---|---|
+| `PUBLIC_POLICY` | Visitor (widget) | None | 7 days (DRAFT) |
+| `SIGNED_IN_POLICY` | Authenticated users | Role-appropriate subset | 90 days (DRAFT) |
+| `TUTOR_POLICY` | Student in tutor mode | Student tools | 90 days (DRAFT) |
+
+### Tool registry (`tools/registry.py`)
+
+| Tool | Who | Wraps | Returns |
+|---|---|---|---|
+| `parent_child_attendance` | parent | `attendance.selectors.student_history` | days present/absent/pct, fetch time |
+| `parent_child_homework` | parent | `homework.selectors.homework_due_soon` | title, subject, due date |
+| `parent_child_quiz_results` | parent | `homework.selectors.released_marks_for_student` | subject, score, status |
+| `parent_child_fee_balance` | parent | `finance.interface.student_balance` | balance |
+| `parent_child_upcoming_classes` | parent | `learning.live_class_selectors.get_upcoming_sessions_for_student` | title, subject, platform, time |
+| `parent_school_events` | parent, student | `public.models.EventItem` | day, month, title |
+| `school_announcements` | all roles | `communications.selectors.announcements_for_user` | title, date, is_read |
+| `student_due_work` | student | `homework.selectors.homework_due_soon` | title, subject, due date |
+| `student_progress` | student | `results.selectors.student_latest_result_summary` | average, position |
+| `student_upcoming_classes` | student | same as parent | same |
+| `student_points_badges` | student | `learning.points_selectors.student_points_summary` | points, level, badge count |
+| `teacher_unmarked_homework` | teacher | `homework.models.HomeworkSubmission` | title, subject, ungraded count |
+| `teacher_unanswered_questions` | teacher | `learning.feed_selectors.classrooms_for_feed` | class, count |
+| `teacher_todays_classes` | teacher | `learning.live_class_selectors.get_upcoming_sessions_for_teacher` | title, class, time |
+| `teacher_class_progress` | teacher | `learning.selectors.classrooms_for_teacher` | class, subject, student count |
+| `director_school_summary` | director, admin | `students.models.Student`, `accounts.models.User` | active students, staff count |
+| `director_attendance_trend` | director, admin | `attendance.selectors.summarise` | 7-day attendance pct |
+| `director_handoff_queue` | director, admin | `assistant.models.Handoff` | open, critical, overdue counts |
+| `admin_system_health` | admin | `AssistantJobFailure`, `SafeguardingAlert` | failure/alert counts |
+| `admin_assistant_usage` | admin | `limits.month_spend_ksh`, `UsageEvent` | spend, today's calls |
+| `admin_knowledge_gaps` | admin | `knowledge.gaps.open_gaps` | masked questions, reasons |
+| `admin_pending_approvals` | admin | `KnowledgeDocument` | titles, collections |
+| `student_timetable` | student | `learning.selectors.classrooms_for_student` | class subjects this term |
+| `parent_child_timetable` | parent | same, for one child | child name, subjects, term |
+| `student_next_lesson` / `parent_child_next_lesson` | student / parent | `course_selectors.course_for_student` + `LessonProgress` | next unpublished-completed lesson title/subject |
+| `student_class_materials` | student | `course_for_student` lessons (published, targeted) | lesson titles + ≤400-char notes excerpts (tutor grounding) |
+| `parent_child_fee_next_due` | parent | `finance.models.Invoice` (posted, outstanding) | next due date, amount, overdue count |
+| `parent_child_week_summary` | parent | attendance + homework + live-class selectors | this-week digest for one child |
+| `teacher_unfinished_items` | teacher | `Homework` + `HomeworkSubmission` (own assignments, stream-aware) | per-homework not-submitted counts + names (≤10) |
+| `director_community_queue` | director, admin | `community.selectors.pending_posts` / `open_reports` | moderation backlog counts |
+| `director_engagement_trend` | director, admin | `LessonProgress`, `QuizAttempt`, `HomeworkSubmission` (7d) | engagement counts |
+| `teacher_unanswered_questions` | teacher, director, admin | `learning.feed_selectors.classrooms_for_feed` + `ClassPost` | class, unanswered count |
+| `parent_tutor_usage` / `teacher_tutor_usage` | parent / teacher | `SignedInMessage.is_tutor` counts + topic buckets (30d) | per-student turn counts and topic tags — never message text |
+
+**Tool selection.** The model chooses tools: `_select_tools_model()` shows the role-filtered
+catalogue and asks for a JSON tool list, then every name and parameter is validated server-side
+(unknown names dropped, undeclared params stripped, integers coerced). When no provider is
+available or the reply is unparseable, `_select_tools_keywords()` — a fixed keyword matcher —
+runs instead, so the assistant still answers from records with the fake provider or during an
+outage. Cap stays `MAX_TOOL_CALLS_PER_TURN = 3`.
+
+**Tutor mode.** `TUTOR_POLICY` applies when a student ticks Tutor mode and
+`student_tutor_enabled` is on. `_tutor_guard()` refuses graded work before any provider call:
+an in-progress `QuizAttempt` always refuses, and assessed-work phrasing ("do my homework",
+"quiz answers", …) gets a kind refusal that suggests practising instead. When knowledge
+retrieval finds nothing, `_tutor_answer()` grounds the reply in `student_class_materials` —
+the same published, targeted lessons the student may see. Every tutor turn is flagged
+`is_tutor` on its messages, which is what the usage-summary tools count.
+
+**Confirm-to-save drafts.** `POST /assistant/me/draft-announcement/` (admin/director only —
+the same roles as the announcements screen) creates an **unpublished** announcement from
+AI-drafted text, with an audit entry marked `ai_draft`. Nothing the assistant produces ever
+goes live without a person reviewing and publishing it on the announcements screen.
+
+**Signed-in prompt context.** `_context_lines()` appends the role, current term, Nairobi
+date, the user's children/classes, memory preferences (only what they opted into), and
+`SIGNED_IN_RULES` — the Part D contract: never another person's data, no medical/legal/
+financial advice beyond school policy, live records always state fetch time and source.
+
+**Suggestions.** `_suggestion_for()` appends at most one related-screen link when the
+question's topic matches a screen the role actually has (fees → statement page, homework →
+homework list, etc.). It never fires more than once per answer and never for unmatched roles.
+
+**Invariants enforced by `call_tool()`:**
+1. Tool name must exist in REGISTRY.
+2. Tool name must be in `policy.tools_for(role)` — intersection of the policy whitelist and the role whitelist.
+3. `_resolve_child()` verifies parent-child ownership server-side; the model cannot supply a foreign `child_id`.
+4. Every call writes a `ToolCallLog` row (outcome, field names, latency); never the result values.
+5. Cap: `MAX_TOOL_CALLS_PER_TURN = 3`; enforced in `signed_in_chat._run_tools()`.
+
+### Signed-in chat service (`signed_in_chat.py`)
+
+The pipeline mirrors `chat.py` with these differences:
+
+```
+user question
+  │
+  ├─ 1. guardrails.screen()           same mandatory safeguarding
+  ├─ 2. limits.signed_in_allowed()    per-user daily cap (not visitor cookie)
+  ├─ 3. retrieval.search(audience_for_user(user))  role + class scoped
+  ├─ 4. tool calls (up to 3; model-selected, keyword fallback)
+  ├─ 5. prompt assembly with fenced DATA + tool results + fetch times
+  ├─ 6. gateway.call_chain()
+  ├─ 7. output checks (citations + figures)
+  ├─ 8. SignedInMessage stored (body_masked, citations, tool_summary)
+  └─ 9. handoff trigger check (same routing.py as public chat)
+```
+
+### Memory
+
+`AssistantMemory` is opt-in (`opted_in=False` by default). The school must approve personalisation before it is offered to users. The model: preferred language (en/sw), preferred tone (formal/casual), recurring_summary (≤200 chars, non-sensitive, written by the assistant). The user can see the full record and delete it at any time via `me/memory/`.
+
+### Endpoints
+
+| URL | Method | Purpose |
+|---|---|---|
+| `/assistant/me/page/` | GET | HTML chat page |
+| `/assistant/me/state/` | GET | JSON: enabled? role, children, existing conversation |
+| `/assistant/me/send/` | POST | Submit a question; returns reply JSON |
+| `/assistant/me/new/` | POST | Close current conversation, open a new one |
+| `/assistant/me/history/` | GET | JSON message list for current conversation |
+| `/assistant/me/child/` | POST | Parent: switch active child (ownership verified) |
+| `/assistant/me/memory/` | GET/POST | View or update memory; `action=forget` clears all |
+| `/assistant/me/delete/` | POST | Delete the user's own conversation history |
+| `/assistant/me/draft-announcement/` | POST | Save an AI-drafted announcement as unpublished (admin/director only) |

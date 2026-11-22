@@ -534,3 +534,283 @@ embedding provider.
 - The refusal wording and the 90-day gap retention are DRAFT for your review.
 
 Each of those arrives in its own module, with this guide updated in the same change.
+
+---
+
+## Handoff rules (CP4)
+
+### What is a handoff?
+
+A handoff is the moment the AI assistant decides a human is needed.  It
+creates a row in the inbox, writes a notice into the visitor's chat ("I'm
+passing this to the finance office — someone will reply by tomorrow noon"),
+and sends an in-app notification to the destination.  The assistant never
+pretends the visitor has reached a person; the labelling is always clear.
+
+### Setting up handoff rules
+
+**Sidebar → AI Assistant → Handoff Rules.**
+
+Seed the Kenyan starter set first (the **Seed starter rules** button at the
+top of the rules page).  This adds 8 rules covering safeguarding, fee
+disputes, complaints, legal threats, admissions, technical problems, a
+visitor asking for a person, and low-confidence answers.
+
+**Review the safeguarding rule immediately.**  It is marked
+`Required — cannot be deleted or switched off`.  Set the safeguarding
+contact in **AI Assistant → Settings** so the rule knows who to alert.
+
+**Each rule has:**
+
+| Field | Purpose |
+|---|---|
+| **Triggers** | Topics (Fee dispute, Bullying, …), signals (Asks for person, Low confidence, …), keywords, or user types |
+| **Priority** | Normal / Urgent / Critical |
+| **Destination** | A person, a team, or a role (e.g. all Finance staff) |
+| **Fallback** | Used when the primary destination is not set |
+| **Working hours** | Nairobi time.  Set both to 00:00 for "always treat as outside hours" |
+| **Outside-hours message** | What the assistant tells the visitor in both English and Kiswahili |
+| **Response target** | Minutes before the handoff is flagged overdue (0 uses the priority default) |
+
+### Starter rule set for a Kenyan school
+
+| Rule | Priority | Trigger | Destination |
+|---|---|---|---|
+| Safeguarding (required) | **Critical** | Topics: Bullying, Medical | Role: Admin |
+| Fee dispute | Urgent | Topic: Fee dispute | Role: Finance |
+| Formal complaint | Urgent | Topic: Complaint | Role: Admin |
+| Legal threat | **Critical** | Topic: Legal threat | Role: Admin |
+| Admissions enquiry | Normal | Topic: Admissions | Role: Admin |
+| Portal/login problem | Normal | Topic: Technical | Role: Admin |
+| Visitor asks for a person | Normal | Signal: Asks for person | Role: Admin |
+| Assistant cannot answer | Normal | Signals: Low confidence, Repeated unhelpful | Role: Admin |
+
+**These rules await the school's approval before going live.**  Review each
+one with the relevant member of staff (the named safeguarding contact, the
+finance lead, the admissions team).
+
+### Teams
+
+**AI Assistant → Handoff Rules → Teams.**
+
+Create a team (e.g. "Finance Office") and add its members.  When a rule's
+destination is set to that team, every member receives a notification and
+any of them can pick up and reply.
+
+### Channels
+
+The current channel is **in-app notification** (the bell).  Future channels
+(email, SMS, WhatsApp) are plumbed in the model; the current cost and
+requirement for each:
+
+| Channel | Cost | What you need |
+|---|---|---|
+| Email | Free (uses existing mail server) | `EMAIL_HOST` configured in `.env` |
+| SMS | Paid (Africa's Talking ~KSh 1.50/SMS) | Africa's Talking API key |
+| WhatsApp | Paid (Meta/Twilio Cloud API) | WhatsApp Business Account |
+
+---
+
+## Human inbox (CP5)
+
+### How handoff works
+
+1. The assistant sends the visitor a notice and writes a system message in
+   the chat.
+2. A **Handoff** row is created with a frozen packet (the full conversation,
+   the citations, and the rule that fired).
+3. Staff assigned to the destination receive a bell notification with a link.
+
+### Using the inbox
+
+**Sidebar → AI Assistant → Inbox.**
+
+The list shows open handoffs sorted by priority (Critical first), then by
+SLA deadline.  Overdue items are highlighted in red with a pulsing badge.
+
+From the inbox detail page a staff member can:
+
+- **Reply** — type a reply; it appears in the visitor's widget labelled
+  "A person from the school is now replying."  Canned replies can be
+  inserted with one click.
+- **Assign** — route to a specific person or team.
+- **Add an internal note** — never shown to the visitor.
+- **Resolve** — mark as done with an optional note.  Tick "Add to knowledge
+  base" to propose the resolution as a draft Q&A for the admin to approve.
+
+Director-role staff have read-only access; they can see all handoffs but
+cannot reply or resolve.
+
+### What to do when a Critical handoff arrives
+
+1. Open the inbox immediately — the notification badge shows on every page.
+2. Read the frozen packet (the conversation and the rule that fired).
+3. If it is a safeguarding concern, follow the school's safeguarding
+   procedure first.  Contact the named safeguarding contact.
+4. Reply to the visitor from the inbox detail page.
+5. Add an internal note recording what action you took.
+6. Resolve the handoff when the matter is closed.
+
+### Service levels
+
+| Priority | Default target |
+|---|---|
+| Normal | 480 min (1 working day) |
+| Urgent | 240 min (half day) |
+| Critical | 15 min |
+
+When the target is missed, the assignee receives a reminder.  If it is still
+unresolved after the reminder, the handoff is escalated to all admin users.
+**Critical handoffs are never silently dropped** — the escalation is
+retried until an admin acknowledges it.
+
+### Canned replies
+
+**Sidebar → AI Assistant → Handoff Rules → Canned replies.**
+
+Add pre-written replies for common situations (e.g. "Thank you for
+contacting us — we will check your fee statement and reply within one
+working day.").  Staff can insert them with one click from the inbox detail
+page.
+
+---
+
+## Conversation management (CP6)
+
+### Exporting a conversation
+
+Admin only.  From the inbox detail page → **Export CSV**.  The CSV contains
+the timestamps, roles, message bodies and citation references.  It has no
+visitor name or IP address (those are never stored).  Use this for subject-
+access requests.
+
+### Deleting a conversation
+
+Admin only.  From the inbox detail page → **Delete conversation**.  Enter a
+reason (required for the audit log).  This permanently deletes the
+conversation, all its messages, the handoff row, notes and feedback.  The
+audit log entry records the visitor key hash, the message count and the
+reason, but not the message text.
+
+### Retention
+
+The retention periods below are **DRAFT** — they await the school's approval
+before any automatic deletion is set up.
+
+| Data | Proposed retention |
+|---|---|
+| Open conversations | Until closed, then 90 days |
+| Handoff conversations | 12 months after resolution |
+| Callback name and contact | 30 days after completion |
+| Feedback free-text reason | 90 days |
+
+Nothing is deleted automatically until the school approves a period and an
+operator configures the deletion schedule.
+
+
+---
+
+## Signed-in assistant (Module 4)
+
+### Enabling it
+
+**AI Assistant → Settings:**
+- Turn on **Global switch** (enabled)
+- Turn on **Signed-in assistant** (signed_in_enabled)
+- Set **Daily message limit** (default 20 per user per day)
+- For student tutor mode: turn on **Student tutor mode** (requires a safeguarding contact)
+
+### What each role can ask
+
+#### Parent
+
+The assistant knows which children are linked to the account. Use the child switcher at the top of the chat page to choose which child you are asking about.
+
+| Ask about | What you get |
+|---|---|
+| "How is Amara's attendance?" | Days present, days absent and percentage for the last 30 days |
+| "What homework is due for Kofi?" | Assignments due in the next 14 days, with subject and due date |
+| "What is the fee balance?" | Current fee balance for the selected child |
+| "Any upcoming live classes?" | Scheduled online sessions for the child's class |
+| "What marks did she get?" | Released homework marks for the current term |
+| "What is her timetable?" | Subjects her class takes this term |
+| "What is her next lesson?" | Next published lesson she has not completed |
+| "When are fees next due?" | Earliest unpaid invoice due date and amount |
+| "Summarise her week" | Attendance, homework due and live classes this week |
+| "How is the tutor being used?" | Tutor-turn counts and topic buckets for your children (no message text) |
+| "What events are coming up?" | Upcoming school events |
+| "Any announcements?" | Last 5 school announcements |
+
+**A parent sees only their own children.** Supplying a different child's ID in the conversation has no effect — the assistant always uses the child selected in the switcher.
+
+#### Student
+
+| Ask about | What you get |
+|---|---|
+| "What do I have due?" | Homework due in the next 14 days |
+| "How am I doing?" | Latest result summary: average, class position |
+| "Any live classes coming up?" | Upcoming online sessions |
+| "What are my points?" | Total points, current level and badge count |
+| "What is my timetable?" | Subjects your class takes this term |
+| "What is my next lesson?" | Next published lesson you have not completed |
+| "Show me my class notes" | Published lesson titles and short notes (used for tutoring) |
+| "Any announcements?" | Last 5 school announcements |
+
+**Tutor mode** (if the school has enabled it): the assistant asks guiding questions and gives hints before answers, grounded in your own class materials. It **will not** do graded work — an open quiz, an exam or assessed homework gets a kind refusal that suggests practising instead.
+
+#### Teacher
+
+| Ask about | What you get |
+|---|---|
+| "What needs marking?" | Homework with ungraded submissions |
+| "Any unanswered questions in my feed?" | Unanswered class-feed questions per class |
+| "What classes do I have today?" | Today's live sessions with class and time |
+| "Show me my classrooms" | List of assigned classrooms with student counts |
+| "Who hasn't submitted homework?" | Published homework with not-yet-submitted students (respects stream targeting) |
+| "How is the tutor being used in my classes?" | Tutor-turn counts and topic buckets for your students (no message text) |
+| "Any announcements?" | Last 5 school announcements |
+
+Teachers also see **Class Feed** in their navigation (class teachers only). For drafts, ask the assistant for a lesson outline, quiz questions in the CSV import format, a rubric or feedback comments — the text comes back clearly marked as an AI draft for you to review; quiz questions can be pasted into the existing CSV import. Admins and directors can also save an AI-drafted announcement as an **unpublished draft** for review.
+
+#### Director
+
+| Ask about | What you get |
+|---|---|
+| "How many students do we have?" | Active student count |
+| "What's attendance like this week?" | 7-day school-wide attendance rate |
+| "How is the assistant handoff queue?" | Open, critical and overdue handoff counts |
+| "How is engagement this week?" | Lessons completed, quiz attempts and homework submissions (7 days) |
+| "Is the community queue clear?" | Posts awaiting approval and open reports |
+| "Any unanswered class questions?" | Unanswered class-feed questions across classes |
+| "Any announcements?" | Last 5 school announcements |
+
+Directors have **read-only** access to the inbox — they can see all handoffs but cannot reply or resolve.
+
+#### Admin
+
+All director questions, plus:
+
+| Ask about | What you get |
+|---|---|
+| "What is the assistant spending?" | Month-to-date spend vs budget |
+| "What questions can't the assistant answer?" | Last 10 unresolved knowledge gaps |
+| "Any documents waiting for approval?" | Draft knowledge documents |
+| "Any system problems?" | Unresolved job failures and open safeguarding alerts |
+
+### Child switcher (parents)
+
+If you have more than one child linked to your account, a dropdown appears at the top of the chat page. All live-data answers (attendance, homework, fees, classes) are about the child selected in that dropdown. The assistant always states which child it is describing in its reply.
+
+### Memory and personalisation
+
+Go to the chat page → scroll down to the **Personalisation** panel on the right.
+
+- **Turn on memory**: the assistant remembers your preferred language (English or Kiswahili) and builds a short, non-sensitive note about recurring topics (e.g. "usually asks about homework deadlines"). It never stores names, fees, marks or health details.
+- **Forget everything**: clears all preferences and the topic summary.
+- **Delete conversation history**: deletes all your message history from the system.
+
+Memory is **off by default**. The school must enable personalisation in Settings before the option appears.
+
+### Rate limits
+
+Each signed-in user can send up to **20 messages per day** by default (admin can change this in AI Assistant → Settings → Daily message limit). When the limit is reached, the assistant says so and suggests contacting the school office.

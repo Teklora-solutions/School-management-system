@@ -3,6 +3,7 @@
 
 {% block title %}Sign In | {{ identity.name|default:SCHOOL_NAME }}{% endblock %}
 {% block meta_description %}Sign in to the {{ identity.name|default:SCHOOL_NAME }} portal.{% endblock %}
+{% block body_class %}auth-layout{% endblock %}
 
 {% block content %}
 <div class="auth-page">

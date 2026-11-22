@@ -4,6 +4,8 @@ from django.urls import path
 
 from . import chat_views, views
 from .knowledge import views as knowledge_views
+from .handoff import views as handoff_views
+from . import signed_in_views
 
 app_name = "assistant"
 
@@ -16,6 +18,7 @@ urlpatterns = [
     path("chat/feedback/", chat_views.ChatFeedbackView.as_view(), name="chat_feedback"),
     path("chat/callback/", chat_views.ChatCallbackView.as_view(), name="chat_callback"),
     path("settings/", views.AssistantSettingsView.as_view(), name="settings"),
+    path("guide/",    views.AssistantGuideView.as_view(),    name="guide"),
     path("providers/", views.ProviderListView.as_view(), name="providers"),
     path("providers/new/", views.ProviderCreateView.as_view(), name="provider_create"),
     path("providers/<int:pk>/edit/", views.ProviderUpdateView.as_view(), name="provider_update"),
@@ -131,4 +134,106 @@ urlpatterns = [
         knowledge_views.GapDeleteView.as_view(),
         name="knowledge_gap_delete",
     ),
+
+    # ── CP4 — Handoff rules and teams ────────────────────────────────────────
+    path(
+        "handoff/rules/",
+        handoff_views.HandoffRuleListView.as_view(),
+        name="handoff_rules",
+    ),
+    path(
+        "handoff/rules/new/",
+        handoff_views.HandoffRuleCreateView.as_view(),
+        name="handoff_rule_create",
+    ),
+    path(
+        "handoff/rules/<int:pk>/edit/",
+        handoff_views.HandoffRuleUpdateView.as_view(),
+        name="handoff_rule_update",
+    ),
+    path(
+        "handoff/rules/<int:pk>/delete/",
+        handoff_views.HandoffRuleDeleteView.as_view(),
+        name="handoff_rule_delete",
+    ),
+    path(
+        "handoff/rules/<int:pk>/toggle/",
+        handoff_views.HandoffRuleToggleView.as_view(),
+        name="handoff_rule_toggle",
+    ),
+    path(
+        "handoff/rules/seed/",
+        handoff_views.HandoffSeedView.as_view(),
+        name="handoff_seed",
+    ),
+    path(
+        "handoff/teams/",
+        handoff_views.HandoffTeamListView.as_view(),
+        name="handoff_teams",
+    ),
+    path(
+        "handoff/teams/new/",
+        handoff_views.HandoffTeamCreateView.as_view(),
+        name="handoff_team_create",
+    ),
+    path(
+        "handoff/teams/<int:pk>/edit/",
+        handoff_views.HandoffTeamUpdateView.as_view(),
+        name="handoff_team_update",
+    ),
+    path(
+        "handoff/canned/",
+        handoff_views.CannedReplyListView.as_view(),
+        name="canned_replies",
+    ),
+    path(
+        "handoff/canned/new/",
+        handoff_views.CannedReplyCreateView.as_view(),
+        name="canned_reply_create",
+    ),
+    path(
+        "handoff/canned/<int:pk>/edit/",
+        handoff_views.CannedReplyUpdateView.as_view(),
+        name="canned_reply_update",
+    ),
+    path(
+        "handoff/canned/<int:pk>/delete/",
+        handoff_views.CannedReplyDeleteView.as_view(),
+        name="canned_reply_delete",
+    ),
+
+    # ── CP5 — Human inbox ────────────────────────────────────────────────────
+    path(
+        "inbox/",
+        handoff_views.InboxListView.as_view(),
+        name="inbox",
+    ),
+    path(
+        "inbox/<int:pk>/",
+        handoff_views.InboxDetailView.as_view(),
+        name="inbox_detail",
+    ),
+
+    # ── CP6 — Conversation management ────────────────────────────────────────
+    path(
+        "conversations/<int:pk>/export/",
+        handoff_views.ConversationExportView.as_view(),
+        name="conversation_export",
+    ),
+    path(
+        "conversations/<int:pk>/delete/",
+        handoff_views.ConversationDeleteView.as_view(),
+        name="conversation_delete",
+    ),
+
+    # ── Module 4 — Signed-in assistant ───────────────────────────────────────
+    path("me/state/",   signed_in_views.SignedInStateView.as_view(),              name="me_state"),
+    path("me/page/",    signed_in_views.SignedInChatPageView.as_view(),           name="me_page"),
+    path("me/send/",    signed_in_views.SignedInSendView.as_view(),               name="me_send"),
+    path("me/new/",     signed_in_views.SignedInNewView.as_view(),                name="me_new"),
+    path("me/history/", signed_in_views.SignedInHistoryView.as_view(),            name="me_history"),
+    path("me/child/",   signed_in_views.SignedInChildSwitchView.as_view(),        name="me_child"),
+    path("me/memory/",  signed_in_views.SignedInMemoryView.as_view(),             name="me_memory"),
+    path("me/delete/",  signed_in_views.SignedInDeleteConversationView.as_view(), name="me_delete"),
+    path("me/draft-announcement/", signed_in_views.SignedInDraftAnnouncementView.as_view(), name="me_draft_announcement"),
 ]

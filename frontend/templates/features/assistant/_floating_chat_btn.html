@@ -1,0 +1,47 @@
+{% comment %}
+Floating "Ask the Assistant" button for signed-in dashboard pages.
+Include near the bottom of base.html ONLY when the user is signed in and the
+signed-in assistant is available.
+
+Usage: {% include "features/assistant/_floating_chat_btn.html" %}
+{% endcomment %}
+{% if request.user.is_authenticated %}
+<a href="{% url 'assistant:me_page' %}"
+   class="assistant-fab"
+   aria-label="Ask the assistant"
+   title="Ask the AI assistant">
+  <i class="bi bi-robot" aria-hidden="true"></i>
+  <span class="assistant-fab__label">Ask</span>
+</a>
+<style>
+.assistant-fab {
+  position: fixed;
+  right: max(1.25rem, env(safe-area-inset-right));
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+  z-index: 200;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  transition: background var(--trans), box-shadow var(--trans), transform var(--trans);
+}
+.assistant-fab:hover {
+  background: var(--accent-dark);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px rgba(0,0,0,0.32);
+}
+.assistant-fab i { font-size: 1rem; }
+/* Hide label on tiny screens, keep the icon */
+@media (max-width: 374px) { .assistant-fab__label { display: none; } }
+/* Don't show on the assistant page itself */
+.assistant-page .assistant-fab { display: none !important; }
+</style>
+{% endif %}

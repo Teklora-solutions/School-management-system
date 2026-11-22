@@ -260,3 +260,81 @@ the Step 2 tables and fields while keeping the original three tables and their d
 `python manage.py migrate assistant zero` removes all thirteen tables, including settings, providers,
 usage history, gap questions and alert records (saved keys are encrypted, but the rows go too). All are
 destructive; take a backup first and only do this deliberately.
+
+---
+
+## Handoff rules — first setup (CP4)
+
+After migration `0006` is applied:
+
+```
+python manage.py seed_handoff_rules
+```
+
+This creates 8 starter rules.  It is idempotent: safe to run again after a
+deploy; required (safeguarding) rules are never modified.
+
+**Review the safeguarding rule immediately.**  Set the safeguarding contact
+in **AI Assistant → Settings**.  The rule is enabled but the assistant
+itself is off until you switch it on.
+
+---
+
+## SLA check schedule (CP5)
+
+The SLA check runs as a background task.  To schedule it with Django-Q2 add
+this to your Q_CLUSTER or run it on a cron:
+
+```python
+# settings/prod.py — add to Q schedules
+from django_q.models import Schedule
+Schedule.objects.get_or_create(
+    func="apps.assistant.tasks.check_sla_task",
+    defaults={"schedule_type": "I", "minutes": 10, "name": "SLA check"},
+)
+```
+
+Or run manually:
+
+```
+python manage.py check_sla
+```
+
+**Critical handoffs are never silently dropped.**  If the check task itself
+fails, it records a `AssistantJobFailure` row and re-queues a retry for any
+critical item.
+
+---
+
+## What to do when a Critical handoff arrives
+
+A Critical handoff (priority = Critical, e.g. a legal threat or a
+safeguarding concern that reached routing) sends an in-app notification to
+every admin.  The notification category is `"safety"`, which bypasses quiet
+hours.
+
+1. Open **AI Assistant → Inbox** from the notification link.
+2. Read the frozen packet and the conversation.
+3. For safeguarding: follow the school's safeguarding procedure.  Contact the
+   named safeguarding contact.
+4. Assign to the right person or handle it directly.
+5. Reply to the visitor from the inbox detail page.
+6. Resolve with a note when the matter is closed.
+
+If the target is missed the inbox highlights the row in red and sends a
+reminder.  A second missed target escalates to all admin users.  This
+repeats until the handoff is resolved.  It will not be silently dropped.
+
+---
+
+## Conversation deletion on request (CP6)
+
+If a visitor asks for their conversation to be deleted:
+
+```
+Admin → AI Assistant → Inbox → find the handoff → Delete conversation
+```
+
+Enter the reason (kept in the audit log).  The deletion removes all
+messages, notes, feedback and the handoff row.  The audit log entry records
+the hash, the count and the reason — not the text.

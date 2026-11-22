@@ -100,3 +100,21 @@ school's safeguarding lead to review and extend. They cover English, Kiswahili a
 self-harm, abuse, neglect, threat, medical emergency and secrecy/coercion. Sheng changes quickly, so
 this list is expected to be revised; admin-added rules can extend it without a release, but the built-in
 floor cannot be weakened from any screen.
+
+
+---
+
+## Module 4 test coverage
+
+| File | Tests | What it proves |
+|---|---|---|
+| `test_tools.py` | ~25 | Tool registry completeness; parent cannot see another parent's child; student tool isolation; teacher tool role-gating; admin tool role-gating; ToolCallLog never stores values; policy whitelist ⊆ registry; public policy has zero tools; MAX_TOOL_CALLS_PER_TURN ≤ 3 |
+| `test_signed_in_chat.py` | ~20 | State off by default; kill switch overrides; unauthenticated rejected 403; message stored; PII masked; safeguarding hit never reaches provider; alert created; child switcher parent-owns-child check; foreign child rejected 403; non-parent cannot use child switcher; memory opt-in/forget; language pref stored; delete clears only own conversations; injection in message body is fenced, not echoed |
+| `test_handoff_routing.py` | 41 | Topic detection English + Kiswahili + Sheng; signal detection; keyword match; user-type triggers; required rules first; create_handoff system message, packet, SLA; mandatory rule cannot be switched off or deleted |
+| `test_handoff_inbox.py` | 32 | Inbox scoping; assign; note; staff reply advances status; first_response_at set once; resolve; SLA reminder then escalation; critical never dropped; no duplicate reminder; director read-only; teacher cannot see another's handoff; admin can delete conversation; export CSV headers; mandatory rule queryset-delete blocked; seed idempotent |
+
+### Running Module 4 tests alone
+
+```
+python -m pytest apps/assistant/tests/test_tools.py apps/assistant/tests/test_signed_in_chat.py -q
+```

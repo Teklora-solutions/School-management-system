@@ -170,3 +170,46 @@ def ingest_knowledge_document_task(document_id: int, attempt: int = 1) -> None:
                     f"Could not queue retry: {queue_exc}",
                     attempt,
                 )
+
+
+def check_sla_task() -> dict[str, int]:
+    """
+    Check all open handoffs for SLA breaches.  Sends reminders for newly-overdue
+    items and escalates to admin when a reminder has already been sent.
+
+    Called periodically by the Q scheduler (every 5–15 minutes is enough).
+    Critical handoffs are never silently dropped: if escalation itself fails, the
+    failure is recorded in ``AssistantJobFailure``.
+    """
+    from django.utils import timezone as _tz
+
+    from .models import Handoff
+    from .handoff.services import escalate_overdue
+
+    overdue = list(
+        Handoff.objects.filter(sla_due_at__lt=_tz.now())
+        .exclude(status=Handoff.Status.RESOLVED)
+        .select_related("rule", "assigned_user", "assigned_team")
+    )
+
+    reminded = 0
+    escalated = 0
+    for handoff in overdue:
+        try:
+            did_escalate = escalate_overdue(handoff)
+            if did_escalate:
+                escalated += 1
+            else:
+                reminded += 1
+        except Exception as exc:  # noqa: BLE001
+            _record_failure("assistant.check_sla", str(exc), 1)
+            # Critical items: re-queue one retry so they cannot be silently missed
+            if handoff.is_critical:
+                try:
+                    from django_q.tasks import async_task
+                    async_task("apps.assistant.tasks.check_sla_task")
+                except Exception:  # noqa: BLE001
+                    pass
+
+    log.info("SLA check: %d overdue, %d reminded, %d escalated", len(overdue), reminded, escalated)
+    return {"overdue": len(overdue), "reminded": reminded, "escalated": escalated}

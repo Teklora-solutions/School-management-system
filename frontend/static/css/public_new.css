@@ -2018,11 +2018,22 @@ main { padding-top: var(--pub-nav-h); }
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* Full-screen centred layout (replaces .login-page) */
+/* Auth pages fill exactly the viewport: no footer, card centred, and the
+   card itself scrolls internally if a small screen ever needs it. */
+body.auth-layout .pub-footer { display: none; }
+body.auth-layout main { display: flex; flex-direction: column; }
+
 .auth-page {
-  min-height: calc(100dvh - var(--pub-nav-h) - 8rem);
+  flex: 1;
+  min-height: calc(100dvh - var(--pub-nav-h));
   display: grid;
   place-items: center;
-  padding: clamp(var(--pub-sp-6), 6vw, var(--pub-sp-16)) var(--pub-gutter);
+  padding: clamp(var(--pub-sp-4), 4vw, var(--pub-sp-10)) var(--pub-gutter);
+}
+
+.auth-card {
+  max-height: calc(100dvh - var(--pub-nav-h) - 2rem);
+  overflow-y: auto;
 }
 
 /* White card centred on the page */

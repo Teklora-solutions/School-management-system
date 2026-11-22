@@ -360,3 +360,27 @@ class JobFailureResolveView(AdminRequiredMixin, View):
         failure.save(update_fields=["resolved_at", "updated_at"])
         messages.success(request, "Failure marked as resolved.")
         return redirect("assistant:jobs")
+
+
+class AssistantGuideView(AdminRequiredMixin, View):
+    """In-app documentation: how the assistant works and how to set it up."""
+
+    def get(self, request):
+        from django.shortcuts import render
+        quick_links = [
+            {"url_name": "assistant:settings", "icon": "bi-sliders", "label": "Settings"},
+            {"url_name": "assistant:providers", "icon": "bi-hdd-network", "label": "Providers"},
+            {"url_name": "assistant:knowledge_documents", "icon": "bi-journals", "label": "Knowledge documents"},
+            {"url_name": "assistant:knowledge_answer_desk", "icon": "bi-chat-left-text", "label": "Answer desk"},
+            {"url_name": "assistant:knowledge_gaps", "icon": "bi-question-diamond", "label": "Knowledge gaps"},
+            {"url_name": "assistant:handoff_rules", "icon": "bi-signpost-split", "label": "Handoff rules"},
+            {"url_name": "assistant:inbox", "icon": "bi-inbox", "label": "Staff inbox"},
+            {"url_name": "assistant:alerts", "icon": "bi-bell", "label": "Safeguarding alerts"},
+            {"url_name": "assistant:console", "icon": "bi-terminal", "label": "Test console"},
+            {"url_name": "assistant:jobs", "icon": "bi-exclamation-diamond", "label": "Failed jobs"},
+        ]
+        return render(request, "features/assistant/guide.html", {
+            "settings": selectors.assistant_settings(),
+            "provider_count": ProviderConfig.objects.filter(is_active=True).count(),
+            "quick_links": quick_links,
+        })

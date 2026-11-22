@@ -428,3 +428,32 @@ were raised by exactly those two queries with the reason in their comments.
 - The assistant is off by default.
 - `cryptography` added to `requirements/base.txt` (Apache-2.0 OR BSD-3-Clause; already present in the
   environment as a transitive dependency).
+
+## 2026-11-22 — Module 4 completion pass: tools, tutor, drafts, suggestions
+
+**Added**
+
+- **12 new read-only tools** in `tools/registry.py`: timetable (student + parent-child), next
+  lesson, class materials (tutor grounding), fee next-due date, parent week summary,
+  teacher unfinished items (stream-aware), director community queue and engagement trend,
+  and tutor-usage summaries for parents and teachers (counts + topic buckets only).
+- **Model-driven tool selection**: `_select_tools_model()` shows the model the role-filtered
+  catalogue and validates every returned name/param server-side; `_select_tools_keywords()`
+  is the fallback when no provider is reachable.
+- **Tutor hardening**: `_tutor_guard()` refuses graded work (in-progress quiz attempt or
+  assessed-work phrasing) before any provider call; `_tutor_answer()` grounds replies in the
+  student's own published class materials; `is_tutor` recorded on every tutor message
+  (migration `0009`).
+- **Confirm-to-save drafts**: `POST /assistant/me/draft-announcement/` creates an unpublished
+  announcement for admin/director only, audited as `ai_draft`.
+- **Signed-in prompt context**: role, current term, Nairobi date, children/classes, memory
+  preferences and `SIGNED_IN_RULES` (no other person's data; no medical/legal/financial
+  advice; live records state fetch time and source).
+- **Personalised suggestions**: at most one related-screen link per answer.
+- **Language toggle** (EN/SW) on the chat page, saved to memory.
+- **Wiring**: "Ask the Assistant" nav entry and floating button now cover admin, director
+  and finance too; `assistant_signed_in.css` extracted from the template.
+- **Tests**: `tests/test_module4_additions.py` — 25 tests covering tool scoping, tutor
+  refusal, model tool selection, draft endpoint permissions, suggestions and safety rules.
+
+**Migration.** `0009_module4_signed_in_v3` adds `SignedInMessage.is_tutor`.
