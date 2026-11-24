@@ -1,0 +1,71 @@
+
+      {# Story #}
+      {% include "features/public/_editor_section.html" with section_id="story" section_title="School Story" section_icon="bi-book" expanded=True %}
+        <form method="post" class="pe-section-form">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="story">
+          {% include "features/public/_editor_field.html" with field_name="about" field_label="About the school" field_type="textarea" field_value=settings_form.about.value rows=5 %}
+          {% include "features/public/_editor_field.html" with field_name="mission" field_label="Mission statement" field_type="textarea" field_value=settings_form.mission.value rows=3 %}
+          {% include "features/public/_editor_field.html" with field_name="vision" field_label="Vision statement" field_type="textarea" field_value=settings_form.vision.value rows=3 %}
+          {% include "features/public/_editor_field.html" with field_name="values" field_label="School values" field_type="textarea" field_value=settings_form.values.value rows=3 %}
+          <button type="submit" class="pe-save-btn">
+            <i class="bi bi-check2 me-1"></i>Save Story
+          </button>
+        </form>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Team Members #}
+      {% include "features/public/_editor_section.html" with section_id="team" section_title="Leadership Team" section_icon="bi-people" %}
+        <div class="pe-items-list">
+          {% for m in team_members %}
+          <div class="pe-item">
+            {% if m.photo %}
+            <img src="{{ m.photo.url }}" alt="{{ m.name }}" class="pe-item__thumb pe-item__thumb--round">
+            {% else %}
+            <div class="pe-item__avatar">{{ m.name|first }}</div>
+            {% endif %}
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ m.name }}</div>
+              <div class="pe-item__meta">{{ m.role }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:team_edit' m.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No team members yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:team_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add member
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Timeline #}
+      {% include "features/public/_editor_section.html" with section_id="timeline" section_title="History Timeline" section_icon="bi-clock-history" %}
+        <div class="pe-items-list">
+          {% for ev in timeline_events %}
+          <div class="pe-item">
+            <div class="pe-item__year-badge">{{ ev.year_label }}</div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ ev.title }}</div>
+              <div class="pe-item__meta">{{ ev.text|truncatechars:50 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:timeline_edit' ev.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No timeline events yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:timeline_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add event
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# ═══════════════ GALLERY PAGE SECTIONS ═══════════════════════════════ #}

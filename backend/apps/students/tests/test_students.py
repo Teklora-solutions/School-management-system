@@ -725,6 +725,9 @@ class PromotionTests(TestCase):
             academic_year=gap_from, name="Grade 4", level_order=4
         )
         SchoolClass.objects.create(
+            academic_year=gap_from, name="Grade 6", level_order=6
+        )
+        SchoolClass.objects.create(
             academic_year=gap_to, name="Grade 4", level_order=4
         )
         self._student("GAP-001", grade4)

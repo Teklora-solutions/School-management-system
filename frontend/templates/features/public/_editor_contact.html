@@ -1,0 +1,94 @@
+
+      {# Contact details #}
+      {% include "features/public/_editor_section.html" with section_id="contact_details" section_title="Contact Details" section_icon="bi-telephone" expanded=True %}
+        <form method="post" class="pe-section-form">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="contact_details">
+          {% include "features/public/_editor_field.html" with field_name="address" field_label="Address" field_type="textarea" field_value=settings_form.address.value rows=3 %}
+          {% include "features/public/_editor_field.html" with field_name="admissions_email" field_label="Admissions email" field_type="email" field_value=settings_form.admissions_email.value %}
+          {% include "features/public/_editor_field.html" with field_name="office_hours" field_label="Office hours" field_type="text" field_value=settings_form.office_hours.value placeholder="e.g. Mon–Fri, 8am–5pm" %}
+          {% include "features/public/_editor_field.html" with field_name="map_embed_url" field_label="Google Maps embed URL" field_type="url" field_value=settings_form.map_embed_url.value %}
+          <button type="submit" class="pe-save-btn">
+            <i class="bi bi-check2 me-1"></i>Save Details
+          </button>
+        </form>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Admission Steps #}
+      {% include "features/public/_editor_section.html" with section_id="admission_steps" section_title="Admission Steps" section_icon="bi-list-ol" %}
+        <div class="pe-items-list">
+          {% for step in admission_steps %}
+          <div class="pe-item">
+            <div class="pe-item__step-badge">{{ step.step_number }}</div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ step.title }}</div>
+              <div class="pe-item__meta">{{ step.text|truncatechars:50 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:admission_edit' step.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No steps yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:admission_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add step
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# FAQs #}
+      {% include "features/public/_editor_section.html" with section_id="faqs" section_title="FAQs" section_icon="bi-question-circle" %}
+        <div class="pe-items-list">
+          {% for faq in faqs %}
+          <div class="pe-item">
+            <i class="bi bi-question-circle pe-item__icon" aria-hidden="true"></i>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ faq.question|truncatechars:60 }}</div>
+              <div class="pe-item__meta">{{ faq.answer|truncatechars:50 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:faq_edit' faq.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No FAQs yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:faq_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add FAQ
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Key Dates #}
+      {% include "features/public/_editor_section.html" with section_id="key_dates" section_title="Key Dates" section_icon="bi-calendar-check" %}
+        <div class="pe-items-list">
+          {% for kd in key_dates %}
+          <div class="pe-item">
+            <div class="pe-item__date-badge">
+              <span class="pe-item__date-day">{{ kd.day }}</span>
+              <span class="pe-item__date-month">{{ kd.month }}</span>
+            </div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ kd.title }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:keydate_edit' kd.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No key dates yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:keydate_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add key date
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# ═══════════════ ACADEMICS PAGE SECTIONS ═════════════════════════════ #}

@@ -142,6 +142,12 @@ class Notification(BaseModel):
     class Meta:
         db_table = "core_notification"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["recipient", "is_read", "deliver_after"],
+                name="core_notif_bell_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.recipient_id}: {self.title}"

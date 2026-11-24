@@ -94,6 +94,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",
+    "apps.accounts.middleware.ForcePasswordChangeMiddleware",
     "apps.core.middleware.RequestIDMiddleware",
     "apps.core.middleware.RequestTimingMiddleware",
     "apps.assistant.middleware.EscalationCheckMiddleware",

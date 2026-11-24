@@ -1357,7 +1357,20 @@ def reverse_promotion(
             | Q(batch__committed_at=batch.committed_at, batch_id__gt=batch.pk)
         )
     )
-    if later.exists():
+    later_batch = (
+        PromotionBatch.objects.filter(
+            from_year=batch.from_year,
+            to_year=batch.to_year,
+            is_committed=True,
+            is_reversed=False,
+        )
+        .exclude(pk=batch.pk)
+        .filter(
+            Q(committed_at__gt=batch.committed_at)
+            | Q(committed_at=batch.committed_at, pk__gt=batch.pk)
+        )
+    )
+    if later.exists() or later_batch.exists():
         raise ValidationError(
             "A later promotion moved some of these pupils. Reverse that batch first."
         )
