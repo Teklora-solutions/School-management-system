@@ -1373,7 +1373,7 @@ class StudentEditViewTests(TestCase):
         self.client.logout()
 
         resp = self.client.post(
-            reverse("accounts:role_login", kwargs={"role": "student"}),
+            reverse("accounts:login"),
             {"username": "ADM/2025/099", "password": "ADM/2025/014"},
         )
         self.assertEqual(resp.status_code, 302)
@@ -1597,7 +1597,7 @@ class StudentLoginToggleTests(TestCase):
         """
         credentials = {"username": "ADM/2025/050", "password": "ADM/2025/050"}
         resp = self.client.post(
-            reverse("accounts:role_login", kwargs={"role": "student"}), credentials
+            reverse("accounts:login"), credentials
         )
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(resp.wsgi_request.user.is_authenticated)
@@ -1608,7 +1608,7 @@ class StudentLoginToggleTests(TestCase):
         self.client.logout()
 
         resp = self.client.post(
-            reverse("accounts:role_login", kwargs={"role": "student"}), credentials
+            reverse("accounts:login"), credentials
         )
         self.assertNotEqual(resp.status_code, 302)
         self.assertFalse(getattr(resp.wsgi_request.user, "is_authenticated", False))

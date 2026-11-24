@@ -17,7 +17,7 @@ from django.contrib.auth.views import (
 from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import DetailView, ListView, TemplateView
@@ -98,102 +98,77 @@ def _add_service_errors(form, exc: ValidationError) -> None:
         form.add_error(None, exc)
 
 
-class PortalChooserView(View):
+class UnifiedLoginView(View):
     """
-    ``/login/`` — the page every ``LoginRequiredMixin`` redirect lands on.
+    ``/login/`` and ``/accounts/login/`` — single unified sign-in page.
 
-    It holds no form: it sends each audience to its own sign-in screen, which is
-    what lets ``LOGIN_URL`` stay a single value while the portals multiply.
-    """
-
-    template_name = "auth/portal_chooser.html"
-
-    def get(self, request):
-        if request.user.is_authenticated:
-            return redirect("accounts:dashboard_redirect")
-        return render(
-            request,
-            self.template_name,
-            {"portals": PORTALS.values(), "next": _safe_next(request), **_pub_ctx(request)},
-        )
-
-
-class RoleLoginView(View):
-    """
-    ``/login/<role>/`` — one portal's sign-in form, pinned to that role.
-
-    Correct credentials for a *different* portal are refused without opening a
-    session, so a teacher cannot accidentally end up browsing from the student
-    page. A superuser with no role set is let through any portal, matching the
-    bypass in ``RoleRequiredMixin``.
+    Accepts a staff email, parent username, or student admission number.
+    The server determines the user's role from the authenticated account and
+    routes them to their dashboard (or ``force_password_change``). No role
+    enumeration hints are leaked on invalid credentials.
     """
 
     template_name = "auth/login.html"
 
-    def get_portal(self):
-        portal = PORTALS.get(self.kwargs.get("role", ""))
-        if portal is None:
-            raise Http404("No such portal.")
-        return portal
-
-    def _form(self, request, portal, data=None):
-        """The shared form, with this portal's credential wording applied."""
+    def _form(self, request, data=None):
         form = LoginForm(request, data=data)
         widget = form.fields["username"].widget
-        widget.attrs["placeholder"] = portal.placeholder
-        widget.attrs["autocomplete"] = "email" if portal.uses_email else "username"
-        widget.attrs["inputmode"] = "email" if portal.uses_email else "text"
+        widget.attrs["placeholder"] = "Staff email, username, or admission number"
+        widget.attrs["autocomplete"] = "username"
         widget.attrs["autocapitalize"] = "none"
         widget.attrs["spellcheck"] = "false"
-        # HTML type only. The field stays a plain text field on the server so a
-        # superuser username is still accepted; the form itself is novalidate.
-        widget.input_type = "email" if portal.uses_email else "text"
+        widget.input_type = "text"
         return form
 
-    def _ctx(self, request, portal, form, next_url):
+    def _ctx(self, request, form, next_url):
         return {
             "form": form,
-            "portal": portal,
             "next": next_url,
-            "other_portals": [p for p in PORTALS.values() if p.slug != portal.slug],
             **_pub_ctx(request),
         }
 
     def get(self, request, *args, **kwargs):
         if request.user.is_authenticated:
             return redirect("accounts:dashboard_redirect")
-        portal = self.get_portal()
         return render(
             request,
             self.template_name,
-            self._ctx(request, portal, self._form(request, portal), _safe_next(request)),
+            self._ctx(request, self._form(request), _safe_next(request)),
         )
 
     def post(self, request, *args, **kwargs):
-        portal = self.get_portal()
         next_url = _safe_next(request)
-        form = self._form(request, portal, data=request.POST)
+        form = self._form(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-            role = getattr(user, "role", "")
-            if role != portal.role and not (user.is_superuser and not role):
-                form.add_error(
-                    None,
-                    f"That is a {role or 'staff'} account. "
-                    f"Use the {role.title() or 'Administration'} sign-in page instead.",
-                )
-            else:
-                login(request, user)
-                # Anyone holding an admin-set or admin-reset password chooses
-                # their own the first time they sign in. A forgotten password
-                # is still an admin reset; the self-service email stays closed
-                # to staff.
-                if user.must_change_password:
-                    return redirect("accounts:force_password_change")
-                return redirect(next_url or user.get_dashboard_url())
+            login(request, user)
+            if user.must_change_password:
+                return redirect("accounts:force_password_change")
+            return redirect(next_url or user.get_dashboard_url())
         return render(
-            request, self.template_name, self._ctx(request, portal, form, next_url)
+            request, self.template_name, self._ctx(request, form, next_url)
         )
+
+
+PortalChooserView = UnifiedLoginView
+
+
+class RoleLoginView(View):
+    """
+    Legacy ``/login/<role>/`` route — validates the portal slug and redirects
+    to the unified ``/login/`` page (preserving ``?next=...``).
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        if PORTALS.get(kwargs.get("role", "")) is None:
+            raise Http404("No such portal.")
+        next_url = _safe_next(request)
+        target = reverse("accounts:login")
+        if next_url:
+            from urllib.parse import urlencode
+
+            target = f"{target}?{urlencode({'next': next_url})}"
+        return redirect(target)
 
 
 class LogoutView(LoginRequiredMixin, View):
