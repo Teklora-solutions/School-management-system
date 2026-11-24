@@ -52,7 +52,7 @@ class Category(BaseModel):
     slug = models.SlugField(max_length=60, unique=True)
     name = models.CharField(max_length=80)
     icon = models.CharField(
-        max_length=10,
+        max_length=40,
         blank=True,
         help_text="Bootstrap Icons class, e.g. 'bi-megaphone'. Shown on the pill.",
     )

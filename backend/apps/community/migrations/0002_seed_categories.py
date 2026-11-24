@@ -22,7 +22,7 @@ Visibility defaults
   Resources and Ideas    — PUBLIC
 """
 
-from django.db import migrations
+from django.db import migrations, models
 
 
 SEED = [
@@ -139,5 +139,14 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.AlterField(
+            model_name="category",
+            name="icon",
+            field=models.CharField(
+                blank=True,
+                help_text="Bootstrap Icons class, e.g. 'bi-megaphone'. Shown on the pill.",
+                max_length=40,
+            ),
+        ),
         migrations.RunPython(seed_categories, reverse_code=unseed_categories),
     ]
