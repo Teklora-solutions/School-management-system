@@ -14,17 +14,16 @@ from django.test import TestCase
 from django.urls import resolve, reverse
 
 from ..models import User
-from ..portals import PORTALS
 
 PASSWORD = "Portal-Pass-1"
 
 PORTAL_HOME = {
-    "admin": "dashboards:admin_home",
-    "director": "dashboards:director_home",
-    "teacher": "dashboards:teacher_home",
-    "student": "dashboards:student_home",
-    "finance": "dashboards:finance_home",
-    "parent": "dashboards:parent_home",
+    User.Role.ADMIN: "dashboards:admin_home",
+    User.Role.DIRECTOR: "dashboards:director_home",
+    User.Role.TEACHER: "dashboards:teacher_home",
+    User.Role.STUDENT: "dashboards:student_home",
+    User.Role.FINANCE: "dashboards:finance_home",
+    User.Role.PARENT: "dashboards:parent_home",
 }
 
 
@@ -33,23 +32,18 @@ def login_url(next_url: str = "") -> str:
     return f"{url}?next={next_url}" if next_url else url
 
 
-def role_login(slug: str, next_url: str = "") -> str:
-    url = reverse("accounts:role_login", kwargs={"role": slug})
-    return f"{url}?next={next_url}" if next_url else url
-
-
 class UnifiedSignInTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.users = {
-            portal.slug: User.objects.create_user(
-                username=f"user_{portal.slug}",
-                email=f"user_{portal.slug}@test.school",
+            role: User.objects.create_user(
+                username=f"user_{role}",
+                email=f"user_{role}@test.school",
                 password=PASSWORD,
-                role=portal.role,
+                role=role,
                 must_change_password=False,
             )
-            for portal in PORTALS.values()
+            for role in PORTAL_HOME
         }
 
     def sign_in(self, username: str, password: str = PASSWORD, next_url: str = ""):
@@ -58,45 +52,33 @@ class UnifiedSignInTests(TestCase):
         )
 
     def test_each_role_signs_into_its_own_dashboard(self):
-        for portal in PORTALS.values():
-            with self.subTest(portal=portal.slug):
+        for role, home in PORTAL_HOME.items():
+            with self.subTest(role=role):
                 self.client.logout()
-                response = self.sign_in(self.users[portal.slug].email)
+                response = self.sign_in(self.users[role].email)
                 self.assertRedirects(
                     response,
-                    reverse(PORTAL_HOME[portal.slug]),
+                    reverse(home),
                     fetch_redirect_response=False,
                 )
 
     def test_bad_password_never_opens_a_session_or_leaks_role(self):
-        response = self.sign_in(self.users["director"].email, password="wrong-once")
+        response = self.sign_in(self.users[User.Role.DIRECTOR].email, password="wrong-once")
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertNotContains(response, "director account")
 
     def test_next_wins_over_the_role_home(self):
-        response = self.sign_in(self.users["teacher"].email, next_url="/students/")
+        response = self.sign_in(self.users[User.Role.TEACHER].email, next_url="/students/")
         self.assertRedirects(response, "/students/", fetch_redirect_response=False)
 
     def test_offsite_next_is_ignored(self):
         response = self.sign_in(
-            self.users["teacher"].email, next_url="//evil.example/steal"
+            self.users[User.Role.TEACHER].email, next_url="//evil.example/steal"
         )
         self.assertRedirects(
             response,
             reverse("dashboards:teacher_home"),
-            fetch_redirect_response=False,
-        )
-
-    def test_unknown_portal_is_a_404(self):
-        response = self.client.get(role_login("bursar"))
-        self.assertEqual(response.status_code, 404)
-
-    def test_legacy_portal_route_forwards_next_to_unified_login(self):
-        response = self.client.get(role_login("teacher", next_url="/finance/invoices/"))
-        self.assertRedirects(
-            response,
-            "/login/?next=%2Ffinance%2Finvoices%2F",
             fetch_redirect_response=False,
         )
 
@@ -216,7 +198,6 @@ class PortalEdgeCaseTests(TestCase):
             reverse("accounts:force_password_change"),
             fetch_redirect_response=False,
         )
-        # Active session with must_change_password=True is also redirected
         self.assertRedirects(
             self.client.get(reverse("dashboards:finance_home")),
             reverse("accounts:force_password_change"),
@@ -238,14 +219,14 @@ class DashboardDestinationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.users = {
-            portal.slug: User.objects.create_user(
-                username=f"dash_{portal.slug}",
-                email=f"dash_{portal.slug}@test.school",
+            role: User.objects.create_user(
+                username=f"dash_{role}",
+                email=f"dash_{role}@test.school",
                 password=PASSWORD,
-                role=portal.role,
+                role=role,
                 must_change_password=False,
             )
-            for portal in PORTALS.values()
+            for role in PORTAL_HOME
         }
 
     def test_dashboard_route_is_its_own_path(self):
@@ -256,9 +237,9 @@ class DashboardDestinationTests(TestCase):
         )
 
     def test_a_signed_in_visitor_lands_on_their_own_dashboard(self):
-        for slug, home in PORTAL_HOME.items():
-            with self.subTest(portal=slug):
-                self.client.force_login(self.users[slug])
+        for role, home in PORTAL_HOME.items():
+            with self.subTest(role=role):
+                self.client.force_login(self.users[role])
                 first = self.client.get(reverse("accounts:login"))
                 self.assertRedirects(
                     first,

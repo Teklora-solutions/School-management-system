@@ -12,7 +12,6 @@ app_name = "public"
 # accounts, but unauthenticated visitors land here first.
 urlpatterns = [
     path("", views.HomeView.as_view(), name="home"),          # "/" → home
-    path("home/", views.HomeView.as_view(), name="home_alt"), # backward-compat alias
     path("about/", views.AboutView.as_view(), name="about"),
     path("programme/", views.AcademicsView.as_view(), name="academics"),
     path("gallery/", views.GalleryView.as_view(), name="gallery"),

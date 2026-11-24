@@ -41,7 +41,6 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.academics.models import AcademicYear, SchoolClass, Stream, Subject, Term
-from apps.accounts.portals import PORTALS
 from apps.core.models import SchoolSettings
 from apps.dashboards.tests.fixtures import make_user
 from apps.students.models import Student
@@ -189,27 +188,20 @@ class PublicPagesTest(TestCase):
 
 
 class FooterPortalLinksTest(TestCase):
-    """The footer is where a first-time visitor finds the door that is theirs."""
+    """The footer provides the unified Portal Login link on every public page."""
 
-    def test_portal_links_mirror_the_portal_registry(self):
+    def test_portal_links_point_to_unified_login(self):
         links = selectors.portal_links()
-        self.assertEqual(len(links), len(PORTALS))
-        for link, portal in zip(links, PORTALS.values()):
-            self.assertEqual(link["slug"], portal.slug)
-            self.assertEqual(link["label"], portal.label)
-            self.assertEqual(link["blurb"], portal.blurb)
-            self.assertEqual(
-                link["url"],
-                reverse("accounts:role_login", kwargs={"role": portal.slug}),
-            )
+        self.assertEqual(len(links), 1)
+        self.assertEqual(links[0]["url"], reverse("accounts:login"))
 
-    def test_every_portal_door_appears_in_the_footer_of_every_page(self):
+    def test_every_public_page_footer_links_to_unified_login(self):
+        login_path = reverse("accounts:login")
         for name in PAGE_URL_NAMES:
             body = self.client.get(reverse(f"public:{name}")).content.decode()
             self.assertIn('class="pub-footer"', body, f"{name} lost the public footer")
             self.assertIn("Portal Login", body)
-            for slug in PORTALS:
-                self.assertIn(f"/login/{slug}/", body, f"{name} footer misses {slug}")
+            self.assertIn(login_path, body, f"{name} footer misses login link")
 
     def test_app_pages_do_not_get_the_public_footer(self):
         """

@@ -36,7 +36,6 @@ from .forms import (
     StaffUserUpdateForm,
 )
 from .models import User
-from .portals import PORTALS
 
 # Roles that are NOT allowed to self-reset their password.
 # Only the admin can reset passwords for these roles via the staff management page.
@@ -148,27 +147,6 @@ class UnifiedLoginView(View):
         return render(
             request, self.template_name, self._ctx(request, form, next_url)
         )
-
-
-PortalChooserView = UnifiedLoginView
-
-
-class RoleLoginView(View):
-    """
-    Legacy ``/login/<role>/`` route — validates the portal slug and redirects
-    to the unified ``/login/`` page (preserving ``?next=...``).
-    """
-
-    def dispatch(self, request, *args, **kwargs):
-        if PORTALS.get(kwargs.get("role", "")) is None:
-            raise Http404("No such portal.")
-        next_url = _safe_next(request)
-        target = reverse("accounts:login")
-        if next_url:
-            from urllib.parse import urlencode
-
-            target = f"{target}?{urlencode({'next': next_url})}"
-        return redirect(target)
 
 
 class LogoutView(LoginRequiredMixin, View):

@@ -248,14 +248,10 @@
       {# Portal Login col #}
       <div class="pub-footer__col">
         <h4><a href="{% url 'accounts:login' %}" class="pub-footer__title-link">Portal Login</a></h4>
-        {% for portal in portal_links %}
-        <a href="{{ portal.url }}">
-          <span class="pub-icon pub-icon--sm" aria-hidden="true">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4"/></svg>
-          </span>
-          <span class="pub-portal-dot" aria-hidden="true">&#9679;</span>{{ portal.label }}
-        </a>
-        {% endfor %}
+        <p class="pub-footer__inquiry">
+          Students, parents, teachers, finance, director &amp; administration.
+        </p>
+        <a href="{% url 'accounts:login' %}" class="pub-btn pub-btn--outline pub-btn--block">Sign In</a>
       </div>
 
       {# CTA col #}
