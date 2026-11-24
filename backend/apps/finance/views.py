@@ -781,6 +781,7 @@ class PaymentReceiptPdfView(FinanceReadMixin, View):
     """
 
     def get(self, request, *args, **kwargs):
+        from django.conf import settings as django_settings
         from django.db import transaction
         from django.template.loader import render_to_string
         from apps.core.pdf import pdf_response
@@ -796,9 +797,7 @@ class PaymentReceiptPdfView(FinanceReadMixin, View):
                     "payment": payment,
                     "duplicate": duplicate,
                     "currency": currency_code(self.request),
-                    "SCHOOL_NAME": __import__(
-                        "django.conf", fromlist=["settings"]
-                    ).settings.SCHOOL_NAME,
+                    "SCHOOL_NAME": django_settings.SCHOOL_NAME,
                     "request": request,
                 },
             )

@@ -491,7 +491,7 @@ class DirectConversation(BaseModel):
                 name="uniq_community_direct_pair",
             ),
             models.CheckConstraint(
-                check=models.Q(user_a__lt=models.F("user_b")),
+                condition=models.Q(user_a__lt=models.F("user_b")),
                 name="community_direct_pair_ordered",
             ),
         ]

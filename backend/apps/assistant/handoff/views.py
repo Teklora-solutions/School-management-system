@@ -281,7 +281,6 @@ class InboxDetailView(InboxAccessMixin, View):
         )
         if getattr(user, "role", "") not in ("admin", "director"):
             from ..models import HandoffTeam as _HT
-            from django.db.models import Q
             team_ids = _HT.objects.filter(members=user).values_list("pk", flat=True)
             if not (
                 handoff.assigned_user == user

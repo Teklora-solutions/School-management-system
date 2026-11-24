@@ -85,6 +85,39 @@ def _resolve_student(request) -> Student:
     raise PermissionDenied("Your role cannot access learning.")
 
 
+def _students_for_targeting(school_class) -> list:
+    """Pupils of a class, for the assign-to-chosen-students pickers."""
+    return list(
+        Student.objects.filter(current_class=school_class)
+        .select_related("user", "current_stream")
+        .order_by("user__last_name", "user__first_name", "pk")
+    )
+
+
+def _get_term(request):
+    from apps.academics.selectors import get_current_term
+    from apps.academics.models import Term
+    term_id = request.POST.get("term_id") or request.GET.get("term_id")
+    if term_id:
+        try:
+            return Term.objects.get(pk=int(term_id))
+        except (Term.DoesNotExist, ValueError):
+            pass
+    term = get_current_term()
+    if term is None:
+        raise Http404("No current term is configured.")
+    return term
+
+
+def _get_all_terms_for_class(school_class):
+    """All terms for the class's academic year, ordered."""
+    from apps.academics.models import Term
+    return list(
+        Term.objects.filter(academic_year=school_class.academic_year)
+        .order_by("start_date")
+    )
+
+
 class TeacherClassroomsView(TeacherRequiredMixin, LearningEnabledMixin, TemplateView):
     """The teacher's classrooms, already populated with their enrolled pupils."""
 

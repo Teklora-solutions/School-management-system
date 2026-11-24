@@ -24,8 +24,12 @@ from .classroom_views import (
     EngagementEnabledMixin,
     LearningEnabledMixin,
     StudentOrParentMixin,
+    _get_all_terms_for_class,
+    _get_term,
     _resolve_student,
+    _students_for_targeting,
 )
+from .course_views import _assert_quiz_reachable_for_student, _get_teacher_assignment
 
 logger = logging.getLogger(__name__)
 

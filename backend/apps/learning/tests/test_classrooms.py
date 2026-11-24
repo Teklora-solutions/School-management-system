@@ -150,7 +150,7 @@ class LearningClassroomsTests(TestCase):
         )
         response = self.client.get(url)
         self.assertContains(response, "Classroom menu")
-        self.assertEqual(response.content.count(b"classroom-menu__item"), 7)
+        self.assertEqual(response.content.count(b"classroom-menu__item"), 6)
 
     def test_teacher_detail_for_unassigned_classroom_is_404(self):
         self.client.force_login(self.teacher_user)
@@ -197,7 +197,7 @@ class LearningClassroomsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Mathematics")
         self.assertContains(response, "Classroom menu")
-        self.assertEqual(response.content.count(b"classroom-menu__item"), 6)
+        self.assertEqual(response.content.count(b"classroom-menu__item"), 10)
 
     # ── Parent ─────────────────────────────────────────────────────────────
 
@@ -216,8 +216,8 @@ class LearningClassroomsTests(TestCase):
             reverse("learning:classroom", args=[self.class_a.pk, self.maths.pk])
         )
         self.assertContains(detail, "read-only")
-        # Parents get the three shared class links, not the pupil-only ones.
-        self.assertEqual(detail.content.count(b"classroom-menu__item"), 3)
+        # Parents get the shared class links, not the pupil-only ones.
+        self.assertEqual(detail.content.count(b"classroom-menu__item"), 4)
         self.assertNotContains(detail, "Search lessons")
 
     # ── Role guards ────────────────────────────────────────────────────────

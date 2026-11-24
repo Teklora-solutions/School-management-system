@@ -224,8 +224,10 @@ def _resolve_fallback(rule: HandoffRule) -> tuple[object | None, HandoffTeam | N
 
 
 def _sla_due_at(rule: HandoffRule, settings_row, now=None) -> object:
+    from datetime import timedelta
+
     minutes = rule.response_target_for(settings_row)
-    return (now or timezone.now()) + __import__("datetime").timedelta(minutes=minutes)
+    return (now or timezone.now()) + timedelta(minutes=minutes)
 
 
 def _freeze_packet(

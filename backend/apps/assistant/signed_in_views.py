@@ -78,11 +78,12 @@ class SignedInStateView(LoginRequiredMixin, View):
         conv = open_signed_in_conversation(user, create=False)
         mem = AssistantMemory.objects.filter(user=user, opted_in=True).first()
 
+        from django.conf import settings
+
         payload = {
             "ok": True,
             "enabled": True,
-            "school": getattr(__import__("django.conf", fromlist=["settings"]).settings,
-                              "SCHOOL_NAME", "the school"),
+            "school": getattr(settings, "SCHOOL_NAME", "the school"),
             "role": getattr(user, "role", ""),
             "user_name": user.get_full_name() or user.username,
             "language": conv.language if conv else (mem.prefer_language if mem else "en"),
