@@ -781,34 +781,37 @@ class PaymentReceiptPdfView(FinanceReadMixin, View):
     """
 
     def get(self, request, *args, **kwargs):
-        payment = selectors.get_payment(kwargs["pk"])
-        duplicate = payment.print_count >= 1
+        from django.db import transaction
         from django.template.loader import render_to_string
-
-        html = render_to_string(
-            "features/finance/payment_receipt_pdf.html",
-            {
-                "payment": payment,
-                "duplicate": duplicate,
-                "currency": currency_code(self.request),
-                "SCHOOL_NAME": __import__(
-                    "django.conf", fromlist=["settings"]
-                ).settings.SCHOOL_NAME,
-                "request": request,
-            },
-        )
         from apps.core.pdf import pdf_response
 
-        response = pdf_response(
-            html=html,
-            filename=f"receipt_{payment.receipt_number}.pdf",
-            base_url=request.build_absolute_uri("/"),
-        )
-        if response.status_code == 200:
-            services.mark_receipt_printed(
-                payment=payment, actor=request.user, request=request
+        with transaction.atomic():
+            payment = selectors.get_payment(kwargs["pk"])
+            locked = Payment.objects.select_for_update().get(pk=payment.pk)
+            duplicate = locked.print_count >= 1
+
+            html = render_to_string(
+                "features/finance/payment_receipt_pdf.html",
+                {
+                    "payment": payment,
+                    "duplicate": duplicate,
+                    "currency": currency_code(self.request),
+                    "SCHOOL_NAME": __import__(
+                        "django.conf", fromlist=["settings"]
+                    ).settings.SCHOOL_NAME,
+                    "request": request,
+                },
             )
-        return response
+            response = pdf_response(
+                html=html,
+                filename=f"receipt_{payment.receipt_number}.pdf",
+                base_url=request.build_absolute_uri("/"),
+            )
+            if response.status_code == 200:
+                services.mark_receipt_printed(
+                    payment=locked, actor=request.user, request=request
+                )
+            return response
 
 
 class PaymentReverseView(FinanceWriteMixin, TemplateView):

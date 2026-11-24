@@ -167,18 +167,31 @@ def staff_reply(handoff: Handoff, *, body: str, actor) -> ChatMessage:
         from django.core.exceptions import ValidationError
         raise ValidationError({"body": "Write your reply before sending."})
 
-    conversation = handoff.conversation
+    if handoff.signed_in_conversation_id:
+        from ..models import SignedInMessage
 
-    msg = ChatMessage.objects.create(
-        conversation=conversation,
-        role=ChatMessage.Role.STAFF,
-        body=body.strip(),
-        staff_user=actor,
-        language=conversation.language,
-    )
-    conversation.last_activity_at = timezone.now()
-    conversation.message_count = models.F("message_count") + 1
-    conversation.save(update_fields=["last_activity_at", "message_count", "updated_at"])
+        conversation = handoff.signed_in_conversation
+        msg = SignedInMessage.objects.create(
+            conversation=conversation,
+            role=SignedInMessage.Role.SYSTEM,
+            body=body.strip(),
+            language=conversation.language,
+        )
+        conversation.last_activity_at = timezone.now()
+        conversation.message_count = models.F("message_count") + 1
+        conversation.save(update_fields=["last_activity_at", "message_count", "updated_at"])
+    else:
+        conversation = handoff.conversation
+        msg = ChatMessage.objects.create(
+            conversation=conversation,
+            role=ChatMessage.Role.STAFF,
+            body=body.strip(),
+            staff_user=actor,
+            language=conversation.language,
+        )
+        conversation.last_activity_at = timezone.now()
+        conversation.message_count = models.F("message_count") + 1
+        conversation.save(update_fields=["last_activity_at", "message_count", "updated_at"])
 
     if handoff.status in (Handoff.Status.NEW, Handoff.Status.ASSIGNED):
         handoff.status = Handoff.Status.IN_PROGRESS

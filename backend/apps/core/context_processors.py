@@ -54,15 +54,14 @@ def school_settings(request: HttpRequest) -> dict:
     the matching ``SCHOOL_*`` setting from the environment. Costs one
     primary-key read per rendered request.
     """
-    from .selectors import school_settings_values
+    from .selectors import school_settings_row, school_settings_values
 
     values = school_settings_values(request)
 
     # Logo URL — served relative so it works on any host
     logo_url = ""
     try:
-        from .models import SchoolSettings
-        row = SchoolSettings.objects.filter(pk=SchoolSettings.SINGLETON_PK).first()
+        row = school_settings_row(request)
         logo = getattr(row, "logo", None) if row else None
         if logo:
             logo_url = logo.url

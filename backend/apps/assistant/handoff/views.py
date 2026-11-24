@@ -293,11 +293,19 @@ class InboxDetailView(InboxAccessMixin, View):
 
     def get(self, request, pk):
         handoff = self._get_handoff(pk, request.user)
+        if handoff.signed_in_conversation_id:
+            from ..models import SignedInMessage
+
+            chat_messages = SignedInMessage.objects.filter(
+                conversation=handoff.signed_in_conversation
+            ).order_by("created_at", "pk")
+        else:
+            chat_messages = ChatMessage.objects.filter(
+                conversation=handoff.conversation
+            ).order_by("created_at", "pk")
         return render(request, self.template_name, {
             "handoff": handoff,
-            "chat_messages": ChatMessage.objects.filter(
-                conversation=handoff.conversation
-            ).order_by("created_at", "pk"),
+            "chat_messages": chat_messages,
             "note_form": HandoffNoteForm(),
             "reply_form": StaffReplyForm(),
             "resolve_form": ResolveForm(),
@@ -425,6 +433,16 @@ class CannedReplyDeleteView(AdminRequiredMixin, View):
 # CP6 -- Conversation export and deletion
 # ---------------------------------------------------------------------------
 
+_CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _safe_csv_cell(value) -> str:
+    text = str(value or "")
+    if text and text[0] in _CSV_FORMULA_PREFIXES:
+        return "'" + text
+    return text
+
+
 class ConversationExportView(AdminRequiredMixin, View):
     def get(self, request, pk):
         conv = get_object_or_404(ChatConversation, pk=pk)
@@ -435,7 +453,10 @@ class ConversationExportView(AdminRequiredMixin, View):
         for msg in rows:
             writer.writerow([
                 msg.created_at.isoformat() if msg.created_at else "",
-                msg.role, msg.body, msg.language, msg.blocked_reason,
+                _safe_csv_cell(msg.role),
+                _safe_csv_cell(msg.body),
+                _safe_csv_cell(msg.language),
+                _safe_csv_cell(msg.blocked_reason),
             ])
         log_action(
             actor=request.user, action="assistant.conversation_exported",

@@ -23,9 +23,11 @@ Image src is restricted to http/https to prevent data-URI payloads.
 
 from __future__ import annotations
 
-import markdown
+from html import escape as html_escape
+from html.parser import HTMLParser
+
 import bleach
-from bleach.linkifier import LinkifyFilter
+import markdown
 from django.utils.safestring import mark_safe
 
 
@@ -44,11 +46,13 @@ ALLOWED_TAGS = [
 ]
 
 ALLOWED_ATTRS = {
-    "a":   ["href", "title", "rel"],
+    "a":   ["href", "title"],
     "img": ["src", "alt", "title", "width", "height"],
     "th":  ["align"],
     "td":  ["align"],
 }
+
+ALLOWED_PROTOCOLS = ["http", "https"]
 
 # Markdown extensions to enable
 MD_EXTENSIONS = [
@@ -90,6 +94,7 @@ def render_notes(text: str, *, notes_format: str = "plain") -> str:
         raw_html,
         tags=ALLOWED_TAGS,
         attributes=ALLOWED_ATTRS,
+        protocols=ALLOWED_PROTOCOLS,
         strip=True,       # strip (not escape) disallowed tags
         strip_comments=True,
     )
@@ -101,16 +106,44 @@ def render_notes(text: str, *, notes_format: str = "plain") -> str:
     return mark_safe(clean)
 
 
+class _LinkPatcher(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            filtered = [
+                (k, v) for k, v in attrs if k.lower() not in ("target", "rel")
+            ]
+            filtered.extend([("target", "_blank"), ("rel", "noopener noreferrer")])
+            attr_str = "".join(
+                f' {k}="{html_escape(v, quote=True)}"' if v is not None else f" {k}"
+                for k, v in filtered
+            )
+            self.parts.append(f"<a{attr_str}>")
+        else:
+            self.parts.append(self.get_starttag_text())
+
+    def handle_startendtag(self, tag, attrs):
+        self.parts.append(self.get_starttag_text())
+
+    def handle_endtag(self, tag):
+        self.parts.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+    def handle_entityref(self, name):
+        self.parts.append(f"&{name};")
+
+    def handle_charref(self, name):
+        self.parts.append(f"&#{name};")
+
+
 def _patch_links(html: str) -> str:
-    """Add target="_blank" rel="noopener noreferrer" to every <a> tag."""
-    from html.parser import HTMLParser
-    import re
-
-    # Simple regex approach — safe because bleach already cleaned the HTML
-    def replace_a(m):
-        tag = m.group(0)
-        if 'target=' not in tag:
-            tag = tag.rstrip('>') + ' target="_blank" rel="noopener noreferrer">'
-        return tag
-
-    return re.sub(r'<a\s[^>]*>', replace_a, html)
+    """Enforce target="_blank" rel="noopener noreferrer" on every <a> tag."""
+    parser = _LinkPatcher()
+    parser.feed(html)
+    parser.close()
+    return "".join(parser.parts)

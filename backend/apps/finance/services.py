@@ -2040,10 +2040,16 @@ def mark_receipt_printed(
     payment. The first copy is the receipt itself, so only the second and later
     are marked, and the PDF asks this function how many have already gone.
     """
+    from django.db.models import F
+
     copies = max(1, int(copies))
-    payment.print_count = payment.print_count + copies
-    payment.last_printed_at = timezone.now()
-    payment.save(update_fields=["print_count", "last_printed_at", "updated_at"])
+    locked = Payment.objects.select_for_update().get(pk=payment.pk)
+    locked.print_count = F("print_count") + copies
+    locked.last_printed_at = timezone.now()
+    locked.save(update_fields=["print_count", "last_printed_at", "updated_at"])
+    locked.refresh_from_db(fields=["print_count", "last_printed_at"])
+    payment.print_count = locked.print_count
+    payment.last_printed_at = locked.last_printed_at
 
     log_action(
         actor=actor,

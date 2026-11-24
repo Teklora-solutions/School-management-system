@@ -264,7 +264,7 @@ def create_staff_user(
     must_change_password: bool = True,
     actor: UserType | None = None,
     request: HttpRequest | None = None,
-    send_credentials: bool = True,
+    send_credentials: bool = False,
     extra_profile: dict | None = None,
 ) -> tuple[UserType, str]:
     """

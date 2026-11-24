@@ -337,11 +337,19 @@ class ProviderForm(forms.ModelForm):
                 "saved safely. Ask your developer to set ASSISTANT_ENCRYPTION_KEY first.",
             )
         kind = cleaned.get("kind")
+        base_url = (cleaned.get("base_url") or "").strip()
         if kind != ProviderConfig.Kind.FAKE:
             if not (cleaned.get("model_name") or "").strip():
                 self.add_error("model_name", "Choose the chat model for this provider.")
-            if kind == ProviderConfig.Kind.OPENAI_COMPATIBLE and not (cleaned.get("base_url") or "").strip():
+            if kind == ProviderConfig.Kind.OPENAI_COMPATIBLE and not base_url:
                 self.add_error("base_url", "Enter the server address for this provider.")
+        if base_url:
+            from apps.core.http import validate_http_url_syntax
+
+            try:
+                validate_http_url_syntax(base_url)
+            except ValueError as exc:
+                self.add_error("base_url", str(exc))
         return cleaned
 
 

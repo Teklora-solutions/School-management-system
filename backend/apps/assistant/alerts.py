@@ -227,12 +227,15 @@ def _escalate(overdue, settings_row, now) -> None:
     if not overdue:
         return
 
+    from . import tasks
+
     link = reverse("assistant:alerts")
+    recipients = _staff_recipients()
     for alert in overdue:
         alert.escalated_at = now
         alert.save(update_fields=["escalated_at", "updated_at"])
         notify_many(
-            recipients=_staff_recipients(),
+            recipients=recipients,
             title="Still unacknowledged: safeguarding alert",
             message=(
                 f"A {category_label(alert.category)} alert has not been acknowledged within "
@@ -248,8 +251,6 @@ def _escalate(overdue, settings_row, now) -> None:
             object_id=alert.pk,
             change_summary={"category": alert.category},
         )
-        from . import tasks
-
         tasks.send_alert_email(alert, attempt=1)
 
 

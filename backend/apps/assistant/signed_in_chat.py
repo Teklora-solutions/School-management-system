@@ -438,10 +438,11 @@ def complete(turn: SignedInTurn) -> SignedInTurn:
         if refusal:
             return _store_reply(turn, refusal, [], [], "tutor_refusal", row)
 
-    # 1. Guardrails (mandatory)
+    # 1. Guardrails (mandatory + admin custom rules)
+    from . import selectors
     from .guardrails import screen
-    from .guardrails.rules import MANDATORY_RULES
-    screening = screen(question)
+
+    screening = screen(question, selectors.custom_rules_active())
     if screening.triggered:
         alerts.create_alert(
             profile=UsageEvent.Profile.SIGNED_IN,
@@ -836,7 +837,7 @@ def _check_handoff(turn: SignedInTurn, question: str, answer_obj) -> None:
         from .models import Handoff
 
         already = Handoff.objects.filter(
-            conversation_id=turn.conversation.pk
+            signed_in_conversation=turn.conversation
         ).exclude(status=Handoff.Status.RESOLVED).exists()
 
         if not already:

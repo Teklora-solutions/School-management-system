@@ -452,9 +452,6 @@ def student_statement(*, student_id: int, term=None) -> dict:
     )
 
     if term:
-        payments_qs = all_payments_qs.filter(
-            allocations__invoice_id__in=posted_ids
-        ).distinct()
         adjustments_qs = adjustments_qs.filter(invoice_id__in=posted_ids)
 
         total_billed = _money_sum(posted_invoices, "total_amount")
@@ -475,8 +472,8 @@ def student_statement(*, student_id: int, term=None) -> dict:
         )
 
         term_ids = set(posted_ids)
-        payments = list(payments_qs)
-        for payment in payments:
+        payments = []
+        for payment in all_payments_qs:
             # A term receipt shows its share of this term, not other terms it
             # also paid and not the unallocated part held as credit.
             here = [
@@ -484,10 +481,13 @@ def student_statement(*, student_id: int, term=None) -> dict:
                 for allocation in payment.allocations.all()
                 if allocation.invoice_id in term_ids
             ]
+            if not here:
+                continue
             payment.term_allocations = here
             payment.shown_amount = sum(
                 (allocation.allocated_amount for allocation in here), ZERO
             )
+            payments.append(payment)
     else:
         payments_qs = all_payments_qs
         total_billed = _money_sum(posted_invoices, "total_amount")

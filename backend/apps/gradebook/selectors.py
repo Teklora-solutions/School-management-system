@@ -224,7 +224,7 @@ def family_releases(student) -> list[dict]:
     both exist for the same subject and term, the stream one wins: it is the
     grading the pupil was actually in.
     """
-    setups = (
+    setups = list(
         _stream_compatible_setups(student)
         .select_related("subject", "term__academic_year", "stream")
         .order_by(
@@ -233,14 +233,39 @@ def family_releases(student) -> list[dict]:
             "subject__name",
         )
     )
+    if not setups:
+        return []
+
+    from .models import GradebookRelease, GradebookResult
+
+    setup_ids = [s.pk for s in setups]
+    latest_by_setup: dict[int, GradebookRelease] = {}
+    for rel in (
+        GradebookRelease.objects.filter(setup_id__in=setup_ids)
+        .select_related("released_by")
+        .order_by("setup_id", "-version")
+    ):
+        if rel.setup_id not in latest_by_setup:
+            latest_by_setup[rel.setup_id] = rel
+
+    release_ids = [rel.pk for rel in latest_by_setup.values()]
+    results_by_release: dict[int, GradebookResult] = (
+        {
+            res.release_id: res
+            for res in GradebookResult.objects.filter(
+                release_id__in=release_ids, student=student
+            )
+        }
+        if release_ids
+        else {}
+    )
+
     chosen: dict[tuple[int, int], dict] = {}
     for setup in setups:
-        release = (
-            setup.releases.select_related("released_by").order_by("-version").first()
-        )
+        release = latest_by_setup.get(setup.pk)
         if release is None:
             continue
-        result = release.results.filter(student=student).first()
+        result = results_by_release.get(release.pk)
         if result is None:
             continue
         key = (setup.term_id, setup.subject_id)

@@ -229,15 +229,24 @@ def _sla_due_at(rule: HandoffRule, settings_row, now=None) -> object:
 
 
 def _freeze_packet(
-    conversation: ChatConversation,
+    conversation,
     rule: HandoffRule,
 ) -> dict:
     """Frozen snapshot stored on the Handoff row."""
-    messages = list(
-        ChatMessage.objects.filter(conversation=conversation)
-        .order_by("created_at", "pk")
-        .values("role", "body", "created_at", "citations")
-    )
+    from ..models import SignedInConversation, SignedInMessage
+
+    if isinstance(conversation, SignedInConversation):
+        messages = list(
+            SignedInMessage.objects.filter(conversation=conversation)
+            .order_by("created_at", "pk")
+            .values("role", "body", "created_at", "citations")
+        )
+    else:
+        messages = list(
+            ChatMessage.objects.filter(conversation=conversation)
+            .order_by("created_at", "pk")
+            .values("role", "body", "created_at", "citations")
+        )
     return {
         "rule_name": rule.name,
         "rule_priority": rule.priority,
@@ -342,16 +351,18 @@ def _notify_destination(handoff: Handoff, rule: HandoffRule) -> None:
 
 @transaction.atomic
 def create_handoff(
-    conversation: ChatConversation,
+    conversation,
     rule: HandoffRule,
     settings_row=None,
 ) -> Handoff:
     """
-    Create a Handoff row for ``conversation``, write the visitor-facing system
-    message, freeze the packet, set the SLA deadline and send notifications.
+    Create a Handoff row for ``conversation`` (public or signed-in), write the
+    system message, freeze the packet, set the SLA deadline and send notifications.
 
     Called only when no Handoff already exists for this conversation.
     """
+    from ..models import SignedInConversation, SignedInMessage
+
     if settings_row is None:
         settings_row = AssistantSettings.read()
 
@@ -364,9 +375,11 @@ def create_handoff(
 
     now = timezone.now()
     within_hours = rule.within_working_hours(now)
+    is_signed_in = isinstance(conversation, SignedInConversation)
 
     handoff = Handoff.objects.create(
-        conversation=conversation,
+        conversation=None if is_signed_in else conversation,
+        signed_in_conversation=conversation if is_signed_in else None,
         rule=rule,
         priority=rule.priority,
         status=Handoff.Status.NEW,
@@ -377,14 +390,22 @@ def create_handoff(
         sla_due_at=_sla_due_at(rule, settings_row, now),
     )
 
-    # System message visible to the visitor
+    # System message visible to the visitor or signed-in user
     notice_text = _handoff_notice(rule, within_hours)
-    ChatMessage.objects.create(
-        conversation=conversation,
-        role=ChatMessage.Role.SYSTEM,
-        body=notice_text,
-        language=conversation.language,
-    )
+    if is_signed_in:
+        SignedInMessage.objects.create(
+            conversation=conversation,
+            role=SignedInMessage.Role.SYSTEM,
+            body=notice_text,
+            language=conversation.language,
+        )
+    else:
+        ChatMessage.objects.create(
+            conversation=conversation,
+            role=ChatMessage.Role.SYSTEM,
+            body=notice_text,
+            language=conversation.language,
+        )
 
     # Audit event
     HandoffEvent.objects.create(

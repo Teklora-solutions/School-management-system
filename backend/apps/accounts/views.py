@@ -441,11 +441,10 @@ class StaffUserCreateView(AdminRequiredMixin, View):
             else:
                 messages.success(
                     request,
-                    f"Staff account created for {user.full_name}. "
-                    f"Login email: {user.email} | "
-                    f"Initial password: {initial_password}"
+                    f"Staff account created for {user.full_name} ({user.email}). "
+                    "Hand them the password you set"
                     + (
-                        " (they must change it on first login)."
+                        " — they will be asked to change it on first sign-in."
                         if user.must_change_password
                         else "."
                     ),

@@ -137,6 +137,11 @@ class PublicLimitTests(TestCase):
         self.assertNotEqual(key, "forged")
 
     def test_ip_comes_from_the_forwarded_header_behind_the_proxy(self):
+        from django.test import override_settings
+
         request = RequestFactory().get("/", HTTP_X_FORWARDED_FOR="41.1.2.3, 10.0.0.1")
         request.META["REMOTE_ADDR"] = "127.0.0.1"
-        self.assertEqual(limits.client_ip(request), "41.1.2.3")
+        # Untrusted REMOTE_ADDR ignores X-Forwarded-For
+        self.assertEqual(limits.client_ip(request), "127.0.0.1")
+        with override_settings(TRUSTED_PROXIES=["127.0.0.1", "10.0.0.0/8"]):
+            self.assertEqual(limits.client_ip(request), "41.1.2.3")

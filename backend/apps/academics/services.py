@@ -309,7 +309,8 @@ def update_subject(
     actor: User | None = None,
     request: HttpRequest | None = None,
 ) -> Subject:
-    before = (subject.name, subject.code, subject.is_active)
+    db_subject = Subject.objects.get(pk=subject.pk)
+    before = (db_subject.name, db_subject.code, db_subject.is_active)
     subject.name = name.strip()
     subject.code = code.strip().upper()
     subject.is_active = is_active
@@ -463,23 +464,31 @@ def update_class_subject(
     """
     from apps.teachers.models import TeacherAssignment
 
+    db_mapping = ClassSubject.objects.select_related(
+        "school_class", "subject", "stream"
+    ).get(pk=mapping.pk)
     before = {
-        "class": mapping.school_class.name,
-        "subject": mapping.subject.code,
-        "stream": mapping.stream.name if mapping.stream_id else None,
+        "class": db_mapping.school_class.name,
+        "subject": db_mapping.subject.code,
+        "stream": db_mapping.stream.name if db_mapping.stream_id else None,
     }
     attached = TeacherAssignment.objects.filter(
-        school_class=mapping.school_class, subject=mapping.subject
+        school_class=db_mapping.school_class, subject=db_mapping.subject
     ).count()
     if attached:
         raise ValidationError(
-            f"{mapping.subject.code} in {mapping.school_class.name} has "
+            f"{db_mapping.subject.code} in {db_mapping.school_class.name} has "
             f"{attached} teacher assignment(s) attached. Remove those first, "
             "then change the mapping."
+        )
+    if stream and stream.school_class_id != school_class.pk:
+        raise ValidationError(
+            {"stream": f"{stream.name} does not belong to {school_class.name}."}
         )
     mapping.school_class = school_class
     mapping.subject = subject
     mapping.stream = stream
+    mapping.full_clean()
     mapping.save()
     log_action(
         actor=actor,

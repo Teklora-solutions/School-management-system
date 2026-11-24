@@ -35,7 +35,7 @@ Top-level comments render their replies underneath.
         <i class="bi bi-slash-circle" aria-hidden="true"></i> This comment was removed.
       </p>
       {% else %}
-      <div class="cmty-comment__body">{{ comment.body|linebreaks }}</div>
+      <div class="cmty-comment__body">{{ comment.body|safe|linebreaksbr }}</div>
       {% endif %}
     </div>
 

@@ -817,6 +817,7 @@ def latest_release(setup: GradebookSetup) -> GradebookRelease | None:
 
 
 @transaction.atomic
+@transaction.atomic
 def release_gradebook(
     *,
     setup: GradebookSetup,
@@ -831,6 +832,7 @@ def release_gradebook(
     mark a family may already have seen. Every release keeps its own weights and
     one result row per pupil, so an older version can always be reconstructed.
     """
+    setup = GradebookSetup.objects.select_for_update().get(pk=setup.pk)
     ensure_writable(setup)
     grid = build_grid(setup)
     if not grid["has_items"]:
