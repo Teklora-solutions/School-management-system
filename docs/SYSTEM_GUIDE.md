@@ -39,6 +39,7 @@ File references are repo-relative, `path:line`, so you can jump straight to the 
 | `community` | School-wide community: posts, comments, reactions, moderation, member map, direct messages |
 | `dashboards` | One home page per role + the Director portal |
 | `assistant` | AI assistant configuration: provider list, encrypted keys, settings and usage (full docs in [`docs/ai-assistant/`](docs/ai-assistant/README.md)) |
+| `api` | External integration layer: REST API, outbound webhooks, inbound webhook receiver, API key management (full docs in [`docs/api/`](../docs/api/README.md)) |
 | `core` | Audit log, notifications, `SystemEvent`, `SchoolSettings`, navigation, mixins, exports, PDF, health |
 
 **The layering rule** every module follows:

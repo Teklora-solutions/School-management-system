@@ -87,6 +87,11 @@ SEED_RNG = 20260901  # fixed so the generated names/scores repeat per run
 
 DEMO_EMAIL_DOMAIN = "demo.school"
 
+# Default password used for every demo account when --password is not supplied.
+# Developers can log in immediately after seeding without reading terminal output.
+# Change this or pass --password to override for a specific run.
+DEMO_PASSWORD = "Demo1234!"
+
 PASSWORD_ALPHABET = string.ascii_letters + string.digits
 
 
@@ -272,10 +277,10 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--password",
-            default="",
+            default=DEMO_PASSWORD,
             help=(
                 "Use this password for every demo login instead of generating "
-                "one. For tests and repeatable demos."
+                f"one (default: {DEMO_PASSWORD!r}). For tests and repeatable demos."
             ),
         )
 

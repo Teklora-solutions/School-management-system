@@ -61,9 +61,10 @@ No Docker, no JS build step, no managed services required — it runs on one sma
 | Dependency audit | `pip-audit` |
 | Markdown rendering | `markdown>=3.5` + `bleach>=6.1` — lesson notes sanitised before display |
 
-`djangorestframework` is installed and configured (session auth, `IsAuthenticated`, page-number
-pagination of 25) but **no API endpoints exist yet** — every screen is an HTML view. Treat DRF as a
-reserved dependency, not a feature.
+`djangorestframework` is installed and configured with API key auth, JWT (simplejwt), scope-based
+permissions, throttling, django-filter, and drf-spectacular for OpenAPI schema generation.
+The external integration API lives at `/api/v1/` — see **[docs/api/README.md](docs/api/README.md)**
+for the full reference including endpoints, authentication, webhooks, and integration guide.
 
 ### Frontend
 | Concern | Choice |
@@ -207,6 +208,7 @@ environment variables instead. Defaults shown are the development defaults.
 | `SLOW_REQUEST_THRESHOLD_MS` | `500` | `RequestTimingMiddleware` warns above this. |
 | `DIRECTOR_KPI_CACHE_TTL` | `600` | Read at call time, so `.env` works even though it is not in the `env()` defaults. |
 | `PDF_BROWSER_PATH` | empty | Absolute path to a Chromium/Edge binary used by the PDF fallback engine when WeasyPrint's native libs are missing. Empty → the code searches Chrome, Edge and the common Linux command names. |
+| `INBOUND_WEBHOOK_SOURCES` | — | Not an env var. Set in `settings.py` as a dict mapping inbound webhook slug → `{"secret": "...", "handler": "dotted.path"}`. See [docs/api/README.md](docs/api/README.md). |
 
 ---
 
@@ -231,7 +233,7 @@ governance state, homework with submissions, announcements and message threads.
 |---|---|
 | `--students-per-class N` | 2–100 pupils per class (default 10). |
 | `--dry-run` | Runs everything, then rolls every write back. |
-| `--password VALUE` | Use a known password for every demo login instead of a generated one (tests, repeatable demos). |
+| `--password VALUE` | Override the default password (`Demo1234!`) for every demo login. Pass an empty string (`--password ""`) to get a generated random password per role instead. |
 | `--force` | Run even with `DEBUG` off (a real database). Refused otherwise. |
 
 It is **idempotent** (natural keys + a fixed RNG seed of `20260901`), so a second run adds nothing.
@@ -242,19 +244,26 @@ For statement-screening work there is a second seeder, `python manage.py seed_st
 covering every per-term statement state: settled, part-paid with carry-over, untouched, paid ahead, late,
 awarded, reversed, draft, holding a credit.
 
-Demo logins — the seeder **generates a random password for each role and prints the table once** at
-the end of its output. Nothing in this repository contains those passwords. Write them down when
-they scroll past: re-running the seeder keeps the passwords the accounts already have rather than
-resetting them.
+Demo logins — the seeder uses **`Demo1234!`** as the default password for every
+account, so you can log in immediately after seeding without reading terminal
+output. Pass `--password VALUE` to override for a specific run.
+
+> To get random per-role passwords instead (e.g. for a shared staging server),
+> pass `--password ""` to suppress the default and let the seeder generate
+> one per role, printing the table once at the end of its output.
 
 | Username | Password | Role | Login identifier |
 |---|---|---|---|
-| `admin` | printed by the seeder | Admin | email |
-| `director` | printed by the seeder | Director | email |
-| `finance` | printed by the seeder | Finance officer | email |
-| `tch_001` … `tch_005` | printed by the seeder | Teacher | email |
-| `stu_001` … | printed by the seeder | Student | **admission number** |
-| `par_001` … | printed by the seeder | Parent | username |
+| `admin` | `Demo1234!` | Admin | email: `admin@demo.school` |
+| `director` | `Demo1234!` | Director | email: `director@demo.school` |
+| `finance` | `Demo1234!` | Finance officer | email: `finance@demo.school` |
+| `tch_001` | `Demo1234!` | Teacher (Basic 5 class teacher) | email: `tch_001@demo.school` |
+| `tch_002` | `Demo1234!` | Teacher (Basic 6 class teacher) | email: `tch_002@demo.school` |
+| `tch_003` | `Demo1234!` | Teacher (JHS 1 class teacher) | email: `tch_003@demo.school` |
+| `tch_004` | `Demo1234!` | Teacher | email: `tch_004@demo.school` |
+| `tch_005` | `Demo1234!` | Teacher (JHS 2 class teacher) | email: `tch_005@demo.school` |
+| `stu_001` … `stu_040` | `Demo1234!` | Student | **admission number** (printed in seeder output, e.g. `GA/26/001`) |
+| `par_001` … `par_038` | `Demo1234!` | Parent | username |
 
 `locustfile.py` reads the same passwords from `LOCUST_ADMIN_PASSWORD`, `LOCUST_STUDENT_PASSWORD`,
 `LOCUST_PARENT_PASSWORD`, `LOCUST_DIRECTOR_PASSWORD` and `LOCUST_FINANCE_PASSWORD`, so a load test
@@ -490,7 +499,7 @@ post-restore checklist (`migrate --check`, `curl /readyz/`, admin login spot-che
 Stated plainly, because they will bite someone:
 
 - **Attendance has no screens.** Models, services and selectors are complete; `/attendance/` renders a "coming soon" page from a stub URLconf. Checkpoint E will add the screens.
-- **No REST API.** DRF is configured but unused. Anything that needs JSON must add endpoints.
+- **REST API write paths are partial.** The API is live at `/api/v1/` with read endpoints for students, results, fees, attendance, and academic structure, plus outbound and inbound webhook infrastructure. `students:write` and finance write endpoints are defined but not yet exposed — enrolment and financial entries still go through the admin console and existing HTML screens. See [docs/api/README.md](docs/api/README.md).
 - **`apps/public_site/` is dead code** — present on disk, absent from `INSTALLED_APPS` and from the root URLconf, so its routes are unreachable. `apps/public` superseded it.
 - **Screen coverage is partial** — no student edit / withdraw / restore / delete screen; classes, streams and subjects are create-only. Fixes go through `/django-admin/`.
 - **Finance edges:** no refunds, no manual-journal UI, and `Invoice.Status.CANCELLED` exists but no flow ever writes it. Late fees are computed but go nowhere. Re-billing after revising a fee structure doubles `billed`. Fee reminders broadcast to every student/parent regardless of the selection.
@@ -512,9 +521,10 @@ school-management-system/
 │   │   ├── settings/         # base.py / dev.py / prod.py / test.py
 │   │   ├── urls.py           # root URLconf
 │   │   └── wsgi.py, asgi.py
-│   ├── apps/                 # 15 installed apps (core, accounts, academics, students,
+│   ├── apps/                 # 16 installed apps (core, accounts, academics, students,
 │   │   │                     #  teachers, results, finance, homework, gradebook, learning,
-│   │   │                     #  attendance, communications, dashboards, public, **community**)
+│   │   │                     #  attendance, communications, dashboards, public, community,
+│   │   │                     #  **api** — external integration layer)
 │   │   └── public_site/      # dormant, not installed, not routed
 │   ├── tests/                # cross-app integration + architecture tests
 │   ├── requirements/         # base.txt / dev.txt / prod.txt
@@ -529,7 +539,8 @@ school-management-system/
 │   └── static/               # css/, js/, vendor/ (Bootstrap 5.3.3, Icons 1.11.3, Chart.js 4.4.4)
 │
 ├── docs/
-│   ├── SYSTEM_GUIDE.md       # 996-line architecture, security and operations handbook
+│   ├── SYSTEM_GUIDE.md       # architecture, security and operations handbook
+│   ├── api/README.md         # External integration API — endpoints, auth, webhooks, integration guide
 │   ├── performance.md        # Locust baseline, budgets, tuning checklist
 │   ├── decisions/observability.md   # ADR-004 (Accepted, 2026-10-16)
 │   └── user_guides/          # empty

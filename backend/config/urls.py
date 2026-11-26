@@ -101,6 +101,8 @@ urlpatterns = [
     path("dashboards/", include("apps.dashboards.urls", namespace="dashboards")),
     # AI assistant configuration (admin only; the assistant is off by default)
     path("assistant/", include("apps.assistant.urls", namespace="assistant")),
+    # External integration API (REST + webhooks)
+    path("api/v1/", include("apps.api.urls", namespace="api_v1")),
 ]
 
 # Serve media files in development

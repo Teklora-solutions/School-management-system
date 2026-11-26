@@ -233,6 +233,39 @@
   </div>
 </section>
 
+<!-- ═══ FUN CORNER — Brain Basket ═══════════════════════════════════════ -->
+<section class="section section--alt" id="fun-corner">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <p class="eyebrow">Fun Corner</p>
+      <h2>Brain Basket</h2>
+      <p>Catch the right answer! A quick maths game for curious minds.</p>
+    </div>
+    <div class="bb-preview" id="brainBasket">
+      <div class="bb-preview__art" aria-hidden="true">
+        <svg viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="A school bag catching falling answer cards">
+          <rect x="0" y="0" width="320" height="200" rx="16" fill="#2f5d50"/>
+          <rect x="20" y="24" width="280" height="34" rx="8" fill="#fff8e7"/>
+          <text x="160" y="47" text-anchor="middle" font-family="system-ui,sans-serif" font-size="16" font-weight="700" fill="#33415c">7 + 5 = ?</text>
+          <rect x="40" y="70" width="64" height="40" rx="8" fill="#fff8e7"/>
+          <text x="72" y="96" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#33415c">12</text>
+          <rect x="128" y="86" width="64" height="40" rx="8" fill="#e8f4ff"/>
+          <text x="160" y="112" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#33415c">11</text>
+          <rect x="216" y="60" width="64" height="40" rx="8" fill="#ffeef5"/>
+          <text x="248" y="86" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#33415c">13</text>
+          <rect x="132" y="150" width="56" height="30" rx="8" fill="#c97b2d"/>
+          <rect x="124" y="142" width="72" height="14" rx="6" fill="#a8621f"/>
+        </svg>
+      </div>
+      <p class="bb-preview__note">A friendly maths game — no sign-up needed, works on phones and laptops.</p>
+      <button type="button" class="btn btn--primary btn--lg" id="bbPlay">&#9654; Play Brain Basket</button>
+      <noscript>
+        <p class="bb-preview__note">Brain Basket needs JavaScript to play. The rest of this page works just fine without it!</p>
+      </noscript>
+    </div>
+  </div>
+</section>
+
 <!-- ═══ CTA ═════════════════════════════════════════════════════════════════ -->
 <section class="section">
   <div class="container">
@@ -298,6 +331,33 @@
 <button class="back-to-top" aria-label="Back to top">&#8593;</button>
 
 <script src="js/main.js"></script>
+<script>
+// Brain Basket loads only when the visitor taps Play — zero cost on first load.
+(function () {
+  var root = document.getElementById('brainBasket');
+  var btn = document.getElementById('bbPlay');
+  if (!root || !btn) return;
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    btn.textContent = 'Warming up the basket…';
+    var s = document.createElement('script');
+    s.src = 'js/brain-basket.js';
+    s.onload = function () {
+      if (window.BrainBasket && window.BrainBasket.boot) {
+        window.BrainBasket.boot(root);
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = '&#9654; Play Brain Basket';
+      }
+    };
+    s.onerror = function () {
+      btn.disabled = false;
+      btn.innerHTML = '&#9654; Play Brain Basket';
+    };
+    document.body.appendChild(s);
+  });
+})();
+</script>
 <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
 </body>
 </html>

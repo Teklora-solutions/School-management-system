@@ -57,6 +57,10 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
+    "drf_spectacular",
     "django_q",
     "axes",
 ]
@@ -78,6 +82,7 @@ LOCAL_APPS = [
     "apps.public",
     "apps.community",
     "apps.assistant",
+    "apps.api",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -236,6 +241,8 @@ SCHOOL_CURRENCY = env("SCHOOL_CURRENCY", default="GHS")  # ISO 4217 currency cod
 # ─── Django REST Framework ────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "apps.api.authentication.APIKeyAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -243,6 +250,48 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "api": "1000/hour",
+        "webhooks": "200/minute",
+        "auth": "20/minute",
+    },
+    "EXCEPTION_HANDLER": "apps.api.exceptions.api_exception_handler",
+}
+
+# ─── SimpleJWT ────────────────────────────────────────────────────────────────
+from datetime import timedelta  # noqa: E402
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+}
+
+# ─── DRF Spectacular (OpenAPI schema) ─────────────────────────────────────────
+SPECTACULAR_SETTINGS = {
+    "TITLE": env("SCHOOL_NAME", default="School Management System") + " API",
+    "DESCRIPTION": (
+        "REST API for external integrations. "
+        "Authenticate with an API key (Authorization: Token sk_…) "
+        "or a JWT (Authorization: Bearer …)."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": "/api/v1/",
 }
 
 # ─── Django-Q2 (background tasks via ORM broker) ─────────────────────────────
