@@ -989,6 +989,8 @@ def start_or_resume_attempt(*, quiz: Quiz, student) -> QuizAttempt:
     if not quiz.is_open_now:
         raise ValidationError("This quiz is not currently open.")
 
+    Quiz.objects.select_for_update().filter(pk=quiz.pk).exists()
+
     # Resume any existing in-progress attempt
     in_progress = QuizAttempt.objects.filter(
         quiz=quiz, student=student, submitted_at__isnull=True
@@ -1115,13 +1117,15 @@ def _mark_and_save(
     total_possible = sum(q.points for q in questions)
     total_earned = Decimal("0.00")
 
+    existing_answers = {
+        ans.question_id: ans
+        for ans in QuizAttemptAnswer.objects.filter(attempt=attempt)
+        .select_related("selected_choice")
+        .prefetch_related("selected_choices")
+    }
+
     for q in questions:
-        answer = (
-            QuizAttemptAnswer.objects.filter(attempt=attempt, question=q)
-            .select_related("selected_choice")
-            .prefetch_related("selected_choices")
-            .first()
-        )
+        answer = existing_answers.get(q.pk)
         if answer is None:
             answer = QuizAttemptAnswer.objects.create(
                 attempt=attempt,

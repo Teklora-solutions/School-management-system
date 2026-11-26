@@ -1,0 +1,57 @@
+
+      {% include "features/public/_editor_section.html" with section_id="photos" section_title="Gallery Photos" section_icon="bi-images" expanded=True %}
+        <div class="pe-photo-grid">
+          {% for photo in photos %}
+          <div class="pe-photo-item {% if not photo.is_published %}pe-photo-item--hidden{% endif %}">
+            <img src="{{ photo.image.url }}" alt="{{ photo.title }}" loading="lazy">
+            <div class="pe-photo-overlay">
+              <a href="{% url 'public_admin:gallery_edit' photo.pk %}" class="pe-item-btn pe-item-btn--sm" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+              <form method="post" action="{% url 'public_admin:gallery_publish' photo.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="{% if photo.is_published %}unpublish{% else %}publish{% endif %}">
+                <button type="submit" class="pe-item-btn pe-item-btn--sm" title="{% if photo.is_published %}Hide{% else %}Publish{% endif %}">
+                  <i class="bi bi-{% if photo.is_published %}eye{% else %}eye-slash{% endif %}" aria-hidden="true"></i>
+                </button>
+              </form>
+            </div>
+            <div class="pe-photo-title">{{ photo.title|truncatechars:20 }}</div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No photos yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:gallery_add' %}" class="pe-add-btn mt-2">
+          <i class="bi bi-plus-circle me-1"></i>Add photo
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Events on gallery page #}
+      {% include "features/public/_editor_section.html" with section_id="gallery_events" section_title="Upcoming Events" section_icon="bi-calendar-event" %}
+        <div class="pe-items-list">
+          {% for ev in event_items %}
+          <div class="pe-item">
+            <div class="pe-item__date-badge">
+              <span class="pe-item__date-day">{{ ev.day }}</span>
+              <span class="pe-item__date-month">{{ ev.month }}</span>
+            </div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ ev.title }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:event_edit' ev.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No events yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:event_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add event
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# ═══════════════ CONTACT PAGE SECTIONS ═══════════════════════════════ #}

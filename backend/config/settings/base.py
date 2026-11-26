@@ -99,6 +99,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",
+    "apps.accounts.middleware.ForcePasswordChangeMiddleware",
     "apps.core.middleware.RequestIDMiddleware",
     "apps.core.middleware.RequestTimingMiddleware",
     "apps.assistant.middleware.EscalationCheckMiddleware",
@@ -209,6 +210,13 @@ KNOWLEDGE_MEDIA_ROOT = Path(
 # docs/ai-assistant/security-and-privacy.md. Empty means no provider key can be
 # saved until an operator sets it.
 ASSISTANT_ENCRYPTION_KEY = env("ASSISTANT_ENCRYPTION_KEY", default="")
+
+# ─── Reverse proxy / rate-limit IP resolution ────────────────────────────────
+# Comma-separated list of trusted proxy IPs or CIDRs (e.g. 127.0.0.1,172.16.0.0/12).
+# Proxy headers (CF-Connecting-IP, X-Forwarded-For) are ignored unless REMOTE_ADDR
+# is in TRUSTED_PROXIES.
+TRUSTED_PROXIES = env.list("TRUSTED_PROXIES", default=[])
+TRUST_CF_CONNECTING_IP = env.bool("TRUST_CF_CONNECTING_IP", default=False)
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},

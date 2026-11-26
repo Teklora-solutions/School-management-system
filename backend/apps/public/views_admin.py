@@ -838,20 +838,25 @@ class PageEditorMixin(WebsiteAdminMixin):
             "public_url": self._public_url(),
         }
 
+    def _settings_section_form(self, fields, data=None, files=None, instance=None):
+        from django.forms import modelform_factory
+        from apps.core.models import SchoolSettings
+
+        widgets = {
+            f: w
+            for f, w in SchoolSettingsForm.Meta.widgets.items()
+            if f in fields
+        }
+        form_cls = modelform_factory(SchoolSettings, fields=list(fields), widgets=widgets)
+        return form_cls(data, files, instance=instance)
+
     def _handle_settings_post(self, request, fields):
         """Save a subset of SchoolSettings fields; return (saved:bool, form)."""
         instance = _settings_instance()
-        # Build a partial form containing only the posted fields
-        form = SchoolSettingsForm(
-            {f: request.POST.get(f, "") for f in SchoolSettingsForm.Meta.fields},
-            request.FILES,
-            instance=instance,
+        form = self._settings_section_form(
+            fields, data=request.POST, files=request.FILES, instance=instance
         )
-        # Only validate the subset we care about
         if form.is_valid():
-            for field in SchoolSettingsForm.Meta.fields:
-                if field not in fields:
-                    form.cleaned_data.pop(field, None)
             obj = form.save(commit=False)
             obj.save(update_fields=list(fields) + ["updated_at"])
             return True, form
@@ -862,22 +867,22 @@ class HomePageEditorView(PageEditorMixin, View):
     page_key = "home"
     public_url_name = "public:home"
 
-    def get(self, request):
-        instance = _settings_instance()
-        ctx = {
+    def _ctx(self, settings_form):
+        return {
             **self.get_base_ctx(),
-            "settings_form": SchoolSettingsForm(instance=instance),
+            "settings_form": settings_form,
             "hero_slides": HeroSlide.objects.all(),
             "feature_cards": FeatureCard.objects.all(),
             "testimonials": Testimonial.objects.all(),
             "event_items": EventItem.objects.all(),
         }
-        return render(request, self.template_name, ctx)
+
+    def get(self, request):
+        instance = _settings_instance()
+        return render(request, self.template_name, self._ctx(SchoolSettingsForm(instance=instance)))
 
     def post(self, request):
         section = request.POST.get("section", "")
-        instance = _settings_instance()
-
         HERO_FIELDS = [
             "hero_eyebrow", "hero_title", "hero_title_highlight",
             "hero_text", "hero_image",
@@ -885,31 +890,21 @@ class HomePageEditorView(PageEditorMixin, View):
         CTA_FIELDS = ["cta_title", "cta_text"]
 
         if section == "hero":
-            form = SchoolSettingsForm(request.POST, request.FILES, instance=instance)
-            if form.is_valid():
-                obj = form.save(commit=False)
-                obj.save(update_fields=HERO_FIELDS + ["updated_at"])
+            saved, form = self._handle_settings_post(request, HERO_FIELDS)
+            if saved:
                 messages.success(request, "Hero section updated.")
                 return redirect("public_admin:editor_home")
-            ctx = {
-                **self.get_base_ctx(),
-                "settings_form": form,
-                "hero_slides": HeroSlide.objects.all(),
-                "feature_cards": FeatureCard.objects.all(),
-                "testimonials": Testimonial.objects.all(),
-                "event_items": EventItem.objects.all(),
-            }
-            return render(request, self.template_name, ctx)
+            messages.error(request, "Please correct the errors in the hero section.")
+            return render(request, self.template_name, self._ctx(form))
 
         if section == "cta":
-            form = SchoolSettingsForm(request.POST, request.FILES, instance=instance)
-            if form.is_valid():
-                obj = form.save(commit=False)
-                obj.save(update_fields=CTA_FIELDS + ["updated_at"])
+            saved, form = self._handle_settings_post(request, CTA_FIELDS)
+            if saved:
                 messages.success(request, "CTA section updated.")
                 return redirect("public_admin:editor_home")
+            messages.error(request, "Please correct the errors in the CTA section.")
+            return render(request, self.template_name, self._ctx(form))
 
-        messages.success(request, "Saved.")
         return redirect("public_admin:editor_home")
 
 
@@ -917,26 +912,28 @@ class AboutPageEditorView(PageEditorMixin, View):
     page_key = "about"
     public_url_name = "public:about"
 
-    def get(self, request):
-        instance = _settings_instance()
-        ctx = {
+    def _ctx(self, settings_form):
+        return {
             **self.get_base_ctx(),
-            "settings_form": SchoolSettingsForm(instance=instance),
+            "settings_form": settings_form,
             "team_members": TeamMember.objects.all(),
             "timeline_events": TimelineEvent.objects.all(),
         }
-        return render(request, self.template_name, ctx)
+
+    def get(self, request):
+        instance = _settings_instance()
+        return render(request, self.template_name, self._ctx(SchoolSettingsForm(instance=instance)))
 
     def post(self, request):
         section = request.POST.get("section", "")
-        instance = _settings_instance()
         ABOUT_FIELDS = ["about", "mission", "vision", "values"]
         if section == "story":
-            form = SchoolSettingsForm(request.POST, request.FILES, instance=instance)
-            if form.is_valid():
-                obj = form.save(commit=False)
-                obj.save(update_fields=ABOUT_FIELDS + ["updated_at"])
+            saved, form = self._handle_settings_post(request, ABOUT_FIELDS)
+            if saved:
                 messages.success(request, "About story updated.")
+                return redirect("public_admin:editor_about")
+            messages.error(request, "Please correct the errors in the about story.")
+            return render(request, self.template_name, self._ctx(form))
         return redirect("public_admin:editor_about")
 
 
@@ -957,27 +954,29 @@ class ContactPageEditorView(PageEditorMixin, View):
     page_key = "contact"
     public_url_name = "public:contact"
 
-    def get(self, request):
-        instance = _settings_instance()
-        ctx = {
+    def _ctx(self, settings_form):
+        return {
             **self.get_base_ctx(),
-            "settings_form": SchoolSettingsForm(instance=instance),
+            "settings_form": settings_form,
             "faqs": FAQ.objects.all(),
             "admission_steps": AdmissionStep.objects.all(),
             "key_dates": KeyDate.objects.all(),
         }
-        return render(request, self.template_name, ctx)
+
+    def get(self, request):
+        instance = _settings_instance()
+        return render(request, self.template_name, self._ctx(SchoolSettingsForm(instance=instance)))
 
     def post(self, request):
         section = request.POST.get("section", "")
-        instance = _settings_instance()
         CONTACT_FIELDS = ["admissions_email", "office_hours", "address", "map_embed_url"]
         if section == "contact_details":
-            form = SchoolSettingsForm(request.POST, request.FILES, instance=instance)
-            if form.is_valid():
-                obj = form.save(commit=False)
-                obj.save(update_fields=CONTACT_FIELDS + ["updated_at"])
+            saved, form = self._handle_settings_post(request, CONTACT_FIELDS)
+            if saved:
                 messages.success(request, "Contact details updated.")
+                return redirect("public_admin:editor_contact")
+            messages.error(request, "Please correct the errors in the contact details.")
+            return render(request, self.template_name, self._ctx(form))
         return redirect("public_admin:editor_contact")
 
 

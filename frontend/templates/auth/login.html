@@ -1,8 +1,8 @@
 {% extends "public/base.html" %}
 {% load static core_extras %}
 
-{% block title %}{{ portal.heading }} Sign In | {{ identity.name|default:SCHOOL_NAME }}{% endblock %}
-{% block meta_description %}Sign in to the {{ portal.heading }} at {{ identity.name|default:SCHOOL_NAME }}.{% endblock %}
+{% block title %}Sign In | {{ identity.name|default:SCHOOL_NAME }}{% endblock %}
+{% block meta_description %}Sign in to {{ identity.name|default:SCHOOL_NAME }}.{% endblock %}
 {% block body_class %}auth-layout{% endblock %}
 
 {% block extra_css %}
@@ -13,13 +13,13 @@
 <div class="auth-page">
   <div class="auth-card">
 
-    {# Portal icon and heading #}
-    <div class="auth-card__icon" style="background:color-mix(in srgb,var(--pc-{{ portal.slug }}-color,var(--pub-accent)) 13%,transparent);color:var(--pc-{{ portal.slug }}-color,var(--pub-accent))">
-      <i class="bi {{ portal.icon }}" style="font-size:1.5rem" aria-hidden="true"></i>
+    {# School portal icon and heading #}
+    <div class="auth-card__icon" style="background:color-mix(in srgb,var(--pub-accent) 13%,transparent);color:var(--pub-accent)">
+      <i class="bi bi-shield-lock-fill" style="font-size:1.5rem" aria-hidden="true"></i>
     </div>
     <p style="text-align:center;font-size:var(--pub-text-xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--pub-accent);margin-bottom:var(--pub-sp-1)">{{ identity.name|default:SCHOOL_NAME }}</p>
-    <h1 class="auth-card__title">{{ portal.heading }}</h1>
-    <p class="auth-card__sub">{{ portal.blurb }}<br>Sign in with {{ portal.credential }}.</p>
+    <h1 class="auth-card__title">Sign In</h1>
+    <p class="auth-card__sub">Enter your staff email, parent username, or student admission number.</p>
 
     {# Non-field errors #}
     {% if form.non_field_errors %}
@@ -36,7 +36,7 @@
       {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
       <div class="auth-field">
-        <label for="id_login_username">{{ portal.field_label }}</label>
+        <label for="id_login_username">Email, username, or admission number</label>
         {{ form.username }}
         {% if form.username.errors %}
           <p class="auth-field__error">{{ form.username.errors.0 }}</p>
@@ -65,27 +65,9 @@
     </form>
 
     <p class="auth-recover">
-      {% if portal.self_reset %}
-        Forgot your password? <a href="{% url 'password_reset' %}">Reset it here</a>
-      {% else %}
-        Forgot your password? Ask the school administrator to reset it.
-      {% endif %}
+      Students &amp; parents: <a href="{% url 'password_reset' %}">Reset a forgotten password</a>.<br>
+      <span style="font-size:0.82em;color:var(--pub-muted)">Staff passwords are reset by the school administrator.</span>
     </p>
-
-    <div class="auth-switch">
-      <p class="auth-switch__label">Not your portal?</p>
-      <div class="auth-switch__links">
-        {% for other in other_portals %}
-          <a href="{% url 'accounts:role_login' other.slug %}{% if next %}?next={{ next|urlencode }}{% endif %}">{{ other.label }}</a>
-        {% endfor %}
-      </div>
-      <a class="auth-back" href="{% url 'accounts:login' %}">
-        <span class="pub-icon pub-icon--sm" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/></svg>
-        </span>
-        All portals
-      </a>
-    </div>
 
   </div>
 </div>

@@ -1,0 +1,147 @@
+
+      {# Hero section #}
+      {% include "features/public/_editor_section.html" with section_id="hero" section_title="Hero Section" section_icon="bi-image" expanded=True %}
+        <form method="post" enctype="multipart/form-data" class="pe-section-form">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="hero">
+          {% include "features/public/_editor_field.html" with field_name="hero_eyebrow" field_label="Eyebrow text" field_type="text" field_value=settings_form.hero_eyebrow.value placeholder="e.g. Welcome to Nairobi Academy" %}
+          {% include "features/public/_editor_field.html" with field_name="hero_title" field_label="Main title" field_type="text" field_value=settings_form.hero_title.value placeholder="e.g. Where Curiosity Meets" %}
+          {% include "features/public/_editor_field.html" with field_name="hero_title_highlight" field_label="Title highlight (accent word)" field_type="text" field_value=settings_form.hero_title_highlight.value placeholder="e.g. Opportunity" %}
+          {% include "features/public/_editor_field.html" with field_name="hero_text" field_label="Hero paragraph" field_type="textarea" field_value=settings_form.hero_text.value %}
+          {% include "features/public/_editor_field.html" with field_name="hero_image" field_label="Background image" field_type="file" %}
+          <button type="submit" class="pe-save-btn">
+            <i class="bi bi-check2 me-1"></i>Save Hero
+          </button>
+        </form>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Hero slides #}
+      {% include "features/public/_editor_section.html" with section_id="slides" section_title="Carousel Slides" section_icon="bi-collection" %}
+        <div class="pe-items-list">
+          {% for slide in hero_slides %}
+          <div class="pe-item">
+            <img src="{{ slide.image.url }}" alt="{{ slide.title }}" class="pe-item__thumb">
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ slide.title }}</div>
+              <div class="pe-item__meta">{{ slide.caption|default:"No caption"|truncatechars:40 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:hero_edit' slide.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+              <form method="post" action="{% url 'public_admin:hero_toggle' slide.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="{% if slide.is_active %}deactivate{% else %}activate{% endif %}">
+                <button type="submit" class="pe-item-btn {% if not slide.is_active %}pe-item-btn--muted{% endif %}" title="{% if slide.is_active %}Hide{% else %}Show{% endif %}">
+                  <i class="bi bi-{% if slide.is_active %}eye{% else %}eye-slash{% endif %}" aria-hidden="true"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No slides yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:hero_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add slide
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Why Choose Us #}
+      {% include "features/public/_editor_section.html" with section_id="features" section_title="Why Choose Us Cards" section_icon="bi-card-checklist" %}
+        <div class="pe-items-list">
+          {% for card in feature_cards %}
+          <div class="pe-item">
+            <div class="pe-item__icon-badge" style="background:var(--accent-glow);color:var(--accent-light);width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+              {% if card.icon %}{{ card.icon }}{% else %}<i class="bi bi-card-text"></i>{% endif %}
+            </div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ card.title }}</div>
+              <div class="pe-item__meta">{{ card.text|truncatechars:50 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:feature_edit' card.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No cards yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:feature_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add card
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Testimonials #}
+      {% include "features/public/_editor_section.html" with section_id="testimonials" section_title="Testimonials" section_icon="bi-chat-quote" %}
+        <div class="pe-items-list">
+          {% for t in testimonials %}
+          <div class="pe-item">
+            {% if t.avatar %}
+            <img src="{{ t.avatar.url }}" alt="{{ t.author_name }}" class="pe-item__thumb pe-item__thumb--round">
+            {% else %}
+            <div class="pe-item__avatar">{{ t.author_name|first }}</div>
+            {% endif %}
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ t.author_name }}</div>
+              <div class="pe-item__meta">{{ t.quote|truncatechars:50 }}</div>
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:testimonial_edit' t.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No testimonials yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:testimonial_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add testimonial
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# Events #}
+      {% include "features/public/_editor_section.html" with section_id="events" section_title="Events Preview" section_icon="bi-calendar-event" %}
+        <div class="pe-items-list">
+          {% for ev in event_items %}
+          <div class="pe-item">
+            <div class="pe-item__date-badge">
+              <span class="pe-item__date-day">{{ ev.day }}</span>
+              <span class="pe-item__date-month">{{ ev.month }}</span>
+            </div>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ ev.title }}</div>
+              {% if ev.description %}<div class="pe-item__meta">{{ ev.description|truncatechars:50 }}</div>{% endif %}
+            </div>
+            <div class="pe-item__actions">
+              <a href="{% url 'public_admin:event_edit' ev.pk %}" class="pe-item-btn" title="Edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No events yet.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'public_admin:event_add' %}" class="pe-add-btn">
+          <i class="bi bi-plus-circle me-1"></i>Add event
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# CTA Band #}
+      {% include "features/public/_editor_section.html" with section_id="cta" section_title="Call-to-Action Band" section_icon="bi-megaphone" %}
+        <form method="post" class="pe-section-form">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="cta">
+          {% include "features/public/_editor_field.html" with field_name="cta_title" field_label="CTA title" field_type="text" field_value=settings_form.cta_title.value %}
+          {% include "features/public/_editor_field.html" with field_name="cta_text" field_label="CTA text" field_type="textarea" field_value=settings_form.cta_text.value %}
+          <button type="submit" class="pe-save-btn">
+            <i class="bi bi-check2 me-1"></i>Save CTA
+          </button>
+        </form>
+      {% include "features/public/_editor_section_end.html" %}
+
+      {# ═══════════════ ABOUT PAGE SECTIONS ═════════════════════════════════ #}

@@ -100,7 +100,7 @@
 
   {# Title + body #}
   <h1 class="cmty-post-full__title">{{ post.title }}</h1>
-  <div class="cmty-post-full__body">{{ post.body|linebreaks }}</div>
+  <div class="cmty-post-full__body">{{ post.body|safe|linebreaksbr }}</div>
 
   {# Reactions row — hidden until the post is live #}
   {% if post.status == 'published' %}

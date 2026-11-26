@@ -24,6 +24,7 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import TemplateView, View
 
 from apps.core.mixins import RoleRequiredMixin
@@ -232,7 +233,7 @@ class PostDetailView(CommunityGateMixin, CommunityContextMixin, TemplateView):
             )
             ctx["can_remove_post"] = (
                 post.author_id == user.pk
-                or getattr(user, "role", "") in ("admin", "director")
+                or getattr(user, "role", "") == "admin"
             )
         return ctx
 
@@ -447,13 +448,13 @@ class ConsentView(CommunityGateMixin, LoginRequiredMixin, TemplateView):
         ctx["identity"] = site_identity(self.request)
         ctx["nav_links"] = nav_links(self.request)
         ctx["cs"] = _community_settings(self.request)
-        ctx["next"] = self.request.GET.get("next", reverse("community:home"))
+        ctx["next"] = _safe_next(self.request, self.request.GET.get("next"), reverse("community:home"))
         return ctx
 
     def post(self, request):
         if request.POST.get("consent") == "yes":
             services.grant_consent(request.user)
-            next_url = request.POST.get("next", reverse("community:home"))
+            next_url = _safe_next(request, request.POST.get("next"), reverse("community:home"))
             return redirect(next_url)
         return redirect(reverse("community:home"))
 
@@ -825,8 +826,37 @@ class DirectThreadView(CommunityGateMixin, CommunityContextMixin, LoginRequiredM
 
 # ─── Admin: moderation queue (M3) ────────────────────────────────────────────
 
+def _safe_next(request, candidate: str | None, fallback: str) -> str:
+    if candidate and url_has_allowed_host_and_scheme(
+        candidate, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return candidate
+    return fallback
+
+
+def _safe_int(value, default: int, *, min_value: int | None = None) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    if min_value is not None and parsed < min_value:
+        return default
+    return parsed
+
+
 class AdminRequiredMixin(RoleRequiredMixin):
     allowed_roles = ["admin", "director"]
+
+
+class AdminWriteMixin(RoleRequiredMixin):
+    """Moderation and configuration mutations are restricted to admins; directors are read-only."""
+
+    allowed_roles = ["admin"]
+
+
+def _require_admin_write(request) -> None:
+    if getattr(request.user, "role", "") != "admin" and not request.user.is_superuser:
+        raise PermissionDenied("Directors have read-only community access.")
 
 
 class ModQueueView(AdminRequiredMixin, TemplateView):
@@ -851,7 +881,7 @@ class ModQueueView(AdminRequiredMixin, TemplateView):
         return ctx
 
 
-class PostApproveView(AdminRequiredMixin, View):
+class PostApproveView(AdminWriteMixin, View):
     def post(self, request, pk):
         post = get_object_or_404(Post, pk=pk)
         try:
@@ -864,7 +894,7 @@ class PostApproveView(AdminRequiredMixin, View):
         return redirect(reverse("community:admin_queue"))
 
 
-class PostRestoreView(AdminRequiredMixin, View):
+class PostRestoreView(AdminWriteMixin, View):
     def post(self, request, pk):
         post = get_object_or_404(Post, pk=pk)
         try:
@@ -877,17 +907,17 @@ class PostRestoreView(AdminRequiredMixin, View):
         return redirect(reverse("community:admin_queue"))
 
 
-class PostPinView(AdminRequiredMixin, View):
+class PostPinView(AdminWriteMixin, View):
     def post(self, request, pk):
         post = get_object_or_404(Post, pk=pk)
-        pin_order = int(request.POST.get("pin_order", 0))
+        pin_order = _safe_int(request.POST.get("pin_order", 0), 0, min_value=0)
         services.pin_post(actor=request.user, post=post, pin_order=pin_order, request=request)
         if _wants_json(request):
             return JsonResponse({"ok": True})
         return redirect(reverse("community:post_detail", args=[pk]))
 
 
-class PostUnpinView(AdminRequiredMixin, View):
+class PostUnpinView(AdminWriteMixin, View):
     def post(self, request, pk):
         post = get_object_or_404(Post, pk=pk)
         services.unpin_post(actor=request.user, post=post, request=request)
@@ -896,7 +926,7 @@ class PostUnpinView(AdminRequiredMixin, View):
         return redirect(reverse("community:post_detail", args=[pk]))
 
 
-class PostLockView(AdminRequiredMixin, View):
+class PostLockView(AdminWriteMixin, View):
     def post(self, request, pk):
         post = get_object_or_404(Post, pk=pk)
         action = request.POST.get("action", "lock")
@@ -909,7 +939,7 @@ class PostLockView(AdminRequiredMixin, View):
         return redirect(reverse("community:post_detail", args=[pk]))
 
 
-class PostMoveView(AdminRequiredMixin, View):
+class PostMoveView(AdminWriteMixin, View):
     def post(self, request, pk):
         post = get_object_or_404(Post, pk=pk)
         new_cat_slug = request.POST.get("category", "")
@@ -921,7 +951,7 @@ class PostMoveView(AdminRequiredMixin, View):
 
 # ─── Admin: warnings (M3) ────────────────────────────────────────────────────
 
-class IssueWarningView(AdminRequiredMixin, View):
+class IssueWarningView(AdminWriteMixin, View):
     def post(self, request):
         from apps.accounts.models import User
         recipient_pk = request.POST.get("recipient_pk")
@@ -947,10 +977,10 @@ class IssueWarningView(AdminRequiredMixin, View):
         if _wants_json(request):
             return JsonResponse({"ok": True})
         messages.success(request, f"Warning issued to {recipient.get_full_name() or recipient.username}.")
-        return redirect(request.POST.get("next", reverse("community:admin_queue")))
+        return redirect(_safe_next(request, request.POST.get("next"), reverse("community:admin_queue")))
 
 
-class LiftWarningView(AdminRequiredMixin, View):
+class LiftWarningView(AdminWriteMixin, View):
     def post(self, request, pk):
         warning = get_object_or_404(Warning, pk=pk)
         reason = request.POST.get("reason", "")
@@ -962,7 +992,7 @@ class LiftWarningView(AdminRequiredMixin, View):
         if _wants_json(request):
             return JsonResponse({"ok": True})
         messages.success(request, "Warning lifted.")
-        return redirect(request.POST.get("next", reverse("community:admin_queue")))
+        return redirect(_safe_next(request, request.POST.get("next"), reverse("community:admin_queue")))
 
 
 # ─── Admin: appeals (M3) ─────────────────────────────────────────────────────
@@ -994,7 +1024,7 @@ class AdminAppealView(AdminRequiredMixin, TemplateView):
 
 # ─── Admin: reports (M3) ─────────────────────────────────────────────────────
 
-class ResolveReportView(AdminRequiredMixin, View):
+class ResolveReportView(AdminWriteMixin, View):
     def post(self, request, pk):
         report = get_object_or_404(Report, pk=pk)
         resolution = request.POST.get("resolution", "dismissed")
@@ -1012,21 +1042,21 @@ class ResolveReportView(AdminRequiredMixin, View):
 
 # ─── Admin: mute / suspend (M3) ──────────────────────────────────────────────
 
-class MuteUserView(AdminRequiredMixin, View):
+class MuteUserView(AdminWriteMixin, View):
     def post(self, request):
         from apps.accounts.models import User
         user = get_object_or_404(User, pk=request.POST.get("user_pk"))
-        hours = int(request.POST.get("hours", 24))
+        hours = _safe_int(request.POST.get("hours", 24), 24, min_value=1)
         reason = request.POST.get("reason", "")
         services.mute_user(actor=request.user, user=user,
                            duration_hours=hours, reason=reason, request=request)
         if _wants_json(request):
             return JsonResponse({"ok": True})
         messages.success(request, f"Posting paused for {user.get_full_name() or user.username}.")
-        return redirect(request.POST.get("next", reverse("community:admin_queue")))
+        return redirect(_safe_next(request, request.POST.get("next"), reverse("community:admin_queue")))
 
 
-class UnmuteUserView(AdminRequiredMixin, View):
+class UnmuteUserView(AdminWriteMixin, View):
     def post(self, request):
         from apps.accounts.models import User
         user = get_object_or_404(User, pk=request.POST.get("user_pk"))
@@ -1034,24 +1064,24 @@ class UnmuteUserView(AdminRequiredMixin, View):
         if _wants_json(request):
             return JsonResponse({"ok": True})
         messages.success(request, "Posting re-enabled.")
-        return redirect(request.POST.get("next", reverse("community:admin_queue")))
+        return redirect(_safe_next(request, request.POST.get("next"), reverse("community:admin_queue")))
 
 
-class SuspendUserView(AdminRequiredMixin, View):
+class SuspendUserView(AdminWriteMixin, View):
     def post(self, request):
         from apps.accounts.models import User
         user = get_object_or_404(User, pk=request.POST.get("user_pk"))
-        days = int(request.POST.get("days", 7))
+        days = _safe_int(request.POST.get("days", 7), 7, min_value=1)
         reason = request.POST.get("reason", "")
         services.suspend_user(actor=request.user, user=user,
                               duration_days=days, reason=reason, request=request)
         if _wants_json(request):
             return JsonResponse({"ok": True})
         messages.success(request, f"Community access paused for {user.get_full_name() or user.username}.")
-        return redirect(request.POST.get("next", reverse("community:admin_queue")))
+        return redirect(_safe_next(request, request.POST.get("next"), reverse("community:admin_queue")))
 
 
-class UnsuspendUserView(AdminRequiredMixin, View):
+class UnsuspendUserView(AdminWriteMixin, View):
     def post(self, request):
         from apps.accounts.models import User
         user = get_object_or_404(User, pk=request.POST.get("user_pk"))
@@ -1059,7 +1089,7 @@ class UnsuspendUserView(AdminRequiredMixin, View):
         if _wants_json(request):
             return JsonResponse({"ok": True})
         messages.success(request, "Community access restored.")
-        return redirect(request.POST.get("next", reverse("community:admin_queue")))
+        return redirect(_safe_next(request, request.POST.get("next"), reverse("community:admin_queue")))
 
 
 # ─── Admin: word filter (M3) ─────────────────────────────────────────────────
@@ -1075,6 +1105,7 @@ class WordFilterView(AdminRequiredMixin, TemplateView):
         return ctx
 
     def post(self, request):
+        _require_admin_write(request)
         action = request.POST.get("action")
         if action == "add":
             word = request.POST.get("word", "").strip().lower()
@@ -1121,6 +1152,7 @@ class DelegationView(AdminRequiredMixin, TemplateView):
         return ctx
 
     def post(self, request):
+        _require_admin_write(request)
         action = request.POST.get("action")
         category = get_object_or_404(Category, pk=request.POST.get("category_pk"))
         if action == "assign":
@@ -1154,7 +1186,7 @@ class InsightsView(AdminRequiredMixin, TemplateView):
 
 # ─── Admin: data management (M3) ─────────────────────────────────────────────
 
-class AnonymiseUserView(AdminRequiredMixin, View):
+class AnonymiseUserView(AdminWriteMixin, View):
     def post(self, request):
         from apps.accounts.models import User
         user = get_object_or_404(User, pk=request.POST.get("user_pk"))
@@ -1166,7 +1198,7 @@ class AnonymiseUserView(AdminRequiredMixin, View):
             f"Content anonymised: {summary['posts_anonymised']} posts, "
             f"{summary['comments_anonymised']} comments.",
         )
-        return redirect(request.POST.get("next", reverse("community:admin_queue")))
+        return redirect(_safe_next(request, request.POST.get("next"), reverse("community:admin_queue")))
 
 
 class ExportUserContentView(AdminRequiredMixin, View):
@@ -1213,18 +1245,19 @@ class CategoryAdminEditView(AdminRequiredMixin, View):
 
     def get(self, request, pk=None):
         from django.shortcuts import render
-        category = Category.objects.get(pk=pk) if pk else None
+        category = get_object_or_404(Category, pk=pk) if pk else None
         return render(request, self.template_name, self._get_ctx(request, category))
 
     def post(self, request, pk=None):
-        category = Category.objects.get(pk=pk) if pk else None
+        _require_admin_write(request)
+        category = get_object_or_404(Category, pk=pk) if pk else None
         data = {
             "name": request.POST.get("name", ""),
             "icon": request.POST.get("icon", ""),
             "description": request.POST.get("description", ""),
             "visibility": request.POST.get("visibility", Category.Visibility.PUBLIC),
             "allowed_roles": request.POST.getlist("allowed_roles"),
-            "display_order": int(request.POST.get("display_order", 0)),
+            "display_order": _safe_int(request.POST.get("display_order", 0), 0, min_value=0),
             "is_active": request.POST.get("is_active") == "on",
             "staff_post_only": request.POST.get("staff_post_only") == "on",
         }

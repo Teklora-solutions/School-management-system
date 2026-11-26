@@ -48,16 +48,13 @@
       </div>
 
       <div class="col-12 col-lg-3">
-        <h2 class="footer-heading">Sign in to a portal</h2>
-        <ul class="footer-links footer-links--portals">
-          {% for portal in portal_links %}
-          <li>
-            <a href="{{ portal.url }}">
-              <i class="bi {{ portal.icon }} me-2" aria-hidden="true"></i>{{ portal.label }}
-            </a>
-          </li>
-          {% endfor %}
-        </ul>
+        <h2 class="footer-heading">Portal Sign In</h2>
+        <p class="footer-motto">
+          Students, parents, teachers, finance, director &amp; administration.
+        </p>
+        <a class="btn btn-outline-light btn-sm" href="{% url 'accounts:login' %}">
+          <i class="bi bi-shield-lock-fill me-1" aria-hidden="true"></i>Sign in
+        </a>
       </div>
 
       <div class="col-12 col-lg-3">

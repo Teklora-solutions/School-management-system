@@ -20,10 +20,24 @@ from django.core.checks import Error, register
 
 @register()
 def assistant_encryption_key_check(app_configs, **kwargs):
-    if (getattr(settings, "ASSISTANT_ENCRYPTION_KEY", "") or "").strip():
-        return []
-
+    from . import crypto
     from .models import AssistantSettings, ProviderConfig
+
+    if crypto.is_configured():
+        try:
+            crypto._multi()
+            return []
+        except crypto.EncryptionUnavailable as exc:
+            return [
+                Error(
+                    str(exc),
+                    hint=(
+                        "Run `python manage.py assistant_make_key`, put the printed value in the "
+                        "server environment as ASSISTANT_ENCRYPTION_KEY, and restart."
+                    ),
+                    id="assistant.E001",
+                )
+            ]
 
     try:
         has_saved_keys = ProviderConfig.objects.exclude(api_key_ciphertext="").exists()

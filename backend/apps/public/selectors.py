@@ -23,7 +23,6 @@ from django.utils import timezone
 
 from apps.academics.models import AcademicYear, SchoolClass, Subject, Term
 from apps.accounts.models import User
-from apps.accounts.portals import PORTALS
 from apps.core.selectors import school_settings_row, school_settings_values
 from apps.students.models import Student
 
@@ -171,22 +170,15 @@ def nav_links(request) -> list[dict]:
 
 
 def portal_links() -> list[dict]:
-    """
-    The six sign-in doors, read out of ``accounts.portals.PORTALS``.
-
-    That registry is already the single source for the chooser and the
-    role-pinned login pages, so a portal added or renamed there shows up in
-    this footer without a second list to keep in step.
-    """
+    """Single unified school portal sign-in link for the public footer."""
     return [
         {
-            "slug": portal.slug,
-            "label": portal.label,
-            "blurb": portal.blurb,
-            "icon": portal.icon,
-            "url": reverse("accounts:role_login", kwargs={"role": portal.slug}),
+            "slug": "portal",
+            "label": "Portal Sign In",
+            "blurb": "Sign in for students, parents, teachers, finance, director & admin.",
+            "icon": "bi-shield-lock-fill",
+            "url": reverse("accounts:login"),
         }
-        for portal in PORTALS.values()
     ]
 
 

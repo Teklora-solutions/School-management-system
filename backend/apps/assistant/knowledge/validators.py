@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.utils.deconstruct import deconstructible
 
 MAX_KNOWLEDGE_FILE_MB = 20
+MAX_DOCX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 
 KIND_PDF = "pdf"
 KIND_DOCX = "docx"
@@ -46,7 +47,10 @@ def _sniff(file) -> str:
     if header.startswith(b"PK\x03\x04"):
         try:
             with zipfile.ZipFile(file) as archive:
-                if "word/document.xml" in archive.namelist():
+                infos = archive.infolist()
+                if sum(info.file_size for info in infos) > MAX_DOCX_UNCOMPRESSED_BYTES:
+                    return "unknown"
+                if any(info.filename == "word/document.xml" for info in infos):
                     return KIND_DOCX
         except (zipfile.BadZipFile, OSError):
             return "unknown"

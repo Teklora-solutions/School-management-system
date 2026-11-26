@@ -59,10 +59,9 @@ def _enquiry_bucket(request) -> str:
     token = _signed_visitor(request)
     if token:
         return f"public-enquiry:{token}"
-    address = (
-        request.META.get("HTTP_CF_CONNECTING_IP")
-        or request.META.get("REMOTE_ADDR", "")
-    )
+    from apps.core.http import get_client_ip
+
+    address = get_client_ip(request)
     digest = hashlib.sha256(address.encode()).hexdigest()[:20]
     return f"public-enquiry:ip:{digest}"
 

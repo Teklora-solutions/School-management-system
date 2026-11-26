@@ -168,6 +168,10 @@ class ClassSubjectForm(forms.ModelForm):
         school_class = cleaned.get("school_class")
         subject = cleaned.get("subject")
         stream = cleaned.get("stream")
+        if stream and school_class and stream.school_class_id != school_class.pk:
+            self.add_error(
+                "stream", f"{stream.name} does not belong to {school_class.name}."
+            )
         if school_class and subject:
             clash = ClassSubject.objects.filter(
                 school_class=school_class, subject=subject, stream=stream

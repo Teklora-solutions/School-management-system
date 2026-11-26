@@ -5,11 +5,11 @@ Root URL configuration. Each app registers its own urls under a namespace.
 """
 
 from apps.accounts.views import (
-    PortalChooserView,
     PublicPasswordResetCompleteView,
     PublicPasswordResetConfirmView,
     PublicPasswordResetDoneView,
     StaffBlockedPasswordResetView,
+    UnifiedLoginView,
 )
 from apps.core.health import LivenessView
 from django.conf import settings
@@ -36,7 +36,7 @@ urlpatterns = [
     # /login/ — one answer wherever a redirect or a bookmark arrives.
     path(
         "accounts/login/",
-        PortalChooserView.as_view(),
+        UnifiedLoginView.as_view(),
         name="login_default",
     ),
     # Django auth: provides password_reset/done/, reset/<uidb64>/<token>/,

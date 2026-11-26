@@ -1,0 +1,27 @@
+
+      {% include "features/public/_editor_section.html" with section_id="live_data" section_title="Live Academic Data" section_icon="bi-mortarboard" expanded=True %}
+        <div class="pe-info-box">
+          <i class="bi bi-info-circle me-1" style="color:var(--color-info);" aria-hidden="true"></i>
+          The Academics page pulls live data from the school database. It updates automatically when you add classes, subjects or terms in the Academics section.
+        </div>
+        <div class="pe-items-list mt-2">
+          {% for year in academic_years %}
+          <div class="pe-item">
+            <i class="bi bi-calendar3 pe-item__icon" aria-hidden="true"></i>
+            <div class="pe-item__info">
+              <div class="pe-item__title">{{ year.name }}</div>
+              <div class="pe-item__meta">{{ year.start_date|date:"M Y" }} – {{ year.end_date|date:"M Y" }}</div>
+            </div>
+            <a href="{% url 'academics:year_detail' year.pk %}" class="pe-item-btn" title="Manage" target="_blank">
+              <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+            </a>
+          </div>
+          {% empty %}
+          <p class="pe-empty">No academic years found.</p>
+          {% endfor %}
+        </div>
+        <a href="{% url 'academics:year_list' %}" class="pe-add-btn" target="_blank">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Manage in Academics
+        </a>
+      {% include "features/public/_editor_section_end.html" %}
+

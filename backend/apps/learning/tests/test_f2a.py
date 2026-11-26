@@ -511,6 +511,8 @@ class BestAnswerNotificationTests(TestCase):
         cls.subj = make_subject("BASUBJ", "BA Subject")
         ClassSubject.objects.create(school_class=cls.sc, subject=cls.subj)
         cls.teacher_user, cls.teacher = make_teacher("ba_teacher", "BA-001")
+        cls.sc.class_teacher = cls.teacher_user
+        cls.sc.save(update_fields=["class_teacher"])
         TeacherAssignment.objects.create(
             teacher=cls.teacher, school_class=cls.sc,
             subject=cls.subj, academic_year=cls.year,
@@ -733,6 +735,8 @@ class DigestTaskTests(TestCase):
         cls.subj = make_subject("DGSUBJ", "Digest Subject")
         ClassSubject.objects.create(school_class=cls.sc, subject=cls.subj)
         cls.teacher_user, cls.teacher = make_teacher("dg_teacher", "DG-001")
+        cls.sc.class_teacher = cls.teacher_user
+        cls.sc.save(update_fields=["class_teacher"])
         TeacherAssignment.objects.create(
             teacher=cls.teacher, school_class=cls.sc,
             subject=cls.subj, academic_year=cls.year,

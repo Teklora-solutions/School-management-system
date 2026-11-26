@@ -19,7 +19,10 @@ def assistant_notices(request):
 
     state = getattr(request, "assistant_notice_state", None)
     if state is None:
-        state = alerts.page_state()
+        try:
+            state = alerts.page_state()
+        except Exception:  # never break a page over the notice banner
+            state = {}
 
     data: dict = {}
     is_admin = role == "admin" or (user.is_superuser and not role)

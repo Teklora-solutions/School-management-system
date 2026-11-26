@@ -39,6 +39,7 @@ class EscalationCheckMiddleware:
                     request.assistant_notice_state = alerts.refresh_page_state()
                 except Exception:  # never break a page over the check
                     log.exception("Assistant safeguarding escalation check failed")
+                    request.assistant_notice_state = cache.get(alerts.PAGE_STATE_KEY) or {}
             else:
                 request.assistant_notice_state = cache.get(alerts.PAGE_STATE_KEY)
         return self.get_response(request)

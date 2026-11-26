@@ -97,14 +97,22 @@ def _extract_pdf(document) -> str:
 
 
 def _extract_docx(document) -> str:
+    import zipfile
+
     from docx import Document as DocxDocument
     from docx.oxml.ns import qn
     from docx.table import Table
     from docx.text.paragraph import Paragraph
 
+    from .validators import MAX_DOCX_UNCOMPRESSED_BYTES
+
     if not document.file:
         raise ExtractionError("This document has no file to read.")
     try:
+        with zipfile.ZipFile(document.file) as archive:
+            if sum(info.file_size for info in archive.infolist()) > MAX_DOCX_UNCOMPRESSED_BYTES:
+                raise ExtractionError("This Word document expands beyond the allowed size limit.")
+        document.file.seek(0)
         docx_document = DocxDocument(document.file)
         parts: list[str] = []
         body = docx_document.element.body
@@ -177,7 +185,7 @@ def fetch_url(url: str) -> str:
     if not current:
         raise ExtractionError("This web page has no address.")
 
-    with httpx.Client(follow_redirects=False, timeout=FETCH_TIMEOUT) as client:
+    with httpx.Client(follow_redirects=False, trust_env=False, timeout=FETCH_TIMEOUT) as client:
         for _ in range(MAX_REDIRECTS + 1):
             _check_public_address(current)
             try:

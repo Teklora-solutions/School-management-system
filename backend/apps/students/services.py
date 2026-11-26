@@ -315,11 +315,14 @@ def update_student(
                 }
             )
 
-    if current_stream and current_class and current_stream.school_class_id != current_class.pk:
+    if current_stream and (
+        current_class is None or current_stream.school_class_id != current_class.pk
+    ):
         raise ValidationError(
             {
                 "current_stream": f"{current_stream.name} is not a stream of "
-                f"{current_class.name}; pick a stream from that class or clear it."
+                f"{current_class.name if current_class else 'the selected class'}; "
+                "pick a stream from that class or clear it."
             }
         )
 
@@ -1176,6 +1179,7 @@ def preview_promotion(
 
 
 @transaction.atomic
+@transaction.atomic
 def commit_promotion(
     *,
     from_year: AcademicYear,
@@ -1195,6 +1199,9 @@ def commit_promotion(
     that batch are written to a new batch. Decisions for pupils already in a
     committed batch are not changed here — reverse that batch first.
     """
+    from apps.academics.models import AcademicYear
+
+    AcademicYear.objects.select_for_update().filter(pk=from_year.pk).exists()
     preview = preview_promotion(
         from_year=from_year,
         to_year=to_year,
@@ -1320,6 +1327,7 @@ def commit_promotion(
 
 
 @transaction.atomic
+@transaction.atomic
 def reverse_promotion(
     *,
     batch: PromotionBatch,
@@ -1328,6 +1336,7 @@ def reverse_promotion(
     request: HttpRequest | None = None,
 ) -> PromotionBatch:
     """Put every pupil in the batch back in the class, stream and status they left."""
+    batch = PromotionBatch.objects.select_for_update().get(pk=batch.pk)
     if not batch.is_committed or batch.is_reversed:
         raise ValidationError("Only a committed promotion can be reversed.")
     if not reason.strip():
@@ -1348,7 +1357,20 @@ def reverse_promotion(
             | Q(batch__committed_at=batch.committed_at, batch_id__gt=batch.pk)
         )
     )
-    if later.exists():
+    later_batch = (
+        PromotionBatch.objects.filter(
+            from_year=batch.from_year,
+            to_year=batch.to_year,
+            is_committed=True,
+            is_reversed=False,
+        )
+        .exclude(pk=batch.pk)
+        .filter(
+            Q(committed_at__gt=batch.committed_at)
+            | Q(committed_at=batch.committed_at, pk__gt=batch.pk)
+        )
+    )
+    if later.exists() or later_batch.exists():
         raise ValidationError(
             "A later promotion moved some of these pupils. Reverse that batch first."
         )

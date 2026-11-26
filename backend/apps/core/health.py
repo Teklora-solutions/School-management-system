@@ -116,7 +116,3 @@ class ReadinessView(View):
                 status=503,
             )
         return JsonResponse({"status": "ok", "checks": checks})
-
-
-# Keep backward-compatible alias so existing /healthz/ URL still works
-HealthCheckView = ReadinessView

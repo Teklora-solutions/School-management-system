@@ -409,16 +409,33 @@
       var optBtn = el('si-mem-optin-btn');
       var forgetBtn = el('si-mem-forget-btn');
       if (!status) return;
+      status.textContent = '';
+      var p = document.createElement('p');
+      p.className = 'text-muted-sm';
+      p.style.fontSize = '0.78rem';
       if (data.opted_in) {
-        status.innerHTML = '<p class="text-muted-sm" style="font-size:0.78rem;">' +
-          'Memory is <strong style="color:var(--color-success);">on</strong>. ' +
-          (data.prefer_language === 'sw' ? 'Language: Kiswahili. ' : 'Language: English. ') +
-          (data.recurring_summary ? 'Note: ' + data.recurring_summary : '') +
-          '</p>';
+        p.appendChild(document.createTextNode('Memory is '));
+        var strong = document.createElement('strong');
+        strong.style.color = 'var(--color-success)';
+        strong.textContent = 'on';
+        p.appendChild(strong);
+        p.appendChild(document.createTextNode('. '));
+        p.appendChild(document.createTextNode(
+          data.prefer_language === 'sw' ? 'Language: Kiswahili. ' : 'Language: English. '
+        ));
+        if (data.recurring_summary) {
+          p.appendChild(document.createTextNode('Note: ' + data.recurring_summary));
+        }
+        status.appendChild(p);
         if (optBtn) optBtn.textContent = 'Turn off memory';
         if (forgetBtn) forgetBtn.hidden = false;
       } else {
-        status.innerHTML = '<p class="text-muted-sm" style="font-size:0.78rem;">Memory is <strong>off</strong>.</p>';
+        p.appendChild(document.createTextNode('Memory is '));
+        var offStrong = document.createElement('strong');
+        offStrong.textContent = 'off';
+        p.appendChild(offStrong);
+        p.appendChild(document.createTextNode('.'));
+        status.appendChild(p);
         if (optBtn) optBtn.textContent = 'Turn on memory';
         if (forgetBtn) forgetBtn.hidden = true;
       }

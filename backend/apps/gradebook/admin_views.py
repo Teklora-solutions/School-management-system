@@ -116,23 +116,25 @@ class AdminGradebookSetupListView(AdminRequiredMixin, GradebookEnabledMixin, Tem
 
         rows = []
         if selected_term:
-            setups = (
+            setups = list(
                 GradebookSetup.objects.filter(term=selected_term)
                 .select_related(
                     "school_class", "subject", "stream", "exam_sheet__exam"
                 )
                 .order_by("school_class__level_order", "school_class__name", "subject__name")
             )
+            sheets_by_key: dict[tuple[int, int], list] = {}
+            for sheet in (
+                ResultSheet.objects.filter(term=selected_term)
+                .select_related("exam")
+                .order_by("exam__order", "pk")
+            ):
+                sheets_by_key.setdefault(
+                    (sheet.school_class_id, sheet.subject_id), []
+                ).append(sheet)
             for setup in setups:
-                # Candidate result sheets: same class + subject + term
-                candidates = list(
-                    ResultSheet.objects.filter(
-                        school_class=setup.school_class,
-                        subject=setup.subject,
-                        term=selected_term,
-                    )
-                    .select_related("exam")
-                    .order_by("exam__order", "pk")
+                candidates = sheets_by_key.get(
+                    (setup.school_class_id, setup.subject_id), []
                 )
                 rows.append({"setup": setup, "candidates": candidates})
         ctx["rows"] = rows

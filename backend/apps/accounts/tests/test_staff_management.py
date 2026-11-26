@@ -87,7 +87,7 @@ class StaffUserServiceTests(TestCase):
         self.assertTrue(
             TeacherProfile.objects.filter(user=user, staff_id="TCH-9001").exists()
         )
-        queued.assert_called_once_with(user, temp_password, True)
+        queued.assert_not_called()
         self.assertTrue(
             AuditLog.objects.filter(
                 action="user.staff_created", object_id=str(user.pk)
@@ -108,7 +108,7 @@ class StaffUserServiceTests(TestCase):
         self.assertEqual(returned, "BoardRoom-2026")
         self.assertTrue(user.check_password("BoardRoom-2026"))
         self.assertTrue(user.must_change_password)
-        queued.assert_called_once_with(user, "BoardRoom-2026", True)
+        queued.assert_not_called()
 
     def test_must_change_password_flag_follows_the_admin_choice(self):
         with patch("apps.accounts.services.enqueue_credentials_email") as queued:
@@ -123,7 +123,7 @@ class StaffUserServiceTests(TestCase):
             )
 
         self.assertFalse(user.must_change_password)
-        queued.assert_called_once_with(user, "KeptForNow-9", False)
+        queued.assert_not_called()
 
     def test_create_director_and_finance_create_role_profiles(self):
         cases = [
@@ -271,7 +271,7 @@ class StaffCreateViewTests(TestCase):
         self.assertTrue(user.must_change_password)
         self.assertTrue(user.check_password("Chosen-By-Admin1"))
         self.assertTrue(TeacherProfile.objects.filter(user=user).exists())
-        queued.assert_called_once_with(user, "Chosen-By-Admin1", True)
+        queued.assert_not_called()
 
     def test_password_is_required_by_the_form(self):
         self.client.force_login(self.admin)

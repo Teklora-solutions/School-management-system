@@ -176,7 +176,7 @@ class StudentResultsView(StudentOrParentMixin, TemplateView):
                         "release_date": entry["release"].created_at,
                         "exam_sheet_linked": entry["setup"].exam_sheet_id is not None,
                     }
-            except Exception:  # noqa: BLE001 — gradebook feature may be disabled
+            except (ImportError, ModuleNotFoundError):  # gradebook app may be absent
                 gradebook_data = {}
 
         ctx.update(
@@ -412,12 +412,15 @@ class ClassTeacherBroadsheetView(TeacherRequiredMixin, TemplateView):
 
     def _homeroom_class(self):
         """The class this teacher is the class teacher of, or None."""
+        if hasattr(self, "_cached_homeroom_class"):
+            return self._cached_homeroom_class
         from apps.academics.models import SchoolClass
         from apps.academics.selectors import get_current_year
         year = get_current_year()
         if year is None:
+            self._cached_homeroom_class = None
             return None
-        return (
+        self._cached_homeroom_class = (
             SchoolClass.objects.filter(
                 academic_year=year,
                 class_teacher=self.request.user,
@@ -425,6 +428,7 @@ class ClassTeacherBroadsheetView(TeacherRequiredMixin, TemplateView):
             .select_related("academic_year")
             .first()
         )
+        return self._cached_homeroom_class
 
     def dispatch(self, request, *args, **kwargs):
         response = super().dispatch(request, *args, **kwargs)
@@ -442,7 +446,6 @@ class ClassTeacherBroadsheetView(TeacherRequiredMixin, TemplateView):
         homeroom = self._homeroom_class()
 
         from apps.academics.models import Term
-        from apps.academics.selectors import get_current_year
 
         year = homeroom.academic_year
         years = [year]  # teacher sees only their own class's year

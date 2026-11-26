@@ -1016,15 +1016,15 @@ class JournalLine(BaseModel):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(debit_amount__gte=0),
+                condition=models.Q(debit_amount__gte=0),
                 name="finance_jl_debit_nonneg",
             ),
             models.CheckConstraint(
-                check=models.Q(credit_amount__gte=0),
+                condition=models.Q(credit_amount__gte=0),
                 name="finance_jl_credit_nonneg",
             ),
             models.CheckConstraint(
-                check=~(models.Q(debit_amount__gt=0) & models.Q(credit_amount__gt=0)),
+                condition=~(models.Q(debit_amount__gt=0) & models.Q(credit_amount__gt=0)),
                 name="finance_jl_one_sided",
             ),
         ]
@@ -1400,7 +1400,7 @@ class FinancialPeriod(BaseModel):
                 name="finance_period_one_row_per_term",
             ),
             models.CheckConstraint(
-                check=models.Q(end_date__gte=models.F("start_date")),
+                condition=models.Q(end_date__gte=models.F("start_date")),
                 name="finance_period_dates_ordered",
             ),
         ]

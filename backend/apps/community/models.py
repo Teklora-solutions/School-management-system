@@ -52,7 +52,7 @@ class Category(BaseModel):
     slug = models.SlugField(max_length=60, unique=True)
     name = models.CharField(max_length=80)
     icon = models.CharField(
-        max_length=10,
+        max_length=40,
         blank=True,
         help_text="Bootstrap Icons class, e.g. 'bi-megaphone'. Shown on the pill.",
     )
@@ -491,7 +491,7 @@ class DirectConversation(BaseModel):
                 name="uniq_community_direct_pair",
             ),
             models.CheckConstraint(
-                check=models.Q(user_a__lt=models.F("user_b")),
+                condition=models.Q(user_a__lt=models.F("user_b")),
                 name="community_direct_pair_ordered",
             ),
         ]

@@ -9,8 +9,7 @@ from . import views
 app_name = "accounts"
 
 urlpatterns = [
-    path("login/", views.PortalChooserView.as_view(), name="login"),
-    path("login/<slug:role>/", views.RoleLoginView.as_view(), name="role_login"),
+    path("login/", views.UnifiedLoginView.as_view(), name="login"),
     path("logout/", views.LogoutView.as_view(), name="logout"),
     # Must keep its own path: "/" belongs to the public site (config/urls.py
     # includes apps.public first), so a root-mounted stub would resolve to the
