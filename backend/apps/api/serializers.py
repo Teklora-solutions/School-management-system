@@ -200,14 +200,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
         max_digits=14, decimal_places=2, coerce_to_string=True
     )
     amount_paid = serializers.DecimalField(
-        source="amount_paid",
         max_digits=14,
         decimal_places=2,
         coerce_to_string=True,
         read_only=True,
     )
     amount_outstanding = serializers.DecimalField(
-        source="amount_outstanding",
         max_digits=14,
         decimal_places=2,
         coerce_to_string=True,

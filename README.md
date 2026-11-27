@@ -12,6 +12,8 @@ No Docker, no JS build step, no managed services required — it runs on one sma
 - **Licence:** [LICENSE](LICENSE) — proprietary, all rights reserved. Owned by
   **Teklora Solutions** ([https://teklora.co.ke/](https://teklora.co.ke/))
 - **Deeper reference:** [docs/SYSTEM_GUIDE.md](docs/SYSTEM_GUIDE.md) (architecture handbook),
+  [docs/api/README.md](docs/api/README.md) (API reference),
+  [docs/api/integration-guide.md](docs/api/integration-guide.md) (external developer integration guide),
   [docs/performance.md](docs/performance.md), [docs/decisions/observability.md](docs/decisions/observability.md)
 
 ---

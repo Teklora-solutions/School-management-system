@@ -62,12 +62,12 @@ urlpatterns = [
     path("schema/", SpectacularAPIView.as_view(), name="api-schema"),
     path(
         "schema/swagger-ui/",
-        SpectacularSwaggerView.as_view(url_name="api-v1:api-schema"),
+        SpectacularSwaggerView.as_view(url_name="api_v1:api-schema"),
         name="swagger-ui",
     ),
     path(
         "schema/redoc/",
-        SpectacularRedocView.as_view(url_name="api-v1:api-schema"),
+        SpectacularRedocView.as_view(url_name="api_v1:api-schema"),
         name="redoc",
     ),
     # JWT auth

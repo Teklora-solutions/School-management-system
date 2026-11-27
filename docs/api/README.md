@@ -8,6 +8,9 @@ touching the HTML interface.
 interactive Swagger UI, or `/api/v1/schema/redoc/` for the ReDoc layout. Both are generated
 automatically from the code and are always current.
 
+**New to integrating?** Start with the **[Integration guide](integration-guide.md)** — it's written
+for external developers and covers every pattern with working code examples in Python, Node.js and PHP.
+
 ---
 
 ## Contents
